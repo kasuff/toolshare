@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  MODERATOR
+  MANAGER
+}
+
+enum ToolStatus {
+  AVAILABLE
+  REQUESTED
+  BORROWED
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  RETURNED
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  address       String
+  role          Role           @default(USER)
+  createdAt     DateTime       @default(now())
+  tools         Tool[]
+  bookings      Booking[]
+  workshops     Workshop[]
+  notifications Notification[]
+  reports       Report[]       @relation("ReporterReports")
+  ratingsGiven  Rating[]       @relation("RatingsGiven")
+  ratingsReceived Rating[]     @relation("RatingsReceived")
+}
+
+model Tool {
+  id          String     @id @default(uuid())
+  ownerId     String
+  name        String
+  description String
+  category    String
+  status      ToolStatus @default(AVAILABLE)
+  createdAt   DateTime   @default(now())
+  owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+}
+
+model Workshop {
+  id          String     @id @default(uuid())
+  managerId   String
+  name        String
+  description String
+  location    String
+  maxCapacity Int
+  manager     User       @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  timeslots   TimeSlot[]
+}
+
+model TimeSlot {
+  id         String    @id @default(uuid())
+  workshopId String
+  startTime  DateTime
+  endTime    DateTime
+  workshop   Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+}
+
+model Booking {
+  id         String        @id @default(uuid())
+  userId     String
+  toolId     String?
+  timeslotId String?
+  status     BookingStatus @default(PENDING)
+  startDate  DateTime
+  endDate    DateTime
+  pickupTime DateTime?
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool       Tool?         @relation(fields: [toolId], references: [id], onDelete: SetNull)
+  timeslot   TimeSlot?     @relation(fields: [timeslotId], references: [id], onDelete: SetNull)
+  reports    Report[]
+  ratings    Rating[]
+
+  @@index([toolId, startDate, endDate])
+  @@index([timeslotId])
+}
+
+model Rating {
+  id         String   @id @default(uuid())
+  bookingId  String
+  fromUserId String
+  toUserId   String
+  score      Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromUser   User     @relation("RatingsGiven", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("RatingsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, fromUserId, toUserId])
+  @@index([toUserId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id           String       @id @default(uuid())
+  reporterId   String
+  bookingId    String?
+  reason       String
+  details      String?
+  status       ReportStatus @default(OPEN)
+  moderatorId  String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  reporter     User         @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  booking      Booking?     @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+}

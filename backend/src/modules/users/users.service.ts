@@ -1,0 +1,57 @@
+import { AppError } from "../../utils/app-error";
+import { usersRepository } from "./users.repository";
+
+export const usersService = {
+  listUsers(filters: { role?: "USER" | "MODERATOR" | "MANAGER"; search?: string }) {
+    return usersRepository.listPublic(filters);
+  },
+
+  async getMyProfile(userId: string) {
+    const user = await usersRepository.findByIdPublic(userId);
+    if (!user) {
+      throw new AppError("USER_NOT_FOUND", "User not found", 404);
+    }
+    return user;
+  },
+
+  async getById(userId: string) {
+    const user = await usersRepository.findByIdPublic(userId);
+    if (!user) {
+      throw new AppError("USER_NOT_FOUND", "User not found", 404);
+    }
+    return user;
+  },
+
+  async updateMyProfile(input: { userId: string; name?: string; address?: string }) {
+    const existing = await usersRepository.findByIdPublic(input.userId);
+    if (!existing) {
+      throw new AppError("USER_NOT_FOUND", "User not found", 404);
+    }
+
+    return usersRepository.updateProfile(input.userId, {
+      name: input.name,
+      address: input.address
+    });
+  },
+
+  async updateRole(input: {
+    targetUserId: string;
+    role: "USER" | "MODERATOR" | "MANAGER";
+    actorId: string;
+  }) {
+    const existing = await usersRepository.findByIdPublic(input.targetUserId);
+    if (!existing) {
+      throw new AppError("USER_NOT_FOUND", "User not found", 404);
+    }
+
+    if (input.actorId === input.targetUserId && input.role !== "MANAGER") {
+      throw new AppError(
+        "INVALID_ROLE_CHANGE",
+        "Managers cannot downgrade themselves through this endpoint",
+        400
+      );
+    }
+
+    return usersRepository.updateRole(input.targetUserId, input.role);
+  }
+};
