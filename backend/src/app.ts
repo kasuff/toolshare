@@ -7,6 +7,10 @@ import { authRouter } from "./modules/auth/auth.routes";
 import { bookingsRouter } from "./modules/bookings/bookings.routes";
 import { moderationRouter } from "./modules/moderation/moderation.routes";
 import { notificationsRouter } from "./modules/notifications/notifications.routes";
+import { ratingsRouter } from "./modules/ratings/ratings.routes";
+import { toolsRouter } from "./modules/tools/tools.routes";
+import { usersRouter } from "./modules/users/users.routes";
+import { workshopsRouter } from "./modules/workshops/workshops.routes";
 
 export const createApp = () => {
   const app = express();
@@ -24,6 +28,10 @@ export const createApp = () => {
   app.use("/api/bookings", bookingsRouter);
   app.use("/api/notifications", notificationsRouter);
   app.use("/api/moderation", moderationRouter);
+  app.use("/api/users", usersRouter);
+  app.use("/api/tools", toolsRouter);
+  app.use("/api/workshops", workshopsRouter);
+  app.use("/api/ratings", ratingsRouter);
 
   app.use(errorHandler);
 

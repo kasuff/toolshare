@@ -46,6 +46,8 @@ model User {
   workshops     Workshop[]
   notifications Notification[]
   reports       Report[]       @relation("ReporterReports")
+  ratingsGiven  Rating[]       @relation("RatingsGiven")
+  ratingsReceived Rating[]     @relation("RatingsReceived")
 }
 
 model Tool {
@@ -93,9 +95,26 @@ model Booking {
   tool       Tool?         @relation(fields: [toolId], references: [id], onDelete: SetNull)
   timeslot   TimeSlot?     @relation(fields: [timeslotId], references: [id], onDelete: SetNull)
   reports    Report[]
+  ratings    Rating[]
 
   @@index([toolId, startDate, endDate])
   @@index([timeslotId])
+}
+
+model Rating {
+  id         String   @id @default(uuid())
+  bookingId  String
+  fromUserId String
+  toUserId   String
+  score      Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromUser   User     @relation("RatingsGiven", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("RatingsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, fromUserId, toUserId])
+  @@index([toUserId])
 }
 
 model Notification {
