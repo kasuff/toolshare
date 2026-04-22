@@ -20,21 +20,21 @@ workshopsRouter.get("/:id", validate(workshopIdParamSchema), workshopsController
 workshopsRouter.post(
   "/",
   requireAuth,
-  requireRole("MANAGER"),
+  requireRole("MANAGER", "USER"),
   validate(createWorkshopSchema),
   workshopsController.create
 );
 workshopsRouter.patch(
   "/:id",
   requireAuth,
-  requireRole("MANAGER"),
+  requireRole("MANAGER", "USER"),
   validate(updateWorkshopSchema),
   workshopsController.update
 );
 workshopsRouter.delete(
   "/:id",
   requireAuth,
-  requireRole("MANAGER"),
+  requireRole("MANAGER", "USER"),
   validate(workshopIdParamSchema),
   workshopsController.remove
 );
@@ -42,14 +42,14 @@ workshopsRouter.delete(
 workshopsRouter.post(
   "/:id/timeslots",
   requireAuth,
-  requireRole("MANAGER"),
+  requireRole("MANAGER", "USER"),
   validate(createTimeslotSchema),
   workshopsController.createTimeslot
 );
 workshopsRouter.delete(
   "/:id/timeslots/:timeslotId",
   requireAuth,
-  requireRole("MANAGER"),
+  requireRole("MANAGER", "USER"),
   validate(removeTimeslotSchema),
   workshopsController.removeTimeslot
 );

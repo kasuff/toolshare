@@ -11,6 +11,7 @@ import {
 export const bookingsRouter = Router();
 
 bookingsRouter.use(requireAuth);
+bookingsRouter.get("/me", bookingsController.listMine);
 bookingsRouter.post("/tool", validate(createToolBookingSchema), bookingsController.createToolBooking);
 bookingsRouter.post("/workshop", validate(createWorkshopBookingSchema), bookingsController.createWorkshopBooking);
 bookingsRouter.patch("/:id/status", validate(updateBookingStatusSchema), bookingsController.updateStatus);

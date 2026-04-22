@@ -3,6 +3,11 @@ import { asyncHandler } from "../../utils/async-handler";
 import { bookingsService } from "./bookings.service";
 
 export const bookingsController = {
+  listMine: asyncHandler(async (req: Request, res: Response) => {
+    const bookings = await bookingsService.listForUserContext(req.authUser!.userId);
+    res.status(200).json(bookings);
+  }),
+
   createToolBooking: asyncHandler(async (req: Request, res: Response) => {
     const booking = await bookingsService.createToolBooking({
       requesterId: req.authUser!.userId,

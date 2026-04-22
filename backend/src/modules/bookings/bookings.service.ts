@@ -3,6 +3,10 @@ import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
 
 export const bookingsService = {
+  listForUserContext(userId: string) {
+    return bookingsRepository.listForUserContext(userId);
+  },
+
   async createToolBooking(input: {
     requesterId: string;
     toolId: string;
