@@ -56,7 +56,9 @@ toolshare/
 ├── shared/                 # Gemeinsame TypeScript Types
 │   └── types/
 │
-├── docker-compose.yml
+├── docker-compose.yml           # Development (Hot Reload, Volumes)
+├── docker-compose.prod.yml      # Produktionsnahes Setup ohne Mounts
+├── k8s/                         # Kubernetes Manifeste (No-Budget Setup)
 └── .gitignore
 ```
 
@@ -77,14 +79,27 @@ toolshare/
 git clone https://gitlab.lrz.de/swe2_if/team06/toolshare.git
 cd toolshare
 
-# Alle Services starten (Frontend, Backend, DB)
-docker compose up
+# Alle Services starten (Frontend, Backend, DB) - Development
+docker compose up --build
+
+# Produktionsnahes Setup lokal testen
+POSTGRES_PASSWORD=toolshare JWT_SECRET=change-me docker compose -f docker-compose.prod.yml up --build
 
 # Oder einzeln:
 # Frontend:  http://localhost:3000
 # Backend:   http://localhost:4000
 # DB:        localhost:5432
 ```
+
+### Kubernetes Deployment (ohne Managed DB)
+
+Im Verzeichnis `k8s/` liegen die Basismanifeste für ein self-hosted Deployment auf HMKube:
+
+- PostgreSQL mit persistentem Volume
+- Prisma-Migrationsjob
+- Backup-CronJob (`pg_dump`)
+- Frontend/Backend Deployments und Services
+- Ingress für `/` und `/api`
 
 ---
 
