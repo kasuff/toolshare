@@ -1,0 +1,241 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap");
+
+:root {
+  --ink: #1f2933;
+  --muted: #52606d;
+  --surface: #ffffff;
+  --surface-soft: #f7faf9;
+  --line: #d2dbe2;
+  --brand: #0f766e;
+  --brand-deep: #115e59;
+  --brand-warm: #f59e0b;
+  --radius: 14px;
+
+  font-family: "Manrope", "Trebuchet MS", "Lucida Grande", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at 10% -10%, #dff8f2 0%, #f3f7fa 48%, #eef2f6 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Fraunces", "Palatino Linotype", serif;
+  letter-spacing: 0.2px;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  background: linear-gradient(120deg, #083344, #0f766e 65%, #14b8a6);
+  color: #fff;
+  padding: 0.9rem 1rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.logo {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.nav a {
+  color: #e6fffb;
+  text-decoration: none;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+}
+
+.nav a.active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.role-switcher {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.2rem 1rem 2rem;
+}
+
+.session-info {
+  background: #ecfdf5;
+  padding: 0.7rem;
+  border-radius: 10px;
+  border: 1px solid #b7ebd8;
+}
+
+.hero {
+  background: linear-gradient(130deg, #ffffff, #f8fffd 45%, #ebfffb);
+  border: 1px solid #ccebe2;
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 12px 28px -22px rgba(6, 95, 70, 0.5);
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--brand-deep);
+  margin: 0 0 0.25rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 10px 30px -26px rgba(17, 24, 39, 0.8);
+}
+
+.form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+input,
+textarea,
+select {
+  border: 1px solid #b9cbd6;
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  background: #fff;
+}
+
+textarea {
+  min-height: 80px;
+}
+
+.field-label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.field-label span {
+  font-weight: 700;
+  color: #334e68;
+}
+
+button,
+.button-link {
+  border: 1px solid var(--brand-deep);
+  background: var(--brand);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+button.ghost,
+.ghost-link {
+  background: #fff;
+  color: var(--brand-deep);
+}
+
+button.mini {
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem;
+  box-shadow: 0 10px 30px -26px rgba(17, 24, 39, 0.8);
+}
+
+.card img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.inbox-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
+  padding: 0.6rem;
+  background: var(--surface-soft);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  padding: 0.4rem;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+}
