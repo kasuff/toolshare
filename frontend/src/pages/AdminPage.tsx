@@ -1,29 +1,43 @@
-import { useMemo, useState } from "react";
-import { api } from "../services/mockApi";
+import { useEffect, useState } from "react";
+import { api } from "../services/api";
 import type { Role, User } from "../types/domain";
 
 type Props = {
   currentUser: User;
+  token: string;
 };
 
-export function AdminPage({ currentUser }: Props) {
-  const users = useMemo(() => api.getUsers(), [currentUser.id]);
-  const metrics = useMemo(() => api.getMetrics(), [currentUser.id]);
-  const [rules, setRules] = useState(api.getRules());
+export function AdminPage({ token }: Props) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [metrics, setMetrics] = useState({
+    users: 0,
+    tools: 0,
+    workshops: 0,
+    openBookings: 0,
+    openReports: 0
+  });
 
-  const updateRole = (userId: string, role: Role) => {
-    api.updateUserRole(userId, role);
-    window.location.reload();
+  const loadData = async () => {
+    try {
+      const [nextUsers, nextMetrics] = await Promise.all([api.listUsers(token), api.getMetrics(token)]);
+      setUsers(nextUsers);
+      setMetrics(nextMetrics);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Admin-Daten konnten nicht geladen werden.");
+    }
   };
 
-  const toggleSuspended = (userId: string) => {
-    api.toggleUserSuspended(userId);
-    window.location.reload();
-  };
+  useEffect(() => {
+    void loadData();
+  }, [token]);
 
-  const saveRule = (id: string, text: string) => {
-    api.updateRule(id, text);
-    setRules(api.getRules());
+  const updateRole = async (userId: string, role: Role) => {
+    try {
+      await api.updateUserRole(userId, role, token);
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Rolle konnte nicht aktualisiert werden.");
+    }
   };
 
   return (
@@ -63,32 +77,11 @@ export function AdminPage({ currentUser }: Props) {
                   </select>
                 </td>
                 <td>{u.isSuspended ? "Gesperrt" : "Aktiv"}</td>
-                <td>
-                  <button className="ghost" onClick={() => toggleSuspended(u.id)}>
-                    {u.isSuspended ? "Entsperren" : "Sperren"}
-                  </button>
-                </td>
+                <td>-</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="panel">
-        <h2>Systemregeln</h2>
-        {rules.map((r) => (
-          <div key={r.id} className="row">
-            <input
-              value={r.text}
-              onChange={(e) =>
-                setRules((prev) =>
-                  prev.map((it) => (it.id === r.id ? { ...it, text: e.target.value } : it)),
-                )
-              }
-            />
-            <button onClick={() => saveRule(r.id, r.text)}>Speichern</button>
-          </div>
-        ))}
       </div>
     </section>
   );

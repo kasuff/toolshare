@@ -1,28 +1,37 @@
-import { useMemo, useState } from "react";
-import { api } from "../services/mockApi";
+import { useEffect, useState } from "react";
+import { api } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
   currentUser: User;
+  token: string;
 };
 
-export function ModerationPage({ currentUser }: Props) {
-  const [decisionByReport, setDecisionByReport] = useState<Record<string, string>>({});
-  const [selectedRating, setSelectedRating] = useState("");
+export function ModerationPage({ token }: Props) {
+  const [reports, setReports] = useState<Array<{ id: string; reason: string; details?: string; status: string }>>([]);
+  const [ratings, setRatings] = useState<Array<{ id: string; score: number; comment?: string; createdAt: string; fromUser?: { name?: string } }>>([]);
 
-  const reports = useMemo(() => api.getReports(), [currentUser.id]);
-  const ratings = useMemo(() => api.getRatings(), [currentUser.id]);
-
-  const resolve = (id: string) => {
-    const note = decisionByReport[id] || "Moderiert ohne Zusatzkommentar";
-    api.resolveReport(id, note);
-    window.location.reload();
+  const loadData = async () => {
+    try {
+      const [nextReports, nextRatings] = await Promise.all([api.listReports(token), api.getRatingsReceived(token)]);
+      setReports(nextReports);
+      setRatings(nextRatings);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Moderationsdaten konnten nicht geladen werden.");
+    }
   };
 
-  const moderateRating = () => {
-    if (!selectedRating) return;
-    api.moderateRating(selectedRating);
-    window.location.reload();
+  useEffect(() => {
+    void loadData();
+  }, [token]);
+
+  const resolve = async (id: string) => {
+    try {
+      await api.updateReportStatus(id, "RESOLVED", token);
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Report konnte nicht aktualisiert werden.");
+    }
   };
 
   return (
@@ -37,21 +46,14 @@ export function ModerationPage({ currentUser }: Props) {
             {reports.map((r) => (
               <li key={r.id} className="inbox-item">
                 <p>
-                  <strong>{r.targetType}</strong> | {r.reason} | Status: {r.status}
+                  <strong>Report</strong> | {r.reason} | Status: {r.status}
                 </p>
-                {r.status === "OFFEN" && (
+                {r.details && <p>{r.details}</p>}
+                {(r.status === "OPEN" || r.status === "IN_REVIEW") && (
                   <div className="row">
-                    <input
-                      placeholder="Entscheidungsnotiz"
-                      value={decisionByReport[r.id] || ""}
-                      onChange={(e) =>
-                        setDecisionByReport((prev) => ({ ...prev, [r.id]: e.target.value }))
-                      }
-                    />
-                    <button onClick={() => resolve(r.id)}>Als bearbeitet markieren</button>
+                    <button onClick={() => void resolve(r.id)}>Als bearbeitet markieren</button>
                   </div>
                 )}
-                {r.decisionNote && <p>Notiz: {r.decisionNote}</p>}
               </li>
             ))}
           </ul>
@@ -59,18 +61,19 @@ export function ModerationPage({ currentUser }: Props) {
       </div>
 
       <div className="panel">
-        <h2>Bewertungen prüfen</h2>
-        <select value={selectedRating} onChange={(e) => setSelectedRating(e.target.value)}>
-          <option value="">Bewertung auswählen</option>
+        <h2>Bewertungen (eingehend)</h2>
+        {ratings.length === 0 ? (
+          <p>Keine Bewertungen vorhanden.</p>
+        ) : (
+          <ul>
           {ratings.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.id} | Score {r.score} | {r.status}
-            </option>
+            <li key={r.id}>
+              {new Date(r.createdAt).toLocaleString()} | Score {r.score} | von {r.fromUser?.name ?? "Unbekannt"}
+              {r.comment ? ` | "${r.comment}"` : ""}
+            </li>
           ))}
-        </select>
-        <button onClick={moderateRating} className="ghost">
-          Bewertung moderieren
-        </button>
+          </ul>
+        )}
       </div>
     </section>
   );
