@@ -25,6 +25,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    command: sh -c "npx prisma db push && node dist/index.js"
     restart: unless-stopped
 
   db:

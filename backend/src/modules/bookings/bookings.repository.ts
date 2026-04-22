@@ -2,6 +2,19 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 
 export const bookingsRepository = {
+  listForUserContext(userId: string) {
+    return prisma.booking.findMany({
+      where: {
+        OR: [{ userId }, { tool: { ownerId: userId } }]
+      },
+      include: {
+        tool: true,
+        timeslot: true
+      },
+      orderBy: { startDate: "desc" }
+    });
+  },
+
   findToolById(toolId: string) {
     return prisma.tool.findUnique({ where: { id: toolId } });
   },
