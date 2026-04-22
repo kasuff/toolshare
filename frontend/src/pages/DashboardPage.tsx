@@ -1,12 +1,6 @@
-﻿import { Link } from "react-router-dom";
-import { resetDb } from "../services/storage";
+import { Link } from "react-router-dom";
 
 export function DashboardPage() {
-  const resetTestData = () => {
-    resetDb();
-    window.location.reload();
-  };
-
   return (
     <section>
       <div className="hero">
@@ -45,11 +39,8 @@ export function DashboardPage() {
       </div>
 
       <div className="panel">
-        <h2>Testdaten</h2>
-        <p>Setzt lokale Beispieldaten zurück, damit du die Flows erneut testen kannst.</p>
-        <button className="ghost" onClick={resetTestData}>
-          Testdaten zurücksetzen
-        </button>
+        <h2>Hinweis</h2>
+        <p>Diese Oberfläche nutzt jetzt die echte REST-API und keine lokalen Mockdaten mehr.</p>
       </div>
     </section>
   );

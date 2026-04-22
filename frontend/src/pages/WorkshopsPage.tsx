@@ -1,30 +1,48 @@
-﻿import { useMemo, useState } from "react";
-import { api } from "../services/mockApi";
+import { useEffect, useState } from "react";
+import { api } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
   currentUser: User;
+  token: string;
 };
 
-export function WorkshopsPage({ currentUser }: Props) {
+type WorkshopListItem = Awaited<ReturnType<typeof api.getWorkshops>>[number] & {
+  tools: Array<{ id: string; name: string; selectable: boolean }>;
+};
+
+export function WorkshopsPage({ token }: Props) {
   const [q, setQ] = useState("");
   const [toolFilter, setToolFilter] = useState("");
+  const [items, setItems] = useState<WorkshopListItem[]>([]);
 
-  const items = useMemo(() => api.getWorkshops({ q, toolFilter }), [q, toolFilter]);
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const workshops = await api.getWorkshops({ q }, token);
+        const mapped = workshops.map(({ workshop, slots }) => ({
+          workshop,
+          slots,
+          tools: []
+        }));
+        const filtered = toolFilter
+          ? mapped.filter((item) => item.workshop.name.toLowerCase().includes(toolFilter.toLowerCase()))
+          : mapped;
+        setItems(filtered);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : "Werkstätten konnten nicht geladen werden.");
+      }
+    };
+    void run();
+  }, [q, toolFilter, token]);
 
-  const bookWorkshop = (workshopId: string, slotId: string) => {
-    const created = api.createWorkshopBooking({
-      requesterId: currentUser.id,
-      workshopId,
-      slotId,
-    });
-
-    if (!created) {
-      alert("Buchung fehlgeschlagen (ggf. blockierter oder bereits belegter Slot).");
-      return;
+  const bookWorkshop = async (_workshopId: string, slotId: string) => {
+    try {
+      await api.createWorkshopBooking({ slotId }, token);
+      alert("Werkstattbuchung erstellt.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Buchung fehlgeschlagen.");
     }
-
-    alert("Werkstattbuchung erstellt.");
   };
 
   return (
@@ -69,10 +87,9 @@ export function WorkshopsPage({ currentUser }: Props) {
             <ul>
               {slots.map((s) => (
                 <li key={s.id}>
-                  {new Date(s.startIso).toLocaleString()} - {new Date(s.endIso).toLocaleString()} {" "}
-                  {s.blockedByOwner ? "(blockiert)" : ""}
+                  {new Date(s.startIso).toLocaleString()} - {new Date(s.endIso).toLocaleString()}{" "}
                   {!s.blockedByOwner && (
-                    <button className="mini" onClick={() => bookWorkshop(workshop.id, s.id)}>
+                    <button className="mini" onClick={() => void bookWorkshop(workshop.id, s.id)}>
                       Buchen
                     </button>
                   )}

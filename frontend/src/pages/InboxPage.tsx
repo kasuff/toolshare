@@ -1,9 +1,10 @@
-﻿import { useMemo, useState } from "react";
-import { api } from "../services/mockApi";
+import { useEffect, useState } from "react";
+import { api } from "../services/api";
 import type { Booking, BookingStatus, BookingType, User } from "../types/domain";
 
 type Props = {
   currentUser: User;
+  token: string;
 };
 
 const bookingTypeLabel: Record<BookingType, string> = {
@@ -18,31 +19,45 @@ const bookingStatusLabel: Record<BookingStatus, string> = {
   ABGESCHLOSSEN: "Abgeschlossen",
 };
 
-export function InboxPage({ currentUser }: Props) {
-  const [altByBooking, setAltByBooking] = useState<Record<string, string>>({});
-  const bookings = useMemo(() => api.getBookingsForUser(currentUser.id), [currentUser.id]);
-  const notifications = useMemo(() => api.getNotifications(currentUser.id), [currentUser.id]);
+export function InboxPage({ currentUser, token }: Props) {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; message: string; createdIso: string }>>([]);
+
+  const loadData = async () => {
+    try {
+      const [bookingResult, notificationResult] = await Promise.all([
+        api.getBookingsForUser(token),
+        api.getNotifications(token)
+      ]);
+      setBookings(bookingResult);
+      setNotifications(notificationResult);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.");
+    }
+  };
+
+  useEffect(() => {
+    void loadData();
+  }, [token]);
 
   const isProvider = (b: Booking) => b.providerId === currentUser.id;
 
-  const decide = (bookingId: string, accept: boolean) => {
-    api.decideBooking(bookingId, accept ? "BESTAETIGT" : "ABGELEHNT");
-    window.location.reload();
-  };
-
-  const suggestAlternative = (bookingId: string) => {
-    const value = altByBooking[bookingId];
-    if (!value) {
-      alert("Bitte Alternativzeit eintragen.");
-      return;
+  const decide = async (bookingId: string, accept: boolean) => {
+    try {
+      await api.decideBooking(bookingId, accept ? "BESTAETIGT" : "ABGELEHNT", token);
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Status konnte nicht gesetzt werden.");
     }
-    api.suggestAlternativePickup(bookingId, value);
-    window.location.reload();
   };
 
-  const close = (bookingId: string) => {
-    api.closeBooking(bookingId);
-    window.location.reload();
+  const close = async (bookingId: string) => {
+    try {
+      await api.decideBooking(bookingId, "ABGESCHLOSSEN", token);
+      await loadData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Buchung konnte nicht abgeschlossen werden.");
+    }
   };
 
   return (
@@ -80,28 +95,14 @@ export function InboxPage({ currentUser }: Props) {
               )}
               {isProvider(b) && b.status === "OFFEN" && (
                 <div className="row">
-                  <button onClick={() => decide(b.id, true)}>Annehmen</button>
-                  <button className="ghost" onClick={() => decide(b.id, false)}>
+                  <button onClick={() => void decide(b.id, true)}>Annehmen</button>
+                  <button className="ghost" onClick={() => void decide(b.id, false)}>
                     Ablehnen
                   </button>
-                  {b.type === "TOOL" && (
-                    <>
-                      <input
-                        type="datetime-local"
-                        value={altByBooking[b.id] || ""}
-                        onChange={(e) =>
-                          setAltByBooking((prev) => ({ ...prev, [b.id]: e.target.value }))
-                        }
-                      />
-                      <button className="ghost" onClick={() => suggestAlternative(b.id)}>
-                        Alternativzeit senden
-                      </button>
-                    </>
-                  )}
                 </div>
               )}
               {b.status === "BESTAETIGT" && (
-                <button onClick={() => close(b.id)}>Als abgeschlossen markieren</button>
+                <button onClick={() => void close(b.id)}>Als abgeschlossen markieren</button>
               )}
             </li>
           ))}

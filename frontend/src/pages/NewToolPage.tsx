@@ -1,34 +1,39 @@
-﻿import { useState, type FormEvent } from "react";
-import { api } from "../services/mockApi";
+import { useState, type FormEvent } from "react";
+import { api } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
   currentUser: User;
+  token: string;
 };
 
-export function NewToolPage({ currentUser }: Props) {
+export function NewToolPage({ token }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
-  const [imageUrl, setImageUrl] = useState("https://picsum.photos/seed/newtool/600/300");
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name || !description || !category || !imageUrl) {
+    if (!name || !description || !category) {
       alert("Bitte alle Felder ausfüllen.");
       return;
     }
-    api.createTool({
-      ownerId: currentUser.id,
-      name,
-      description,
-      category,
-      imageUrl,
-    });
-    setName("");
-    setDescription("");
-    setCategory("");
-    alert("Werkzeug angelegt.");
+    try {
+      await api.createTool(
+        {
+          name,
+          description,
+          category
+        },
+        token
+      );
+      setName("");
+      setDescription("");
+      setCategory("");
+      alert("Werkzeug angelegt.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Werkzeug konnte nicht angelegt werden.");
+    }
   };
 
   return (
@@ -38,7 +43,6 @@ export function NewToolPage({ currentUser }: Props) {
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Beschreibung" />
         <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Kategorie" />
-        <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Bild-URL" />
         <button type="submit">Speichern</button>
       </form>
     </section>

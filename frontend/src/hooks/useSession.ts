@@ -1,25 +1,75 @@
-import { useMemo, useState } from "react";
-import { api } from "../services/mockApi";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../services/api";
 import type { User } from "../types/domain";
 
-const STORAGE_KEY = "toolshare_mvp_user";
+const TOKEN_STORAGE_KEY = "toolshare_access_token";
 
 export function useSession() {
-  const users = api.getUsers();
-  const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored || users[0]?.id || "";
-  });
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_STORAGE_KEY));
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const currentUser = useMemo<User | undefined>(
-    () => users.find((u) => u.id === currentUserId),
-    [users, currentUserId],
-  );
+  useEffect(() => {
+    const run = async () => {
+      if (!token) {
+        setCurrentUser(null);
+        setIsLoading(false);
+        return;
+      }
 
-  const switchUser = (userId: string) => {
-    localStorage.setItem(STORAGE_KEY, userId);
-    setCurrentUserId(userId);
+      setIsLoading(true);
+      try {
+        const me = await api.getCurrentUser(token);
+        setCurrentUser(me);
+        setError(null);
+      } catch (err) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        setToken(null);
+        setCurrentUser(null);
+        setError(err instanceof Error ? err.message : "Session konnte nicht geladen werden.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void run();
+  }, [token]);
+
+  const login = async (email: string, password: string) => {
+    const result = await api.login(email, password);
+    localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
+    setToken(result.accessToken);
   };
 
-  return { users, currentUser, switchUser };
+  const register = async (input: {
+    email: string;
+    password: string;
+    name: string;
+    address: string;
+    role?: "USER" | "MODERATOR" | "MANAGER";
+  }) => {
+    const result = await api.register(input);
+    localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
+    setToken(result.accessToken);
+  };
+
+  const logout = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    setToken(null);
+    setCurrentUser(null);
+  };
+
+  const users = useMemo(() => (currentUser ? [currentUser] : []), [currentUser]);
+
+  return {
+    token,
+    users,
+    currentUser,
+    isLoading,
+    error,
+    login,
+    register,
+    logout
+  };
 }

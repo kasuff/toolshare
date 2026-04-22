@@ -1,9 +1,10 @@
-﻿import { useMemo, useState, type FormEvent } from "react";
-import { api } from "../services/mockApi";
+import { useState, type FormEvent } from "react";
+import { api } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
   currentUser: User;
+  token: string;
 };
 
 type SlotDraft = {
@@ -12,20 +13,13 @@ type SlotDraft = {
   blockedByOwner: boolean;
 };
 
-export function NewWorkshopPage({ currentUser }: Props) {
+export function NewWorkshopPage({ token }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [maxCapacity, setMaxCapacity] = useState(2);
-  const [imageUrlsInput, setImageUrlsInput] = useState("https://picsum.photos/seed/newworkshop/600/300");
   const [slot, setSlot] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: false });
   const [slots, setSlots] = useState<SlotDraft[]>([]);
-  const [toolIds, setToolIds] = useState<string[]>([]);
-
-  const ownTools = useMemo(
-    () => api.getTools().filter((t) => t.ownerId === currentUser.id),
-    [currentUser.id],
-  );
 
   const addSlot = () => {
     if (!slot.startIso || !slot.endIso) {
@@ -36,45 +30,34 @@ export function NewWorkshopPage({ currentUser }: Props) {
     setSlot({ startIso: "", endIso: "", blockedByOwner: false });
   };
 
-  const toggleTool = (toolId: string) => {
-    setToolIds((prev) =>
-      prev.includes(toolId) ? prev.filter((id) => id !== toolId) : [...prev, toolId],
-    );
-  };
-
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const imageUrls = imageUrlsInput
-      .split(",")
-      .map((it) => it.trim())
-      .filter(Boolean);
-
-    if (!name || !description || !location || slots.length === 0 || imageUrls.length === 0) {
-      alert("Bitte alle Pflichtfelder inkl. mindestens einem Foto und einem Slot ausfüllen.");
+    if (!name || !description || !location || slots.length === 0) {
+      alert("Bitte alle Pflichtfelder inkl. mindestens einem Slot ausfüllen.");
       return;
     }
 
-    api.createWorkshop(
-      {
-        ownerId: currentUser.id,
-        name,
-        description,
-        location,
-        maxCapacity,
-        imageUrls,
-        toolIds,
-      },
-      slots,
-    );
+    try {
+      await api.createWorkshop(
+        {
+          name,
+          description,
+          location,
+          maxCapacity,
+          slots: slots.map((item) => ({ startIso: item.startIso, endIso: item.endIso }))
+        },
+        token
+      );
 
-    setName("");
-    setDescription("");
-    setLocation("");
-    setMaxCapacity(2);
-    setImageUrlsInput("https://picsum.photos/seed/newworkshop/600/300");
-    setToolIds([]);
-    setSlots([]);
-    alert("Werkstatt angelegt.");
+      setName("");
+      setDescription("");
+      setLocation("");
+      setMaxCapacity(2);
+      setSlots([]);
+      alert("Werkstatt angelegt.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Werkstatt konnte nicht angelegt werden.");
+    }
   };
 
   return (
@@ -84,12 +67,6 @@ export function NewWorkshopPage({ currentUser }: Props) {
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Werkstattname" />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Beschreibung" />
         <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ort" />
-        <input
-          value={imageUrlsInput}
-          onChange={(e) => setImageUrlsInput(e.target.value)}
-          placeholder="Foto-URLs (kommagetrennt)"
-        />
-
         <label>
           Max. Personen
           <input
@@ -99,21 +76,6 @@ export function NewWorkshopPage({ currentUser }: Props) {
             onChange={(e) => setMaxCapacity(Number(e.target.value))}
           />
         </label>
-
-        <fieldset>
-          <legend>Werkstatt-Werkzeuge</legend>
-          {ownTools.length === 0 && <p>Keine eigenen Werkzeuge vorhanden.</p>}
-          {ownTools.map((tool) => (
-            <label key={tool.id}>
-              <input
-                type="checkbox"
-                checked={toolIds.includes(tool.id)}
-                onChange={() => toggleTool(tool.id)}
-              />
-              {tool.name}
-            </label>
-          ))}
-        </fieldset>
 
         <fieldset>
           <legend>Zeitfenster/Blockierungen</legend>

@@ -1,4 +1,4 @@
-﻿import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import type { User } from "../types/domain";
 import { RoleSwitcher } from "./RoleSwitcher";
 
@@ -6,9 +6,10 @@ type Props = {
   users: User[];
   currentUser?: User;
   onSwitchUser: (userId: string) => void;
+  onLogout: () => void;
 };
 
-export function Layout({ users, currentUser, onSwitchUser }: Props) {
+export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -21,8 +22,15 @@ export function Layout({ users, currentUser, onSwitchUser }: Props) {
           <NavLink to="/workshops">Werkstätten</NavLink>
           <NavLink to="/workshops/new">Werkstatt einstellen</NavLink>
           <NavLink to="/inbox">Inbox</NavLink>
+          {currentUser?.role === "MODERATOR" && <NavLink to="/moderation">Moderation</NavLink>}
+          {currentUser?.role === "ADMIN" && <NavLink to="/admin">Admin</NavLink>}
         </nav>
-        <RoleSwitcher users={users} currentUserId={currentUser?.id} onChange={onSwitchUser} />
+        <div className="row">
+          {users.length > 1 && <RoleSwitcher users={users} currentUserId={currentUser?.id} onChange={onSwitchUser} />}
+          <button className="ghost" onClick={onLogout}>
+            Logout
+          </button>
+        </div>
       </header>
 
       <main className="content">
