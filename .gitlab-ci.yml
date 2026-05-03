@@ -1,0 +1,262 @@
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  NODE_ENV: "test"
+
+# === FRONTEND JOBS ===
+
+frontend:lint:
+  stage: lint
+  image: node:18-alpine
+  script:
+    - cd frontend
+    - npm ci
+    - npm run lint
+  only:
+    - merge_requests
+    - main
+    - /^feature\/.*$/
+  artifacts:
+    reports:
+      junit: frontend/junit.xml
+    expire_in: 1 week
+  cache:
+    paths:
+      - frontend/node_modules/
+
+frontend:test:
+  stage: test
+  image: node:18-alpine
+  script:
+    - cd frontend
+    - npm ci
+    - npm run test
+  only:
+    - merge_requests
+    - main
+    - /^feature\/.*$/
+  coverage: '/Coverage: \d+\.\d+%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: frontend/coverage/cobertura-coverage.xml
+      junit: frontend/junit.xml
+    paths:
+      - frontend/coverage/
+    expire_in: 1 week
+  cache:
+    paths:
+      - frontend/node_modules/
+
+frontend:build:
+  stage: build
+  image: node:18-alpine
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
+  only:
+    - merge_requests
+    - main
+    - /^feature\/.*$/
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 week
+  cache:
+    paths:
+      - frontend/node_modules/
+
+# === BACKEND JOBS ===
+
+backend:lint:
+  stage: lint
+  image: node:18-alpine
+  script:
+    - cd backend
+    - npm ci
+    - npm run lint
+  only:
+    - merge_requests
+    - main
+    - /^feature\/.*$/
+  artifacts:
+    reports:
+      junit: backend/junit.xml
+    expire_in: 1 week
+  cache:
+    paths:
+      - backend/node_modules/
+
+backend:test:
+  stage: test
+  image: node:18-alpine
+  services:
+    - postgres:15
+  variables:
+    POSTGRES_DB: toolshare_test
+    POSTGRES_USER: toolshare
+    POSTGRES_PASSWORD: testpass
+    POSTGRES_HOST_AUTH_METHOD: trust
+    DATABASE_URL: "postgresql://toolshare:testpass@postgres:5432/toolshare_test"
+  script:
+    - cd backend
+    - npm ci
+    - npm run test -- --coverage
+  only:
+    - merge_requests
+    - main
+    - /^feature\/.*$/
+  coverage: '/All files\s+\|\s+(\d+\.\d+)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: backend/coverage/cobertura-coverage.xml
+      junit: backend/junit.xml
+    paths:
+      - backend/coverage/
+    expire_in: 1 week
+  cache:
+    paths:
+      - backend/node_modules/
+
+backend:build:
+  stage: build
+  image: node:18-alpine
+  script:
+    - cd backend
+    - npm ci
+    - npm run build
+  only:
+    - merge_requests
+    - main
+    - /^feature\/.*$/
+  artifacts:
+    paths:
+      - backend/dist/
+    expire_in: 1 week
+  cache:
+    paths:
+      - backend/node_modules/
+
+# === DOCKER BUILD JOBS (für Production/Kubernetes) ===
+
+docker:build:backend:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA -f backend/Dockerfile backend/
+    - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        docker tag $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE/backend:latest
+        docker push $CI_REGISTRY_IMAGE/backend:latest
+      fi
+  only:
+    - main
+    - /^release\/.*$/
+  needs:
+    - backend:build
+
+docker:build:frontend:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA -f frontend/Dockerfile frontend/
+    - docker push $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        docker tag $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE/frontend:latest
+        docker push $CI_REGISTRY_IMAGE/frontend:latest
+      fi
+  only:
+    - main
+    - /^release\/.*$/
+  needs:
+    - frontend:build
+
+# === DEPLOYMENT JOBS ===
+
+deploy:k8s:staging:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - mkdir -p $HOME/.kube
+    - echo $KUBECONFIG_STAGING | base64 -d > $HOME/.kube/config
+    - cd k8s
+    - kubectl apply -f namespace.yaml
+    - kubectl set image deployment/backend deployment/backend=deploy:$CI_COMMIT_SHA -n toolshare --record
+    - kubectl set image deployment/frontend deployment/frontend=deploy:$CI_COMMIT_SHA -n toolshare --record
+    - kubectl rollout status deployment/backend -n toolshare
+    - kubectl rollout status deployment/frontend -n toolshare
+  environment:
+    name: staging
+    url: https://staging.toolshare.example.com
+  only:
+    - merge_requests
+  when: manual
+  needs:
+    - docker:build:backend
+    - docker:build:frontend
+
+deploy:k8s:production:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - mkdir -p $HOME/.kube
+    - echo $KUBECONFIG_PRODUCTION | base64 -d > $HOME/.kube/config
+    - cd k8s
+    - kubectl apply -f namespace.yaml
+    - kubectl set image deployment/backend deployment/backend=deploy:$CI_COMMIT_SHA -n toolshare --record
+    - kubectl set image deployment/frontend deployment/frontend=deploy:$CI_COMMIT_SHA -n toolshare --record
+    - kubectl rollout status deployment/backend -n toolshare
+    - kubectl rollout status deployment/frontend -n toolshare
+  environment:
+    name: production
+    url: https://toolshare.example.com
+  only:
+    - main
+  when: manual
+  needs:
+    - docker:build:backend
+    - docker:build:frontend
+
+# === CODE QUALITY & COMPLIANCE ===
+
+security:scan:
+  stage: test
+  image: node:18-alpine
+  allow_failure: true
+  script:
+    - npm install -g npm-audit
+    - cd backend && npm audit --audit-level=moderate && cd ..
+    - cd frontend && npm audit --audit-level=moderate && cd ..
+  only:
+    - merge_requests
+    - main
+
+# === MERGE REQUEST RULES ===
+# Konfiguration in GitLab UI:
+# - Mindestens 1 Approval erforderlich
+# - Alle Pipelines-Jobs müssen erfolgreich sein
+# - Push-Protektion auf main-Branch
