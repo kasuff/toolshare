@@ -13,7 +13,15 @@ const API_BASE = ((import.meta as unknown as FrontendImportMeta).env.VITE_API_UR
 type BackendRole = "USER" | "MODERATOR" | "MANAGER";
 type BackendToolStatus = "AVAILABLE" | "REQUESTED" | "BORROWED";
 type BackendBookingStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED";
-type BackendUser = { id: string; email: string; name: string; role: BackendRole; isSuspended: boolean };
+type BackendUser = {
+  id: string;
+  email: string;
+  name: string;
+  address?: string;
+  avatarUrl?: string | null;
+  role: BackendRole;
+  isSuspended: boolean;
+};
 type BackendMetrics = {
   users: number;
   tools: number;
@@ -23,7 +31,15 @@ type BackendMetrics = {
 };
 
 type AuthPayload = {
-  user: { id: string; email: string; name: string; role: BackendRole };
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    address?: string;
+    avatarUrl?: string | null;
+    role: BackendRole;
+    isSuspended?: boolean;
+  };
   accessToken: string;
   refreshToken: string;
 };
@@ -209,6 +225,8 @@ export const api = {
       id: user.id,
       name: user.name,
       email: user.email,
+      address: user.address,
+      avatarUrl: user.avatarUrl ?? undefined,
       role: roleMap[user.role],
       isSuspended: user.isSuspended
     };
@@ -256,6 +274,27 @@ export const api = {
       },
       token
     );
+  },
+
+  async updateMyProfile(input: { name?: string; address?: string; avatarUrl?: string | null }, token: string): Promise<User> {
+    const user = await request<BackendUser>(
+      "/users/me",
+      {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      },
+      token
+    );
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      address: user.address,
+      avatarUrl: user.avatarUrl ?? undefined,
+      role: roleMap[user.role],
+      isSuspended: user.isSuspended
+    };
   },
 
   async getTools(filters: { q?: string; category?: string }, token: string): Promise<Tool[]> {

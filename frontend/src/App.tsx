@@ -13,6 +13,7 @@ import { NewWorkshopPage } from "./pages/NewWorkshopPage";
 import { InboxPage } from "./pages/InboxPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ModerationPage } from "./pages/ModerationPage";
+import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 
 function AuthScreen({
   onLogin,
@@ -136,7 +137,17 @@ export default function App() {
 }
 
 function AppWithProviders() {
-  const { token, users, currentUser, isLoading, error, login, register, logout } = useSession();
+  const {
+    token,
+    users,
+    currentUser,
+    isLoading,
+    error,
+    login,
+    register,
+    logout,
+    updateProfile
+  } = useSession();
 
   if (isLoading) return <p>Lade Session...</p>;
 
@@ -155,6 +166,10 @@ function AppWithProviders() {
           path="workshops/new"
           element={<NewWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />}
         />
+        <Route
+          path="profile"
+          element={<ProfileSettingsPage currentUser={currentUser ?? undefined} onSave={updateProfile} />}
+        />
         <Route path="inbox" element={<InboxPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && (
           <Route path="moderation" element={<ModerationPage currentUser={currentUser} token={token ?? undefined} />} />
@@ -162,7 +177,16 @@ function AppWithProviders() {
         {currentUser?.role === "ADMIN" && (
           <Route path="admin" element={<AdminPage currentUser={currentUser} token={token ?? undefined} />} />
         )}
-        <Route path="auth" element={currentUser && token ? <Navigate to="/" replace /> : <AuthScreen onLogin={login} onRegister={register} error={error} />} />
+        <Route
+          path="auth"
+          element={
+            currentUser && token ? (
+              <Navigate to="/" replace />
+            ) : (
+              <AuthScreen onLogin={login} onRegister={register} error={error} />
+            )
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -57,9 +57,28 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
         <div className="topbar-right">
           {users.length > 1 && <RoleSwitcher users={users} currentUserId={currentUser?.id} onChange={onSwitchUser} />}
           {currentUser ? (
-            <button className="ghost btn secondary" onClick={onLogout}>
-              Ausloggen
-            </button>
+            <details className="profile-menu">
+              <summary aria-label="Profil-Menü öffnen">
+                <span className="profile-avatar" aria-hidden="true">
+                  {currentUser.avatarUrl ? (
+                    <img src={currentUser.avatarUrl} alt="" className="profile-avatar-image" />
+                  ) : (
+                    <svg viewBox="0 0 24 24" role="img" focusable="false">
+                      <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-4.14 0-7.5 2.69-7.5 6a.75.75 0 0 0 1.5 0c0-2.47 2.69-4.5 6-4.5s6 2.03 6 4.5a.75.75 0 0 0 1.5 0c0-3.31-3.36-6-7.5-6Z" />
+                    </svg>
+                  )}
+                </span>
+              </summary>
+              <div className="profile-menu-panel">
+                <p className="profile-menu-meta">{currentUser.name}</p>
+                <Link to="/profile" className="profile-menu-item">
+                  Settings
+                </Link>
+                <button type="button" className="profile-menu-item profile-menu-logout" onClick={onLogout}>
+                  Ausloggen
+                </button>
+              </div>
+            </details>
           ) : (
             <Link className="btn secondary" to="/auth">
               Einloggen
@@ -69,15 +88,8 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
       </header>
 
       <main className="content">
-        {!currentUser ? (
+        {!currentUser && (
           <GuestBanner text="Du nutzt ToolShare aktuell im Gastmodus. Ansehen ist möglich, für Buchungen und Angebote musst du dich einloggen." />
-        ) : (
-          <p className="session-info">
-            <span>
-              Angemeldet als <strong>{currentUser.name}</strong>
-            </span>
-            <span className="status-pill neutral">{currentUser.role}</span>
-          </p>
         )}
         <Outlet />
       </main>
