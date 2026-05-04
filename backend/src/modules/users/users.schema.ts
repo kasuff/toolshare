@@ -23,9 +23,10 @@ export const updateMyProfileSchema = z.object({
   body: z
     .object({
       name: z.string().min(2).optional(),
-      address: z.string().min(5).optional()
+      address: z.string().min(5).optional(),
+      avatarUrl: z.string().url().nullable().optional()
     })
-    .refine((value) => value.name !== undefined || value.address !== undefined, {
+    .refine((value) => value.name !== undefined || value.address !== undefined || value.avatarUrl !== undefined, {
       message: "At least one field must be provided"
     }),
   params: z.object({}),

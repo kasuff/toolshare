@@ -5,6 +5,7 @@ const publicUserSelect = {
   email: true,
   name: true,
   address: true,
+  avatarUrl: true,
   role: true,
   isSuspended: true,
   createdAt: true
@@ -37,7 +38,7 @@ export const usersRepository = {
     });
   },
 
-  updateProfile(id: string, data: { name?: string; address?: string }) {
+  updateProfile(id: string, data: { name?: string; address?: string; avatarUrl?: string | null }) {
     return prisma.user.update({
       where: { id },
       data,
