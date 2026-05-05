@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
+import { EmptyState, Field, SkeletonCards, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 
@@ -14,6 +14,7 @@ type WorkshopListItem = Awaited<ReturnType<typeof api.getWorkshops>>[number] & {
 
 export function WorkshopsPage({ token }: Props) {
   const { pushToast } = useToast();
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [toolFilter, setToolFilter] = useState("");
   const [maxCapacityFilter, setMaxCapacityFilter] = useState(10);
@@ -36,7 +37,11 @@ export function WorkshopsPage({ token }: Props) {
           : mapped;
         setItems(filtered.filter((item) => item.workshop.maxCapacity <= maxCapacityFilter));
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "Werkstätten konnten nicht geladen werden.", "error");
+        if (token) {
+          pushToast(error instanceof Error ? error.message : "Werkstätten konnten nicht geladen werden.", "error");
+        } else {
+          setItems([]);
+        }
       } finally {
         setIsLoading(false);
         setHasLoaded(true);
@@ -47,7 +52,8 @@ export function WorkshopsPage({ token }: Props) {
 
   const bookWorkshop = async (_workshopId: string, slotId: string) => {
     if (!token) {
-      pushToast("Bitte logge dich ein, um eine Werkstatt zu buchen.", "error");
+      pushToast("Zum Buchen bitte anmelden.", "info");
+      navigate("/auth", { state: { redirectHint: "Bitte melde dich an, um eine Werkstatt zu buchen." } });
       return;
     }
     try {
@@ -102,10 +108,6 @@ export function WorkshopsPage({ token }: Props) {
           <p className="hint">Weitere Filter (Ausstattung, Entfernung, Bewertung) können hier ergänzt werden.</p>
         </details>
       </Surface>
-      {!token && (
-        <GuestBanner text="Als Gast kannst du Werkstätten ansehen. Für Buchungen bitte einloggen." />
-      )}
-
       <div className="cards">
         {isLoading && <SkeletonCards />}
         {!isLoading && hasLoaded && items.length === 0 && (
@@ -152,15 +154,9 @@ export function WorkshopsPage({ token }: Props) {
                     {!s.blockedByOwner && (
                       <>
                         <span className="chip">frei</span>
-                        {token ? (
-                          <button className="mini" onClick={() => void bookWorkshop(workshop.id, s.id)} disabled={!token}>
-                            Buchen
-                          </button>
-                        ) : (
-                          <Link className="btn mini" to="/auth">
-                            Login
-                          </Link>
-                        )}
+                        <button className="mini" onClick={() => void bookWorkshop(workshop.id, s.id)}>
+                          {token ? "Buchen" : "Login"}
+                        </button>
                       </>
                     )}
                   </div>

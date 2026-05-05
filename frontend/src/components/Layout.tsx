@@ -2,7 +2,6 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import type { User } from "../types/domain";
 import { RoleSwitcher } from "./RoleSwitcher";
-import { GuestBanner } from "./ui";
 
 type Props = {
   users: User[];
@@ -84,9 +83,6 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
       </header>
 
       <main className="content">
-        {!currentUser && (
-          <GuestBanner text="Du nutzt ToolShare aktuell im Gastmodus. Ansehen ist möglich, für Buchungen und Angebote musst du dich einloggen." />
-        )}
         <Outlet />
       </main>
     </div>
