@@ -55,6 +55,23 @@ describe("US-13 Authentication acceptance criteria", () => {
     expect(response.body.user?.email).toBe(validEmail);
   });
 
+  it("issues JWT usable for protected endpoints", async () => {
+    const loginResponse = await request(app).post("/api/auth/login").send({
+      email: validEmail,
+      password: validPassword
+    });
+
+    expect(loginResponse.status).toBe(200);
+    expect(loginResponse.body.accessToken).toBeTypeOf("string");
+
+    const protectedResponse = await request(app)
+      .get("/api/bookings/me")
+      .set("Authorization", `Bearer ${loginResponse.body.accessToken as string}`);
+
+    expect(protectedResponse.status).toBe(200);
+    expect(Array.isArray(protectedResponse.body)).toBe(true);
+  });
+
   it("rejects invalid credentials and keeps user logged out", async () => {
     const response = await request(app).post("/api/auth/login").send({
       email: validEmail,
@@ -63,6 +80,7 @@ describe("US-13 Authentication acceptance criteria", () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error?.code).toBe("INVALID_CREDENTIALS");
+    expect(response.body.accessToken).toBeUndefined();
   });
 
   it("requires login for protected bookings route", async () => {
