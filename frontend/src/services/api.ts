@@ -241,6 +241,32 @@ export const api = {
     });
   },
 
+  async suggestAddresses(query: string): Promise<string[]> {
+    if (query.trim().length < 3) return [];
+    try {
+      const response = await request<{ suggestions: Array<{ label: string }> }>(
+        `/address/suggest?q=${encodeURIComponent(query.trim())}`
+      );
+      return response.suggestions.map((entry) => entry.label);
+    } catch {
+      return [];
+    }
+  },
+
+  async validateAddress(query: string): Promise<{ isValid: boolean; normalizedAddress: string | null }> {
+    if (query.trim().length < 5) {
+      return { isValid: false, normalizedAddress: null };
+    }
+    try {
+      return await request<{ isValid: boolean; normalizedAddress: string | null }>(
+        `/address/validate?q=${encodeURIComponent(query.trim())}`
+      );
+    } catch {
+      // Do not hard-block registration/profile save if provider is unavailable.
+      return { isValid: true, normalizedAddress: null };
+    }
+  },
+
   async getCurrentUser(token: string): Promise<User> {
     const user = await request<BackendUser>("/users/me", undefined, token);
     return {

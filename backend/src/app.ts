@@ -3,6 +3,7 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import { errorHandler } from "./middleware/error-handler";
+import { addressRouter } from "./modules/address/address.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { bookingsRouter } from "./modules/bookings/bookings.routes";
 import { moderationRouter } from "./modules/moderation/moderation.routes";
@@ -24,6 +25,7 @@ export const createApp = () => {
     res.status(200).json({ status: "ok" });
   });
 
+  app.use("/api/address", addressRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/bookings", bookingsRouter);
   app.use("/api/notifications", notificationsRouter);

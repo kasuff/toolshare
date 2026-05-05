@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ToastViewport } from "./components/ui";
@@ -14,6 +14,7 @@ import { InboxPage } from "./pages/InboxPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ModerationPage } from "./pages/ModerationPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
+import { api } from "./services/api";
 
 function AuthScreen({
   onLogin,
@@ -37,6 +38,24 @@ function AuthScreen({
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isRegister || address.trim().length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void api.suggestAddresses(address).then((suggestions) => {
+        setAddressSuggestions(suggestions);
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [address, isRegister]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -47,7 +66,11 @@ function AuthScreen({
         if (password !== repeatPassword) {
           throw new Error("Passwörter stimmen nicht überein.");
         }
-        await onRegister({ email, password, name, address });
+        const validation = await api.validateAddress(address);
+        if (!validation.isValid) {
+          throw new Error("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.");
+        }
+        await onRegister({ email, password, name, address: validation.normalizedAddress ?? address.trim() });
         pushToast("Konto erstellt und eingeloggt.", "success");
         return;
       }
@@ -98,7 +121,17 @@ function AuthScreen({
                   type="password"
                 />
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Adresse" />
+                <input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Adresse"
+                  list="register-address-suggestions"
+                />
+                <datalist id="register-address-suggestions">
+                  {addressSuggestions.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
               </>
             )}
             {error && <p className="status-pill danger">{error}</p>}

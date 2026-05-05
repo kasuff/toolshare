@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
+import { api } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -13,12 +14,30 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
   const { pushToast } = useToast();
   const [name, setName] = useState(currentUser?.name ?? "");
   const [address, setAddress] = useState(currentUser?.address ?? "");
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setName(currentUser?.name ?? "");
     setAddress(currentUser?.address ?? "");
   }, [currentUser?.id, currentUser?.name, currentUser?.address]);
+
+  useEffect(() => {
+    if (address.trim().length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void api.suggestAddresses(address).then((suggestions) => {
+        setAddressSuggestions(suggestions);
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [address]);
 
   if (!currentUser) {
     return (
@@ -51,7 +70,12 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
 
     setIsSaving(true);
     try {
-      await onSave({ name: nextName, address: nextAddress });
+      const validation = await api.validateAddress(nextAddress);
+      if (!validation.isValid) {
+        pushToast("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.", "error");
+        return;
+      }
+      await onSave({ name: nextName, address: validation.normalizedAddress ?? nextAddress });
       pushToast("Profil gespeichert.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Profil konnte nicht gespeichert werden.", "error");
@@ -83,7 +107,17 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Dein Name" />
           </Field>
           <Field label="Adresse">
-            <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Deine Adresse" />
+            <input
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              placeholder="Deine Adresse"
+              list="profile-address-suggestions"
+            />
+            <datalist id="profile-address-suggestions">
+              {addressSuggestions.map((suggestion) => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
           </Field>
           <div className="row">
             <button type="submit" disabled={isSaving}>
