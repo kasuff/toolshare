@@ -1,10 +1,35 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ButtonLink, Surface } from "../components/ui";
+import { ButtonLink } from "../components/ui";
+import { api } from "../services/api";
+import type { Tool, Workshop } from "../types/domain";
 
 export function DashboardPage() {
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [workshops, setWorkshops] = useState<Workshop[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const toolsData = await api.getTools({}, "");
+        setTools(toolsData.slice(0, 4));
+        const workshopsData = await api.getWorkshops({}, "");
+        setWorkshops(workshopsData.slice(0, 3).map(w => w.workshop));
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void loadData();
+  }, []);
+
   return (
-    <section className="stack">
-      <div className="hero">
+    <section className="dashboard">
+      {/* Hero Section */}
+      <div className="hero-playtomic">
         <p className="eyebrow">Nachbarschaftlich teilen</p>
         <h1>Finde Werkzeuge und Werkstätten in deiner Community.</h1>
         <p>
@@ -21,49 +46,84 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <Surface title="Schnell starten" subtitle="Die wichtigsten Flows in einer Übersicht">
-        <div className="grid grid-3">
-          <Surface className="interactive" title="Werkzeuge entdecken">
-            <p className="hint">Suche nach Kategorie, Verfügbarkeit und starte eine Ausleihanfrage.</p>
-            <Link className="btn secondary" to="/tools">
-              Zu den Werkzeugen
-            </Link>
-          </Surface>
-          <Surface className="interactive" title="Werkstätten buchen">
-            <p className="hint">Finde freie Zeitslots und buche den passenden Arbeitsraum.</p>
-            <Link className="btn secondary" to="/workshops">
-              Zu den Werkstätten
-            </Link>
-          </Surface>
-          <Surface className="interactive" title="Anfragen verwalten">
-            <p className="hint">Status, Benachrichtigungen und Entscheidungen zentral in der Inbox.</p>
-            <Link className="btn secondary" to="/inbox">
-              Zur Inbox
-            </Link>
-          </Surface>
-        </div>
-      </Surface>
+      {/* Quick Start Cards with Icons */}
+      <div className="quick-start-section">
+        <h2>Schnell starten</h2>
+        <div className="quick-start-grid">
+          {/* Werkzeuge Card */}
+          <Link to="/tools" className="quick-start-card">
+            <div className="card-icon tools-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12h18M8 12l2-4m0 4l-2 4m8-4l2-4m0 4l-2 4M6 6l2-2m0 2l-2 2m12 0l2-2m0 2l-2 2M4 18l2-2m0 2l-2 2m14 0l2-2m0 2l-2 2" />
+              </svg>
+            </div>
+            <h3>Werkzeuge entdecken</h3>
+            <p>Suche nach Kategorie, Verfügbarkeit und starte eine Ausleihanfrage.</p>
+            <span className="card-arrow">→</span>
+          </Link>
 
-      <Surface title="Für Anbieter" subtitle="Angebote verwalten und transparent reagieren">
-        <div className="grid grid-2">
-          <div>
-            <p className="hint">Eigene Werkzeuge mit Foto einstellen und Verfügbarkeit im Blick behalten.</p>
-            <Link className="btn secondary" to="/tools/new">
-              Werkzeug anbieten
-            </Link>
-          </div>
-          <div>
-            <p className="hint">Werkstatt inklusive Zeitslots anlegen und Buchungsanfragen steuern.</p>
-            <Link className="btn secondary" to="/workshops/new">
-              Werkstatt anbieten
-            </Link>
+          {/* Werkstätten Card */}
+          <Link to="/workshops" className="quick-start-card">
+            <div className="card-icon workshops-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </div>
+            <h3>Werkstätten buchen</h3>
+            <p>Finde freie Zeitslots und buche den passenden Arbeitsraum.</p>
+            <span className="card-arrow">→</span>
+          </Link>
+
+          {/* Inbox Card */}
+          <Link to="/inbox" className="quick-start-card">
+            <div className="card-icon inbox-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 8h18M3 8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2m0 0V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1" />
+              </svg>
+            </div>
+            <h3>Anfragen verwalten</h3>
+            <p>Status, Benachrichtigungen und Entscheidungen zentral in der Inbox.</p>
+            <span className="card-arrow">→</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Featured Tools Scroll */}
+      {tools.length > 0 && (
+        <div className="featured-section">
+          <h2>Werkzeuge</h2>
+          <div className="horizontal-scroll">
+            {tools.map((tool) => (
+              <div key={tool.id} className="scroll-card">
+                <div className="scroll-card-image">
+                  <img src={tool.imageUrl || "https://via.placeholder.com/240x160"} alt={tool.name} />
+                </div>
+                <h4>{tool.name}</h4>
+                <p>{tool.category}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </Surface>
+      )}
 
-      <Surface title="Plattformstatus" subtitle="Aktuelle Systembasis">
-        <p>Diese Oberfläche nutzt die REST-API als Source of Truth für alle Kernprozesse.</p>
-      </Surface>
+      {/* Featured Workshops Scroll */}
+      {workshops.length > 0 && (
+        <div className="featured-section">
+          <h2>Verfügbare Werkstätten</h2>
+          <div className="horizontal-scroll">
+            {workshops.map((workshop) => (
+              <div key={workshop.id} className="scroll-card">
+                <div className="scroll-card-image">
+                  <img src={workshop.imageUrls?.[0] || "https://via.placeholder.com/240x160"} alt={workshop.name} />
+                </div>
+                <h4>{workshop.name}</h4>
+                <p>{workshop.location}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
