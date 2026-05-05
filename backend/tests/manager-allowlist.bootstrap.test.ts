@@ -1,29 +1,30 @@
 import { bootstrapManagerAllowlist } from "../src/modules/users/manager-allowlist.bootstrap";
 import { prisma } from "../src/config/prisma";
 import { env } from "../src/config/env";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-jest.mock("../src/config/prisma", () => ({
+vi.mock("../src/config/prisma", () => ({
   prisma: {
     user: {
-      findMany: jest.fn(),
-      updateMany: jest.fn()
+      findMany: vi.fn(),
+      updateMany: vi.fn()
     }
   }
 }));
 
-jest.mock("../src/config/env", () => ({
+vi.mock("../src/config/env", () => ({
   env: {
     managerEmailAllowlist: [] as string[]
   }
 }));
 
 const mockedEnv = env as typeof env & { managerEmailAllowlist: string[] };
-const findManyMock = prisma.user.findMany as unknown as jest.Mock;
-const updateManyMock = prisma.user.updateMany as unknown as jest.Mock;
+const findManyMock = vi.mocked(prisma.user.findMany);
+const updateManyMock = vi.mocked(prisma.user.updateMany);
 
 describe("bootstrapManagerAllowlist", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockedEnv.managerEmailAllowlist = [];
   });
 
@@ -41,11 +42,15 @@ describe("bootstrapManagerAllowlist", () => {
       {
         id: "u1",
         email: "admin1@example.com",
-        role: "USER"
+        passwordHash: "hash",
+        name: "Admin One",
+        address: "Address 1",
+        role: "USER",
+        createdAt: new Date("2026-01-01T00:00:00.000Z")
       }
     ]);
 
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await bootstrapManagerAllowlist();
 
@@ -82,7 +87,11 @@ describe("bootstrapManagerAllowlist", () => {
       {
         id: "m1",
         email: "manager@example.com",
-        role: "MANAGER"
+        passwordHash: "hash",
+        name: "Manager One",
+        address: "Address 2",
+        role: "MANAGER",
+        createdAt: new Date("2026-01-01T00:00:00.000Z")
       }
     ]);
 

@@ -32,6 +32,7 @@ export const workshopsController = {
     const workshop = await workshopsService.update({
       workshopId: req.params.id,
       managerId: req.authUser!.userId,
+      actorRole: req.authUser!.role,
       data: {
         name: req.body.name,
         description: req.body.description,
@@ -45,7 +46,8 @@ export const workshopsController = {
   remove: asyncHandler(async (req: Request, res: Response) => {
     await workshopsService.remove({
       workshopId: req.params.id,
-      managerId: req.authUser!.userId
+      managerId: req.authUser!.userId,
+      actorRole: req.authUser!.role
     });
     res.status(204).send();
   }),
@@ -54,6 +56,7 @@ export const workshopsController = {
     const timeslot = await workshopsService.createTimeslot({
       workshopId: req.params.id,
       managerId: req.authUser!.userId,
+      actorRole: req.authUser!.role,
       startTime: req.body.startTime,
       endTime: req.body.endTime
     });
@@ -64,7 +67,8 @@ export const workshopsController = {
     await workshopsService.removeTimeslot({
       workshopId: req.params.id,
       timeslotId: req.params.timeslotId,
-      managerId: req.authUser!.userId
+      managerId: req.authUser!.userId,
+      actorRole: req.authUser!.role
     });
     res.status(204).send();
   })

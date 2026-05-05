@@ -1,16 +1,17 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import type { Express } from "express";
 import { usersRepository } from "../src/modules/users/users.repository";
 
-jest.mock("../src/modules/users/users.repository", () => ({
+vi.mock("../src/modules/users/users.repository", () => ({
   usersRepository: {
-    findByIdPublic: jest.fn(),
-    updateRole: jest.fn()
+    findByIdPublic: vi.fn(),
+    updateRole: vi.fn()
   }
 }));
 
-const mockedUsersRepository = usersRepository as jest.Mocked<typeof usersRepository>;
+const mockedUsersRepository = vi.mocked(usersRepository);
 
 const MANAGER_ACTOR_ID = "11111111-1111-1111-1111-111111111111";
 const TARGET_MANAGER_ID = "22222222-2222-2222-2222-222222222222";
@@ -28,7 +29,7 @@ describe("PATCH /api/users/:id/role integration", () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const managerToken = () =>

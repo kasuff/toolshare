@@ -27,6 +27,7 @@ export const workshopsService = {
   async update(input: {
     workshopId: string;
     managerId: string;
+    actorRole: "USER" | "MODERATOR" | "MANAGER";
     data: {
       name?: string;
       description?: string;
@@ -38,19 +39,27 @@ export const workshopsService = {
     if (!workshop) {
       throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
     }
-    if (workshop.managerId !== input.managerId) {
+    const isOwner = workshop.managerId === input.managerId;
+    const isManagerRole = input.actorRole === "MANAGER";
+    if (!isOwner && !isManagerRole) {
       throw new AppError("FORBIDDEN", "Only the workshop manager can update this workshop", 403);
     }
 
     return workshopsRepository.update(input.workshopId, input.data);
   },
 
-  async remove(input: { workshopId: string; managerId: string }) {
+  async remove(input: {
+    workshopId: string;
+    managerId: string;
+    actorRole: "USER" | "MODERATOR" | "MANAGER";
+  }) {
     const workshop = await workshopsRepository.findById(input.workshopId);
     if (!workshop) {
       throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
     }
-    if (workshop.managerId !== input.managerId) {
+    const isOwner = workshop.managerId === input.managerId;
+    const isManagerRole = input.actorRole === "MANAGER";
+    if (!isOwner && !isManagerRole) {
       throw new AppError("FORBIDDEN", "Only the workshop manager can delete this workshop", 403);
     }
 
@@ -60,6 +69,7 @@ export const workshopsService = {
   async createTimeslot(input: {
     workshopId: string;
     managerId: string;
+    actorRole: "USER" | "MODERATOR" | "MANAGER";
     startTime: string;
     endTime: string;
   }) {
@@ -67,7 +77,9 @@ export const workshopsService = {
     if (!workshop) {
       throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
     }
-    if (workshop.managerId !== input.managerId) {
+    const isOwner = workshop.managerId === input.managerId;
+    const isManagerRole = input.actorRole === "MANAGER";
+    if (!isOwner && !isManagerRole) {
       throw new AppError("FORBIDDEN", "Only the workshop manager can manage timeslots", 403);
     }
 
@@ -93,12 +105,19 @@ export const workshopsService = {
     });
   },
 
-  async removeTimeslot(input: { workshopId: string; timeslotId: string; managerId: string }) {
+  async removeTimeslot(input: {
+    workshopId: string;
+    timeslotId: string;
+    managerId: string;
+    actorRole: "USER" | "MODERATOR" | "MANAGER";
+  }) {
     const timeslot = await workshopsRepository.findTimeslotById(input.timeslotId);
     if (!timeslot || timeslot.workshopId !== input.workshopId) {
       throw new AppError("TIMESLOT_NOT_FOUND", "Timeslot not found", 404);
     }
-    if (timeslot.workshop.managerId !== input.managerId) {
+    const isOwner = timeslot.workshop.managerId === input.managerId;
+    const isManagerRole = input.actorRole === "MANAGER";
+    if (!isOwner && !isManagerRole) {
       throw new AppError("FORBIDDEN", "Only the workshop manager can remove timeslots", 403);
     }
 

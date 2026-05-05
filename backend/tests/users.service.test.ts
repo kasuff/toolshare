@@ -1,18 +1,19 @@
 import { usersService } from "../src/modules/users/users.service";
 import { usersRepository } from "../src/modules/users/users.repository";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-jest.mock("../src/modules/users/users.repository", () => ({
+vi.mock("../src/modules/users/users.repository", () => ({
   usersRepository: {
-    findByIdPublic: jest.fn(),
-    updateRole: jest.fn()
+    findByIdPublic: vi.fn(),
+    updateRole: vi.fn()
   }
 }));
 
-const mockedUsersRepository = usersRepository as jest.Mocked<typeof usersRepository>;
+const mockedUsersRepository = vi.mocked(usersRepository);
 
 describe("usersService.updateRole", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("throws USER_NOT_FOUND when target user does not exist", async () => {
