@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ToastViewport } from "./components/ui";
 import { useSession } from "./hooks/useSession";
@@ -28,6 +28,10 @@ function toAddressPayload(fields: AddressFormFields) {
   return `${fields.street} ${fields.houseNumber}, ${fields.postalCode} ${fields.city}, ${fields.country}`.trim();
 }
 
+function toAddressPreview(fields: AddressFormFields) {
+  return toAddressPayload(fields).replace(/\s+,/g, ",").replace(/\s{2,}/g, " ").trim();
+}
+
 function AuthScreen({
   onLogin,
   onRegister,
@@ -42,6 +46,11 @@ function AuthScreen({
   }) => Promise<void>;
   error: string | null;
 }) {
+  const location = useLocation();
+  const redirectHint =
+    typeof (location.state as { redirectHint?: unknown } | null)?.redirectHint === "string"
+      ? ((location.state as { redirectHint: string }).redirectHint as string)
+      : null;
   const { pushToast } = useToast();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
@@ -59,6 +68,7 @@ function AuthScreen({
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const addressPreview = toAddressPreview(address);
 
   useEffect(() => {
     if (!isRegister || addressSearch.trim().length < 3) {
@@ -225,8 +235,14 @@ function AuthScreen({
                     autoComplete="country-name"
                   />
                 </div>
+                {addressPreview.length > 0 && (
+                  <p className="address-preview" aria-live="polite">
+                    {addressPreview}
+                  </p>
+                )}
               </>
             )}
+            {redirectHint && <p className="status-pill">{redirectHint}</p>}
             {error && <p className="status-pill danger">{error}</p>}
             <button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Bitte warten..." : isRegister ? "Registrieren und starten" : "Einloggen"}
@@ -274,17 +290,40 @@ function AppWithProviders() {
         <Route index element={<DashboardPage />} />
         <Route path="tools" element={<ToolsPage token={token ?? undefined} />} />
         <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
-        <Route path="tools/new" element={<NewToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
+        <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
+        <Route
+          path="tools/new"
+          element={
+            <RequireAuth token={token}>
+              <NewToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
+        />
         <Route path="workshops" element={<WorkshopsPage token={token ?? undefined} />} />
         <Route
           path="workshops/new"
-          element={<NewWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />}
+          element={
+            <RequireAuth token={token}>
+              <NewWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
         />
         <Route
           path="profile"
-          element={<ProfileSettingsPage currentUser={currentUser ?? undefined} onSave={updateProfile} />}
+          element={
+            <RequireAuth token={token}>
+              <ProfileSettingsPage currentUser={currentUser ?? undefined} onSave={updateProfile} />
+            </RequireAuth>
+          }
         />
-        <Route path="inbox" element={<InboxPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
+        <Route
+          path="inbox"
+          element={
+            <RequireAuth token={token}>
+              <InboxPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
+        />
         {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && (
           <Route path="moderation" element={<ModerationPage currentUser={currentUser} token={token ?? undefined} />} />
         )}
@@ -305,4 +344,14 @@ function AppWithProviders() {
       </Route>
     </Routes>
   );
+}
+
+function RequireAuth({ token, children }: { token: string | null; children: JSX.Element }) {
+  const location = useLocation();
+
+  if (!token) {
+    return <Navigate to="/auth" replace state={{ redirectHint: "Bitte melde dich an, um diese Funktion zu nutzen.", from: location.pathname }} />;
+  }
+
+  return children;
 }
