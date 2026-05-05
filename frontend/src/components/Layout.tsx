@@ -60,13 +60,9 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
             <details className="profile-menu">
               <summary aria-label="Profil-Menü öffnen">
                 <span className="profile-avatar" aria-hidden="true">
-                  {currentUser.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt="" className="profile-avatar-image" />
-                  ) : (
-                    <svg viewBox="0 0 24 24" role="img" focusable="false">
-                      <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-4.14 0-7.5 2.69-7.5 6a.75.75 0 0 0 1.5 0c0-2.47 2.69-4.5 6-4.5s6 2.03 6 4.5a.75.75 0 0 0 1.5 0c0-3.31-3.36-6-7.5-6Z" />
-                    </svg>
-                  )}
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-4.14 0-7.5 2.69-7.5 6a.75.75 0 0 0 1.5 0c0-2.47 2.69-4.5 6-4.5s6 2.03 6 4.5a.75.75 0 0 0 1.5 0c0-3.31-3.36-6-7.5-6Z" />
+                  </svg>
                 </span>
               </summary>
               <div className="profile-menu-panel">

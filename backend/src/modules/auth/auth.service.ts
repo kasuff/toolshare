@@ -38,7 +38,6 @@ export const authService = {
     password: string;
     name: string;
     address: string;
-    role?: "USER" | "MODERATOR" | "MANAGER";
   }) {
     const existing = await authRepository.findByEmail(input.email);
     if (existing) {
@@ -51,7 +50,7 @@ export const authService = {
       passwordHash,
       name: input.name,
       address: input.address,
-      role: input.role ?? "USER"
+      role: "USER"
     });
 
     return buildAuthPayload(user);

@@ -36,7 +36,6 @@ type AuthPayload = {
     email: string;
     name: string;
     address?: string;
-    avatarUrl?: string | null;
     role: BackendRole;
     isSuspended?: boolean;
   };
@@ -112,36 +111,59 @@ function toLocalDateTimeInputValue(input: string) {
 }
 
 async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {})
-    }
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {})
+      }
+    });
+  } catch {
+    throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
+  }
 
   if (!response.ok) {
     let message = `Request failed: ${response.status}`;
     try {
-      const payload = (await response.json()) as { message?: string };
-      if (payload.message) {
+      const payload = (await response.json()) as {
+        message?: string;
+        error?: {
+          message?: string;
+          code?: string;
+          details?: {
+            fieldErrors?: Record<string, string[] | undefined>;
+            formErrors?: string[];
+          };
+        };
+      };
+      if (payload.error?.message) {
+        message = payload.error.message;
+      } else if (payload.message) {
         message = payload.message;
-      } else if (typeof payload === "object" && payload && "error" in payload) {
-        const error = payload as { error?: { message?: string; details?: { fieldErrors?: Record<string, string[]> } } };
-        if (error.error?.message) {
-          message = error.error.message;
-        }
-
-        const fieldErrors = error.error?.details?.fieldErrors;
-        if (fieldErrors) {
-          const fieldMessages = Object.entries(fieldErrors).flatMap(([field, messages]) =>
-            messages.map((fieldMessage) => `${field}: ${fieldMessage}`)
-          );
-          if (fieldMessages.length > 0) {
-            message = `${message} (${fieldMessages.join(", ")})`;
+      }
+      if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
+        message = "Diese E-Mail ist bereits registriert.";
+      }
+      const fieldErrorEntries = payload.error?.details?.fieldErrors
+        ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
+        : [];
+      if (fieldErrorEntries.length > 0) {
+        const [field, errors] = fieldErrorEntries[0];
+        const rawError = errors?.[0] ?? "Ungültige Eingabe.";
+        if (field === "body") {
+          if (rawError.includes("at least 8 character")) {
+            message = "Passwort muss mindestens 8 Zeichen lang sein.";
+          } else {
+            message = rawError;
           }
+        } else {
+          message = `${field}: ${rawError}`;
         }
+      } else if (payload.error?.details?.formErrors?.length) {
+        message = payload.error.details.formErrors[0];
       }
     } catch {
       // keep fallback message
@@ -212,7 +234,7 @@ export const api = {
     });
   },
 
-  async register(input: { email: string; password: string; name: string; address: string; role?: BackendRole }) {
+  async register(input: { email: string; password: string; name: string; address: string }) {
     return request<AuthPayload>("/auth/register", {
       method: "POST",
       body: JSON.stringify(input)
@@ -226,7 +248,6 @@ export const api = {
       name: user.name,
       email: user.email,
       address: user.address,
-      avatarUrl: user.avatarUrl ?? undefined,
       role: roleMap[user.role],
       isSuspended: user.isSuspended
     };
@@ -276,7 +297,7 @@ export const api = {
     );
   },
 
-  async updateMyProfile(input: { name?: string; address?: string; avatarUrl?: string | null }, token: string): Promise<User> {
+  async updateMyProfile(input: { name?: string; address?: string }, token: string): Promise<User> {
     const user = await request<BackendUser>(
       "/users/me",
       {
@@ -291,7 +312,6 @@ export const api = {
       name: user.name,
       email: user.email,
       address: user.address,
-      avatarUrl: user.avatarUrl ?? undefined,
       role: roleMap[user.role],
       isSuspended: user.isSuspended
     };

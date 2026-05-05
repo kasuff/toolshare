@@ -6,21 +6,19 @@ import type { User } from "../types/domain";
 
 type Props = {
   currentUser?: User;
-  onSave: (input: { name?: string; address?: string; avatarUrl?: string | null }) => Promise<User>;
+  onSave: (input: { name?: string; address?: string }) => Promise<User>;
 };
 
 export function ProfileSettingsPage({ currentUser, onSave }: Props) {
   const { pushToast } = useToast();
   const [name, setName] = useState(currentUser?.name ?? "");
   const [address, setAddress] = useState(currentUser?.address ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setName(currentUser?.name ?? "");
     setAddress(currentUser?.address ?? "");
-    setAvatarUrl(currentUser?.avatarUrl ?? "");
-  }, [currentUser?.id, currentUser?.name, currentUser?.address, currentUser?.avatarUrl]);
+  }, [currentUser?.id, currentUser?.name, currentUser?.address]);
 
   if (!currentUser) {
     return (
@@ -50,15 +48,10 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
       pushToast("Adresse muss mindestens 5 Zeichen haben.", "error");
       return;
     }
-    const nextAvatarUrl = avatarUrl.trim();
-    if (nextAvatarUrl && !/^https?:\/\/.+/i.test(nextAvatarUrl)) {
-      pushToast("Profilbild muss als gültige URL angegeben werden (http/https).", "error");
-      return;
-    }
 
     setIsSaving(true);
     try {
-      await onSave({ name: nextName, address: nextAddress, avatarUrl: nextAvatarUrl || null });
+      await onSave({ name: nextName, address: nextAddress });
       pushToast("Profil gespeichert.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Profil konnte nicht gespeichert werden.", "error");
@@ -71,17 +64,6 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
     <section className="stack">
       <h1>Profil-Settings</h1>
       <Surface title="Konto" subtitle="Übersicht deiner Kontodaten">
-        <div className="profile-head">
-          <div className="profile-image-wrap">
-            {avatarUrl.trim() ? (
-              <img src={avatarUrl.trim()} alt="Profilbild" className="profile-image" />
-            ) : (
-              <span className="profile-image-fallback" aria-hidden="true">
-                {currentUser.name.slice(0, 1).toUpperCase()}
-              </span>
-            )}
-          </div>
-        </div>
         <ul className="meta-list">
           <li>
             <strong>E-Mail:</strong> {currentUser.email}
@@ -102,14 +84,6 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
           </Field>
           <Field label="Adresse">
             <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Deine Adresse" />
-          </Field>
-          <Field label="Profilbild URL" hint="Füge ein Bild per Link hinzu (z. B. von GitHub oder Gravatar)">
-            <input
-              value={avatarUrl}
-              onChange={(event) => setAvatarUrl(event.target.value)}
-              placeholder="https://..."
-              type="url"
-            />
           </Field>
           <div className="row">
             <button type="submit" disabled={isSaving}>

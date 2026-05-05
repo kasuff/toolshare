@@ -53,7 +53,6 @@ export function useSession() {
     password: string;
     name: string;
     address: string;
-    role?: "USER" | "MODERATOR" | "MANAGER";
   }) => {
     try {
       const result = await api.register(input);
@@ -73,7 +72,7 @@ export function useSession() {
     setError(null);
   };
 
-  const updateProfile = async (input: { name?: string; address?: string; avatarUrl?: string | null }) => {
+  const updateProfile = async (input: { name?: string; address?: string }) => {
     if (!token) {
       throw new Error("Du musst eingeloggt sein.");
     }

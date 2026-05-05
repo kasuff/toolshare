@@ -26,7 +26,6 @@ function AuthScreen({
     password: string;
     name: string;
     address: string;
-    role?: "USER" | "MODERATOR" | "MANAGER";
   }) => Promise<void>;
   error: string | null;
 }) {
@@ -34,9 +33,9 @@ function AuthScreen({
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [repeatPassword, setRepeatPassword] = useState("");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
-  const [role, setRole] = useState<"USER" | "MODERATOR" | "MANAGER">("USER");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onSubmit = async (event: FormEvent) => {
@@ -45,7 +44,10 @@ function AuthScreen({
     setIsSubmitting(true);
     try {
       if (isRegister) {
-        await onRegister({ email, password, name, address, role });
+        if (password !== repeatPassword) {
+          throw new Error("Passwörter stimmen nicht überein.");
+        }
+        await onRegister({ email, password, name, address });
         pushToast("Konto erstellt und eingeloggt.", "success");
         return;
       }
@@ -90,27 +92,13 @@ function AuthScreen({
             {isRegister && (
               <>
                 <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Name (mind. 2 Zeichen)"
-                  minLength={2}
-                  required
+                  value={repeatPassword}
+                  onChange={(e) => setRepeatPassword(e.target.value)}
+                  placeholder="Passwort wiederholen"
+                  type="password"
                 />
-                <input
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Adresse (mind. 5 Zeichen)"
-                  minLength={5}
-                  required
-                />
-                <label className="field">
-                  <span>Rolle für Demo-Account</span>
-                  <select value={role} onChange={(e) => setRole(e.target.value as "USER" | "MODERATOR" | "MANAGER")}>
-                    <option value="USER">USER</option>
-                    <option value="MODERATOR">MODERATOR</option>
-                    <option value="MANAGER">MANAGER</option>
-                  </select>
-                </label>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Adresse" />
               </>
             )}
             {error && <p className="status-pill danger">{error}</p>}

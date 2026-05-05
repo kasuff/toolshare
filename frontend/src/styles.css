@@ -310,13 +310,6 @@ button {
   fill: currentColor;
 }
 
-.profile-avatar-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: inherit;
-}
-
 .profile-menu[open] .profile-avatar,
 .profile-menu summary:hover .profile-avatar {
   border-color: #9bcfb3;
@@ -363,38 +356,6 @@ button {
 
 .profile-menu-logout {
   color: var(--color-danger);
-}
-
-.profile-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.profile-image-wrap {
-  width: 72px;
-  height: 72px;
-}
-
-.profile-image {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #dbe5df;
-}
-
-.profile-image-fallback {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #eaf7f1;
-  color: #14532d;
-  font-size: 1.25rem;
-  font-weight: 700;
 }
 
 .btn,
