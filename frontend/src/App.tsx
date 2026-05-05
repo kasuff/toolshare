@@ -6,6 +6,7 @@ import { useSession } from "./hooks/useSession";
 import { ToastProvider, useToast } from "./hooks/useToast";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ToolsPage } from "./pages/ToolsPage";
+import { ToolDetailPage } from "./pages/ToolDetailPage";
 import { NewToolPage } from "./pages/NewToolPage";
 import { WorkshopsPage } from "./pages/WorkshopsPage";
 import { NewWorkshopPage } from "./pages/NewWorkshopPage";
@@ -134,6 +135,7 @@ function AppWithProviders() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="tools" element={<ToolsPage token={token ?? undefined} />} />
+        <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route path="tools/new" element={<NewToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route path="workshops" element={<WorkshopsPage token={token ?? undefined} />} />
         <Route

@@ -95,13 +95,20 @@ export function DashboardPage() {
           <h2>Werkzeuge</h2>
           <div className="horizontal-scroll">
             {tools.map((tool) => (
-              <div key={tool.id} className="scroll-card">
+              <Link key={tool.id} to={`/tools/${tool.id}`} className="scroll-card">
                 <div className="scroll-card-image">
                   <img src={tool.imageUrl || "https://via.placeholder.com/240x160"} alt={tool.name} />
                 </div>
                 <h4>{tool.name}</h4>
-                <p>{tool.category}</p>
-              </div>
+                <p className="scroll-card-category">{tool.category}</p>
+                <div className="scroll-card-status">
+                  {tool.status === "VERFUEGBAR" ? (
+                    <span className="status-badge available">Verfügbar</span>
+                  ) : (
+                    <span className="status-badge borrowed">Ausgeliehen</span>
+                  )}
+                </div>
+              </Link>
             ))}
           </div>
         </div>
