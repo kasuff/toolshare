@@ -1,5 +1,26 @@
+type NominatimAddressParts = {
+  road?: string;
+  house_number?: string;
+  postcode?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  country?: string;
+};
+
 type NominatimSearchResult = {
   display_name: string;
+  address?: NominatimAddressParts;
+};
+
+type StructuredAddressSuggestion = {
+  label: string;
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
+  country: string;
 };
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
@@ -31,17 +52,31 @@ async function searchAddress(query: string, limit: number): Promise<NominatimSea
   return Array.isArray(payload) ? payload : [];
 }
 
+function toStructuredSuggestion(result: NominatimSearchResult): StructuredAddressSuggestion {
+  const parts = result.address ?? {};
+  return {
+    label: result.display_name,
+    street: parts.road ?? "",
+    houseNumber: parts.house_number ?? "",
+    postalCode: parts.postcode ?? "",
+    city: parts.city ?? parts.town ?? parts.village ?? parts.municipality ?? "",
+    country: parts.country ?? "Deutschland"
+  };
+}
+
 export const addressService = {
   async suggest(query: string) {
     const results = await searchAddress(query, 5);
-    return results.map((result) => result.display_name);
+    return results.map(toStructuredSuggestion);
   },
 
   async validate(query: string) {
     const results = await searchAddress(query, 1);
+    const topResult = results[0];
     return {
       isValid: results.length > 0,
-      normalizedAddress: results[0]?.display_name ?? null
+      normalizedAddress: topResult?.display_name ?? null,
+      normalizedParts: topResult ? toStructuredSuggestion(topResult) : null
     };
   }
 };

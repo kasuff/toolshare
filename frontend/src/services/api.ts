@@ -30,6 +30,15 @@ type BackendMetrics = {
   openReports: number;
 };
 
+export type AddressSuggestion = {
+  label: string;
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
+  country: string;
+};
+
 type AuthPayload = {
   user: {
     id: string;
@@ -241,29 +250,33 @@ export const api = {
     });
   },
 
-  async suggestAddresses(query: string): Promise<string[]> {
+  async suggestAddresses(query: string): Promise<AddressSuggestion[]> {
     if (query.trim().length < 3) return [];
     try {
-      const response = await request<{ suggestions: Array<{ label: string }> }>(
+      const response = await request<{ suggestions: AddressSuggestion[] }>(
         `/address/suggest?q=${encodeURIComponent(query.trim())}`
       );
-      return response.suggestions.map((entry) => entry.label);
+      return response.suggestions;
     } catch {
       return [];
     }
   },
 
-  async validateAddress(query: string): Promise<{ isValid: boolean; normalizedAddress: string | null }> {
+  async validateAddress(query: string): Promise<{
+    isValid: boolean;
+    normalizedAddress: string | null;
+    normalizedParts: AddressSuggestion | null;
+  }> {
     if (query.trim().length < 5) {
-      return { isValid: false, normalizedAddress: null };
+      return { isValid: false, normalizedAddress: null, normalizedParts: null };
     }
     try {
-      return await request<{ isValid: boolean; normalizedAddress: string | null }>(
+      return await request<{ isValid: boolean; normalizedAddress: string | null; normalizedParts: AddressSuggestion | null }>(
         `/address/validate?q=${encodeURIComponent(query.trim())}`
       );
     } catch {
       // Do not hard-block registration/profile save if provider is unavailable.
-      return { isValid: true, normalizedAddress: null };
+      return { isValid: true, normalizedAddress: null, normalizedParts: null };
     }
   },
 

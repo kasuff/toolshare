@@ -14,7 +14,19 @@ import { InboxPage } from "./pages/InboxPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ModerationPage } from "./pages/ModerationPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
-import { api } from "./services/api";
+import { api, type AddressSuggestion } from "./services/api";
+
+type AddressFormFields = {
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
+  country: string;
+};
+
+function toAddressPayload(fields: AddressFormFields) {
+  return `${fields.street} ${fields.houseNumber}, ${fields.postalCode} ${fields.city}, ${fields.country}`.trim();
+}
 
 function AuthScreen({
   onLogin,
@@ -36,18 +48,26 @@ function AuthScreen({
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const [addressSearch, setAddressSearch] = useState("");
+  const [address, setAddress] = useState<AddressFormFields>({
+    street: "",
+    houseNumber: "",
+    postalCode: "",
+    city: "",
+    country: "Deutschland"
+  });
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!isRegister || address.trim().length < 3) {
+    if (!isRegister || addressSearch.trim().length < 3) {
       setAddressSuggestions([]);
       return;
     }
 
     const timer = window.setTimeout(() => {
-      void api.suggestAddresses(address).then((suggestions) => {
+      void api.suggestAddresses(addressSearch).then((suggestions) => {
         setAddressSuggestions(suggestions);
       });
     }, 250);
@@ -55,7 +75,7 @@ function AuthScreen({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [address, isRegister]);
+  }, [addressSearch, isRegister]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -66,11 +86,15 @@ function AuthScreen({
         if (password !== repeatPassword) {
           throw new Error("Passwörter stimmen nicht überein.");
         }
-        const validation = await api.validateAddress(address);
+        if (!address.street.trim() || !address.houseNumber.trim() || !address.postalCode.trim() || !address.city.trim()) {
+          throw new Error("Bitte Straße, Hausnummer, PLZ und Ort vollständig ausfüllen.");
+        }
+        const payloadAddress = toAddressPayload(address);
+        const validation = await api.validateAddress(payloadAddress);
         if (!validation.isValid) {
           throw new Error("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.");
         }
-        await onRegister({ email, password, name, address: validation.normalizedAddress ?? address.trim() });
+        await onRegister({ email, password, name, address: payloadAddress });
         pushToast("Konto erstellt und eingeloggt.", "success");
         return;
       }
@@ -103,6 +127,7 @@ function AuthScreen({
               placeholder="E-Mail"
               type="email"
               required
+              autoComplete={isRegister ? "email" : "username"}
             />
             <input
               value={password}
@@ -111,6 +136,7 @@ function AuthScreen({
               type="password"
               minLength={8}
               required
+              autoComplete={isRegister ? "new-password" : "current-password"}
             />
             {isRegister && (
               <>
@@ -119,19 +145,86 @@ function AuthScreen({
                   onChange={(e) => setRepeatPassword(e.target.value)}
                   placeholder="Passwort wiederholen"
                   type="password"
+                  autoComplete="new-password"
                 />
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
-                <input
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Adresse"
-                  list="register-address-suggestions"
-                />
-                <datalist id="register-address-suggestions">
-                  {addressSuggestions.map((suggestion) => (
-                    <option key={suggestion} value={suggestion} />
-                  ))}
-                </datalist>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoComplete="name" />
+                <div className="address-autocomplete">
+                  <input
+                    value={addressSearch}
+                    onChange={(e) => setAddressSearch(e.target.value)}
+                    onFocus={() => setIsAddressSearchFocused(true)}
+                    onBlur={() => window.setTimeout(() => setIsAddressSearchFocused(false), 120)}
+                    placeholder="Adresse suchen (optional für Autofill)"
+                    autoComplete="street-address"
+                  />
+                  {isAddressSearchFocused && addressSearch.trim().length >= 3 && (
+                    <div className="address-dropdown" role="listbox" aria-label="Adressvorschläge">
+                      <p className="address-dropdown-head">Vorschläge - klicken zum Übernehmen</p>
+                      {addressSuggestions.length > 0 ? (
+                        <ul className="address-suggestion-list">
+                          {addressSuggestions.map((suggestion) => (
+                            <li key={suggestion.label}>
+                              <button
+                                type="button"
+                                className="address-suggestion-item"
+                                onMouseDown={() => {
+                                  setAddress({
+                                    street: suggestion.street,
+                                    houseNumber: suggestion.houseNumber,
+                                    postalCode: suggestion.postalCode,
+                                    city: suggestion.city,
+                                    country: suggestion.country || "Deutschland"
+                                  });
+                                  setAddressSearch(suggestion.label);
+                                }}
+                              >
+                                <span className="address-suggestion-title">{suggestion.label}</span>
+                                <span className="address-suggestion-meta">
+                                  {suggestion.postalCode} {suggestion.city}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="address-suggestion-empty">Keine Vorschläge gefunden.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <p className="hint">Mindestens 3 Zeichen eingeben, um Adressvorschläge zu sehen.</p>
+                <div className="address-grid">
+                  <input
+                    value={address.street}
+                    onChange={(e) => setAddress((prev) => ({ ...prev, street: e.target.value }))}
+                    placeholder="Straße"
+                    autoComplete="address-line1"
+                  />
+                  <input
+                    value={address.houseNumber}
+                    onChange={(e) => setAddress((prev) => ({ ...prev, houseNumber: e.target.value }))}
+                    placeholder="Hausnummer"
+                    autoComplete="address-line2"
+                  />
+                  <input
+                    value={address.postalCode}
+                    onChange={(e) => setAddress((prev) => ({ ...prev, postalCode: e.target.value }))}
+                    placeholder="PLZ"
+                    autoComplete="postal-code"
+                  />
+                  <input
+                    value={address.city}
+                    onChange={(e) => setAddress((prev) => ({ ...prev, city: e.target.value }))}
+                    placeholder="Ort"
+                    autoComplete="address-level2"
+                  />
+                  <input
+                    value={address.country}
+                    onChange={(e) => setAddress((prev) => ({ ...prev, country: e.target.value }))}
+                    placeholder="Land"
+                    autoComplete="country-name"
+                  />
+                </div>
               </>
             )}
             {error && <p className="status-pill danger">{error}</p>}
