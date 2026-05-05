@@ -65,12 +65,31 @@ function AuthScreen({
         <div className="auth-form">
           <h2>{isRegister ? "Konto erstellen" : "Willkommen zurück"}</h2>
           <form className="stack" onSubmit={(event) => void onSubmit(event)}>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" type="email" />
-            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Passwort" type="password" />
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="E-Mail"
+              type="email"
+              required
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Passwort"
+              type="password"
+              minLength={8}
+              required
+            />
             {isRegister && (
               <>
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Adresse" />
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" minLength={2} required />
+                <input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Adresse"
+                  minLength={5}
+                  required
+                />
                 <label className="field">
                   <span>Rolle für Demo-Account</span>
                   <select value={role} onChange={(e) => setRole(e.target.value as "USER" | "MODERATOR" | "MANAGER")}>

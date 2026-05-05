@@ -23,7 +23,7 @@ export const toolsService = {
     return tool;
   },
 
-  create(input: { ownerId: string; name: string; description: string; category: string }) {
+  create(input: { ownerId: string; name: string; description: string; category: string; imageUrl?: string }) {
     return toolsRepository.create(input);
   },
 
@@ -35,6 +35,7 @@ export const toolsService = {
       name?: string;
       description?: string;
       category?: string;
+        imageUrl?: string;
       status?: "AVAILABLE" | "REQUESTED" | "BORROWED";
     };
   }) {

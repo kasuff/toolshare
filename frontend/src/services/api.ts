@@ -26,6 +26,7 @@ type BackendTool = {
   name: string;
   description: string;
   category: string;
+  imageUrl?: string | null;
   status: BackendToolStatus;
 };
 
@@ -100,7 +101,23 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
     let message = `Request failed: ${response.status}`;
     try {
       const payload = (await response.json()) as { message?: string };
-      if (payload.message) message = payload.message;
+      if (payload.message) {
+        message = payload.message;
+      } else if (typeof payload === "object" && payload && "error" in payload) {
+        const error = payload as { error?: { message?: string; details?: { fieldErrors?: Record<string, string[]> } } };
+        if (error.error?.message) {
+          message = error.error.message;
+        }
+
+        const fieldErrors = error.error?.details?.fieldErrors;
+        if (fieldErrors) {
+          const fieldMessages = Object.entries(fieldErrors)
+            .flatMap(([field, messages]) => messages.map((fieldMessage) => `${field}: ${fieldMessage}`));
+          if (fieldMessages.length > 0) {
+            message = `${message} (${fieldMessages.join(", ")})`;
+          }
+        }
+      }
     } catch {
       // keep fallback message
     }
@@ -119,7 +136,7 @@ function mapTool(tool: BackendTool): Tool {
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: "https://picsum.photos/seed/toolshare-default/600/300"
+    imageUrl: tool.imageUrl ?? "https://picsum.photos/seed/toolshare-default/600/300"
   };
 }
 
@@ -223,7 +240,10 @@ export const api = {
     return tools.map(mapTool);
   },
 
-  async createTool(input: { name: string; description: string; category: string }, token: string): Promise<Tool> {
+  async createTool(
+    input: { name: string; description: string; category: string; imageUrl?: string },
+    token: string
+  ): Promise<Tool> {
     const created = await request<BackendTool>(
       "/tools",
       {

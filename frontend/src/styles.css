@@ -623,3 +623,229 @@ td {
     background-position: 0 0;
   }
 }
+
+/* ===== Image Upload Component ===== */
+.image-upload {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.image-upload label {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.image-preview-container {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-soft);
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  width: 100%;
+  text-align: inherit;
+  color: inherit;
+}
+
+.image-preview-container:focus-visible {
+  outline: 3px solid rgba(31, 138, 91, 0.25);
+  outline-offset: 2px;
+}
+
+.image-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  max-height: 400px;
+}
+
+.image-placeholder {
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.image-placeholder p {
+  margin: 0;
+}
+
+.image-placeholder p:first-child {
+  font-size: 3rem;
+}
+
+.image-placeholder p:last-child {
+  font-size: 0.9rem;
+}
+
+.image-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: var(--space-3) var(--space-4);
+}
+
+.image-info p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.button-group {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.btn-secondary {
+  background: #f3f4f6 !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb !important;
+}
+
+.btn-outline {
+  background: transparent !important;
+  color: var(--color-brand) !important;
+  border: 2px solid var(--color-brand) !important;
+}
+
+.btn-outline:hover {
+  background: var(--color-brand-soft) !important;
+}
+
+/* ===== Category Select Component ===== */
+.category-select {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.category-select label {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.select-field {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: white;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.select-field:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px rgba(31, 138, 91, 0.1);
+}
+
+.select-field option {
+  padding: var(--space-2);
+}
+
+/* ===== Owner Contact Card ===== */
+.owner-contact-card {
+  border: 1px solid #cde8d8;
+  background: #f5fbf8;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.owner-contact-card h3 {
+  margin: 0;
+  color: var(--color-brand-strong);
+  font-size: 1.1rem;
+}
+
+.contact-info {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.contact-field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.contact-field label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-brand-strong);
+}
+
+.contact-field p {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.contact-field a {
+  color: var(--color-brand);
+  text-decoration: none;
+}
+
+.contact-field a:hover {
+  text-decoration: underline;
+}
+
+.contact-note {
+  border-top: 1px solid #b7e2ca;
+  padding-top: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.contact-note p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #14532d;
+}
+
+/* ===== Info Box ===== */
+.info-box {
+  border-left: 4px solid var(--color-brand);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-brand-soft);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.info-box p {
+  margin: 0;
+  color: var(--color-brand-strong);
+}
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 640px) {
+  .image-upload {
+    gap: var(--space-2);
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .button-group button,
+  .button-group .btn {
+    width: 100%;
+  }
+
+  .contact-info {
+    gap: var(--space-2);
+  }
+
+}
