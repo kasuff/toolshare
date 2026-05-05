@@ -68,7 +68,6 @@ describe("Authentication user journey", () => {
   });
 
   it("autofills address fields when suggestions exist", async () => {
-    vi.useFakeTimers();
     vi.mocked(api.suggestAddresses).mockResolvedValue([
       {
         label: "Musterstrasse 10, 80802 Muenchen, Deutschland",
@@ -82,10 +81,9 @@ describe("Authentication user journey", () => {
 
     renderApp("/auth");
 
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
     await user.type(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), "Muster");
-    vi.advanceTimersByTime(300);
 
     await user.click(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
 
@@ -93,18 +91,16 @@ describe("Authentication user journey", () => {
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
     expect(screen.getByDisplayValue("80802")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Muenchen")).toBeInTheDocument();
-    expect(screen.getByText("Musterstrasse 10, 80802 Muenchen, Deutschland")).toBeInTheDocument();
+    expect(screen.getByText("Musterstrasse 10, 80802 Muenchen, Deutschland", { selector: "p.address-preview" })).toBeInTheDocument();
   });
 
   it("shows no-suggestion state and keeps manual fields unchanged", async () => {
-    vi.useFakeTimers();
     vi.mocked(api.suggestAddresses).mockResolvedValue([]);
 
     renderApp("/auth");
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
     await user.type(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), "zzz");
-    vi.advanceTimersByTime(300);
 
     expect(await screen.findByText("Keine Vorschläge gefunden.")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Straße")).toHaveValue("");
