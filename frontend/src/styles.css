@@ -664,11 +664,35 @@ button.mini {
 .address-grid {
   display: grid;
   gap: var(--space-2);
-  grid-template-columns: 1.3fr 0.7fr 0.8fr 1.2fr;
+  grid-template-columns: minmax(0, 1.4fr) minmax(6.5rem, 0.7fr) minmax(6rem, 0.8fr) minmax(0, 1.2fr);
+}
+
+.address-grid input {
+  min-width: 0;
+}
+
+.address-grid input:first-child {
+  grid-column: 1 / span 2;
+}
+
+.address-grid input:nth-child(4) {
+  grid-column: 1 / span 2;
 }
 
 .address-grid input:last-child {
   grid-column: 1 / -1;
+}
+
+.address-preview {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .empty-state {

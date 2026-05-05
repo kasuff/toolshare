@@ -39,6 +39,10 @@ function toAddressPayload(fields: AddressFormFields) {
   return `${fields.street} ${fields.houseNumber}, ${fields.postalCode} ${fields.city}, ${fields.country}`.trim();
 }
 
+function toAddressPreview(fields: AddressFormFields) {
+  return toAddressPayload(fields).replace(/\s+,/g, ",").replace(/\s{2,}/g, " ").trim();
+}
+
 export function ProfileSettingsPage({ currentUser, onSave }: Props) {
   const { pushToast } = useToast();
   const [name, setName] = useState(currentUser?.name ?? "");
@@ -47,6 +51,7 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const addressPreview = toAddressPreview(address);
 
   useEffect(() => {
     setName(currentUser?.name ?? "");
@@ -232,6 +237,11 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
                 autoComplete="country-name"
               />
             </div>
+            {addressPreview.length > 0 && (
+              <p className="address-preview" aria-live="polite">
+                {addressPreview}
+              </p>
+            )}
           </Field>
           <div className="row">
             <button type="submit" disabled={isSaving}>
