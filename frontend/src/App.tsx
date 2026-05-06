@@ -35,9 +35,12 @@ function AuthScreen({
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [role, setRole] = useState<"USER" | "MODERATOR" | "MANAGER">("USER");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       if (isRegister) {
         await onRegister({ email, password, name, address, role });
@@ -48,6 +51,8 @@ function AuthScreen({
       pushToast("Erfolgreich eingeloggt.", "success");
     } catch (submitError) {
       pushToast(submitError instanceof Error ? submitError.message : "Authentifizierung fehlgeschlagen.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -65,12 +70,25 @@ function AuthScreen({
         <div className="auth-form">
           <h2>{isRegister ? "Konto erstellen" : "Willkommen zurück"}</h2>
           <form className="stack" onSubmit={(event) => void onSubmit(event)}>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" type="email" />
-            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Passwort" type="password" />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" type="email" required />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Passwort (mind. 8 Zeichen)"
+              type="password"
+              minLength={8}
+              required
+            />
             {isRegister && (
               <>
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Adresse" />
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (mind. 2 Zeichen)" minLength={2} required />
+                <input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Adresse (mind. 5 Zeichen)"
+                  minLength={5}
+                  required
+                />
                 <label className="field">
                   <span>Rolle für Demo-Account</span>
                   <select value={role} onChange={(e) => setRole(e.target.value as "USER" | "MODERATOR" | "MANAGER")}>
@@ -82,9 +100,11 @@ function AuthScreen({
               </>
             )}
             {error && <p className="status-pill danger">{error}</p>}
-            <button type="submit">{isRegister ? "Registrieren und starten" : "Einloggen"}</button>
+            <button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Bitte warten..." : isRegister ? "Registrieren und starten" : "Einloggen"}
+            </button>
           </form>
-          <button className="auth-switch" onClick={() => setIsRegister((v) => !v)}>
+          <button className="auth-switch" type="button" onClick={() => setIsRegister((v) => !v)}>
             {isRegister ? "Du hast schon ein Konto? Zum Login" : "Neu bei Toolshare? Jetzt registrieren"}
           </button>
         </div>
@@ -122,7 +142,7 @@ function AppWithProviders() {
           element={<NewWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />}
         />
         <Route path="inbox" element={<InboxPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
-        {currentUser?.role === "MODERATOR" && (
+        {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && (
           <Route path="moderation" element={<ModerationPage currentUser={currentUser} token={token ?? undefined} />} />
         )}
         {currentUser?.role === "ADMIN" && (

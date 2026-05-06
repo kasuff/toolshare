@@ -7,6 +7,7 @@ import {
   listUsersSchema,
   updateMyProfileSchema,
   updateUserRoleSchema,
+  updateUserSuspensionSchema,
   userIdParamSchema
 } from "./users.schema";
 
@@ -15,6 +16,7 @@ export const usersRouter = Router();
 usersRouter.use(requireAuth);
 usersRouter.get("/me", usersController.getMine);
 usersRouter.patch("/me", validate(updateMyProfileSchema), usersController.updateMine);
+usersRouter.get("/admin/metrics", requireRole("MANAGER"), usersController.adminMetrics);
 
 usersRouter.get("/", requireRole("MODERATOR", "MANAGER"), validate(listUsersSchema), usersController.list);
 usersRouter.get(
@@ -28,4 +30,10 @@ usersRouter.patch(
   requireRole("MANAGER"),
   validate(updateUserRoleSchema),
   usersController.updateRole
+);
+usersRouter.patch(
+  "/:id/suspension",
+  requireRole("MANAGER"),
+  validate(updateUserSuspensionSchema),
+  usersController.updateSuspension
 );

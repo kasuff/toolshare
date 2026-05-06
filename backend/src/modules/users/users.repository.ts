@@ -6,6 +6,7 @@ const publicUserSelect = {
   name: true,
   address: true,
   role: true,
+  isSuspended: true,
   createdAt: true
 } as const;
 
@@ -50,5 +51,25 @@ export const usersRepository = {
       data: { role },
       select: publicUserSelect
     });
+  },
+
+  updateSuspension(id: string, isSuspended: boolean) {
+    return prisma.user.update({
+      where: { id },
+      data: { isSuspended },
+      select: publicUserSelect
+    });
+  },
+
+  async getSystemMetrics() {
+    const [users, tools, workshops, openBookings, openReports] = await prisma.$transaction([
+      prisma.user.count(),
+      prisma.tool.count(),
+      prisma.workshop.count(),
+      prisma.booking.count({ where: { status: "PENDING" } }),
+      prisma.report.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] } } })
+    ]);
+
+    return { users, tools, workshops, openBookings, openReports };
   }
 };

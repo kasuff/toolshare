@@ -59,6 +59,10 @@ export const authService = {
       throw new AppError("INVALID_CREDENTIALS", "Invalid credentials", 401);
     }
 
+    if (user.isSuspended) {
+      throw new AppError("ACCOUNT_SUSPENDED", "Konto ist gesperrt.", 403);
+    }
+
     const isValid = await bcrypt.compare(input.password, user.passwordHash);
     if (!isValid) {
       throw new AppError("INVALID_CREDENTIALS", "Invalid credentials", 401);
@@ -72,14 +76,26 @@ export const authService = {
     };
   },
 
-  refresh(refreshToken: string) {
+  async refresh(refreshToken: string) {
     try {
       const payload = jwt.verify(refreshToken, env.jwtSecret) as TokenPayload;
+      const user = await authRepository.findById(payload.userId);
+      if (!user) {
+        throw new AppError("UNAUTHORIZED", "Invalid refresh token", 401);
+      }
+
+      if (user.isSuspended) {
+        throw new AppError("ACCOUNT_SUSPENDED", "Konto ist gesperrt.", 403);
+      }
+
       return {
-        accessToken: signAccessToken({ userId: payload.userId, role: payload.role }),
-        refreshToken: signRefreshToken({ userId: payload.userId, role: payload.role })
+        accessToken: signAccessToken({ userId: payload.userId, role: user.role }),
+        refreshToken: signRefreshToken({ userId: payload.userId, role: user.role })
       };
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       throw new AppError("UNAUTHORIZED", "Invalid refresh token", 401);
     }
   }

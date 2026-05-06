@@ -24,7 +24,7 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
           {currentUser && <NavLink to="/inbox">Inbox</NavLink>}
           {currentUser && <NavLink to="/tools/new">Anbieten</NavLink>}
           {currentUser && <NavLink to="/workshops/new">Werkstatt anlegen</NavLink>}
-          {currentUser?.role === "MODERATOR" && <NavLink to="/moderation">Moderation</NavLink>}
+          {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && <NavLink to="/moderation">Moderation</NavLink>}
           {currentUser?.role === "ADMIN" && <NavLink to="/admin">Admin</NavLink>}
         </nav>
         <div className="topbar-right">

@@ -2,16 +2,25 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import type { Express } from "express";
+import { authRepository } from "../src/modules/auth/auth.repository";
 import { usersRepository } from "../src/modules/users/users.repository";
 
 vi.mock("../src/modules/users/users.repository", () => ({
   usersRepository: {
     findByIdPublic: vi.fn(),
-    updateRole: vi.fn()
+    updateRole: vi.fn(),
+    updateSuspension: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/auth/auth.repository", () => ({
+  authRepository: {
+    findById: vi.fn()
   }
 }));
 
 const mockedUsersRepository = vi.mocked(usersRepository);
+const mockedAuthRepository = vi.mocked(authRepository);
 
 const MANAGER_ACTOR_ID = "11111111-1111-1111-1111-111111111111";
 const TARGET_MANAGER_ID = "22222222-2222-2222-2222-222222222222";
@@ -30,6 +39,11 @@ describe("PATCH /api/users/:id/role integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedAuthRepository.findById.mockResolvedValue({
+      id: MANAGER_ACTOR_ID,
+      role: "MANAGER",
+      isSuspended: false
+    });
   });
 
   const managerToken = () =>
@@ -48,6 +62,7 @@ describe("PATCH /api/users/:id/role integration", () => {
       name: "Manager",
       address: "Main Street 1",
       role: "MANAGER",
+      isSuspended: false,
       createdAt: new Date()
     });
 
@@ -73,6 +88,7 @@ describe("PATCH /api/users/:id/role integration", () => {
       name: "User",
       address: "Main Street 2",
       role: "USER",
+      isSuspended: false,
       createdAt: new Date()
     });
 
@@ -82,6 +98,7 @@ describe("PATCH /api/users/:id/role integration", () => {
       name: "User",
       address: "Main Street 2",
       role: "MODERATOR",
+      isSuspended: false,
       createdAt: new Date()
     });
 
@@ -99,6 +116,12 @@ describe("PATCH /api/users/:id/role integration", () => {
   });
 
   it("rejects request when caller is not MANAGER", async () => {
+    mockedAuthRepository.findById.mockResolvedValueOnce({
+      id: MANAGER_ACTOR_ID,
+      role: "MODERATOR",
+      isSuspended: false
+    });
+
     const moderatorToken = jwt.sign(
       {
         userId: MANAGER_ACTOR_ID,
