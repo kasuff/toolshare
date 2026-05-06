@@ -40,6 +40,14 @@ export function ToolsPage({ token }: Props) {
     <section className="stack">
       <h1>Werkzeuge</h1>
 
+      <div className="page-actions">
+        {token && (
+          <Link to="/tools/new" className="btn offer-tool">
+            Werkzeug anbieten
+          </Link>
+        )}
+      </div>
+
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
           <p className="result-summary">

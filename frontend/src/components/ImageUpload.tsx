@@ -1,16 +1,21 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface ImageUploadProps {
   onImageSelect: (imageData: string | null) => void;
   currentImage?: string;
+  placeholderImage: string;
   label: string;
   hint?: string;
 }
 
-export function ImageUpload({ onImageSelect, currentImage, label, hint }: ImageUploadProps) {
-  const [preview, setPreview] = useState<string | null>(currentImage || null);
+export function ImageUpload({ onImageSelect, currentImage, placeholderImage, label, hint }: ImageUploadProps) {
+  const [preview, setPreview] = useState<string | null>(currentImage || placeholderImage);
   const [fileName, setFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setPreview(currentImage || placeholderImage);
+  }, [currentImage, placeholderImage]);
 
   const openFileDialog = () => {
     fileInputRef.current?.click();
@@ -43,7 +48,7 @@ export function ImageUpload({ onImageSelect, currentImage, label, hint }: ImageU
   };
 
   const handleClear = () => {
-    setPreview(null);
+    setPreview(placeholderImage);
     setFileName("");
     onImageSelect(null);
     if (fileInputRef.current) {
@@ -63,7 +68,7 @@ export function ImageUpload({ onImageSelect, currentImage, label, hint }: ImageU
           <>
             <img src={preview} alt="Preview" className="image-preview" />
             <div className="image-info">
-              <p>{fileName || "Bild ausgewählt"}</p>
+              <p>{fileName || "Standardbild verwendet"}</p>
               <p>Klicken zum Ersetzen</p>
             </div>
           </>
@@ -92,7 +97,7 @@ export function ImageUpload({ onImageSelect, currentImage, label, hint }: ImageU
         >
           {preview ? "Bild wechseln" : "Bild hochladen"}
         </button>
-        {preview && (
+        {fileName && (
           <button type="button" onClick={handleClear} className="btn btn-outline">
             Entfernen
           </button>

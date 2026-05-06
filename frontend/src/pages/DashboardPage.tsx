@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ButtonLink } from "../components/ui";
+import { ButtonLink, HammerIcon } from "../components/ui";
 import { api } from "../services/api";
+import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory } from "../utils/categories";
 import type { Tool, Workshop } from "../types/domain";
 
 export function DashboardPage() {
@@ -53,9 +54,7 @@ export function DashboardPage() {
           {/* Werkzeuge Card */}
           <Link to="/tools" className="quick-start-card">
             <div className="card-icon tools-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12h18M8 12l2-4m0 4l-2 4m8-4l2-4m0 4l-2 4M6 6l2-2m0 2l-2 2m12 0l2-2m0 2l-2 2M4 18l2-2m0 2l-2 2m14 0l2-2m0 2l-2 2" />
-              </svg>
+              <HammerIcon />
             </div>
             <h3>Werkzeuge entdecken</h3>
             <p>Suche nach Kategorie, Verfügbarkeit und starte eine Ausleihanfrage.</p>
@@ -97,7 +96,7 @@ export function DashboardPage() {
             {tools.map((tool) => (
               <Link key={tool.id} to={`/tools/${tool.id}`} className="scroll-card">
                 <div className="scroll-card-image">
-                  <img src={tool.imageUrl || "https://via.placeholder.com/240x160"} alt={tool.name} />
+                  <img src={tool.imageUrl || getPlaceholderImageForCategory(tool.category)} alt={tool.name} />
                 </div>
                 <h4>{tool.name}</h4>
                 <p className="scroll-card-category">{tool.category}</p>
@@ -122,7 +121,7 @@ export function DashboardPage() {
             {workshops.map((workshop) => (
               <div key={workshop.id} className="scroll-card">
                 <div className="scroll-card-image">
-                  <img src={workshop.imageUrls?.[0] || "https://via.placeholder.com/240x160"} alt={workshop.name} />
+                  <img src={workshop.imageUrls?.[0] || DEFAULT_PLACEHOLDER_IMAGE} alt={workshop.name} />
                 </div>
                 <h4>{workshop.name}</h4>
                 <p>{workshop.location}</p>

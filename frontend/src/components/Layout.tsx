@@ -40,53 +40,15 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
         <nav className="nav" ref={dropdownRef}>
           <NavLink to="/">Entdecken</NavLink>
           
-          {/* Werkzeuge Dropdown */}
-          <div className="nav-dropdown">
-            <button
-              className="nav-dropdown-toggle"
-              onClick={() => toggleDropdown("tools")}
-              aria-expanded={activeDropdown === "tools"}
-            >
-              Werkzeuge
-              <span className="dropdown-arrow">›</span>
-            </button>
-            {activeDropdown === "tools" && (
-              <div className="nav-dropdown-menu">
-                <Link to="/tools" className="nav-dropdown-item" onClick={() => setActiveDropdown(null)}>
-                  Werkzeuge anschauen
-                </Link>
-                {currentUser && (
-                  <Link to="/tools/new" className="nav-dropdown-item" onClick={() => setActiveDropdown(null)}>
-                    Werkzeug anbieten
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Werkzeuge link */}
+          <NavLink to="/tools" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Werkzeuge
+          </NavLink>
 
-          {/* Werkstätten Dropdown */}
-          <div className="nav-dropdown">
-            <button
-              className="nav-dropdown-toggle"
-              onClick={() => toggleDropdown("workshops")}
-              aria-expanded={activeDropdown === "workshops"}
-            >
-              Werkstätten
-              <span className="dropdown-arrow">›</span>
-            </button>
-            {activeDropdown === "workshops" && (
-              <div className="nav-dropdown-menu">
-                <Link to="/workshops" className="nav-dropdown-item" onClick={() => setActiveDropdown(null)}>
-                  Werkstatt anschauen
-                </Link>
-                {currentUser && (
-                  <Link to="/workshops/new" className="nav-dropdown-item" onClick={() => setActiveDropdown(null)}>
-                    Werkstatt anlegen
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Werkstätten link (no dropdown) */}
+          <NavLink to="/workshops" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Werkstätten
+          </NavLink>
 
           {currentUser && <NavLink to="/inbox">Inbox</NavLink>}
           {currentUser?.role === "MODERATOR" && <NavLink to="/moderation">Moderation</NavLink>}

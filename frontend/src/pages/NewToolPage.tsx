@@ -6,7 +6,7 @@ import { CategorySelect } from "../components/CategorySelect";
 import { OwnerContactCard } from "../components/OwnerContactCard";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import { getPlaceholderImageForCategory } from "../utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory } from "../utils/categories";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -22,6 +22,7 @@ export function NewToolPage({ currentUser, token }: Props) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const previewImage = uploadedImage || (category ? getPlaceholderImageForCategory(category) : DEFAULT_PLACEHOLDER_IMAGE);
 
   // Fallback for user data if not provided
   const [owner, setOwner] = useState<User | null>(currentUser || null);
@@ -112,7 +113,8 @@ export function NewToolPage({ currentUser, token }: Props) {
           {/* Bild Upload */}
           <ImageUpload
             onImageSelect={setUploadedImage}
-            currentImage={uploadedImage || undefined}
+            currentImage={previewImage}
+            placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
             label="Werkzeug Foto"
             hint="Lade ein gutes Foto deines Werkzeugs hoch (JPG, PNG, max. 5MB). Ohne Upload wird ein Standard-Bild für deine Kategorie verwendet."
           />

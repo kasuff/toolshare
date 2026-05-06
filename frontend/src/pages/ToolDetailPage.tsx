@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { StatusPill } from "../components/ui";
+import { getPlaceholderImageForCategory } from "../utils/categories";
 import type { Tool, User } from "../types/domain";
 
 type Props = {
@@ -118,7 +119,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
 
       {/* Hero Image with Status */}
       <div className="tool-hero">
-        <img src={tool.imageUrl || "https://via.placeholder.com/600x400"} alt={tool.name} />
+        <img src={tool.imageUrl || getPlaceholderImageForCategory(tool.category)} alt={tool.name} />
         <div className="tool-status-badge">
           <span className={`status-badge ${isAvailable ? "available" : "borrowed"}`}>
             {isAvailable ? "Verfügbar" : "Ausgeliehen"}
@@ -228,6 +229,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
             </div>
           ) : isAvailable ? (
             <div className="playtomic-booking-panel">
+              <h2>Werkzeug buchen</h2>
               <p className="booking-hint">
                 <strong>Einloggen, um zu buchen</strong>
               </p>
@@ -237,7 +239,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
             </div>
           ) : (
             <div className="playtomic-booking-panel unavailable">
-              <div className="unavailable-icon">🔒</div>
+              <h2>Werkzeug buchen</h2>
               <p><strong>Dieses Werkzeug ist derzeit ausgeliehen.</strong></p>
               <p className="booking-hint">
                 Schau später noch mal vorbei oder kontaktiere den Anbieter.
