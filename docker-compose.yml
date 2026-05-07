@@ -14,6 +14,7 @@ services:
       - VITE_API_URL=http://localhost:4000/api
     depends_on:
       - backend
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 3000"
 
   backend:
     build:
@@ -28,7 +29,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npx prisma db push && npm run dev"
+    command: sh -c "npx prisma db push --accept-data-loss && npm run dev"
     volumes:
       - ./backend/src:/app/src
       - ./backend/prisma:/app/prisma

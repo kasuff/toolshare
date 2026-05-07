@@ -23,7 +23,8 @@ export const toolsController = {
       ownerId: req.authUser!.userId,
       name: req.body.name,
       description: req.body.description,
-      category: req.body.category
+      category: req.body.category,
+      imageUrl: req.body.imageUrl
     });
     res.status(201).json(tool);
   }),
@@ -37,6 +38,7 @@ export const toolsController = {
         name: req.body.name,
         description: req.body.description,
         category: req.body.category,
+        imageUrl: req.body.imageUrl,
         status: req.body.status
       }
     });

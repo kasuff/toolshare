@@ -59,13 +59,14 @@ export const toolsRepository = {
     });
   },
 
-  create(input: { ownerId: string; name: string; description: string; category: string }) {
+  create(input: { ownerId: string; name: string; description: string; category: string; imageUrl?: string }) {
     return prisma.tool.create({
       data: {
         ownerId: input.ownerId,
         name: input.name,
         description: input.description,
         category: input.category,
+        imageUrl: input.imageUrl,
         status: "AVAILABLE"
       }
     });
@@ -77,6 +78,7 @@ export const toolsRepository = {
       name?: string;
       description?: string;
       category?: string;
+      imageUrl?: string;
       status?: "AVAILABLE" | "REQUESTED" | "BORROWED";
     }
   ) {

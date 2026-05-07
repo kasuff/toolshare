@@ -29,6 +29,34 @@ export function StatusPill({ label, tone = "neutral" }: { label: string; tone?: 
   return <span className={`status-pill ${tone}`}>{label}</span>;
 }
 
+export function HammerIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M11.414 10 4.031 17.418a2.091 2.091 0 0 0 0 2.967 2.11 2.11 0 0 0 2.976 0l7.407-7.385" />
+      <path d="M18.121 15.293 20.707 12.707a1 1 0 0 0 0-1.414l-7.586-7.586a1 1 0 0 0-1.414 0L9.121 6.293a1 1 0 0 0 0 1.414l7.586 7.586a1 1 0 0 0 1.414 0" />
+    </svg>
+  );
+}
+
+export function InboxBubbleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2h11A2.5 2.5 0 0 1 20 4.5v8A2.5 2.5 0 0 1 17.5 15H10l-4.7 3.8c-.6.5-1.5.1-1.5-.7V15A2.5 2.5 0 0 1 4 12.5v-8z" />
+      <circle cx="9" cy="8.5" r="1.1" />
+      <circle cx="12" cy="8.5" r="1.1" />
+      <circle cx="15" cy="8.5" r="1.1" />
+    </svg>
+  );
+}
+
 export function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className="empty-state">
