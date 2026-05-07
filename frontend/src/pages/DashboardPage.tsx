@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ButtonLink, HammerIcon } from "../components/ui";
+import { ButtonLink, HammerIcon, InboxBubbleIcon } from "../components/ui";
 import { api } from "../services/api";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory } from "../utils/categories";
 import type { Tool, Workshop } from "../types/domain";
@@ -77,9 +77,7 @@ export function DashboardPage() {
           {/* Inbox Card */}
           <Link to="/inbox" className="quick-start-card">
             <div className="card-icon inbox-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 8h18M3 8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2m0 0V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1" />
-              </svg>
+              <InboxBubbleIcon />
             </div>
             <h3>Anfragen verwalten</h3>
             <p>Status, Benachrichtigungen und Entscheidungen zentral in der Inbox.</p>
