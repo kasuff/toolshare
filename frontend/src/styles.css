@@ -667,19 +667,24 @@ button.mini {
   grid-template-columns: minmax(0, 1.4fr) minmax(6.5rem, 0.7fr) minmax(6rem, 0.8fr) minmax(0, 1.2fr);
 }
 
+.address-field {
+  display: grid;
+  gap: 0.3rem;
+}
+
 .address-grid input {
   min-width: 0;
 }
 
-.address-grid input:first-child {
+.address-field-street {
   grid-column: 1 / span 2;
 }
 
-.address-grid input:nth-child(4) {
+.address-field-city {
   grid-column: 1 / span 2;
 }
 
-.address-grid input:last-child {
+.address-field-country {
   grid-column: 1 / -1;
 }
 
@@ -707,6 +712,17 @@ button.mini {
 .hint {
   color: var(--color-text-muted);
   font-size: 0.92rem;
+}
+
+.input-invalid {
+  border-color: #fca5a5;
+  background: #fff5f5;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.82rem;
 }
 
 details {
