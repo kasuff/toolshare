@@ -16,21 +16,9 @@ export function ToolsPage({ token }: Props) {
   const { pushToast } = useToast();
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
-  const [startIso, setStartIso] = useState("");
-  const [pickupIso, setPickupIso] = useState("");
-  const [durationDays, setDurationDays] = useState(2);
-  const [activeToolId, setActiveToolId] = useState<string | null>(null);
   const [tools, setTools] = useState<Awaited<ReturnType<typeof api.getTools>>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-
-  const computeEndIso = (startValue: string, days: number) => {
-    if (!startValue) return "";
-    const start = new Date(startValue);
-    if (Number.isNaN(start.getTime())) return "";
-    start.setDate(start.getDate() + days);
-    return `${start.getFullYear()}-${`${start.getMonth() + 1}`.padStart(2, "0")}-${`${start.getDate()}`.padStart(2, "0")}T${`${start.getHours()}`.padStart(2, "0")}:${`${start.getMinutes()}`.padStart(2, "0")}`;
-  };
 
   useEffect(() => {
     const run = async () => {
@@ -48,36 +36,17 @@ export function ToolsPage({ token }: Props) {
     void run();
   }, [q, category, token, pushToast]);
 
-  const requestTool = async (toolId: string) => {
-    const endIso = computeEndIso(startIso, durationDays);
-    if (!startIso || !endIso || !pickupIso) {
-      pushToast("Bitte Start, Ende und Abholzeit ausfüllen.", "error");
-      return;
-    }
-    if (!token) {
-      pushToast("Bitte logge dich ein, um eine Ausleihe anzufragen.", "error");
-      return;
-    }
-
-    try {
-      await api.createToolRequest(
-        {
-          toolId,
-          startIso,
-          endIso,
-          pickupTimeIso: pickupIso
-        },
-        token
-      );
-      pushToast("Ausleihanfrage erstellt.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Anfrage konnte nicht erstellt werden.", "error");
-    }
-  };
-
   return (
     <section className="stack">
       <h1>Werkzeuge</h1>
+
+      <div className="page-actions">
+        {token && (
+          <Link to="/tools/new" className="btn offer-tool">
+            Werkzeug anbieten
+          </Link>
+        )}
+      </div>
 
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
@@ -110,44 +79,13 @@ export function ToolsPage({ token }: Props) {
         <GuestBanner text="Du kannst als Gast stöbern. Für Ausleihanfragen bitte einloggen." />
       )}
 
-      {token && (
-        <Surface
-          title="Ausleihanfrage vorbereiten"
-          subtitle="Die Eingaben gelten für die ausgewählte Karte"
-          className="interactive"
-        >
-          <div className="request-panel">
-            <Field label="Ausleihstart">
-              <input type="datetime-local" value={startIso} onChange={(e) => setStartIso(e.target.value)} />
-            </Field>
-            <div className="slider-row">
-              <label htmlFor="duration-slider">
-                Dauer: <strong>{durationDays} Tag{durationDays === 1 ? "" : "e"}</strong>
-              </label>
-              <input
-                id="duration-slider"
-                type="range"
-                min={1}
-                max={14}
-                value={durationDays}
-                onChange={(e) => setDurationDays(Number(e.target.value))}
-              />
-              <p className="hint">Ende wird automatisch berechnet: {computeEndIso(startIso, durationDays) || "—"}</p>
-            </div>
-            <Field label="Gewünschte Abholzeit">
-              <input type="datetime-local" value={pickupIso} onChange={(e) => setPickupIso(e.target.value)} />
-            </Field>
-          </div>
-        </Surface>
-      )}
-
       <div className="cards">
         {isLoading && <SkeletonCards />}
         {!isLoading && hasLoaded && tools.length === 0 && (
           <EmptyState title="Keine Treffer" text="Passe Suche oder Kategorie an, um passende Werkzeuge zu finden." />
         )}
         {tools.map((t) => (
-          <article key={t.id} className="card card-enter">
+          <Link key={t.id} to={`/tools/${t.id}`} className="card card-enter card-link">
             <figure>
               <img src={t.imageUrl} alt={t.name} />
             </figure>
@@ -170,28 +108,9 @@ export function ToolsPage({ token }: Props) {
                 {q && <span className="chip">Suchbezug: {q}</span>}
                 {category && <span className="chip">Kategorie: {category}</span>}
               </div>
-              <div className="row">
-                {token ? (
-                  <>
-                    <button className="btn secondary" onClick={() => setActiveToolId(t.id)}>
-                      Anfrage vorbereiten
-                    </button>
-                    <button
-                      onClick={() => void requestTool(t.id)}
-                      disabled={t.status !== "VERFUEGBAR" || activeToolId !== t.id}
-                      title={activeToolId !== t.id ? "Bitte zuerst Anfrage vorbereiten wählen." : undefined}
-                    >
-                      Jetzt anfragen
-                    </button>
-                  </>
-                ) : (
-                  <Link className="btn" to="/auth">
-                    Einloggen zum Anfragen
-                  </Link>
-                )}
-              </div>
+              <p className="card-link-hint">→ Klicke um Details und Buchung zu sehen</p>
             </div>
-          </article>
+          </Link>
         ))}
       </div>
     </section>

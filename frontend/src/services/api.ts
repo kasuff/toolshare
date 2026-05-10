@@ -34,6 +34,7 @@ type BackendTool = {
   name: string;
   description: string;
   category: string;
+  imageUrl?: string | null;
   status: BackendToolStatus;
 };
 
@@ -107,29 +108,24 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
   if (!response.ok) {
     let message = `Request failed: ${response.status}`;
     try {
-      const payload = (await response.json()) as {
-        message?: string;
-        error?: {
-          code?: string;
-          message?: string;
-          details?: { fieldErrors?: Record<string, string[] | undefined> };
-        };
-      };
-
-      if (payload.error?.code === "VALIDATION_ERROR" && payload.error.details?.fieldErrors) {
-        const entries = Object.entries(payload.error.details.fieldErrors).filter(
-          (_entry): _entry is [string, string[]] => Array.isArray(_entry[1]) && _entry[1].length > 0
-        );
-        if (entries.length > 0) {
-          const [field, errors] = entries[0];
-          message = `${field}: ${errors[0]}`;
-        } else if (payload.error.message) {
-          message = payload.error.message;
-        }
-      } else if (payload.error?.message) {
-        message = payload.error.message;
-      } else if (payload.message) {
+      const payload = (await response.json()) as { message?: string };
+      if (payload.message) {
         message = payload.message;
+      } else if (typeof payload === "object" && payload && "error" in payload) {
+        const error = payload as { error?: { message?: string; details?: { fieldErrors?: Record<string, string[]> } } };
+        if (error.error?.message) {
+          message = error.error.message;
+        }
+
+        const fieldErrors = error.error?.details?.fieldErrors;
+        if (fieldErrors) {
+          const fieldMessages = Object.entries(fieldErrors).flatMap(([field, messages]) =>
+            messages.map((fieldMessage) => `${field}: ${fieldMessage}`)
+          );
+          if (fieldMessages.length > 0) {
+            message = `${message} (${fieldMessages.join(", ")})`;
+          }
+        }
       }
     } catch {
       // keep fallback message
@@ -149,7 +145,7 @@ function mapTool(tool: BackendTool): Tool {
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: "https://picsum.photos/seed/toolshare-default/600/300"
+    imageUrl: tool.imageUrl ?? "https://picsum.photos/seed/toolshare-default/600/300"
   };
 }
 
@@ -270,7 +266,10 @@ export const api = {
     return tools.map(mapTool);
   },
 
-  async createTool(input: { name: string; description: string; category: string }, token: string): Promise<Tool> {
+  async createTool(
+    input: { name: string; description: string; category: string; imageUrl?: string },
+    token: string
+  ): Promise<Tool> {
     const created = await request<BackendTool>(
       "/tools",
       {

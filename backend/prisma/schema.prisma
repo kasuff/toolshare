@@ -58,6 +58,7 @@ model Tool {
   name        String
   description String
   category    String
+  imageUrl    String?
   status      ToolStatus @default(AVAILABLE)
   createdAt   DateTime   @default(now())
   owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)

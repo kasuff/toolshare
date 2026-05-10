@@ -6,6 +6,7 @@ import { useSession } from "./hooks/useSession";
 import { ToastProvider, useToast } from "./hooks/useToast";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ToolsPage } from "./pages/ToolsPage";
+import { ToolDetailPage } from "./pages/ToolDetailPage";
 import { NewToolPage } from "./pages/NewToolPage";
 import { WorkshopsPage } from "./pages/WorkshopsPage";
 import { NewWorkshopPage } from "./pages/NewWorkshopPage";
@@ -70,7 +71,13 @@ function AuthScreen({
         <div className="auth-form">
           <h2>{isRegister ? "Konto erstellen" : "Willkommen zurück"}</h2>
           <form className="stack" onSubmit={(event) => void onSubmit(event)}>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" type="email" required />
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="E-Mail"
+              type="email"
+              required
+            />
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -81,7 +88,13 @@ function AuthScreen({
             />
             {isRegister && (
               <>
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (mind. 2 Zeichen)" minLength={2} required />
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Name (mind. 2 Zeichen)"
+                  minLength={2}
+                  required
+                />
                 <input
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
@@ -135,6 +148,7 @@ function AppWithProviders() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="tools" element={<ToolsPage token={token ?? undefined} />} />
+        <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route path="tools/new" element={<NewToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route path="workshops" element={<WorkshopsPage token={token ?? undefined} />} />
         <Route
