@@ -12,7 +12,7 @@ moderationRouter.post("/reports", validate(createReportSchema), moderationContro
 moderationRouter.get("/reports", requireRole("MODERATOR", "MANAGER"), moderationController.listReports);
 moderationRouter.patch(
   "/reports/:id",
-  requireRole("MODERATOR"),
+  requireRole("MODERATOR","MANAGER"),
   validate(updateReportSchema),
   moderationController.updateStatus
 );

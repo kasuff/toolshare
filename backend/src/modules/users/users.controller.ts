@@ -3,6 +3,11 @@ import { asyncHandler } from "../../utils/async-handler";
 import { usersService } from "./users.service";
 
 export const usersController = {
+  adminMetrics: asyncHandler(async (_req: Request, res: Response) => {
+    const result = await usersService.getAdminMetrics();
+    res.status(200).json(result);
+  }),
+
   list: asyncHandler(async (req: Request, res: Response) => {
     const users = await usersService.listUsers({
       role: req.query.role as "USER" | "MODERATOR" | "MANAGER" | undefined,
@@ -35,6 +40,14 @@ export const usersController = {
       targetUserId: req.params.id,
       role: req.body.role as "USER" | "MODERATOR" | "MANAGER",
       actorId: req.authUser!.userId
+    });
+    res.status(200).json(user);
+  }),
+
+  updateSuspension: asyncHandler(async (req: Request, res: Response) => {
+    const user = await usersService.updateSuspension({
+      targetUserId: req.params.id,
+      isSuspended: req.body.isSuspended as boolean
     });
     res.status(200).json(user);
   })

@@ -13,6 +13,14 @@ const API_BASE = ((import.meta as unknown as FrontendImportMeta).env.VITE_API_UR
 type BackendRole = "USER" | "MODERATOR" | "MANAGER";
 type BackendToolStatus = "AVAILABLE" | "REQUESTED" | "BORROWED";
 type BackendBookingStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED";
+type BackendUser = { id: string; email: string; name: string; role: BackendRole; isSuspended: boolean };
+type BackendMetrics = {
+  users: number;
+  tools: number;
+  workshops: number;
+  openBookings: number;
+  openReports: number;
+};
 
 type AuthPayload = {
   user: { id: string; email: string; name: string; role: BackendRole };
@@ -111,8 +119,9 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
 
         const fieldErrors = error.error?.details?.fieldErrors;
         if (fieldErrors) {
-          const fieldMessages = Object.entries(fieldErrors)
-            .flatMap(([field, messages]) => messages.map((fieldMessage) => `${field}: ${fieldMessage}`));
+          const fieldMessages = Object.entries(fieldErrors).flatMap(([field, messages]) =>
+            messages.map((fieldMessage) => `${field}: ${fieldMessage}`)
+          );
           if (fieldMessages.length > 0) {
             message = `${message} (${fieldMessages.join(", ")})`;
           }
@@ -195,28 +204,34 @@ export const api = {
   },
 
   async getCurrentUser(token: string): Promise<User> {
-    const user = await request<{ id: string; email: string; name: string; role: BackendRole }>("/users/me", undefined, token);
+    const user = await request<BackendUser>("/users/me", undefined, token);
     return {
       id: user.id,
       name: user.name,
       email: user.email,
       role: roleMap[user.role],
-      isSuspended: false
+      isSuspended: user.isSuspended
     };
   },
 
-  async listUsers(token: string): Promise<User[]> {
-    const users = await request<Array<{ id: string; email: string; name: string; role: BackendRole }>>(
-      "/users",
-      undefined,
-      token
-    );
+  async listUsers(
+    token: string,
+    filters: { search?: string; role?: "NUTZER" | "MODERATOR" | "ADMIN" } = {}
+  ): Promise<User[]> {
+    const params = new URLSearchParams();
+    if (filters.search) params.set("search", filters.search);
+    if (filters.role) {
+      params.set("role", filters.role === "ADMIN" ? "MANAGER" : filters.role === "MODERATOR" ? "MODERATOR" : "USER");
+    }
+
+    const query = params.toString();
+    const users = await request<BackendUser[]>(query ? `/users?${query}` : "/users", undefined, token);
     return users.map((user) => ({
       id: user.id,
       name: user.name,
       email: user.email,
       role: roleMap[user.role],
-      isSuspended: false
+      isSuspended: user.isSuspended
     }));
   },
 
@@ -227,6 +242,17 @@ export const api = {
       {
         method: "PATCH",
         body: JSON.stringify({ role: backendRole })
+      },
+      token
+    );
+  },
+
+  async updateUserSuspension(userId: string, isSuspended: boolean, token: string) {
+    await request(
+      `/users/${userId}/suspension`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ isSuspended })
       },
       token
     );
@@ -390,22 +416,7 @@ export const api = {
     );
   },
 
-  async getMetrics(token: string) {
-    const [users, tools, workshops, bookings, reports] = await Promise.all([
-      this.listUsers(token),
-      this.getTools({}, token),
-      this.getWorkshops({}, token),
-      this.getBookingsForUser(token),
-      this.listReports(token)
-    ]);
-
-    return {
-      users: users.length,
-      tools: tools.length,
-      workshops: workshops.length,
-      openBookings: bookings.filter((booking) => booking.status === "OFFEN").length,
-      openReports: reports.filter((report) => report.status === "OPEN" || report.status === "IN_REVIEW").length
-    };
+  async getMetrics(token: string): Promise<BackendMetrics> {
+    return request<BackendMetrics>("/users/admin/metrics", undefined, token);
   }
 };
-

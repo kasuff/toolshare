@@ -41,3 +41,13 @@ export const updateUserRoleSchema = z.object({
   }),
   query: z.object({})
 });
+
+export const updateUserSuspensionSchema = z.object({
+  body: z.object({
+    isSuspended: z.boolean()
+  }),
+  params: z.object({
+    id: z.string().uuid()
+  }),
+  query: z.object({})
+});

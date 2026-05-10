@@ -44,14 +44,35 @@ export const usersService = {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
 
-    if (input.actorId === input.targetUserId && input.role !== "MANAGER") {
+    if (existing.role === "MANAGER" && input.role !== "MANAGER") {
       throw new AppError(
         "INVALID_ROLE_CHANGE",
-        "Managers cannot downgrade themselves through this endpoint",
+        "Managers cannot be downgraded through this endpoint",
         400
       );
     }
 
     return usersRepository.updateRole(input.targetUserId, input.role);
+  },
+
+  async updateSuspension(input: { targetUserId: string; isSuspended: boolean }) {
+    const existing = await usersRepository.findByIdPublic(input.targetUserId);
+    if (!existing) {
+      throw new AppError("USER_NOT_FOUND", "User not found", 404);
+    }
+
+    if (existing.role === "MANAGER") {
+      throw new AppError(
+        "INVALID_ACCOUNT_SUSPENSION",
+        "Managers cannot be suspended through this endpoint",
+        400
+      );
+    }
+
+    return usersRepository.updateSuspension(input.targetUserId, input.isSuspended);
+  },
+
+  async getAdminMetrics() {
+    return usersRepository.getSystemMetrics();
   }
 };

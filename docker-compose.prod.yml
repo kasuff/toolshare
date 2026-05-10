@@ -20,6 +20,8 @@ services:
       DATABASE_URL: postgresql://toolshare:${POSTGRES_PASSWORD}@db:5432/toolshare
       JWT_SECRET: ${JWT_SECRET}
       PORT: 4000
+      MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
+
     depends_on:
       db:
         condition: service_healthy
