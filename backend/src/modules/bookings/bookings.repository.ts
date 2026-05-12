@@ -8,8 +8,13 @@ export const bookingsRepository = {
         OR: [{ userId }, { tool: { ownerId: userId } }]
       },
       include: {
-        tool: true,
-        timeslot: true
+        user: true,
+        tool: { include: { owner: true } },
+        timeslot: { include: { workshop: { include: { manager: true } } } },
+        pickupProposals: {
+          orderBy: { createdAt: "asc" },
+          include: { proposedBy: { select: { id: true, name: true } } }
+        }
       },
       orderBy: { startDate: "desc" }
     });
@@ -22,7 +27,52 @@ export const bookingsRepository = {
   findBookingById(id: string) {
     return prisma.booking.findUnique({
       where: { id },
-      include: { tool: true }
+      include: {
+        tool: true,
+        timeslot: { include: { workshop: true } }
+      }
+    });
+  },
+
+  findBookingForPickupProposal(bookingId: string) {
+    return prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        tool: true,
+        timeslot: { include: { workshop: true } },
+        pickupProposals: {
+          orderBy: { createdAt: "asc" },
+          include: { proposedBy: { select: { id: true, name: true } } }
+        }
+      }
+    });
+  },
+
+  declinePendingPickupProposals(tx: Prisma.TransactionClient, bookingId: string) {
+    return tx.bookingPickupProposal.updateMany({
+      where: { bookingId, status: "PENDING" },
+      data: { status: "DECLINED" }
+    });
+  },
+
+  createPickupProposal(
+    tx: Prisma.TransactionClient,
+    input: {
+      bookingId: string;
+      proposedByUserId: string;
+      proposedPickupTime: Date;
+      previousPickupTime: Date | null;
+    }
+  ) {
+    return tx.bookingPickupProposal.create({
+      data: {
+        bookingId: input.bookingId,
+        proposedByUserId: input.proposedByUserId,
+        proposedPickupTime: input.proposedPickupTime,
+        previousPickupTime: input.previousPickupTime,
+        status: "PENDING"
+      },
+      include: { proposedBy: { select: { id: true, name: true } } }
     });
   },
 

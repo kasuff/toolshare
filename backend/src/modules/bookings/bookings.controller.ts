@@ -35,5 +35,24 @@ export const bookingsController = {
       status: req.body.status as "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED"
     });
     res.status(200).json(updated);
+  }),
+
+  createPickupProposal: asyncHandler(async (req: Request, res: Response) => {
+    const created = await bookingsService.createPickupProposal({
+      actorId: req.authUser!.userId,
+      bookingId: req.params.id as string,
+      pickupTime: req.body.pickupTime as string
+    });
+    res.status(201).json(created);
+  }),
+
+  respondPickupProposal: asyncHandler(async (req: Request, res: Response) => {
+    const updated = await bookingsService.respondPickupProposal({
+      actorId: req.authUser!.userId,
+      bookingId: req.params.id as string,
+      proposalId: req.params.proposalId as string,
+      decision: req.body.decision as "ACCEPT" | "DECLINE"
+    });
+    res.status(200).json(updated);
   })
 };
