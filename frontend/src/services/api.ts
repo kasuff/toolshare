@@ -1,4 +1,4 @@
-import type { Booking, BookingStatus, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import type { Booking, BookingStatus, PickupProposal, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 
 interface FrontendImportMetaEnv {
@@ -92,6 +92,18 @@ type BackendWorkshopTimeslot = {
   blockedByOwner?: boolean;
 };
 
+type BackendPickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
+
+type BackendPickupProposal = {
+  id: string;
+  bookingId: string;
+  proposedByUserId: string;
+  proposedPickupTime: string;
+  previousPickupTime: string | null;
+  status: BackendPickupProposalStatus;
+  createdAt: string;
+};
+
 type BackendBooking = {
   id: string;
   userId: string;
@@ -101,7 +113,21 @@ type BackendBooking = {
   endDate: string;
   pickupTime?: string | null;
   status: BackendBookingStatus;
-  tool?: { ownerId: string } | null;
+  user?: BackendUser | null;
+  tool?: (BackendTool & { owner?: BackendUser | null }) | null;
+  timeslot?: {
+    id: string;
+    workshopId: string;
+    startTime: string;
+    endTime: string;
+    workshop?: {
+      id: string;
+      name: string;
+      managerId: string;
+      manager?: BackendUser | null;
+    } | null;
+  } | null;
+  pickupProposals?: BackendPickupProposal[];
 };
 
 const roleMap: Record<BackendRole, User["role"]> = {
@@ -251,19 +277,52 @@ function mapWorkshopSlot(slot: BackendWorkshopTimeslot): WorkshopSlot {
   };
 }
 
+function mapPickupProposal(p: BackendPickupProposal): PickupProposal {
+  return {
+    id: p.id,
+    proposedById: p.proposedByUserId,
+    proposedPickupIso: p.proposedPickupTime,
+    previousPickupIso: p.previousPickupTime ?? undefined,
+    status: p.status,
+    createdIso: p.createdAt
+  };
+}
+
 function mapBooking(booking: BackendBooking): Booking {
+  const tool = booking.tool;
+  const workshop = booking.timeslot?.workshop;
+
+  const providerId = tool?.ownerId ?? workshop?.managerId ?? "";
+  const requesterName = booking.user?.name;
+  const providerName = tool?.owner?.name ?? workshop?.manager?.name;
+
+  let toolName: string | undefined;
+  let toolImageUrl: string | undefined;
+  if (tool) {
+    toolName = tool.name;
+    toolImageUrl = tool.imageUrl ?? undefined;
+  } else if (workshop) {
+    toolName = workshop.name;
+  }
+
   return {
     id: booking.id,
     type: booking.toolId ? "TOOL" : "WORKSHOP",
     requesterId: booking.userId,
-    providerId: booking.tool?.ownerId ?? "",
+    providerId,
     toolId: booking.toolId ?? undefined,
+    workshopId: workshop?.id,
     slotId: booking.timeslotId ?? undefined,
     startIso: booking.startDate,
     endIso: booking.endDate,
     pickupTimeIso: booking.pickupTime ?? undefined,
     status: bookingStatusMap[booking.status],
-    createdIso: booking.startDate
+    createdIso: booking.startDate,
+    requesterName,
+    providerName,
+    toolName,
+    toolImageUrl,
+    pickupProposals: (booking.pickupProposals ?? []).map(mapPickupProposal)
   };
 }
 
@@ -616,6 +675,37 @@ export const api = {
       {
         method: "PATCH",
         body: JSON.stringify({ status: bookingStatusReverseMap[status] })
+      },
+      token
+    );
+  },
+
+  async createPickupProposal(bookingId: string, pickupTimeIso: string, token: string) {
+    const d = new Date(pickupTimeIso);
+    if (Number.isNaN(d.getTime())) {
+      throw new Error("Ungültige Abholzeit.");
+    }
+    await request(
+      `/bookings/${bookingId}/pickup-proposals`,
+      {
+        method: "POST",
+        body: JSON.stringify({ pickupTime: d.toISOString() })
+      },
+      token
+    );
+  },
+
+  async respondPickupProposal(
+    bookingId: string,
+    proposalId: string,
+    decision: "ACCEPT" | "DECLINE",
+    token: string
+  ) {
+    await request(
+      `/bookings/${bookingId}/pickup-proposals/${proposalId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ decision })
       },
       token
     );

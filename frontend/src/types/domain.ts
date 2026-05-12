@@ -3,6 +3,17 @@ export type ToolStatus = "VERFUEGBAR" | "AUSGELIEHEN";
 export type BookingStatus = "OFFEN" | "BESTAETIGT" | "ABGELEHNT" | "ABGESCHLOSSEN";
 export type BookingType = "TOOL" | "WORKSHOP";
 
+export type PickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
+
+export interface PickupProposal {
+  id: string;
+  proposedById: string;
+  proposedPickupIso: string;
+  previousPickupIso?: string;
+  status: PickupProposalStatus;
+  createdIso: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -63,6 +74,15 @@ export interface Booking {
   altPickupTimeIso?: string;
   status: BookingStatus;
   createdIso: string;
+  /** Display name of the person who requested the booking */
+  requesterName?: string;
+  /** Display name of the provider (tool owner or workshop manager) */
+  providerName?: string;
+  /** Tool title or workshop name for listings */
+  toolName?: string;
+  /** Tool listing image when available */
+  toolImageUrl?: string;
+  pickupProposals?: PickupProposal[];
 }
 
 export interface Notification {
