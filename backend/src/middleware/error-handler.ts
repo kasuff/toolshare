@@ -73,10 +73,23 @@ export const errorHandler = (
     });
   }
 
+  const exposeInternalDetails =
+    process.env.NODE_ENV !== "production" || process.env.SHOW_INTERNAL_ERRORS === "true";
+
+  if (exposeInternalDetails) {
+    // eslint-disable-next-line no-console
+    console.error("[INTERNAL_SERVER_ERROR]", error);
+  }
+
+  const internalMessage =
+    exposeInternalDetails && error instanceof Error
+      ? error.message
+      : "Es ist ein unerwarteter Serverfehler aufgetreten.";
+
   return res.status(500).json({
     error: {
       code: "INTERNAL_SERVER_ERROR",
-      message: "Es ist ein unerwarteter Serverfehler aufgetreten.",
+      message: internalMessage,
       status: 500
     }
   });
