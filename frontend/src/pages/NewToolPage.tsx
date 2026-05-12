@@ -6,13 +6,15 @@ import { CategorySelect } from "../components/CategorySelect";
 import { OwnerContactCard } from "../components/OwnerContactCard";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory } from "../utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 import type { User } from "../types/domain";
 
 type Props = {
   currentUser?: User;
   token?: string;
 };
+
+type ToolFormField = "name" | "description" | "category";
 
 export function NewToolPage({ currentUser, token }: Props) {
   const { pushToast } = useToast();
@@ -22,7 +24,24 @@ export function NewToolPage({ currentUser, token }: Props) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const previewImage = uploadedImage || (category ? getPlaceholderImageForCategory(category) : DEFAULT_PLACEHOLDER_IMAGE);
+  const [touchedFields, setTouchedFields] = useState<Partial<Record<ToolFormField, boolean>>>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const previewImage = uploadedImage || DEFAULT_PLACEHOLDER_IMAGE;
+  const formErrors = {
+    name: name.trim() ? null : "Bitte gib einen Namen für das Werkzeug ein.",
+    description:
+      description.trim().length >= 5
+        ? null
+        : "Bitte gib eine Beschreibung mit mindestens 5 Zeichen ein.",
+    category: category.trim() ? null : "Bitte wähle eine Kategorie aus."
+  };
+
+  const showFieldError = (field: ToolFormField) =>
+    Boolean(formErrors[field]) && (submitAttempted || touchedFields[field]);
+
+  const markFieldTouched = (field: ToolFormField) => {
+    setTouchedFields((prev) => ({ ...prev, [field]: true }));
+  };
 
   // Fallback for user data if not provided
   const [owner, setOwner] = useState<User | null>(currentUser || null);
@@ -56,19 +75,9 @@ export function NewToolPage({ currentUser, token }: Props) {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
-    if (!name.trim()) {
-      pushToast("Bitte gib einen Namen für das Werkzeug ein.", "error");
-      return;
-    }
-    
-    if (!description.trim()) {
-      pushToast("Bitte schreib eine Beschreibung für das Werkzeug.", "error");
-      return;
-    }
-    
-    if (!category) {
-      pushToast("Bitte wähle eine Kategorie.", "error");
+    setSubmitAttempted(true);
+    if (Object.values(formErrors).some((error) => error !== null)) {
+      pushToast("Bitte fülle alle Pflichtfelder aus.", "error");
       return;
     }
 
@@ -79,7 +88,7 @@ export function NewToolPage({ currentUser, token }: Props) {
           name: name.trim(),
           description: description.trim(),
           category: category.trim(),
-          imageUrl: uploadedImage || getPlaceholderImageForCategory(category)
+          imageUrl: uploadedImage || DEFAULT_PLACEHOLDER_IMAGE
         },
         token
       );
@@ -89,6 +98,8 @@ export function NewToolPage({ currentUser, token }: Props) {
       setDescription("");
       setCategory("");
       setUploadedImage(null);
+      setTouchedFields({});
+      setSubmitAttempted(false);
       
       pushToast("Werkzeug erfolgreich eingestellt!", "success");
       navigate("/tools");
@@ -116,7 +127,7 @@ export function NewToolPage({ currentUser, token }: Props) {
             currentImage={previewImage}
             placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
             label="Werkzeug Foto"
-            hint="Lade ein gutes Foto deines Werkzeugs hoch (JPG, PNG, max. 5MB). Ohne Upload wird ein Standard-Bild für deine Kategorie verwendet."
+            hint="Lade ein gutes Foto deines Werkzeugs hoch (JPG, PNG, max. 5MB). Ohne Upload wird das Standard-Hammerbild verwendet."
           />
 
           {/* Name */}
@@ -125,9 +136,13 @@ export function NewToolPage({ currentUser, token }: Props) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={() => markFieldTouched("name")}
               placeholder="z.B. Akku-Bohrmaschine 18V"
               maxLength={100}
+              className={showFieldError("name") ? "input-invalid" : undefined}
+              aria-invalid={showFieldError("name")}
             />
+            {showFieldError("name") && <p className="field-error">{formErrors.name}</p>}
           </Field>
 
           {/* Beschreibung */}
@@ -135,11 +150,16 @@ export function NewToolPage({ currentUser, token }: Props) {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onBlur={() => markFieldTouched("description")}
               placeholder="z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, Ladegerät. Besonderheiten: sehr leise, eingebaute LED"
               maxLength={1000}
+              minLength={5}
               rows={5}
               style={{ minHeight: "150px" }}
+              className={showFieldError("description") ? "input-invalid" : undefined}
+              aria-invalid={showFieldError("description")}
             />
+            {showFieldError("description") && <p className="field-error">{formErrors.description}</p>}
             <p style={{ fontSize: "0.85em", color: "#666" }}>
               {description.length}/1000 Zeichen
             </p>
@@ -149,16 +169,12 @@ export function NewToolPage({ currentUser, token }: Props) {
           <CategorySelect
             value={category}
             onChange={setCategory}
+            onBlur={() => markFieldTouched("category")}
             label="Kategorie"
             hint="Wähle eine passende Kategorie, damit andere dein Werkzeug leicht finden können."
+            hasError={showFieldError("category")}
+            errorMessage={formErrors.category}
           />
-
-          {/* Pflichtfelder Hinweis */}
-          <div className="info-box" style={{ backgroundColor: "#f5f5f5", padding: "12px", borderRadius: "6px", borderLeft: "4px solid #2196F3" }}>
-            <p style={{ margin: "0", fontSize: "0.9em" }}>
-              <strong>Alle Felder sind erforderlich:</strong> Name, Beschreibung und Kategorie. Ein Foto ist optional.
-            </p>
-          </div>
 
           {/* Submit Button */}
           <div className="row" style={{ gap: "12px" }}>

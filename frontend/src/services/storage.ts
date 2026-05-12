@@ -1,4 +1,5 @@
 import type { AppDb } from "../types/domain";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 
 const STORAGE_KEY = "toolshare_mvp_db_v1";
 
@@ -20,7 +21,7 @@ const DEFAULT_DB: AppDb = {
       name: "Akkuschrauber Bosch",
       description: "Gut erhalten, inkl. Ladegerät und Bits.",
       category: "Bohrmaschine",
-      imageUrl: "https://picsum.photos/seed/tool1/600/300",
+      imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
       status: "VERFUEGBAR",
     },
     {
@@ -29,7 +30,7 @@ const DEFAULT_DB: AppDb = {
       name: "Stichsäge Makita",
       description: "Für Holz und Kunststoff, 3 Sägeblätter inklusive.",
       category: "Säge",
-      imageUrl: "https://picsum.photos/seed/tool2/600/300",
+      imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
       status: "VERFUEGBAR",
     },
   ],
@@ -41,7 +42,7 @@ const DEFAULT_DB: AppDb = {
       description: "Hobbywerkstatt mit Basis-Ausstattung.",
       location: "Neufreimann Block A",
       maxCapacity: 3,
-      imageUrls: ["https://picsum.photos/seed/workshop1/600/300"],
+      imageUrls: [DEFAULT_PLACEHOLDER_IMAGE],
       toolIds: ["t2"],
     },
   ],

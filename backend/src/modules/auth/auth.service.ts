@@ -23,13 +23,21 @@ const signRefreshToken = (payload: TokenPayload) => {
   });
 };
 
+const buildAuthPayload = (user: { id: string; email: string; role: TokenPayload["role"]; name: string }) => {
+  const payload: TokenPayload = { userId: user.id, role: user.role };
+  return {
+    user: { id: user.id, email: user.email, role: user.role, name: user.name },
+    accessToken: signAccessToken(payload),
+    refreshToken: signRefreshToken(payload)
+  };
+};
+
 export const authService = {
   async register(input: {
     email: string;
     password: string;
     name: string;
     address: string;
-    role?: "USER" | "MODERATOR" | "MANAGER";
   }) {
     const existing = await authRepository.findByEmail(input.email);
     if (existing) {
@@ -42,15 +50,10 @@ export const authService = {
       passwordHash,
       name: input.name,
       address: input.address,
-      role: input.role ?? "USER"
+      role: "USER"
     });
 
-    const payload: TokenPayload = { userId: user.id, role: user.role };
-    return {
-      user: { id: user.id, email: user.email, role: user.role, name: user.name },
-      accessToken: signAccessToken(payload),
-      refreshToken: signRefreshToken(payload)
-    };
+    return buildAuthPayload(user);
   },
 
   async login(input: { email: string; password: string }) {
@@ -68,12 +71,7 @@ export const authService = {
       throw new AppError("INVALID_CREDENTIALS", "Invalid credentials", 401);
     }
 
-    const payload: TokenPayload = { userId: user.id, role: user.role };
-    return {
-      user: { id: user.id, email: user.email, role: user.role, name: user.name },
-      accessToken: signAccessToken(payload),
-      refreshToken: signRefreshToken(payload)
-    };
+    return buildAuthPayload(user);
   },
 
   async refresh(refreshToken: string) {

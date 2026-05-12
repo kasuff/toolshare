@@ -37,9 +37,15 @@ export function useSession() {
   }, [token]);
 
   const login = async (email: string, password: string) => {
-    const result = await api.login(email, password);
-    localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
-    setToken(result.accessToken);
+    try {
+      const result = await api.login(email, password);
+      localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
+      setToken(result.accessToken);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Anmeldung fehlgeschlagen.");
+      throw err;
+    }
   };
 
   const register = async (input: {
@@ -47,17 +53,32 @@ export function useSession() {
     password: string;
     name: string;
     address: string;
-    role?: "USER" | "MODERATOR" | "MANAGER";
   }) => {
-    const result = await api.register(input);
-    localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
-    setToken(result.accessToken);
+    try {
+      const result = await api.register(input);
+      localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
+      setToken(result.accessToken);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registrierung fehlgeschlagen.");
+      throw err;
+    }
   };
 
   const logout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setCurrentUser(null);
+    setError(null);
+  };
+
+  const updateProfile = async (input: { name?: string; address?: string }) => {
+    if (!token) {
+      throw new Error("Du musst eingeloggt sein.");
+    }
+    const nextUser = await api.updateMyProfile(input, token);
+    setCurrentUser(nextUser);
+    return nextUser;
   };
 
   const users = useMemo(() => (currentUser ? [currentUser] : []), [currentUser]);
@@ -70,6 +91,7 @@ export function useSession() {
     error,
     login,
     register,
-    logout
+    logout,
+    updateProfile
   };
 }

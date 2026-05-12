@@ -1,4 +1,5 @@
 import type { Booking, BookingStatus, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 
 interface FrontendImportMetaEnv {
   readonly VITE_API_URL?: string;
@@ -13,7 +14,15 @@ const API_BASE = ((import.meta as unknown as FrontendImportMeta).env.VITE_API_UR
 type BackendRole = "USER" | "MODERATOR" | "MANAGER";
 type BackendToolStatus = "AVAILABLE" | "REQUESTED" | "BORROWED";
 type BackendBookingStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED";
-type BackendUser = { id: string; email: string; name: string; role: BackendRole; isSuspended: boolean };
+type BackendUser = {
+  id: string;
+  email: string;
+  name: string;
+  address?: string;
+  avatarUrl?: string | null;
+  role: BackendRole;
+  isSuspended: boolean;
+};
 type BackendMetrics = {
   users: number;
   tools: number;
@@ -22,8 +31,24 @@ type BackendMetrics = {
   openReports: number;
 };
 
+export type AddressSuggestion = {
+  label: string;
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
+  country: string;
+};
+
 type AuthPayload = {
-  user: { id: string; email: string; name: string; role: BackendRole };
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    address?: string;
+    role: BackendRole;
+    isSuspended?: boolean;
+  };
   accessToken: string;
   refreshToken: string;
 };
@@ -96,36 +121,64 @@ function toLocalDateTimeInputValue(input: string) {
 }
 
 async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {})
-    }
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {})
+      }
+    });
+  } catch {
+    throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
+  }
 
   if (!response.ok) {
     let message = `Request failed: ${response.status}`;
     try {
-      const payload = (await response.json()) as { message?: string };
-      if (payload.message) {
+      const payload = (await response.json()) as {
+        message?: string;
+        error?: {
+          message?: string;
+          code?: string;
+          details?: {
+            fieldErrors?: Record<string, string[] | undefined>;
+            formErrors?: string[];
+          };
+        };
+      };
+      if (payload.error?.message) {
+        message = payload.error.message;
+      } else if (payload.message) {
         message = payload.message;
-      } else if (typeof payload === "object" && payload && "error" in payload) {
-        const error = payload as { error?: { message?: string; details?: { fieldErrors?: Record<string, string[]> } } };
-        if (error.error?.message) {
-          message = error.error.message;
-        }
-
-        const fieldErrors = error.error?.details?.fieldErrors;
-        if (fieldErrors) {
-          const fieldMessages = Object.entries(fieldErrors).flatMap(([field, messages]) =>
-            messages.map((fieldMessage) => `${field}: ${fieldMessage}`)
-          );
-          if (fieldMessages.length > 0) {
-            message = `${message} (${fieldMessages.join(", ")})`;
+      }
+      if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
+        message = "Diese E-Mail ist bereits registriert.";
+      }
+      const fieldErrorEntries = payload.error?.details?.fieldErrors
+        ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
+        : [];
+      if (fieldErrorEntries.length > 0) {
+        const [field, errors] = fieldErrorEntries[0];
+        const rawError = errors?.[0] ?? "Ungültige Eingabe.";
+        const minCharsMatch = rawError.match(/at least (\d+) character/);
+        if (field === "body") {
+          if (rawError.includes("at least 8 character")) {
+            message = "Passwort muss mindestens 8 Zeichen lang sein.";
+          } else if (minCharsMatch) {
+            message = `Eingabe muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`;
+          } else {
+            message = rawError;
           }
+        } else {
+          message = minCharsMatch
+            ? `${field}: Muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`
+            : `${field}: ${rawError}`;
         }
+      } else if (payload.error?.details?.formErrors?.length) {
+        message = payload.error.details.formErrors[0];
       }
     } catch {
       // keep fallback message
@@ -145,7 +198,7 @@ function mapTool(tool: BackendTool): Tool {
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: tool.imageUrl ?? "https://picsum.photos/seed/toolshare-default/600/300"
+    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE
   };
 }
 
@@ -157,7 +210,7 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
     description: workshop.description,
     location: workshop.location,
     maxCapacity: workshop.maxCapacity,
-    imageUrls: ["https://picsum.photos/seed/workshop-default/600/300"],
+    imageUrls: [DEFAULT_PLACEHOLDER_IMAGE],
     toolIds: []
   };
 }
@@ -196,11 +249,41 @@ export const api = {
     });
   },
 
-  async register(input: { email: string; password: string; name: string; address: string; role?: BackendRole }) {
+  async register(input: { email: string; password: string; name: string; address: string }) {
     return request<AuthPayload>("/auth/register", {
       method: "POST",
       body: JSON.stringify(input)
     });
+  },
+
+  async suggestAddresses(query: string): Promise<AddressSuggestion[]> {
+    if (query.trim().length < 3) return [];
+    try {
+      const response = await request<{ suggestions: AddressSuggestion[] }>(
+        `/address/suggest?q=${encodeURIComponent(query.trim())}`
+      );
+      return response.suggestions;
+    } catch {
+      return [];
+    }
+  },
+
+  async validateAddress(query: string): Promise<{
+    isValid: boolean;
+    normalizedAddress: string | null;
+    normalizedParts: AddressSuggestion | null;
+  }> {
+    if (query.trim().length < 5) {
+      return { isValid: false, normalizedAddress: null, normalizedParts: null };
+    }
+    try {
+      return await request<{ isValid: boolean; normalizedAddress: string | null; normalizedParts: AddressSuggestion | null }>(
+        `/address/validate?q=${encodeURIComponent(query.trim())}`
+      );
+    } catch {
+      // Do not hard-block registration/profile save if provider is unavailable.
+      return { isValid: true, normalizedAddress: null, normalizedParts: null };
+    }
   },
 
   async getCurrentUser(token: string): Promise<User> {
@@ -209,6 +292,7 @@ export const api = {
       id: user.id,
       name: user.name,
       email: user.email,
+      address: user.address,
       role: roleMap[user.role],
       isSuspended: user.isSuspended
     };
@@ -256,6 +340,26 @@ export const api = {
       },
       token
     );
+  },
+
+  async updateMyProfile(input: { name?: string; address?: string }, token: string): Promise<User> {
+    const user = await request<BackendUser>(
+      "/users/me",
+      {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      },
+      token
+    );
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      address: user.address,
+      role: roleMap[user.role],
+      isSuspended: user.isSuspended
+    };
   },
 
   async getTools(filters: { q?: string; category?: string }, token: string): Promise<Tool[]> {
