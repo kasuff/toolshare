@@ -1,4 +1,5 @@
 import type { Booking, BookingStatus, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 
 interface FrontendImportMetaEnv {
   readonly VITE_API_URL?: string;
@@ -162,14 +163,19 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
       if (fieldErrorEntries.length > 0) {
         const [field, errors] = fieldErrorEntries[0];
         const rawError = errors?.[0] ?? "Ungültige Eingabe.";
+        const minCharsMatch = rawError.match(/at least (\d+) character/);
         if (field === "body") {
           if (rawError.includes("at least 8 character")) {
             message = "Passwort muss mindestens 8 Zeichen lang sein.";
+          } else if (minCharsMatch) {
+            message = `Eingabe muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`;
           } else {
             message = rawError;
           }
         } else {
-          message = `${field}: ${rawError}`;
+          message = minCharsMatch
+            ? `${field}: Muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`
+            : `${field}: ${rawError}`;
         }
       } else if (payload.error?.details?.formErrors?.length) {
         message = payload.error.details.formErrors[0];
@@ -192,7 +198,7 @@ function mapTool(tool: BackendTool): Tool {
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: tool.imageUrl ?? "https://picsum.photos/seed/toolshare-default/600/300"
+    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE
   };
 }
 
@@ -204,7 +210,7 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
     description: workshop.description,
     location: workshop.location,
     maxCapacity: workshop.maxCapacity,
-    imageUrls: ["https://picsum.photos/seed/workshop-default/600/300"],
+    imageUrls: [DEFAULT_PLACEHOLDER_IMAGE],
     toolIds: []
   };
 }

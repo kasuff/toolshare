@@ -1067,6 +1067,7 @@ td {
   background: transparent !important;
   color: var(--color-brand) !important;
   border: 2px solid var(--color-brand) !important;
+  border-radius: var(--radius-sm);
 }
 
 .btn-outline:hover {

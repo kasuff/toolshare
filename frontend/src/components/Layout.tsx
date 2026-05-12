@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { User } from "../types/domain";
 import { RoleSwitcher } from "./RoleSwitcher";
 
@@ -11,24 +11,33 @@ type Props = {
 };
 
 export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDetailsElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setActiveDropdown(null);
+    const closeProfileMenu = () => {
+      if (profileMenuRef.current) {
+        profileMenuRef.current.open = false;
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        closeProfileMenu();
+      }
+    };
 
-  const toggleDropdown = (dropdownId: string) => {
-    setActiveDropdown(activeDropdown === dropdownId ? null : dropdownId);
-  };
+    const handleScroll = () => {
+      closeProfileMenu();
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, []);
 
   return (
     <div className="app-shell">
@@ -36,7 +45,7 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
         <Link to="/" className="logo">
           Tool<strong>Share</strong>
         </Link>
-        <nav className="nav" ref={dropdownRef}>
+        <nav className="nav">
           <NavLink to="/">Entdecken</NavLink>
           
           {/* Werkzeuge link */}
@@ -56,7 +65,7 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
         <div className="topbar-right">
           {users.length > 1 && <RoleSwitcher users={users} currentUserId={currentUser?.id} onChange={onSwitchUser} />}
           {currentUser ? (
-            <details className="profile-menu">
+            <details className="profile-menu" ref={profileMenuRef}>
               <summary aria-label="Profil-Menü öffnen">
                 <span className="profile-avatar" aria-hidden="true">
                   <svg viewBox="0 0 24 24" role="img" focusable="false">
