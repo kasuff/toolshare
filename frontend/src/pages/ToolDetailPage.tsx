@@ -71,7 +71,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       return;
     }
     if (!token) {
-      pushToast("Bitte logge dich ein, um eine Ausleihe anzufragen.", "error");
+      navigate("/auth", {
+        state: {
+          redirectHint: "Bitte melde dich an, um eine Ausleihe anzufragen."
+        }
+      });
       return;
     }
 
@@ -80,13 +84,27 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       const startIso = `${startDate}T${startTime}`;
       const endDate = getEndDate();
       const endIso = `${endDate}T${startTime}`;
+      const pickupTimeIso = `${startDate}T${pickupTime}`;
+
+      const start = new Date(startIso);
+      const end = new Date(endIso);
+      const pickup = new Date(pickupTimeIso);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || Number.isNaN(pickup.getTime())) {
+        throw new Error("Ungültiges Datum oder ungültige Uhrzeit.");
+      }
+      if (end <= start) {
+        throw new Error("Der gewählte Zeitraum ist ungültig. Bitte Endzeit nach Startzeit wählen.");
+      }
+      if (pickup < start || pickup > end) {
+        throw new Error("Die Abholzeit muss innerhalb des angefragten Zeitraums liegen.");
+      }
       
       await api.createToolRequest(
         {
           toolId: tool.id,
           startIso,
           endIso,
-          pickupTimeIso: `${startDate}T${pickupTime}`
+          pickupTimeIso
         },
         token
       );
