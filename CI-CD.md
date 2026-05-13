@@ -4,6 +4,8 @@ Diese Dokumentation beschreibt die CI/CD-Pipeline für das ToolShare Projekt.
 
 ## Übersicht
 
+Die Pipeline-Reihenfolge entspricht dem [Testkonzept](https://project-management-8f8306.pages.gitlab.lrz.de/testkonzept.html): zuerst ESLint (Quality Gate), danach automatisierte Tests, dann Build und optional Deploy.
+
 Die CI/CD-Pipeline folgt dem in der [DevOps-Dokumentation](../../../project-management/docs/devops.md) definierten Schema mit den Stages:
 
 1. **lint** - Statische Codeanalyse
@@ -36,8 +38,8 @@ Die Hauptpipeline ist in `.gitlab-ci.yml` definiert und wird auf GitLab-Infrastr
 #### Stage: `build`
 - `frontend:build` - Vite Build für SPA
 - `backend:build` - TypeScript Compilation
-- `docker:build:frontend` - Docker Image Build (nur auf `main`)
-- `docker:build:backend` - Docker Image Build (nur auf `main`)
+- `docker:build:frontend` - Docker Image Build (`main`, `release/*`, sowie Merge Requests für Staging-Deploy)
+- `docker:build:backend` - Docker Image Build (`main`, `release/*`, sowie Merge Requests für Staging-Deploy)
 
 #### Stage: `deploy`
 - `deploy:k8s:staging` - Deployment zu HMKube Staging (manuell)
