@@ -96,4 +96,55 @@ describe("ToolDetailPage", () => {
       "token-123"
     );
   });
+
+  it("shows unavailable and guest states with proper actions", async () => {
+    getTools
+      .mockResolvedValueOnce([
+        {
+          id: "t1",
+          ownerId: "u1",
+          name: "Akkuschrauber Bosch",
+          description: "Leistungsstark",
+          category: "Elektro",
+          imageUrl: "https://example.com/tool.jpg",
+          status: "AUSGELIEHEN"
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "t1",
+          ownerId: "u1",
+          name: "Akkuschrauber Bosch",
+          description: "Leistungsstark",
+          category: "Elektro",
+          imageUrl: "https://example.com/tool.jpg",
+          status: "VERFUEGBAR"
+        }
+      ]);
+
+    const { unmount } = render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/tools/t1"]}>
+          <Routes>
+            <Route path="/tools/:id" element={<ToolDetailPage token="token-123" />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByText(/derzeit ausgeliehen/i)).toBeInTheDocument();
+    unmount();
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/tools/t1"]}>
+          <Routes>
+            <Route path="/tools/:id" element={<ToolDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByRole("link", { name: /Jetzt einloggen/i })).toHaveAttribute("href", "/auth");
+  });
 });

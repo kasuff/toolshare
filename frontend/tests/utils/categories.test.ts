@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TOOL_CATEGORIES, getPlaceholderImageForCategory } from "../../src/utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES, getPlaceholderImageForCategory } from "../../src/utils/categories";
 
 describe("categories utilities", () => {
   it("exposes the expected category list", () => {
@@ -8,7 +8,7 @@ describe("categories utilities", () => {
   });
 
   it("returns a category-specific placeholder image and falls back safely", () => {
-    expect(getPlaceholderImageForCategory("Holz")).toContain("photo-1502920917128-1aa500764cbd");
-    expect(getPlaceholderImageForCategory("unknown-category")).toBeDefined();
+    expect(getPlaceholderImageForCategory("Holz")).toBe(DEFAULT_PLACEHOLDER_IMAGE);
+    expect(getPlaceholderImageForCategory("unknown-category")).toBe(DEFAULT_PLACEHOLDER_IMAGE);
   });
 });
