@@ -8,7 +8,7 @@ import type { Tool, Workshop } from "../types/domain";
 export function DashboardPage() {
   const [tools, setTools] = useState<Tool[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -20,8 +20,6 @@ export function DashboardPage() {
         setWorkshops(workshopsData.slice(0, 3).map(w => w.workshop));
       } catch (error) {
         console.error("Failed to load data:", error);
-      } finally {
-        setIsLoading(false);
       }
     };
     void loadData();

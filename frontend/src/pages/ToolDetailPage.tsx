@@ -2,7 +2,6 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
-import { StatusPill } from "../components/ui";
 import { getPlaceholderImageForCategory } from "../utils/categories";
 import type { Tool, User } from "../types/domain";
 
@@ -11,12 +10,7 @@ type Props = {
   currentUser?: User;
 };
 
-const statusLabel: Record<"VERFUEGBAR" | "AUSGELIEHEN", string> = {
-  VERFUEGBAR: "Verfügbar",
-  AUSGELIEHEN: "Ausgeliehen",
-};
-
-export function ToolDetailPage({ token, currentUser }: Props) {
+export function ToolDetailPage({ token, currentUser: _currentUser }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { pushToast } = useToast();
