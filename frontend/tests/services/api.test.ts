@@ -206,9 +206,9 @@ describe("api service", () => {
         method: "POST",
         body: JSON.stringify({
           toolId: "t1",
-          startDate: "2026-05-06T08:00:00.000Z",
-          endDate: "2026-05-07T08:00:00.000Z",
-          pickupTime: "2026-05-06T07:00:00.000Z"
+          startDate: new Date("2026-05-06T10:00").toISOString(),
+          endDate: new Date("2026-05-07T10:00").toISOString(),
+          pickupTime: new Date("2026-05-06T09:00").toISOString()
         })
       }
     );
