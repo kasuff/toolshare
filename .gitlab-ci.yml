@@ -101,6 +101,7 @@ backend:test:
   script:
     - cd backend
     - npm ci
+    - npx prisma db push
     - npm run test -- --coverage
   only:
     - merge_requests
