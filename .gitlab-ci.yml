@@ -200,8 +200,19 @@ pages:
   artifacts:
     paths:
       - public
-  only:
-    - main
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      variables:
+        PAGES_PREFIX: "mr-$CI_MERGE_REQUEST_IID"
+    - if: $CI_COMMIT_BRANCH == "main"
+      variables:
+        PAGES_PREFIX: ""
+  pages:
+    path_prefix: "$PAGES_PREFIX"
+  environment:
+    name: pages/$CI_COMMIT_REF_SLUG
+    url: $CI_PAGES_URL/$PAGES_PREFIX
+    action: start
 
 
 
