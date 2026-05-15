@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: [],
+    setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'cobertura'],
@@ -17,9 +17,9 @@ export default defineConfig({
         'src/**/*.d.ts',
       ],
     },
-    reporters: ['default', 'vitest-junit'],
+    reporters: ['default', 'junit'],
     outputFile: {
-      'vitest-junit': './junit.xml',
+      junit: './junit.xml',
     },
   },
   resolve: {

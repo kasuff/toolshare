@@ -44,6 +44,16 @@ spec:
                 secretKeyRef:
                   name: toolshare-secrets
                   key: JWT_SECRET
+            - name: CORS_ORIGIN
+              valueFrom:
+                secretKeyRef:
+                  name: toolshare-secrets
+                  key: CORS_ORIGIN
+            - name: MANAGER_EMAIL_ALLOWLIST
+              valueFrom:
+                secretKeyRef:
+                  name: toolshare-secrets
+                  key: MANAGER_EMAIL_ALLOWLIST
           readinessProbe:
             httpGet:
               path: /health

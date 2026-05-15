@@ -18,6 +18,8 @@ Dieses Verzeichnis enthält ein self-hosted Kubernetes-Setup für ToolShare ohne
 1. Secrets anpassen:
    - `secrets.template.yaml` kopieren/anpassen
    - sichere Werte für `POSTGRES_PASSWORD`, `JWT_SECRET`, `DATABASE_URL` setzen
+   - `CORS_ORIGIN` auf die öffentliche Frontend-URL setzen (z. B. `https://toolshare.example.com`)
+   - `MANAGER_EMAIL_ALLOWLIST` mit den erlaubten Manager-E-Mail-Adressen füllen
 2. Images bauen und in Registry pushen:
    - `registry.example.com/toolshare/backend:<tag>`
    - `registry.example.com/toolshare/frontend:<tag>`

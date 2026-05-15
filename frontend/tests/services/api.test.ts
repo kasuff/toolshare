@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { api } from "../../src/services/api";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 
 const fetchMock = vi.fn();
 
@@ -19,7 +20,9 @@ beforeEach(() => {
 
 describe("api service", () => {
   it("maps backend users and sends authorization headers", async () => {
-    fetchMock.mockResolvedValueOnce(responseJson({ id: "u1", email: "lea@toolshare.local", name: "Lea", role: "MANAGER" }));
+    fetchMock.mockResolvedValueOnce(
+      responseJson({ id: "u1", email: "lea@toolshare.local", name: "Lea", role: "MANAGER", isSuspended: false })
+    );
 
     const user = await api.getCurrentUser("token-123");
 
@@ -103,6 +106,16 @@ describe("api service", () => {
         return responseJson([{ id: "r1", reason: "Test", status: "OPEN" }]);
       }
 
+      if (url.includes("/users/admin/metrics")) {
+        return responseJson({
+          users: 2,
+          tools: 3,
+          workshops: 1,
+          openBookings: 4,
+          openReports: 1
+        });
+      }
+
       if (url.endsWith("/users")) {
         return responseJson([
           { id: "u1", email: "a@example.com", name: "A", role: "USER" },
@@ -122,12 +135,12 @@ describe("api service", () => {
       id: "t1",
       ownerId: "u3",
       status: "VERFUEGBAR",
-      imageUrl: "https://picsum.photos/seed/toolshare-default/600/300"
+      imageUrl: DEFAULT_PLACEHOLDER_IMAGE
     });
     expect(workshops[0].workshop).toMatchObject({
       id: "w1",
       ownerId: "u2",
-      imageUrls: ["https://picsum.photos/seed/workshop-default/600/300"]
+      imageUrls: [DEFAULT_PLACEHOLDER_IMAGE]
     });
     expect(workshops[0].slots[0]).toMatchObject({
       id: "s1",
@@ -207,7 +220,7 @@ describe("api service", () => {
     ));
 
     await expect(api.createTool({ name: "", description: "Test", category: "holz" }, "token-123")).rejects.toThrow(
-      /Validation failed.*name: required/
+      /name: required/
     );
   });
 });

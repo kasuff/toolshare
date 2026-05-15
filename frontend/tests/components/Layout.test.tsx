@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { Layout } from "../../src/components/Layout";
@@ -10,7 +10,7 @@ const users: User[] = [
 ];
 
 describe("Layout", () => {
-  it("opens tool and workshop dropdowns and closes them on outside click", () => {
+  it("renders primary navigation links", () => {
     const onSwitchUser = vi.fn();
     const onLogout = vi.fn();
 
@@ -26,11 +26,9 @@ describe("Layout", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Werkzeuge/i }));
-    expect(screen.getByText("Werkzeuge anschauen")).toBeInTheDocument();
-    expect(screen.getByText("Werkzeug anbieten")).toBeInTheDocument();
-
-    fireEvent.mouseDown(document.body);
-    expect(screen.queryByText("Werkzeug anbieten")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Entdecken/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Werkzeuge/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Werkstätten/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Inbox/i })).toBeInTheDocument();
   });
 });

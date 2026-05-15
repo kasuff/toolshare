@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../hooks/useToast";
 import { api } from "../../services/api";
-import { ToolsPage } from "../../pages/ToolsPage";
+import { ToolDetailPage } from "../../pages/ToolDetailPage";
 import { WorkshopsPage } from "../../pages/WorkshopsPage";
 
 vi.mock("../../services/api", async () => {
@@ -56,10 +56,19 @@ describe("Guest protected actions", () => {
       }
     ]);
 
-    renderWithRoutes(<ToolsPage />, "/tools");
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/tools/tool-1"]}>
+          <Routes>
+            <Route path="/tools/:id" element={<ToolDetailPage />} />
+            <Route path="/auth" element={<AuthStateProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Einloggen zum Anfragen" }));
+    await user.click(await screen.findByRole("link", { name: "Jetzt einloggen" }));
 
     expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
       "Bitte melde dich an, um eine Ausleihe anzufragen."

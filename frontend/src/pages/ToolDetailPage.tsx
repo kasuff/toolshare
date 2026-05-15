@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
@@ -233,9 +233,13 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               <p className="booking-hint">
                 <strong>Einloggen, um zu buchen</strong>
               </p>
-              <a href="/auth" className="booking-button">
+              <Link
+                to="/auth"
+                state={{ redirectHint: "Bitte melde dich an, um eine Ausleihe anzufragen." }}
+                className="booking-button"
+              >
                 Jetzt einloggen
-              </a>
+              </Link>
             </div>
           ) : (
             <div className="playtomic-booking-panel unavailable">

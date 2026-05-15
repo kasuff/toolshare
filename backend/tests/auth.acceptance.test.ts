@@ -1,18 +1,35 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createApp } from "../src/app";
-import { prisma } from "../src/config/prisma";
+import type { Express } from "express";
 
-const app = createApp();
+async function isDatabaseAvailable() {
+  try {
+    const { prisma } = await import("../src/config/prisma");
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-describe("US-13 Authentication acceptance criteria", () => {
+const dbAvailable = await isDatabaseAvailable();
+
+describe.skipIf(!dbAvailable)("US-13 Authentication acceptance criteria", () => {
   const seed = Date.now();
   const validEmail = `us13-valid-${seed}@example.com`;
   const validPassword = "Test1234!";
   const blockedEmail = `us13-blocked-${seed}@example.com`;
   const blockedPassword = "Blocked1234!";
 
+  let app: Express;
+  let prisma: typeof import("../src/config/prisma").prisma;
+
   beforeAll(async () => {
+    const appModule = await import("../src/app");
+    const prismaModule = await import("../src/config/prisma");
+    app = appModule.createApp();
+    prisma = prismaModule.prisma;
+
     await request(app).post("/api/auth/register").send({
       email: validEmail,
       password: validPassword,
@@ -29,7 +46,7 @@ describe("US-13 Authentication acceptance criteria", () => {
 
     await prisma.user.update({
       where: { email: blockedEmail },
-      data: { isBlocked: true }
+      data: { isSuspended: true }
     });
   });
 
@@ -90,14 +107,14 @@ describe("US-13 Authentication acceptance criteria", () => {
     expect(response.body.error?.code).toBe("UNAUTHORIZED");
   });
 
-  it("rejects login for blocked accounts", async () => {
+  it("rejects login for suspended accounts", async () => {
     const response = await request(app).post("/api/auth/login").send({
       email: blockedEmail,
       password: blockedPassword
     });
 
     expect(response.status).toBe(403);
-    expect(response.body.error?.code).toBe("ACCOUNT_BLOCKED");
+    expect(response.body.error?.code).toBe("ACCOUNT_SUSPENDED");
   });
 
   it("validates minimum password length on registration", async () => {

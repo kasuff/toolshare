@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ImageUpload } from "../../src/components/ImageUpload";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 
 class MockFileReader {
   result: string | ArrayBuffer | null = null;
@@ -19,13 +20,20 @@ describe("ImageUpload", () => {
     const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
     const user = userEvent.setup();
 
-    render(<ImageUpload onImageSelect={onImageSelect} label="Foto" hint="Maximal 5 MB" />);
+    render(
+      <ImageUpload
+        onImageSelect={onImageSelect}
+        placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
+        label="Foto"
+        hint="Maximal 5 MB"
+      />
+    );
 
     expect(screen.getByText("Foto")).toBeInTheDocument();
     expect(screen.getByText("Maximal 5 MB")).toBeInTheDocument();
-    expect(screen.getByText("Klick zum Bild hochladen")).toBeInTheDocument();
+    expect(screen.getByText("Standardbild verwendet")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^Bild hochladen$/i }));
+    await user.click(screen.getByRole("button", { name: /^Bild wechseln$/i }));
     expect(clickSpy).toHaveBeenCalled();
   });
 
@@ -34,7 +42,13 @@ describe("ImageUpload", () => {
     const onImageSelect = vi.fn();
     const user = userEvent.setup();
 
-    const { container } = render(<ImageUpload onImageSelect={onImageSelect} label="Foto" />);
+    const { container } = render(
+      <ImageUpload
+        onImageSelect={onImageSelect}
+        placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
+        label="Foto"
+      />
+    );
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
     await user.upload(input, new File(["image"], "sample.png", { type: "image/png" }));
@@ -48,7 +62,13 @@ describe("ImageUpload", () => {
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
     const user = userEvent.setup();
 
-    const { container } = render(<ImageUpload onImageSelect={onImageSelect} label="Foto" />);
+    const { container } = render(
+      <ImageUpload
+        onImageSelect={onImageSelect}
+        placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
+        label="Foto"
+      />
+    );
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
     fireEvent.change(input, { target: { files: [new File(["doc"], "note.txt", { type: "text/plain" })] } });
@@ -63,14 +83,23 @@ describe("ImageUpload", () => {
   });
 
   it("clears the selected image", async () => {
+    vi.stubGlobal("FileReader", MockFileReader as unknown as typeof FileReader);
     const onImageSelect = vi.fn();
     const user = userEvent.setup();
 
-    render(<ImageUpload onImageSelect={onImageSelect} currentImage="https://example.com/image.jpg" label="Foto" />);
+    const { container } = render(
+      <ImageUpload
+        onImageSelect={onImageSelect}
+        placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
+        label="Foto"
+      />
+    );
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    expect(screen.getByRole("img", { name: /Preview/i })).toBeInTheDocument();
+    await user.upload(input, new File(["image"], "sample.png", { type: "image/png" }));
     await user.click(screen.getByRole("button", { name: /Entfernen/i }));
 
     expect(onImageSelect).toHaveBeenCalledWith(null);
+    expect(screen.getByText("Standardbild verwendet")).toBeInTheDocument();
   });
 });
