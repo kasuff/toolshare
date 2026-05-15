@@ -26,6 +26,7 @@ services:
       DATABASE_URL: postgresql://toolshare:toolshare@db:5432/toolshare
       JWT_SECRET: dev-secret-change-in-production
       PORT: 4000
+      CORS_ORIGIN: http://localhost:3000
       MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
     depends_on:
       db:
@@ -37,8 +38,7 @@ services:
 
   db:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
+    # Kein Host-Port: DB nur im Docker-Netz erreichbar (nicht von außen)
     environment:
       POSTGRES_USER: toolshare
       POSTGRES_PASSWORD: toolshare

@@ -379,7 +379,7 @@ export const api = {
       email: user.email,
       address: user.address,
       role: roleMap[user.role],
-      isSuspended: user.isSuspended
+      isSuspended: user.isSuspended ?? false
     };
   },
 
