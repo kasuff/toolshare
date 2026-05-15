@@ -64,6 +64,7 @@ export function InboxPage({ currentUser, token }: Props) {
   useEffect(() => {
     if (!token) return;
     void loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
