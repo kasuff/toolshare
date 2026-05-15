@@ -74,7 +74,7 @@ frontend:build:
 
 backend:lint:
   stage: lint
-  image: node:18-alpine
+  image: node:20-alpine
   script:
     - cd backend
     - npm ci
@@ -89,7 +89,7 @@ backend:lint:
 
 backend:test:
   stage: test
-  image: node:18-alpine
+  image: node:20-alpine
   services:
     - postgres:15
   variables:
@@ -98,11 +98,9 @@ backend:test:
     POSTGRES_PASSWORD: testpass
     POSTGRES_HOST_AUTH_METHOD: trust
     DATABASE_URL: "postgresql://toolshare:testpass@postgres:5432/toolshare_test"
-    JWT_SECRET: "ci-test-secret"
   script:
     - cd backend
     - npm ci
-    - npx prisma db push --skip-generate
     - npm run test -- --coverage
   only:
     - merge_requests
