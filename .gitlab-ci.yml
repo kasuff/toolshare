@@ -74,7 +74,7 @@ frontend:build:
 
 backend:lint:
   stage: lint
-  image: node:20-alpine
+  image: node:20
   script:
     - cd backend
     - npm ci
@@ -89,7 +89,7 @@ backend:lint:
 
 backend:test:
   stage: test
-  image: node:20-alpine
+  image: node:20
   services:
     - postgres:15
   variables:
@@ -122,7 +122,7 @@ backend:test:
 
 backend:build:
   stage: build
-  image: node:18-alpine
+  image: node:20
   script:
     - cd backend
     - npm ci
@@ -239,7 +239,7 @@ deploy:k8s:production:
 
 security:scan:
   stage: test
-  image: node:18-alpine
+  image: node:20
   allow_failure: true
   script:
     - npm install -g npm-audit
