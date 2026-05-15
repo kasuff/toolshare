@@ -211,7 +211,7 @@ pages:
     path_prefix: "$PAGES_PREFIX"
   environment:
     name: pages/$CI_COMMIT_REF_SLUG
-    url: $CI_PAGES_URL/$PAGES_PREFIX
+    url: $CI_PAGES_URL/$PAGES_PREFIX/
     action: start
 
 
