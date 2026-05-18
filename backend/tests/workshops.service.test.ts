@@ -1,0 +1,189 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { workshopsRepository } from "../src/modules/workshops/workshops.repository";
+import { workshopsService } from "../src/modules/workshops/workshops.service";
+
+vi.mock("../src/modules/workshops/workshops.repository", () => ({
+  workshopsRepository: {
+    list: vi.fn(),
+    findById: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    findOverlappingTimeslot: vi.fn(),
+    createTimeslot: vi.fn(),
+    findTimeslotById: vi.fn(),
+    findActiveBookingForTimeslot: vi.fn(),
+    removeTimeslot: vi.fn()
+  }
+}));
+
+const mockedWorkshopsRepository = vi.mocked(workshopsRepository);
+
+describe("workshopsService", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("lists workshops with filters", async () => {
+    mockedWorkshopsRepository.list.mockResolvedValueOnce([{ id: "w1" }] as any);
+
+    const result = await workshopsService.list({ search: "holz" });
+
+    expect(mockedWorkshopsRepository.list).toHaveBeenCalledWith({ search: "holz" });
+    expect(result).toEqual([{ id: "w1" }]);
+  });
+
+  it("returns workshop by id", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1" } as any);
+
+    const result = await workshopsService.getById("w1");
+
+    expect(result).toMatchObject({ id: "w1" });
+  });
+
+  it("throws when workshop is missing", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce(null);
+
+    await expect(workshopsService.getById("missing")).rejects.toMatchObject({
+      code: "WORKSHOP_NOT_FOUND",
+      status: 404
+    });
+  });
+
+  it("creates workshop", async () => {
+    mockedWorkshopsRepository.create.mockResolvedValueOnce({ id: "w2" } as any);
+
+    const result = await workshopsService.create({
+      managerId: "u1",
+      name: "Werkstatt",
+      description: "desc",
+      location: "Muenchen",
+      maxCapacity: 4
+    });
+
+    expect(mockedWorkshopsRepository.create).toHaveBeenCalled();
+    expect(result).toMatchObject({ id: "w2" });
+  });
+
+  it("updates workshop for owner", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+    mockedWorkshopsRepository.update.mockResolvedValueOnce({ id: "w1", name: "Neu" } as any);
+
+    const result = await workshopsService.update({
+      workshopId: "w1",
+      managerId: "owner-1",
+      actorRole: "USER",
+      data: { name: "Neu" }
+    });
+
+    expect(mockedWorkshopsRepository.update).toHaveBeenCalledWith("w1", { name: "Neu" });
+    expect(result).toMatchObject({ id: "w1", name: "Neu" });
+  });
+
+  it("blocks workshop updates for non-owners without manager role", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+
+    await expect(
+      workshopsService.update({
+        workshopId: "w1",
+        managerId: "other-user",
+        actorRole: "USER",
+        data: { name: "Neu" }
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+  });
+
+  it("removes workshop as manager role", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+
+    await workshopsService.remove({
+      workshopId: "w1",
+      managerId: "other-manager",
+      actorRole: "MANAGER"
+    });
+
+    expect(mockedWorkshopsRepository.remove).toHaveBeenCalledWith("w1");
+  });
+
+  it("creates timeslot when input is valid", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+    mockedWorkshopsRepository.findOverlappingTimeslot.mockResolvedValueOnce(null);
+    mockedWorkshopsRepository.createTimeslot.mockResolvedValueOnce({ id: "slot-1" } as any);
+
+    const result = await workshopsService.createTimeslot({
+      workshopId: "w1",
+      managerId: "owner-1",
+      actorRole: "USER",
+      startTime: "2026-06-01T10:00:00.000Z",
+      endTime: "2026-06-01T12:00:00.000Z"
+    });
+
+    expect(mockedWorkshopsRepository.createTimeslot).toHaveBeenCalled();
+    expect(result).toMatchObject({ id: "slot-1" });
+  });
+
+  it("rejects invalid timeslot ranges", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+
+    await expect(
+      workshopsService.createTimeslot({
+        workshopId: "w1",
+        managerId: "owner-1",
+        actorRole: "USER",
+        startTime: "2026-06-01T12:00:00.000Z",
+        endTime: "2026-06-01T10:00:00.000Z"
+      })
+    ).rejects.toMatchObject({ code: "INVALID_TIME_RANGE", status: 400 });
+  });
+
+  it("rejects overlapping timeslots", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+    mockedWorkshopsRepository.findOverlappingTimeslot.mockResolvedValueOnce({ id: "slot-existing" } as any);
+
+    await expect(
+      workshopsService.createTimeslot({
+        workshopId: "w1",
+        managerId: "owner-1",
+        actorRole: "USER",
+        startTime: "2026-06-01T10:00:00.000Z",
+        endTime: "2026-06-01T12:00:00.000Z"
+      })
+    ).rejects.toMatchObject({ code: "TIMESLOT_CONFLICT", status: 409 });
+  });
+
+  it("removes timeslot when no active booking exists", async () => {
+    mockedWorkshopsRepository.findTimeslotById.mockResolvedValueOnce({
+      id: "slot-1",
+      workshopId: "w1",
+      workshop: { managerId: "owner-1" }
+    } as any);
+    mockedWorkshopsRepository.findActiveBookingForTimeslot.mockResolvedValueOnce(null);
+
+    await workshopsService.removeTimeslot({
+      workshopId: "w1",
+      timeslotId: "slot-1",
+      managerId: "owner-1",
+      actorRole: "USER"
+    });
+
+    expect(mockedWorkshopsRepository.removeTimeslot).toHaveBeenCalledWith("slot-1");
+  });
+
+  it("rejects removing timeslot with active booking", async () => {
+    mockedWorkshopsRepository.findTimeslotById.mockResolvedValueOnce({
+      id: "slot-1",
+      workshopId: "w1",
+      workshop: { managerId: "owner-1" }
+    } as any);
+    mockedWorkshopsRepository.findActiveBookingForTimeslot.mockResolvedValueOnce({ id: "b1" } as any);
+
+    await expect(
+      workshopsService.removeTimeslot({
+        workshopId: "w1",
+        timeslotId: "slot-1",
+        managerId: "owner-1",
+        actorRole: "USER"
+      })
+    ).rejects.toMatchObject({ code: "ACTIVE_BOOKING_EXISTS", status: 409 });
+  });
+});
