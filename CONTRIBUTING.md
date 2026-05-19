@@ -7,7 +7,7 @@ Architektur, ADRs und Scrum-Doku liegen im separaten Repository
 
 Weil Doku und Code getrennt sind, muss dieser Code **für Reviewer und zukünftiges Ich** verständlich sein – ohne jedes Mal MkDocs zu öffnen.
 
-**Entscheidung:** [ADR-008: Code als lebende Dokumentation](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/adr/008-code-als-dokumentation.md)
+**Entscheidung:** [ADR-007: Repository-Struktur und Code als Dokumentation](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/adr/007-repo-struktur.md)
 
 **Ausführliche Richtlinie:** [Code als Dokumentation](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/architektur/code-als-dokumentation.md)
 
