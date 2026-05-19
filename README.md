@@ -109,6 +109,8 @@ Die vollständige Projektdokumentation (Architektur, ADRs, Scrum, etc.) befindet
 
 👉 [project-management](https://gitlab.lrz.de/swe2_if/team06/project-management)
 
+**Code-Repo:** Implementierungsdetails sollen im Quellcode nachvollziehbar sein ([ADR-008](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/adr/008-code-als-dokumentation.md)). Kurzregeln für Beiträge: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ---
 
 ## Team
