@@ -38,7 +38,7 @@ frontend:test:
   script:
     - cd frontend
     - npm ci
-    - npm run test
+    - npm run test -- --coverage
   only:
     - merge_requests
     - main
@@ -166,24 +166,369 @@ pages:
       <html lang="de">
       <head>
           <meta charset="UTF-8">
-          <title>ToolShare CI Metriken</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>ToolShare Quality & Metrics Dashboard</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
           <style>
-              body { font-family: sans-serif; padding: 2rem; background: #f4f4f9; }
-              .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-              a { display: block; margin: 5px 0; color: #007bff; text-decoration: none; }
+              :root {
+                  --bg-color: #0b0f19;
+                  --card-bg: rgba(22, 28, 45, 0.6);
+                  --card-border: rgba(255, 255, 255, 0.08);
+                  --primary: #3b82f6;
+                  --primary-glow: rgba(59, 130, 246, 0.15);
+                  --success: #10b981;
+                  --success-glow: rgba(16, 185, 129, 0.15);
+                  --text-main: #f8fafc;
+                  --text-muted: #94a3b8;
+                  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              }
+              * {
+                  box-sizing: border-box;
+                  margin: 0;
+                  padding: 0;
+              }
+              body {
+                  font-family: 'Outfit', sans-serif;
+                  background-color: var(--bg-color);
+                  background-image: 
+                      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+                      radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+                  color: var(--text-main);
+                  min-height: 100vh;
+                  padding: 3rem 1.5rem;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+              }
+              .container {
+                  width: 100%;
+                  max-width: 1000px;
+              }
+              header {
+                  text-align: center;
+                  margin-bottom: 4rem;
+                  position: relative;
+              }
+              .logo-area {
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 0.75rem;
+                  margin-bottom: 1rem;
+              }
+              .logo-icon {
+                  width: 42px;
+                  height: 42px;
+                  background: linear-gradient(135deg, var(--primary), var(--success));
+                  border-radius: 12px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+              }
+              .logo-icon svg {
+                  width: 22px;
+                  height: 22px;
+                  fill: white;
+              }
+              h1 {
+                  font-size: 2.5rem;
+                  font-weight: 700;
+                  letter-spacing: -0.025em;
+                  background: linear-gradient(to right, #ffffff, #94a3b8);
+                  -webkit-background-clip: text;
+                  -webkit-text-fill-color: transparent;
+              }
+              .tagline {
+                  color: var(--text-muted);
+                  font-size: 1.1rem;
+                  margin-top: 0.5rem;
+              }
+              .status-badge {
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 0.5rem;
+                  background: rgba(16, 185, 129, 0.1);
+                  border: 1px solid rgba(16, 185, 129, 0.2);
+                  color: var(--success);
+                  padding: 0.35rem 0.75rem;
+                  border-radius: 9999px;
+                  font-size: 0.85rem;
+                  font-weight: 500;
+                  margin-top: 1rem;
+              }
+              .status-dot {
+                  width: 8px;
+                  height: 8px;
+                  background-color: var(--success);
+                  border-radius: 50%;
+                  animation: pulse 2s infinite;
+              }
+              @keyframes pulse {
+                  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+                  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+                  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+              }
+              .section-title {
+                  font-size: 1.5rem;
+                  font-weight: 600;
+                  margin-bottom: 1.5rem;
+                  display: flex;
+                  align-items: center;
+                  gap: 0.5rem;
+                  color: #ffffff;
+                  border-left: 4px solid var(--primary);
+                  padding-left: 0.75rem;
+              }
+              .section-title.backend {
+                  border-left-color: var(--success);
+              }
+              .grid {
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                  gap: 2rem;
+                  margin-bottom: 4rem;
+              }
+              .card {
+                  background-color: var(--card-bg);
+                  border: 1px solid var(--card-border);
+                  border-radius: 16px;
+                  padding: 2rem;
+                  position: relative;
+                  overflow: hidden;
+                  backdrop-filter: blur(12px);
+                  -webkit-backdrop-filter: blur(12px);
+                  transition: var(--transition);
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: space-between;
+              }
+              .card::before {
+                  content: '';
+                  position: absolute;
+                  top: 0;
+                  left: 0;
+                  width: 100%;
+                  height: 4px;
+                  background: linear-gradient(90deg, var(--primary), transparent);
+                  opacity: 0.5;
+                  transition: var(--transition);
+              }
+              .card.backend-card::before {
+                  background: linear-gradient(90deg, var(--success), transparent);
+              }
+              .card:hover {
+                  transform: translateY(-5px);
+                  border-color: rgba(255, 255, 255, 0.15);
+                  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 40px var(--primary-glow);
+              }
+              .card.backend-card:hover {
+                  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 40px var(--success-glow);
+              }
+              .card-header {
+                  display: flex;
+                  align-items: flex-start;
+                  justify-content: space-between;
+                  margin-bottom: 1.5rem;
+              }
+              .card-icon {
+                  width: 48px;
+                  height: 48px;
+                  border-radius: 12px;
+                  background: rgba(255, 255, 255, 0.03);
+                  border: 1px solid var(--card-border);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: var(--primary);
+                  transition: var(--transition);
+              }
+              .card.backend-card .card-icon {
+                  color: var(--success);
+              }
+              .card:hover .card-icon {
+                  background: var(--primary);
+                  color: white;
+                  box-shadow: 0 0 15px var(--primary);
+              }
+              .card.backend-card:hover .card-icon {
+                  background: var(--success);
+                  color: white;
+                  box-shadow: 0 0 15px var(--success);
+              }
+              .card-icon svg {
+                  width: 24px;
+                  height: 24px;
+                  fill: currentColor;
+              }
+              .card-title {
+                  font-size: 1.25rem;
+                  font-weight: 600;
+                  color: #ffffff;
+                  margin-bottom: 0.5rem;
+              }
+              .card-description {
+                  color: var(--text-muted);
+                  font-size: 0.95rem;
+                  line-height: 1.6;
+                  margin-bottom: 2rem;
+                  flex-grow: 1;
+              }
+              .card-action {
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 0.5rem;
+                  width: 100%;
+                  background: rgba(255, 255, 255, 0.05);
+                  border: 1px solid var(--card-border);
+                  color: #ffffff;
+                  font-weight: 500;
+                  text-decoration: none;
+                  padding: 0.85rem;
+                  border-radius: 10px;
+                  font-size: 0.95rem;
+                  transition: var(--transition);
+                  cursor: pointer;
+              }
+              .card-action svg {
+                  width: 16px;
+                  height: 16px;
+                  fill: currentColor;
+                  transition: var(--transition);
+              }
+              .card-action:hover {
+                  background: var(--primary);
+                  border-color: var(--primary);
+                  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+              }
+              .card.backend-card .card-action:hover {
+                  background: var(--success);
+                  border-color: var(--success);
+                  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+              }
+              .card-action:hover svg {
+                  transform: translateX(3px);
+              }
+              footer {
+                  margin-top: auto;
+                  text-align: center;
+                  color: var(--text-muted);
+                  font-size: 0.85rem;
+                  border-top: 1px solid var(--card-border);
+                  padding-top: 2rem;
+                  width: 100%;
+              }
           </style>
       </head>
       <body>
-          <h1>ToolShare Dashboard</h1>
-          <div class="card">
-              <h2>Frontend</h2>
-              <a href="frontend-coverage/index.html">Test Coverage</a>
-              <a href="frontend-lint-report.html">Linting Report</a>
-          </div>
-          <div class="card">
-              <h2>Backend</h2>
-              <a href="backend-coverage/index.html">Test Coverage</a>
-              <a href="backend-lint-report.html">Linting Report</a>
+          <div class="container">
+              <header>
+                  <div class="logo-area">
+                      <div class="logo-icon">
+                          <svg viewBox="0 0 24 24">
+                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                          </svg>
+                      </div>
+                  </div>
+                  <h1>ToolShare Quality & Metrics Dashboard</h1>
+                  <p class="tagline">Automatisierte Code-Analysen, Linter-Reports und Testergebnisse</p>
+                  <div class="status-badge">
+                      <div class="status-dot"></div>
+                      <span>CI/CD Pipeline Aktiv</span>
+                  </div>
+              </header>
+      
+              <h2 class="section-title">Frontend Metriken</h2>
+              <div class="grid">
+                  <div class="card">
+                      <div>
+                          <div class="card-header">
+                              <div class="card-icon">
+                                  <svg viewBox="0 0 24 24">
+                                      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2z"/>
+                                  </svg>
+                              </div>
+                          </div>
+                          <div class="card-title">Frontend Test Coverage</div>
+                          <p class="card-description">Detaillierte Übersicht über die Testabdeckung der React- und TypeScript-Komponenten des Frontends.</p>
+                      </div>
+                      <a href="frontend-coverage/index.html" class="card-action">
+                          <span>Coverage ansehen</span>
+                          <svg viewBox="0 0 24 24">
+                              <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21 12l-8.15-8.15-1.42 1.42 5.43 5.43H5v2z"/>
+                          </svg>
+                      </a>
+                  </div>
+      
+                  <div class="card">
+                      <div>
+                          <div class="card-header">
+                              <div class="card-icon">
+                                  <svg viewBox="0 0 24 24">
+                                      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                  </svg>
+                              </div>
+                          </div>
+                          <div class="card-title">Frontend Linting Report</div>
+                          <p class="card-description">Statische Codeanalyse des Frontend-Quellcodes zur Sicherstellung einheitlicher Codierungsrichtlinien.</p>
+                      </div>
+                      <a href="frontend-lint-report.html" class="card-action">
+                          <span>Lint-Report ansehen</span>
+                          <svg viewBox="0 0 24 24">
+                              <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21 12l-8.15-8.15-1.42 1.42 5.43 5.43H5v2z"/>
+                          </svg>
+                      </a>
+                  </div>
+              </div>
+      
+              <h2 class="section-title backend">Backend Metriken</h2>
+              <div class="grid">
+                  <div class="card backend-card">
+                      <div>
+                          <div class="card-header">
+                              <div class="card-icon">
+                                  <svg viewBox="0 0 24 24">
+                                      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2z"/>
+                                  </svg>
+                              </div>
+                          </div>
+                          <div class="card-title">Backend Test Coverage</div>
+                          <p class="card-description">Detaillierte Übersicht über die Testabdeckung der Node.js-, Express- und Prisma-Services des Backends.</p>
+                      </div>
+                      <a href="backend-coverage/index.html" class="card-action">
+                          <span>Coverage ansehen</span>
+                          <svg viewBox="0 0 24 24">
+                              <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21 12l-8.15-8.15-1.42 1.42 5.43 5.43H5v2z"/>
+                          </svg>
+                      </a>
+                  </div>
+      
+                  <div class="card backend-card">
+                      <div>
+                          <div class="card-header">
+                              <div class="card-icon">
+                                  <svg viewBox="0 0 24 24">
+                                      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                  </svg>
+                              </div>
+                          </div>
+                          <div class="card-title">Backend Linting Report</div>
+                          <p class="card-description">Statische Codeanalyse des Backend-Quellcodes zur Sicherstellung einheitlicher Codierungsrichtlinien.</p>
+                      </div>
+                      <a href="backend-lint-report.html" class="card-action">
+                          <span>Lint-Report ansehen</span>
+                          <svg viewBox="0 0 24 24">
+                              <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21 12l-8.15-8.15-1.42 1.42 5.43 5.43H5v2z"/>
+                          </svg>
+                      </a>
+                  </div>
+              </div>
+      
+              <footer>
+                  <p>Erstellt am $(date +'%d.%m.%Y um %H:%M:%S') • ToolShare CI Pipeline</p>
+              </footer>
           </div>
       </body>
       </html>
@@ -215,13 +560,35 @@ pages:
 
 # === CODE QUALITY & COMPLIANCE ===
 
-security:scan:
+security:audit:
   stage: test
   image: node:20
   allow_failure: true
   script:
     - (cd backend && npm audit --audit-level=moderate)
     - (cd frontend && npm audit --audit-level=moderate)
+  only:
+    - merge_requests
+    - main
+
+security:sast:semgrep:
+  stage: test
+  image: returntocorp/semgrep:latest
+  allow_failure: true
+  script:
+    - semgrep scan --config auto --error
+  only:
+    - merge_requests
+    - main
+
+security:container:trivy:
+  stage: test
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  allow_failure: true
+  script:
+    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 0 .
   only:
     - merge_requests
     - main
