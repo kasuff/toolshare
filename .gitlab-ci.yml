@@ -152,8 +152,10 @@ pages:
   stage: pages
   image: alpine:latest
   needs:
-    - frontend:build
-    - backend:build
+    - frontend:lint
+    - frontend:test
+    - backend:lint
+    - backend:test
 
   script:
     - apk add --no-cache bash
@@ -197,14 +199,18 @@ pages:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       variables:
         PAGES_PREFIX: "mr-$CI_MERGE_REQUEST_IID"
+        PAGES_URL: "$CI_PAGES_URL/mr-$CI_MERGE_REQUEST_IID/"
+        PAGES_ENV_NAME: "pages/mr-$CI_MERGE_REQUEST_IID"
     - if: $CI_COMMIT_BRANCH == "main"
       variables:
         PAGES_PREFIX: ""
+        PAGES_URL: "$CI_PAGES_URL/"
+        PAGES_ENV_NAME: "pages/main"
   pages:
     path_prefix: "$PAGES_PREFIX"
   environment:
-    name: pages/$CI_COMMIT_REF_SLUG
-    url: $CI_PAGES_URL/$PAGES_PREFIX/
+    name: $PAGES_ENV_NAME
+    url: $PAGES_URL
     action: start
 
 # === CODE QUALITY & COMPLIANCE ===
@@ -214,9 +220,8 @@ security:scan:
   image: node:20
   allow_failure: true
   script:
-    - npm install -g npm-audit
-    - cd backend && npm audit --audit-level=moderate && cd ..
-    - cd frontend && npm audit --audit-level=moderate && cd ..
+    - (cd backend && npm audit --audit-level=moderate)
+    - (cd frontend && npm audit --audit-level=moderate)
   only:
     - merge_requests
     - main
