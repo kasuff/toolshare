@@ -25,38 +25,40 @@ export const bookingsService = {
     endDate: string;
     pickupTime: string;
   }) {
-    const tool = await bookingsRepository.findToolById(input.toolId);
-    if (!tool) {
-      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
-    }
-
     const startDate = new Date(input.startDate);
     const endDate = new Date(input.endDate);
     const pickupTime = new Date(input.pickupTime);
 
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate >= endDate) {
+    if (
+      Number.isNaN(startDate.getTime()) ||
+      Number.isNaN(endDate.getTime()) ||
+      Number.isNaN(pickupTime.getTime()) ||
+      startDate >= endDate
+    ) {
       throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
 
-    const overlap = await bookingsRepository.findOverlappingToolBooking(tool.id, startDate, endDate);
-    if (overlap) {
-      throw new AppError(
-        "BOOKING_CONFLICT",
-        "This tool is unavailable in the selected period",
-        409
-      );
-    }
-
-    const booking = await bookingsRepository.createToolBooking({
+    const result = await bookingsRepository.createToolBookingTransaction({
       userId: input.requesterId,
-      toolId: tool.id,
+      toolId: input.toolId,
       startDate,
       endDate,
       pickupTime
     });
 
-    await notificationsRepository.create(tool.ownerId, "Neue Ausleihanfrage fuer dein Werkzeug.");
-    return booking;
+    if (result === null) {
+      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
+    }
+    if (result === "CONFLICT") {
+      throw new AppError(
+        "BOOKING_CONFLICT",
+        "Resource is unavailable in the selected period",
+        409
+      );
+    }
+
+    await notificationsRepository.create(result.tool.ownerId, "Neue Ausleihanfrage fuer dein Werkzeug.");
+    return result.booking;
   },
 
   async createWorkshopBooking(input: { requesterId: string; timeslotId: string }) {
@@ -69,7 +71,11 @@ export const bookingsService = {
       throw new AppError("TIMESLOT_NOT_FOUND", "Timeslot not found", 404);
     }
     if (result === "CONFLICT") {
-      throw new AppError("BOOKING_CONFLICT", "Timeslot is already booked", 409);
+      throw new AppError(
+        "BOOKING_CONFLICT",
+        "Resource is unavailable in the selected period",
+        409
+      );
     }
     if (result === "BLOCKED") {
       throw new AppError("TIMESLOT_BLOCKED", "Timeslot is blocked by workshop owner", 409);

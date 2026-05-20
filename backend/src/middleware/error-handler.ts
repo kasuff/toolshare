@@ -12,7 +12,7 @@ const userFriendlyMessageByCode: Record<string, string> = {
   WORKSHOP_NOT_FOUND: "Der Workshop wurde nicht gefunden.",
   TIMESLOT_NOT_FOUND: "Der Zeitslot wurde nicht gefunden.",
   BOOKING_NOT_FOUND: "Die Buchung wurde nicht gefunden.",
-  BOOKING_CONFLICT: "Dieser Zeitslot ist bereits gebucht.",
+  BOOKING_CONFLICT: "Im gewaehlten Zeitraum ist bereits eine Buchung vorhanden.",
   TIMESLOT_CONFLICT: "Der Zeitslot ueberschneidet sich mit einem bestehenden Termin.",
   INVALID_TIME_RANGE: "Der angegebene Zeitraum ist ungueltig.",
   ACTIVE_BOOKING_EXISTS: "Das Werkzeug kann nicht geloescht werden, weil noch aktive Buchungen existieren.",

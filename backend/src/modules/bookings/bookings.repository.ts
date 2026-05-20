@@ -1,5 +1,8 @@
-import { Prisma } from "@prisma/client";
+import { BookingStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
+
+/** Buchungen in diesen Statusen blockieren Werkzeug-Zeiträume bzw. Werkstatt-Slots. */
+const BLOCKING_BOOKING_STATUSES: BookingStatus[] = ["PENDING", "ACCEPTED"];
 
 export const bookingsRepository = {
   listForUserContext(userId: string) {
@@ -76,33 +79,44 @@ export const bookingsRepository = {
     });
   },
 
-  findOverlappingToolBooking(toolId: string, startDate: Date, endDate: Date) {
-    return prisma.booking.findFirst({
-      where: {
-        toolId,
-        status: { in: ["PENDING", "ACCEPTED"] },
-        startDate: { lt: endDate },
-        endDate: { gt: startDate }
-      }
-    });
-  },
-
-  createToolBooking(input: {
+  createToolBookingTransaction(input: {
     userId: string;
     toolId: string;
     startDate: Date;
     endDate: Date;
     pickupTime: Date;
   }) {
-    return prisma.booking.create({
-      data: {
-        userId: input.userId,
-        toolId: input.toolId,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        pickupTime: input.pickupTime,
-        status: "PENDING"
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const tool = await tx.tool.findUnique({ where: { id: input.toolId } });
+      if (!tool) {
+        return null;
       }
+
+      const overlap = await tx.booking.findFirst({
+        where: {
+          toolId: input.toolId,
+          status: { in: BLOCKING_BOOKING_STATUSES },
+          startDate: { lt: input.endDate },
+          endDate: { gt: input.startDate }
+        }
+      });
+
+      if (overlap) {
+        return "CONFLICT" as const;
+      }
+
+      const booking = await tx.booking.create({
+        data: {
+          userId: input.userId,
+          toolId: input.toolId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          pickupTime: input.pickupTime,
+          status: "PENDING"
+        }
+      });
+
+      return { booking, tool };
     });
   },
 
@@ -136,7 +150,7 @@ export const bookingsRepository = {
       const existing = await tx.booking.findFirst({
         where: {
           timeslotId: input.timeslotId,
-          status: { in: ["PENDING", "ACCEPTED"] }
+          status: { in: BLOCKING_BOOKING_STATUSES }
         }
       });
 
