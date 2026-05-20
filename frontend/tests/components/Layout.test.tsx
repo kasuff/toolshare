@@ -10,7 +10,7 @@ const users: User[] = [
 ];
 
 describe("Layout", () => {
-  it("opens tool and workshop dropdowns and closes them on outside click", () => {
+  it("renders top-level navigation links and profile menu actions", () => {
     const onSwitchUser = vi.fn();
     const onLogout = vi.fn();
 
@@ -26,11 +26,12 @@ describe("Layout", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Werkzeuge/i }));
-    expect(screen.getByText("Werkzeuge anschauen")).toBeInTheDocument();
-    expect(screen.getByText("Werkzeug anbieten")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Werkzeuge" })).toHaveAttribute("href", "/tools");
+    expect(screen.getByRole("link", { name: "Werkstätten" })).toHaveAttribute("href", "/workshops");
+    expect(screen.getByRole("link", { name: "Inbox" })).toHaveAttribute("href", "/inbox");
+    expect(screen.getByRole("button", { name: "Ausloggen" })).toBeInTheDocument();
 
-    fireEvent.mouseDown(document.body);
-    expect(screen.queryByText("Werkzeug anbieten")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ausloggen" }));
+    expect(onLogout).toHaveBeenCalledTimes(1);
   });
 });
