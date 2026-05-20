@@ -33,9 +33,7 @@ type MockUser = {
   createdAt: Date;
 };
 
-const dbAvailable = await isDatabaseAvailable();
-
-describe.skipIf(!dbAvailable)("US-13 Authentication acceptance criteria", () => {
+describe("US-13 Authentication acceptance criteria", () => {
   const seed = Date.now();
   const validEmail = `us13-valid-${seed}@example.com`;
   const validPassword = "Test1234!";
