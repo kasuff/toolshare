@@ -32,7 +32,7 @@ describe("api service", () => {
       name: "Lea",
       role: "ADMIN",
       address: undefined,
-      isSuspended: undefined
+      isSuspended: false
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/users/me",

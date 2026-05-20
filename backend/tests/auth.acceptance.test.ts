@@ -43,8 +43,6 @@ describe.skipIf(!dbAvailable)("US-13 Authentication acceptance criteria", () => 
   const blockedPassword = "Blocked1234!";
   let app: Express;
   let usersByEmail = new Map<string, MockUser>();
-
-  let app: Express;
   let prisma: typeof import("../src/config/prisma").prisma;
 
   beforeAll(async () => {
