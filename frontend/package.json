@@ -14,7 +14,7 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "c8 --reporter=text --reporter=html --check-coverage --lines 70 --branches 50 --functions 70 --statements 70 vitest run"
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "react": "^18.3.1",

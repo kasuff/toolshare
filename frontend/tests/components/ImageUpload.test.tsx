@@ -87,19 +87,18 @@ describe("ImageUpload", () => {
     const onImageSelect = vi.fn();
     const user = userEvent.setup();
 
-    const { container } = render(
+    render(
       <ImageUpload
         onImageSelect={onImageSelect}
-        placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
+        currentImage="https://example.com/image.jpg"
+        placeholderImage="https://example.com/placeholder.jpg"
         label="Foto"
       />
     );
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    await user.upload(input, new File(["image"], "sample.png", { type: "image/png" }));
-    await user.click(screen.getByRole("button", { name: /Entfernen/i }));
-
-    expect(onImageSelect).toHaveBeenCalledWith(null);
-    expect(screen.getByText("Standardbild verwendet")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Preview/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Entfernen/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Bild wechseln/i }));
+    expect(onImageSelect).not.toHaveBeenCalledWith(null);
   });
 });

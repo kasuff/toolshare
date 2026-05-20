@@ -10,7 +10,7 @@ const users: User[] = [
 ];
 
 describe("Layout", () => {
-  it("renders primary navigation links", () => {
+  it("renders top-level navigation links and profile menu actions", () => {
     const onSwitchUser = vi.fn();
     const onLogout = vi.fn();
 
@@ -26,9 +26,12 @@ describe("Layout", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("link", { name: /Entdecken/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Werkzeuge/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Werkstätten/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Inbox/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Werkzeuge" })).toHaveAttribute("href", "/tools");
+    expect(screen.getByRole("link", { name: "Werkstätten" })).toHaveAttribute("href", "/workshops");
+    expect(screen.getByRole("link", { name: "Inbox" })).toHaveAttribute("href", "/inbox");
+    expect(screen.getByRole("button", { name: "Ausloggen" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ausloggen" }));
+    expect(onLogout).toHaveBeenCalledTimes(1);
   });
 });

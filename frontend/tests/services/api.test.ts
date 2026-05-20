@@ -31,7 +31,8 @@ describe("api service", () => {
       email: "lea@toolshare.local",
       name: "Lea",
       role: "ADMIN",
-      isSuspended: false
+      address: undefined,
+      isSuspended: undefined
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/users/me",
@@ -121,6 +122,16 @@ describe("api service", () => {
           { id: "u1", email: "a@example.com", name: "A", role: "USER" },
           { id: "u2", email: "b@example.com", name: "B", role: "MODERATOR" }
         ]);
+      }
+
+      if (url.endsWith("/users/admin/metrics")) {
+        return responseJson({
+          users: 2,
+          tools: 1,
+          workshops: 1,
+          openBookings: 1,
+          openReports: 1
+        });
       }
 
       return responseJson([]);

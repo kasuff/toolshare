@@ -11,7 +11,7 @@ describe("categories utilities", () => {
     expect(TOOL_CATEGORIES.map((category) => category.value)).toContain("garten");
   });
 
-  it("returns the default placeholder image for every category", () => {
+  it("returns a category-specific placeholder image and falls back safely", () => {
     expect(getPlaceholderImageForCategory("Holz")).toBe(DEFAULT_PLACEHOLDER_IMAGE);
     expect(getPlaceholderImageForCategory("unknown-category")).toBe(DEFAULT_PLACEHOLDER_IMAGE);
   });

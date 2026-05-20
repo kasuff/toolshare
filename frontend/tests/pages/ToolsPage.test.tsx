@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
@@ -42,5 +42,52 @@ describe("ToolsPage", () => {
     expect(screen.queryByText("Ausleihanfrage vorbereiten")).not.toBeInTheDocument();
     expect(screen.getByText(/Klicke um Details und Buchung zu sehen/i)).toBeInTheDocument();
     await waitFor(() => expect(getTools).toHaveBeenCalled());
+  });
+
+  it("shows guest banner and resets filters", async () => {
+    getTools
+      .mockResolvedValueOnce([
+        {
+          id: "t1",
+          ownerId: "u1",
+          name: "Saege",
+          description: "Holz",
+          category: "Holz",
+          imageUrl: "https://example.com/tool.jpg",
+          status: "VERFUEGBAR"
+        }
+      ])
+      .mockResolvedValue([
+        {
+          id: "t1",
+          ownerId: "u1",
+          name: "Saege",
+          description: "Holz",
+          category: "Holz",
+          imageUrl: "https://example.com/tool.jpg",
+          status: "VERFUEGBAR"
+        }
+      ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <ToolsPage />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByText(/Du kannst als Gast stöbern/i)).toBeInTheDocument();
+    const searchInput = screen.getByPlaceholderText(/Name oder Beschreibung/i);
+    const categoryInput = screen.getByPlaceholderText(/z\.B\. Holz/i);
+
+    fireEvent.change(searchInput, { target: { value: "Bohr" } });
+    fireEvent.change(categoryInput, { target: { value: "Elektro" } });
+
+    const resetButton = await screen.findByRole("button", { name: /Filter zurücksetzen/i });
+    fireEvent.click(resetButton);
+
+    expect(searchInput).toHaveValue("");
+    expect(categoryInput).toHaveValue("");
   });
 });
