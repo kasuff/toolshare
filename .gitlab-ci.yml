@@ -649,6 +649,11 @@ security:audit:
 
 sast:
   stage: test
+  artifacts:
+    paths:
+      - gl-sast-report.json
+    reports:
+      sast: gl-sast-report.json
 
 security:container:trivy:
   stage: test
@@ -657,7 +662,7 @@ security:container:trivy:
     entrypoint: [""]
   allow_failure: true
   script:
-    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table > trivy-report.txt || true
+    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table -o trivy-report.txt . || true
     - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 0 .
   artifacts:
     when: always
