@@ -1,6 +1,3 @@
-include:
-  - template: Security/SAST.gitlab-ci.yml
-
 stages:
   - lint
   - test
@@ -162,8 +159,6 @@ pages:
     - job: security:container:trivy
       optional: true
     - job: semgrep-sast
-      optional: true
-    - job: nodejs-scan-sast
       optional: true
 
   script:
@@ -648,18 +643,19 @@ security:audit:
     - main
 
 semgrep-sast:
+  stage: test
+  image: semgrep/semgrep:latest
+  script:
+    - semgrep scan --config=auto --gitlab-sast > gl-sast-report.json || true
   artifacts:
     paths:
       - gl-sast-report.json
     reports:
       sast: gl-sast-report.json
-
-nodejs-scan-sast:
-  artifacts:
-    paths:
-      - gl-sast-report.json
-    reports:
-      sast: gl-sast-report.json
+    when: always
+  only:
+    - merge_requests
+    - main
 
 security:container:trivy:
   stage: test
