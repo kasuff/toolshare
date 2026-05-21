@@ -586,7 +586,7 @@ pages:
                           <div class="card-title">GitLab SAST</div>
                           <p class="card-description">Static Application Security Testing (SAST) zur automatisierten Erkennung von Sicherheitslücken im Quellcode.</p>
                       </div>
-                      <a href="gl-sast-report.json" class="card-action">
+                      <a href="sast-report.txt" class="card-action">
                           <span>SAST Report ansehen</span>
                           <svg viewBox="0 0 24 24">
                               <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21 12l-8.15-8.15-1.42 1.42 5.43 5.43H5v2z"/>
@@ -608,6 +608,7 @@ pages:
     - cp backend-lint-report.html public/ || true
     - cp trivy-report.txt public/ || true
     - cp gl-sast-report.json public/ || true
+    - cp sast-report.txt public/ || true
   artifacts:
     paths:
       - public
@@ -647,9 +648,11 @@ semgrep-sast:
   image: semgrep/semgrep:latest
   script:
     - semgrep scan --config=auto --gitlab-sast > gl-sast-report.json || true
+    - semgrep scan --config=auto -q --text > sast-report.txt || true
   artifacts:
     paths:
       - gl-sast-report.json
+      - sast-report.txt
     reports:
       sast: gl-sast-report.json
     when: always
