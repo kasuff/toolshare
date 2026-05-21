@@ -647,8 +647,14 @@ security:audit:
     - merge_requests
     - main
 
-sast:
-  stage: test
+semgrep-sast:
+  artifacts:
+    paths:
+      - gl-sast-report.json
+    reports:
+      sast: gl-sast-report.json
+
+nodejs-scan-sast:
   artifacts:
     paths:
       - gl-sast-report.json
