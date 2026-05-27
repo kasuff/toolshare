@@ -23,7 +23,6 @@ frontend:lint:
   only:
     - merge_requests
     - main
-    - /^feature\/.*$/
   artifacts:
     when: always
     paths:
@@ -42,7 +41,6 @@ frontend:test:
   only:
     - merge_requests
     - main
-    - /^feature\/.*$/
   coverage: '/Coverage: \d+\.\d+%/'
   artifacts:
     reports:
@@ -71,7 +69,6 @@ backend:lint:
   only:
     - merge_requests
     - main
-    - /^feature\/.*$/
   artifacts:
     when: always
     paths:
@@ -99,7 +96,6 @@ backend:test:
   only:
     - merge_requests
     - main
-    - /^feature\/.*$/
   coverage: '/All files\s+\|\s+(\d+\.\d+)/'
   artifacts:
     reports:
@@ -126,7 +122,6 @@ frontend:build:
   only:
     - merge_requests
     - main
-    - /^feature\/.*$/
   cache:
     paths:
       - frontend/node_modules/
@@ -141,7 +136,6 @@ backend:build:
   only:
     - merge_requests
     - main
-    - /^feature\/.*$/
   cache:
     paths:
       - backend/node_modules/
@@ -647,8 +641,11 @@ semgrep-sast:
   stage: test
   image: semgrep/semgrep:latest
   script:
-    - semgrep scan --config=auto --gitlab-sast > gl-sast-report.json || true
-    - semgrep scan --config=auto -q --text > sast-report.txt || true
+    - semgrep scan --config=auto --gitlab-sast -o gl-sast-report.json || true
+    - echo "=== Semgrep SAST Security Report ===" > sast-report.txt
+    - echo "====================================" >> sast-report.txt
+    - echo "" >> sast-report.txt
+    - semgrep scan --config=auto --text >> sast-report.txt || true
   artifacts:
     paths:
       - gl-sast-report.json
