@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
@@ -15,9 +15,10 @@ type WorkshopWithSlots = {
   slots: WorkshopSlot[];
 };
 
-type BlockingDraft = {
+type SlotDraft = {
   startIso: string;
   endIso: string;
+  blockedByOwner: boolean;
 };
 
 export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
@@ -25,9 +26,13 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
   const [workshops, setWorkshops] = useState<WorkshopWithSlots[]>([]);
   const [selectedWorkshop, setSelectedWorkshop] = useState<WorkshopWithSlots | null>(null);
   const [slots, setSlots] = useState<WorkshopSlot[]>([]);
-  const [blocking, setBlocking] = useState<BlockingDraft>({ startIso: "", endIso: "" });
-  const [blockings, setBlockings] = useState<BlockingDraft[]>([]);
+  const [draft, setDraft] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: false });
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: false });
   const [loading, setLoading] = useState(true);
+
+  const sortSlots = (items: WorkshopSlot[]) =>
+    [...items].sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
 
   useEffect(() => {
     const fetchWorkshops = async () => {
@@ -43,7 +48,7 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
         if (ownedWorkshops.length > 0) {
           setSelectedWorkshop(ownedWorkshops[0]);
-          setSlots(ownedWorkshops[0].slots || []);
+          setSlots(sortSlots(ownedWorkshops[0].slots || []));
         }
       } catch (error) {
         pushToast("Werkstätten konnten nicht geladen werden.", "error");
@@ -52,8 +57,8 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
       }
     };
 
-    fetchWorkshops();
-  }, [token, currentUser]);
+    void fetchWorkshops();
+  }, [token, currentUser, pushToast]);
 
   if (!token) {
     return (
@@ -99,43 +104,168 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
   const handleSelectWorkshop = (workshop: WorkshopWithSlots) => {
     setSelectedWorkshop(workshop);
-    setSlots(workshop.slots || []);
-    setBlockings([]);
-    setBlocking({ startIso: "", endIso: "" });
+    setSlots(sortSlots(workshop.slots || []));
+    setDraft({ startIso: "", endIso: "", blockedByOwner: false });
+    setEditingSlotId(null);
+    setEditingDraft({ startIso: "", endIso: "", blockedByOwner: false });
   };
 
-  const addBlocking = () => {
-    if (!blocking.startIso || !blocking.endIso) {
-      pushToast("Bitte Start und Ende für die Blockierung angeben.", "error");
-      return;
+  const applySlotsUpdate = (nextSlots: WorkshopSlot[]) => {
+    const sorted = sortSlots(nextSlots);
+    setSlots(sorted);
+    if (!selectedWorkshop) return;
+
+    setWorkshops((prev) =>
+      prev.map((entry) =>
+        entry.workshop.id === selectedWorkshop.workshop.id
+          ? {
+              ...entry,
+              slots: sorted
+            }
+          : entry
+      )
+    );
+    setSelectedWorkshop((prev) =>
+      prev
+        ? {
+            ...prev,
+            slots: sorted
+          }
+        : prev
+    );
+  };
+
+  const refreshWorkshopState = async (workshopId: string) => {
+    if (!token || !currentUser) return;
+    const allWorkshops = await api.getWorkshops({}, token);
+    const ownedWorkshops = allWorkshops.filter((entry) => entry.workshop.ownerId === currentUser.id);
+    setWorkshops(ownedWorkshops);
+
+    const refreshedWorkshop = ownedWorkshops.find((entry) => entry.workshop.id === workshopId) ?? null;
+    setSelectedWorkshop(refreshedWorkshop);
+    setSlots(sortSlots(refreshedWorkshop?.slots ?? []));
+  };
+
+  const validateSlot = (candidate: SlotDraft) => {
+    if (!candidate.startIso || !candidate.endIso) {
+      pushToast("Bitte Start und Ende für das Zeitfenster angeben.", "error");
+      return false;
     }
-    if (new Date(blocking.startIso) >= new Date(blocking.endIso)) {
+    if (new Date(candidate.startIso) >= new Date(candidate.endIso)) {
       pushToast("Die Endzeit muss nach der Startzeit liegen.", "error");
+      return false;
+    }
+    return true;
+  };
+
+  const addSlot = async () => {
+    if (!selectedWorkshop || !token) {
+      pushToast("Bitte wählen Sie eine Werkstatt aus.", "error");
       return;
     }
-    setBlockings((prev) => [...prev, blocking]);
-    setBlocking({ startIso: "", endIso: "" });
+    if (!validateSlot(draft)) return;
+
+    try {
+      await api.createWorkshopTimeslot(
+        selectedWorkshop.workshop.id,
+        {
+          startIso: draft.startIso,
+          endIso: draft.endIso,
+          blockedByOwner: draft.blockedByOwner
+        },
+        token
+      );
+      await refreshWorkshopState(selectedWorkshop.workshop.id);
+      setDraft({ startIso: "", endIso: "", blockedByOwner: false });
+      pushToast("Zeitfenster gespeichert.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht gespeichert werden.", "error");
+    }
   };
 
-  const removeBlocking = (index: number) => {
-    setBlockings((prev) => prev.filter((_, i) => i !== index));
+  const startEditing = (slot: WorkshopSlot) => {
+    setEditingSlotId(slot.id);
+    setEditingDraft({
+      startIso: slot.startIso,
+      endIso: slot.endIso,
+      blockedByOwner: slot.blockedByOwner
+    });
   };
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const cancelEditing = () => {
+    setEditingSlotId(null);
+    setEditingDraft({ startIso: "", endIso: "", blockedByOwner: false });
+  };
 
-    if (!selectedWorkshop) {
-      pushToast("Bitte wählen Sie eine Werkstatt aus.", "error");
+  const saveEditedSlot = async () => {
+    if (!selectedWorkshop || !token || !editingSlotId) {
+      return;
+    }
+    if (!validateSlot(editingDraft)) return;
+
+    const existingSlot = slots.find((slot) => slot.id === editingSlotId);
+    if (!existingSlot) {
+      pushToast("Zeitfenster konnte nicht gefunden werden.", "error");
+      return;
+    }
+
+    const updatePayload: { startIso?: string; endIso?: string; blockedByOwner?: boolean } = {};
+    if (editingDraft.startIso !== existingSlot.startIso) {
+      updatePayload.startIso = editingDraft.startIso;
+    }
+    if (editingDraft.endIso !== existingSlot.endIso) {
+      updatePayload.endIso = editingDraft.endIso;
+    }
+    if (editingDraft.blockedByOwner !== existingSlot.blockedByOwner) {
+      updatePayload.blockedByOwner = editingDraft.blockedByOwner;
+    }
+    if (Object.keys(updatePayload).length === 0) {
+      cancelEditing();
       return;
     }
 
     try {
-      // Here you would call the API to update blockings
-      // For now, just show a success message
-      pushToast("Verfügbarkeit aktualisiert.", "success");
-      setBlockings([]);
+      const updated = await api.updateWorkshopTimeslot(
+        selectedWorkshop.workshop.id,
+        editingSlotId,
+        updatePayload,
+        token
+      );
+      applySlotsUpdate(slots.map((slot) => (slot.id === editingSlotId ? updated : slot)));
+      cancelEditing();
+      pushToast("Zeitfenster aktualisiert.", "success");
     } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Verfügbarkeit konnte nicht aktualisiert werden.", "error");
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
+    }
+  };
+
+  const removeSlot = async (slotId: string) => {
+    if (!selectedWorkshop || !token) return;
+    try {
+      await api.deleteWorkshopTimeslot(selectedWorkshop.workshop.id, slotId, token);
+      applySlotsUpdate(slots.filter((slot) => slot.id !== slotId));
+      if (editingSlotId === slotId) {
+        cancelEditing();
+      }
+      pushToast("Zeitfenster entfernt.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht entfernt werden.", "error");
+    }
+  };
+
+  const toggleBlocked = async (slot: WorkshopSlot) => {
+    if (!selectedWorkshop || !token) return;
+    try {
+      const updated = await api.updateWorkshopTimeslot(
+        selectedWorkshop.workshop.id,
+        slot.id,
+        { blockedByOwner: !slot.blockedByOwner },
+        token
+      );
+      applySlotsUpdate(slots.map((item) => (item.id === slot.id ? updated : item)));
+      pushToast(updated.blockedByOwner ? "Zeitfenster blockiert." : "Zeitfenster freigegeben.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Status konnte nicht geändert werden.", "error");
     }
   };
 
@@ -165,19 +295,105 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
       {selectedWorkshop && (
         <>
-          <Surface title="Verfügbare Zeitfenster" subtitle="Deine konfigurierten Öffnungszeiten">
+          <Surface title="Neues Zeitfenster hinzufügen" subtitle="Lege zusätzliche verfügbare Zeiten oder Blockierungen an">
+            <div className="grid grid-3">
+              <Field label="Startzeit">
+                <input
+                  type="datetime-local"
+                  value={draft.startIso}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, startIso: e.target.value }))}
+                />
+              </Field>
+              <Field label="Endzeit">
+                <input
+                  type="datetime-local"
+                  value={draft.endIso}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, endIso: e.target.value }))}
+                />
+              </Field>
+              <label className="field" style={{ paddingTop: "1.5rem" }}>
+                <span>Als blockiert markieren</span>
+                <input
+                  type="checkbox"
+                  checked={draft.blockedByOwner}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, blockedByOwner: e.target.checked }))}
+                />
+              </label>
+            </div>
+            <div className="row">
+              <button type="button" className="btn secondary" onClick={() => void addSlot()}>
+                Zeitfenster anlegen
+              </button>
+            </div>
+          </Surface>
+
+          <Surface title="Bestehende Zeitfenster" subtitle="Zeiten bearbeiten, blockieren/freigeben oder entfernen">
             {slots.length > 0 ? (
               <div className="time-slots-display">
                 <ul className="meta-list">
-                  {slots.map((slot) => (
-                    <li key={slot.id} className="slot-item">
-                      <div>
-                        <strong>{new Date(slot.startIso).toLocaleString("de-DE")}</strong>
-                        {" – "}
-                        <strong>{new Date(slot.endIso).toLocaleString("de-DE")}</strong>
-                      </div>
-                    </li>
-                  ))}
+                  {slots.map((slot) => {
+                    const isEditing = editingSlotId === slot.id;
+                    return (
+                      <li key={slot.id} className={`slot-item ${isEditing ? "slot-item-editing" : ""}`}>
+                        {isEditing ? (
+                          <div className="slot-edit-form">
+                            <div className="grid grid-3">
+                              <Field label="Startzeit">
+                                <input
+                                  type="datetime-local"
+                                  value={editingDraft.startIso}
+                                  onChange={(e) => setEditingDraft((prev) => ({ ...prev, startIso: e.target.value }))}
+                                />
+                              </Field>
+                              <Field label="Endzeit">
+                                <input
+                                  type="datetime-local"
+                                  value={editingDraft.endIso}
+                                  onChange={(e) => setEditingDraft((prev) => ({ ...prev, endIso: e.target.value }))}
+                                />
+                              </Field>
+                              <label className="field" style={{ paddingTop: "1.5rem" }}>
+                                <span>Blockiert</span>
+                                <input
+                                  type="checkbox"
+                                  checked={editingDraft.blockedByOwner}
+                                  onChange={(e) => setEditingDraft((prev) => ({ ...prev, blockedByOwner: e.target.checked }))}
+                                />
+                              </label>
+                            </div>
+                            <div className="row slot-edit-actions">
+                              <button type="button" onClick={() => void saveEditedSlot()}>
+                                Speichern
+                              </button>
+                              <button type="button" className="btn secondary" onClick={cancelEditing}>
+                                Abbrechen
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div>
+                              <strong>{new Date(slot.startIso).toLocaleString("de-DE")}</strong>
+                              {" – "}
+                              <strong>{new Date(slot.endIso).toLocaleString("de-DE")}</strong>
+                              {slot.blockedByOwner && <span className="slot-badge">blockiert</span>}
+                            </div>
+                            <div className="row slot-actions">
+                              <button type="button" className="btn secondary" onClick={() => startEditing(slot)}>
+                                Bearbeiten
+                              </button>
+                              <button type="button" className="btn secondary" onClick={() => void toggleBlocked(slot)}>
+                                {slot.blockedByOwner ? "Freigeben" : "Blockieren"}
+                              </button>
+                              <button type="button" className="btn ghost danger" onClick={() => void removeSlot(slot.id)}>
+                                Entfernen
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ) : (
@@ -185,68 +401,6 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
                 Keine Zeitfenster konfiguriert
               </p>
             )}
-          </Surface>
-
-          <Surface title="Blockierungen hinzufügen" subtitle="Blockiere Zeiten für Wartung, Reinigung oder andere Aktivitäten">
-            <form className="stack" onSubmit={onSubmit}>
-              <div className="grid grid-3">
-                <Field label="Startzeit">
-                  <input
-                    type="datetime-local"
-                    value={blocking.startIso}
-                    onChange={(e) => setBlocking({ ...blocking, startIso: e.target.value })}
-                  />
-                </Field>
-                <Field label="Endzeit">
-                  <input
-                    type="datetime-local"
-                    value={blocking.endIso}
-                    onChange={(e) => setBlocking({ ...blocking, endIso: e.target.value })}
-                  />
-                </Field>
-                <div style={{ paddingTop: "1.5rem" }}>
-                  <button type="button" className="btn secondary" onClick={addBlocking}>
-                    Blockierung hinzufügen
-                  </button>
-                </div>
-              </div>
-
-              <div className="time-slots-list">
-                {blockings.length > 0 && (
-                  <ul className="meta-list">
-                    {blockings.map((b, i) => (
-                      <li key={`${b.startIso}-${i}`} className="slot-item">
-                        <div>
-                          <strong>{new Date(b.startIso).toLocaleString("de-DE")}</strong>
-                          {" – "}
-                          <strong>{new Date(b.endIso).toLocaleString("de-DE")}</strong>
-                          <span className="slot-badge">blockiert</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeBlocking(i)}
-                          className="btn ghost danger"
-                          style={{ padding: "0.25rem 0.5rem" }}
-                        >
-                          Entfernen
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {blockings.length === 0 && (
-                  <p style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>
-                    Noch keine Blockierungen hinzugefügt
-                  </p>
-                )}
-              </div>
-
-              {blockings.length > 0 && (
-                <div className="row">
-                  <button type="submit">Blockierungen speichern</button>
-                </div>
-              )}
-            </form>
           </Surface>
         </>
       )}

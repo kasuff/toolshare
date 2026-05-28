@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Field, Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
+import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import type { User } from "../types/domain";
@@ -25,7 +26,8 @@ export function NewWorkshopPage({ token }: Props) {
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [maxCapacity, setMaxCapacity] = useState(2);
-  const [equipment, setEquipment] = useState<string[]>([]);
+  const [extras, setExtras] = useState<string[]>([]);
+  const [equipmentItems, setEquipmentItems] = useState<WorkshopToolDraftItem[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [slot, setSlot] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: false });
   const [slots, setSlots] = useState<SlotDraft[]>([]);
@@ -100,9 +102,7 @@ export function NewWorkshopPage({ token }: Props) {
     }
 
     try {
-      const description = equipment.length > 0
-        ? `Ausstattung: ${equipment.join(", ")}`
-        : "Werkstatt";
+      const description = "Werkstatt";
 
       await api.createWorkshop(
         {
@@ -110,7 +110,14 @@ export function NewWorkshopPage({ token }: Props) {
           description,
           location,
           maxCapacity,
-          slots: slots.map((item) => ({ startIso: item.startIso, endIso: item.endIso }))
+          extras,
+          equipmentItems,
+          imageUrls: photos,
+          slots: slots.map((item) => ({
+            startIso: item.startIso,
+            endIso: item.endIso,
+            blockedByOwner: item.blockedByOwner
+          }))
         },
         token
       );
@@ -118,7 +125,8 @@ export function NewWorkshopPage({ token }: Props) {
       setName("");
       setLocation("");
       setMaxCapacity(2);
-      setEquipment([]);
+      setExtras([]);
+      setEquipmentItems([]);
       setPhotos([]);
       setSlots([]);
       setStep("basic");
@@ -194,11 +202,18 @@ export function NewWorkshopPage({ token }: Props) {
               </div>
             </div>
 
+            <WorkshopToolsInput
+              items={equipmentItems}
+              onChange={setEquipmentItems}
+              label="Ausstattung"
+              hint="Füge Werkzeuge hinzu, die in deiner Werkstatt vorhanden sind."
+            />
+
             <WorkshopEquipmentSelect
-              selected={equipment}
-              onChange={setEquipment}
-              label="Ausstattung & Werkzeuge"
-              hint="Welche Geräte und Annehmlichkeiten stellst du bereit?"
+              selected={extras}
+              onChange={setExtras}
+              label="Extras"
+              hint="Optionale Zusatzmerkmale wie WLAN, Starkstrom oder Parkplatz."
             />
 
             <WorkshopPhotoUpload

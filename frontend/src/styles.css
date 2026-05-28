@@ -1779,6 +1779,40 @@ td {
 }
 
 /* ===== Workshop Equipment Select ===== */
+.workshop-tools-builder {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.workshop-tools-input-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) 1.6fr auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.workshop-tools-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.workshop-tools-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+@media (max-width: 720px) {
+  .workshop-tools-input-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .equipment-select {
   display: grid;
   gap: var(--space-2);
@@ -2006,6 +2040,22 @@ td {
   border: 1px solid var(--color-border);
 }
 
+.slot-item.slot-item-editing {
+  align-items: stretch;
+}
+
+.slot-edit-form {
+  width: 100%;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.slot-actions,
+.slot-edit-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .slot-badge {
   display: inline-block;
   background: #fed7aa;
@@ -2131,6 +2181,8 @@ button.danger:hover {
 .workshop-card-footer {
   display: flex;
   justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin-top: var(--space-2);
 }
 
@@ -2227,9 +2279,44 @@ button.danger:hover {
   gap: var(--space-2);
 }
 
+.workshop-equipment-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-2);
+}
+
+.workshop-equipment-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  min-height: 74px;
+  background: #fff;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.workshop-equipment-chip .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.workshop-equipment-chip small {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
 .workshop-modal-footer {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .workshop-slots-count {
