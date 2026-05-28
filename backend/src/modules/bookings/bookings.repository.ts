@@ -66,6 +66,23 @@ export const bookingsRepository = {
         return null;
       }
 
+      if (slot.blockedByOwner) {
+        return "BLOCKED" as const;
+      }
+
+      const overlappingBlockedSlot = await tx.timeSlot.findFirst({
+        where: {
+          workshopId: slot.workshopId,
+          blockedByOwner: true,
+          id: { not: slot.id },
+          startTime: { lt: slot.endTime },
+          endTime: { gt: slot.startTime }
+        }
+      });
+      if (overlappingBlockedSlot) {
+        return "BLOCKED" as const;
+      }
+
       const existing = await tx.booking.findFirst({
         where: {
           timeslotId: input.timeslotId,

@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../App";
@@ -81,11 +80,12 @@ describe("Authentication user journey", () => {
 
     renderApp("/auth");
 
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
-    await user.type(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), "Muster");
+    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
+      target: { value: "Muster" }
+    });
 
-    await user.click(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
 
     expect(screen.getByDisplayValue("Musterstrasse")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
@@ -98,9 +98,10 @@ describe("Authentication user journey", () => {
     vi.mocked(api.suggestAddresses).mockResolvedValue([]);
 
     renderApp("/auth");
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
-    await user.type(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), "zzz");
+    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
+      target: { value: "zzz" }
+    });
 
     expect(await screen.findByText("Keine Vorschläge gefunden.")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Straße")).toHaveValue("");

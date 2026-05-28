@@ -42,6 +42,8 @@ const DEFAULT_DB: AppDb = {
       description: "Hobbywerkstatt mit Basis-Ausstattung.",
       location: "Neufreimann Block A",
       maxCapacity: 3,
+      extras: [],
+      equipmentItems: [],
       imageUrls: [DEFAULT_PLACEHOLDER_IMAGE],
       toolIds: ["t2"],
     },

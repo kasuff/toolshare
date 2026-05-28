@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,8 +57,7 @@ describe("Guest protected actions", () => {
 
     renderWithRoutes(<ToolsPage />, "/tools");
 
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Einloggen zum Anfragen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Einloggen zum Anfragen" }));
 
     expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
       "Bitte melde dich an, um eine Ausleihe anzufragen."
@@ -76,6 +74,8 @@ describe("Guest protected actions", () => {
           description: "Mit Betreuung",
           location: "Muenchen",
           maxCapacity: 5,
+          extras: [],
+          equipmentItems: [],
           imageUrls: [],
           toolIds: []
         },
@@ -93,8 +93,8 @@ describe("Guest protected actions", () => {
 
     renderWithRoutes(<WorkshopsPage />, "/workshops");
 
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Login" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Holzwerkstatt" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Login" }));
 
     expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
       "Bitte melde dich an, um eine Werkstatt zu buchen."

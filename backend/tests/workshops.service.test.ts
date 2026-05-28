@@ -11,7 +11,9 @@ vi.mock("../src/modules/workshops/workshops.repository", () => ({
     remove: vi.fn(),
     findOverlappingTimeslot: vi.fn(),
     createTimeslot: vi.fn(),
+    createBlockedTimeslotWithAvailabilitySplit: vi.fn(),
     findTimeslotById: vi.fn(),
+    updateTimeslot: vi.fn(),
     findActiveBookingForTimeslot: vi.fn(),
     removeTimeslot: vi.fn()
   }
@@ -63,6 +65,29 @@ describe("workshopsService", () => {
 
     expect(mockedWorkshopsRepository.create).toHaveBeenCalled();
     expect(result).toMatchObject({ id: "w2" });
+  });
+
+  it("fills optional extras, tools and photos with defaults on create", async () => {
+    mockedWorkshopsRepository.create.mockResolvedValueOnce({ id: "w2" } as any);
+
+    await workshopsService.create({
+      managerId: "u1",
+      name: "Werkstatt",
+      description: "desc",
+      location: "Muenchen",
+      maxCapacity: 4
+    });
+
+    expect(mockedWorkshopsRepository.create).toHaveBeenCalledWith({
+      managerId: "u1",
+      name: "Werkstatt",
+      description: "desc",
+      location: "Muenchen",
+      maxCapacity: 4,
+      extras: [],
+      workshopTools: [],
+      imageUrls: []
+    });
   });
 
   it("updates workshop for owner", async () => {
@@ -122,6 +147,67 @@ describe("workshopsService", () => {
     expect(result).toMatchObject({ id: "slot-1" });
   });
 
+  it("creates blocked timeslot by splitting overlapping availability", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+    mockedWorkshopsRepository.createBlockedTimeslotWithAvailabilitySplit.mockResolvedValueOnce({
+      id: "slot-blocked",
+      blockedByOwner: true
+    } as any);
+
+    const result = await workshopsService.createTimeslot({
+      workshopId: "w1",
+      managerId: "owner-1",
+      actorRole: "USER",
+      startTime: "2026-02-01T08:00:00.000Z",
+      endTime: "2026-02-28T18:00:00.000Z",
+      blockedByOwner: true
+    });
+
+    expect(mockedWorkshopsRepository.createBlockedTimeslotWithAvailabilitySplit).toHaveBeenCalledWith({
+      workshopId: "w1",
+      startTime: new Date("2026-02-01T08:00:00.000Z"),
+      endTime: new Date("2026-02-28T18:00:00.000Z")
+    });
+    expect(mockedWorkshopsRepository.createTimeslot).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: "slot-blocked", blockedByOwner: true });
+  });
+
+  it("maps blocked overlap conflicts to TIMESLOT_CONFLICT", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+    mockedWorkshopsRepository.createBlockedTimeslotWithAvailabilitySplit.mockResolvedValueOnce(
+      "BLOCKED_CONFLICT" as any
+    );
+
+    await expect(
+      workshopsService.createTimeslot({
+        workshopId: "w1",
+        managerId: "owner-1",
+        actorRole: "USER",
+        startTime: "2026-02-01T08:00:00.000Z",
+        endTime: "2026-02-28T18:00:00.000Z",
+        blockedByOwner: true
+      })
+    ).rejects.toMatchObject({ code: "TIMESLOT_CONFLICT", status: 409 });
+  });
+
+  it("maps active booking conflicts while inserting blocked timeslots", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
+    mockedWorkshopsRepository.createBlockedTimeslotWithAvailabilitySplit.mockResolvedValueOnce(
+      "ACTIVE_BOOKING_EXISTS" as any
+    );
+
+    await expect(
+      workshopsService.createTimeslot({
+        workshopId: "w1",
+        managerId: "owner-1",
+        actorRole: "USER",
+        startTime: "2026-02-01T08:00:00.000Z",
+        endTime: "2026-02-28T18:00:00.000Z",
+        blockedByOwner: true
+      })
+    ).rejects.toMatchObject({ code: "ACTIVE_BOOKING_EXISTS", status: 409 });
+  });
+
   it("rejects invalid timeslot ranges", async () => {
     mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", managerId: "owner-1" } as any);
 
@@ -147,6 +233,86 @@ describe("workshopsService", () => {
         actorRole: "USER",
         startTime: "2026-06-01T10:00:00.000Z",
         endTime: "2026-06-01T12:00:00.000Z"
+      })
+    ).rejects.toMatchObject({ code: "TIMESLOT_CONFLICT", status: 409 });
+  });
+
+  it("rejects time-range updates when active bookings exist", async () => {
+    mockedWorkshopsRepository.findTimeslotById.mockResolvedValueOnce({
+      id: "slot-1",
+      workshopId: "w1",
+      startTime: new Date("2026-05-10T08:00:00.000Z"),
+      endTime: new Date("2026-05-10T18:00:00.000Z"),
+      blockedByOwner: false,
+      workshop: { managerId: "owner-1" }
+    } as any);
+    mockedWorkshopsRepository.findActiveBookingForTimeslot.mockResolvedValueOnce({ id: "b1" } as any);
+
+    await expect(
+      workshopsService.updateTimeslot({
+        workshopId: "w1",
+        timeslotId: "slot-1",
+        managerId: "owner-1",
+        actorRole: "USER",
+        startTime: "2026-05-10T09:00:00.000Z"
+      })
+    ).rejects.toMatchObject({ code: "ACTIVE_BOOKING_EXISTS", status: 409 });
+
+    expect(mockedWorkshopsRepository.updateTimeslot).not.toHaveBeenCalled();
+  });
+
+  it("updates slots to blocked without overlap checks", async () => {
+    mockedWorkshopsRepository.findTimeslotById.mockResolvedValueOnce({
+      id: "slot-1",
+      workshopId: "w1",
+      startTime: new Date("2026-05-10T08:00:00.000Z"),
+      endTime: new Date("2026-05-10T18:00:00.000Z"),
+      blockedByOwner: false,
+      workshop: { managerId: "owner-1" }
+    } as any);
+    mockedWorkshopsRepository.updateTimeslot.mockResolvedValueOnce({
+      id: "slot-1",
+      blockedByOwner: true
+    } as any);
+
+    const result = await workshopsService.updateTimeslot({
+      workshopId: "w1",
+      timeslotId: "slot-1",
+      managerId: "owner-1",
+      actorRole: "USER",
+      blockedByOwner: true
+    });
+
+    expect(mockedWorkshopsRepository.findOverlappingTimeslot).not.toHaveBeenCalled();
+    expect(mockedWorkshopsRepository.updateTimeslot).toHaveBeenCalledWith("slot-1", {
+      startTime: undefined,
+      endTime: undefined,
+      blockedByOwner: true
+    });
+    expect(result).toMatchObject({ id: "slot-1", blockedByOwner: true });
+  });
+
+  it("rejects overlap when updated slot stays available", async () => {
+    mockedWorkshopsRepository.findTimeslotById.mockResolvedValueOnce({
+      id: "slot-1",
+      workshopId: "w1",
+      startTime: new Date("2026-05-10T08:00:00.000Z"),
+      endTime: new Date("2026-05-10T18:00:00.000Z"),
+      blockedByOwner: false,
+      workshop: { managerId: "owner-1" }
+    } as any);
+    mockedWorkshopsRepository.findActiveBookingForTimeslot.mockResolvedValueOnce(null);
+    mockedWorkshopsRepository.findOverlappingTimeslot.mockResolvedValueOnce({ id: "slot-existing" } as any);
+
+    await expect(
+      workshopsService.updateTimeslot({
+        workshopId: "w1",
+        timeslotId: "slot-1",
+        managerId: "owner-1",
+        actorRole: "USER",
+        startTime: "2026-05-10T09:00:00.000Z",
+        endTime: "2026-05-10T19:00:00.000Z",
+        blockedByOwner: false
       })
     ).rejects.toMatchObject({ code: "TIMESLOT_CONFLICT", status: 409 });
   });

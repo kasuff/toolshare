@@ -10,6 +10,8 @@ import { ToolDetailPage } from "./pages/ToolDetailPage";
 import { NewToolPage } from "./pages/NewToolPage";
 import { WorkshopsPage } from "./pages/WorkshopsPage";
 import { NewWorkshopPage } from "./pages/NewWorkshopPage";
+import { EditWorkshopPage } from "./pages/EditWorkshopPage";
+import { WorkshopAvailabilityPage } from "./pages/WorkshopAvailabilityPage";
 import { InboxPage } from "./pages/InboxPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ModerationPage } from "./pages/ModerationPage";
@@ -299,12 +301,28 @@ function AppWithProviders() {
             </RequireAuth>
           }
         />
-        <Route path="workshops" element={<WorkshopsPage token={token ?? undefined} />} />
+        <Route path="workshops" element={<WorkshopsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route
           path="workshops/new"
           element={
             <RequireAuth token={token}>
               <NewWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="workshops/:id/edit"
+          element={
+            <RequireAuth token={token}>
+              <EditWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="workshops/availability"
+          element={
+            <RequireAuth token={token}>
+              <WorkshopAvailabilityPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
             </RequireAuth>
           }
         />

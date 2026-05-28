@@ -30,6 +30,12 @@ export interface WorkshopSlot {
   blockedByOwner: boolean;
 }
 
+export interface WorkshopToolItem {
+  id: string;
+  category: string;
+  name: string;
+}
+
 export interface Workshop {
   id: string;
   ownerId: string;
@@ -37,6 +43,8 @@ export interface Workshop {
   description: string;
   location: string;
   maxCapacity: number;
+  extras: string[];
+  equipmentItems: WorkshopToolItem[];
   imageUrls: string[];
   toolIds: string[];
 }
