@@ -72,8 +72,22 @@ model Workshop {
   description String
   location    String
   maxCapacity Int
+  equipment   String[]   @default([])
+  imageUrls   String[]   @default([])
   manager     User       @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  workshopTools WorkshopTool[]
   timeslots   TimeSlot[]
+}
+
+model WorkshopTool {
+  id         String   @id @default(uuid())
+  workshopId String
+  name       String
+  category   String
+  workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId])
+  @@index([category])
 }
 
 model TimeSlot {
@@ -81,6 +95,7 @@ model TimeSlot {
   workshopId String
   startTime  DateTime
   endTime    DateTime
+  blockedByOwner Boolean @default(false)
   workshop   Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
   bookings   Booking[]
 }
