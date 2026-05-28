@@ -154,7 +154,7 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
               </details>
             </>
           ) : (
-            <Link className="btn secondary" to="/auth">
+            <Link className="btn ghost" to="/auth">
               Einloggen
             </Link>
           )}

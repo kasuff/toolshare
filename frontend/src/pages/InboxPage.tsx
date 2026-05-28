@@ -64,7 +64,6 @@ export function InboxPage({ currentUser, token }: Props) {
   useEffect(() => {
     if (!token) return;
     void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
@@ -663,7 +662,7 @@ function formatDateTime(value?: string) {
 
 function getPendingProposal(booking: Booking): PickupProposal | null {
   const pending = (booking.pickupProposals ?? []).filter((p) => p.status === "PENDING");
-  return pending.length > 0 ? pending[pending.length - 1] ?? null : null;
+  return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
 function getEffectivePickupIso(booking: Booking): string | undefined {

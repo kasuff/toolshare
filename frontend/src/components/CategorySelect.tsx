@@ -26,7 +26,7 @@ export function CategorySelect({ value, onChange, label, hint, onBlur, hasError 
         className={`select-field ${hasError ? "input-invalid" : ""}`.trim()}
         aria-invalid={hasError}
       >
-        <option value="">-- Kategorie wählen --</option>
+        <option value="">Kategorie wählen</option>
         {TOOL_CATEGORIES.map((cat) => (
           <option key={cat.value} value={cat.value}>
             {cat.icon} {cat.label}

@@ -30,10 +30,6 @@ function toAddressPayload(fields: AddressFormFields) {
   return `${fields.street} ${fields.houseNumber}, ${fields.postalCode} ${fields.city}, ${fields.country}`.trim();
 }
 
-function toAddressPreview(fields: AddressFormFields) {
-  return toAddressPayload(fields).replace(/\s+,/g, ",").replace(/\s{2,}/g, " ").trim();
-}
-
 function AuthScreen({
   onLogin,
   onRegister,
@@ -70,7 +66,8 @@ function AuthScreen({
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const addressPreview = toAddressPreview(address);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRepeatPassword, setShowRepeatPassword] = useState(false);
 
   useEffect(() => {
     if (!isRegister || addressSearch.trim().length < 3) {
@@ -121,127 +118,229 @@ function AuthScreen({
 
   return (
     <div className="auth-wrapper">
-      <section className="auth-card">
+      <section className={`auth-card ${isRegister ? "register-mode" : ""}`}>
         <aside className="auth-brand">
           <p className="eyebrow">Toolshare Community</p>
           <h1>Teilen, buchen, gemeinsam bauen.</h1>
           <p>
-            Plattform für Werkzeuge und Werkstätten in der Nachbarschaft mit klaren Buchungsprozessen für Nutzer,
-            Moderation und Admin.
+            Plattform für Werkzeuge und Werkstätten in der Nachbarschaft.
           </p>
         </aside>
         <div className="auth-form">
           <h2>{isRegister ? "Konto erstellen" : "Willkommen zurück"}</h2>
           <form className="stack" onSubmit={(event) => void onSubmit(event)}>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="E-Mail"
-              type="email"
-              required
-              autoComplete={isRegister ? "email" : "username"}
-            />
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Passwort (mind. 8 Zeichen)"
-              type="password"
-              minLength={8}
-              required
-              autoComplete={isRegister ? "new-password" : "current-password"}
-            />
+            <label className="form-label">
+              <span>E-Mail *</span>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="E-Mail"
+                type="email"
+                required
+                autoComplete={isRegister ? "email" : "username"}
+              />
+            </label>
+            {!isRegister && (
+              <label className="form-label">
+                <span>Passwort *</span>
+                <div className="password-input-wrapper">
+                  <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Passwort (mind. 8 Zeichen)"
+                    type={showPassword ? "text" : "password"}
+                    minLength={8}
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Passwort ausblenden" : "Passwort anzeigen"}
+                  >
+                    {showPassword ? (
+                      <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.815 7.815 3 3m-3-3-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                      </svg>
+                    ) : (
+                      <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </label>
+            )}
             {isRegister && (
               <>
-                <input
-                  value={repeatPassword}
-                  onChange={(e) => setRepeatPassword(e.target.value)}
-                  placeholder="Passwort wiederholen"
-                  type="password"
-                  autoComplete="new-password"
-                />
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoComplete="name" />
-                <div className="address-autocomplete">
+                <label className="form-label">
+                  <span>Name *</span>
                   <input
-                    value={addressSearch}
-                    onChange={(e) => setAddressSearch(e.target.value)}
-                    onFocus={() => setIsAddressSearchFocused(true)}
-                    onBlur={() => window.setTimeout(() => setIsAddressSearchFocused(false), 120)}
-                    placeholder="Adresse suchen (optional für Autofill)"
-                    autoComplete="street-address"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Name"
+                    autoComplete="name"
+                    required
                   />
-                  {isAddressSearchFocused && addressSearch.trim().length >= 3 && (
-                    <div className="address-dropdown" role="listbox" aria-label="Adressvorschläge">
-                      <p className="address-dropdown-head">Vorschläge - klicken zum Übernehmen</p>
-                      {addressSuggestions.length > 0 ? (
-                        <ul className="address-suggestion-list">
-                          {addressSuggestions.map((suggestion) => (
-                            <li key={suggestion.label}>
-                              <button
-                                type="button"
-                                className="address-suggestion-item"
-                                onMouseDown={() => {
-                                  setAddress({
-                                    street: suggestion.street,
-                                    houseNumber: suggestion.houseNumber,
-                                    postalCode: suggestion.postalCode,
-                                    city: suggestion.city,
-                                    country: suggestion.country || "Deutschland"
-                                  });
-                                  setAddressSearch(suggestion.label);
-                                }}
-                              >
-                                <span className="address-suggestion-title">{suggestion.label}</span>
-                                <span className="address-suggestion-meta">
-                                  {suggestion.postalCode} {suggestion.city}
-                                </span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="address-suggestion-empty">Keine Vorschläge gefunden.</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                </label>
+                <label className="form-label">
+                  <span>Adresse suchen (optional)</span>
+                  <div className="address-autocomplete">
+                    <input
+                      value={addressSearch}
+                      onChange={(e) => setAddressSearch(e.target.value)}
+                      onFocus={() => setIsAddressSearchFocused(true)}
+                      onBlur={() => window.setTimeout(() => setIsAddressSearchFocused(false), 120)}
+                      placeholder="Adresse suchen (optional für Autofill)"
+                      autoComplete="street-address"
+                    />
+                    {isAddressSearchFocused && addressSearch.trim().length >= 3 && (
+                      <div className="address-dropdown" role="listbox" aria-label="Adressvorschläge">
+                        <p className="address-dropdown-head">Vorschläge - klicken zum Übernehmen</p>
+                        {addressSuggestions.length > 0 ? (
+                          <ul className="address-suggestion-list">
+                            {addressSuggestions.map((suggestion) => (
+                              <li key={suggestion.label}>
+                                <button
+                                  type="button"
+                                  className="address-suggestion-item"
+                                  onMouseDown={() => {
+                                    setAddress({
+                                      street: suggestion.street,
+                                      houseNumber: suggestion.houseNumber,
+                                      postalCode: suggestion.postalCode,
+                                      city: suggestion.city,
+                                      country: suggestion.country || "Deutschland"
+                                    });
+                                    setAddressSearch(suggestion.label);
+                                  }}
+                                >
+                                  <span className="address-suggestion-title">{suggestion.label}</span>
+                                  <span className="address-suggestion-meta">
+                                    {suggestion.postalCode} {suggestion.city}
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="address-suggestion-empty">Keine Vorschläge gefunden.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </label>
                 <p className="hint">Mindestens 3 Zeichen eingeben, um Adressvorschläge zu sehen.</p>
                 <div className="address-grid">
-                  <input
-                    value={address.street}
-                    onChange={(e) => setAddress((prev) => ({ ...prev, street: e.target.value }))}
-                    placeholder="Straße"
-                    autoComplete="address-line1"
-                  />
-                  <input
-                    value={address.houseNumber}
-                    onChange={(e) => setAddress((prev) => ({ ...prev, houseNumber: e.target.value }))}
-                    placeholder="Hausnummer"
-                    autoComplete="address-line2"
-                  />
-                  <input
-                    value={address.postalCode}
-                    onChange={(e) => setAddress((prev) => ({ ...prev, postalCode: e.target.value }))}
-                    placeholder="PLZ"
-                    autoComplete="postal-code"
-                  />
-                  <input
-                    value={address.city}
-                    onChange={(e) => setAddress((prev) => ({ ...prev, city: e.target.value }))}
-                    placeholder="Ort"
-                    autoComplete="address-level2"
-                  />
-                  <input
-                    value={address.country}
-                    onChange={(e) => setAddress((prev) => ({ ...prev, country: e.target.value }))}
-                    placeholder="Land"
-                    autoComplete="country-name"
-                  />
+                  <label className="form-label address-field-street">
+                    <span>Straße *</span>
+                    <input
+                      value={address.street}
+                      onChange={(e) => setAddress((prev) => ({ ...prev, street: e.target.value }))}
+                      placeholder="Straße"
+                      autoComplete="address-line1"
+                    />
+                  </label>
+                  <label className="form-label">
+                    <span>Hausnummer *</span>
+                    <input
+                      value={address.houseNumber}
+                      onChange={(e) => setAddress((prev) => ({ ...prev, houseNumber: e.target.value }))}
+                      placeholder="Hausnr"
+                      autoComplete="address-line2"
+                    />
+                  </label>
+                  <label className="form-label">
+                    <span>PLZ *</span>
+                    <input
+                      value={address.postalCode}
+                      onChange={(e) => setAddress((prev) => ({ ...prev, postalCode: e.target.value }))}
+                      placeholder="PLZ"
+                      autoComplete="postal-code"
+                    />
+                  </label>
+                  <label className="form-label address-field-city">
+                    <span>Ort *</span>
+                    <input
+                      value={address.city}
+                      onChange={(e) => setAddress((prev) => ({ ...prev, city: e.target.value }))}
+                      placeholder="Ort"
+                      autoComplete="address-level2"
+                    />
+                  </label>
+                  <label className="form-label address-field-country">
+                    <span>Land *</span>
+                    <input
+                      value={address.country}
+                      onChange={(e) => setAddress((prev) => ({ ...prev, country: e.target.value }))}
+                      placeholder="Land"
+                      autoComplete="country-name"
+                    />
+                  </label>
                 </div>
-                {addressPreview.length > 0 && (
-                  <p className="address-preview" aria-live="polite">
-                    {addressPreview}
-                  </p>
-                )}
+                <label className="form-label">
+                  <span>Passwort *</span>
+                  <div className="password-input-wrapper">
+                    <input
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Passwort (mind. 8 Zeichen)"
+                      type={showPassword ? "text" : "password"}
+                      minLength={8}
+                      required
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Passwort ausblenden" : "Passwort anzeigen"}
+                    >
+                      {showPassword ? (
+                        <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.815 7.815 3 3m-3-3-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                        </svg>
+                      ) : (
+                        <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </label>
+                <label className="form-label">
+                  <span>Passwort wiederholen *</span>
+                  <div className="password-input-wrapper">
+                    <input
+                      value={repeatPassword}
+                      onChange={(e) => setRepeatPassword(e.target.value)}
+                      placeholder="Passwort wiederholen"
+                      type={showRepeatPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowRepeatPassword(!showRepeatPassword)}
+                      aria-label={showRepeatPassword ? "Passwort ausblenden" : "Passwort anzeigen"}
+                    >
+                      {showRepeatPassword ? (
+                        <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.815 7.815 3 3m-3-3-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                        </svg>
+                      ) : (
+                        <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </label>
               </>
             )}
             {redirectHint && <p className="status-pill">{redirectHint}</p>}
@@ -251,7 +350,17 @@ function AuthScreen({
             </button>
           </form>
           <button className="auth-switch" type="button" onClick={() => setIsRegister((v) => !v)}>
-            {isRegister ? "Du hast schon ein Konto? Zum Login" : "Neu bei Toolshare? Jetzt registrieren"}
+            {isRegister ? (
+              <>
+                <span className="auth-switch-text">Du hast schon ein Konto? </span>
+                <span className="auth-switch-link">Zum Login</span>
+              </>
+            ) : (
+              <>
+                <span className="auth-switch-text">Neu bei Toolshare? </span>
+                <span className="auth-switch-link">Jetzt registrieren</span>
+              </>
+            )}
           </button>
         </div>
       </section>
