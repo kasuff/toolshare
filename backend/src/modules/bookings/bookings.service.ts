@@ -60,6 +60,9 @@ export const bookingsService = {
     if (result === "CONFLICT") {
       throw new AppError("BOOKING_CONFLICT", "Timeslot is already booked", 409);
     }
+    if (result === "BLOCKED") {
+      throw new AppError("TIMESLOT_BLOCKED", "Timeslot is blocked by workshop owner", 409);
+    }
     return result;
   },
 
