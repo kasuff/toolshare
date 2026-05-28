@@ -246,7 +246,7 @@ function AuthScreen({
                     <input
                       value={address.houseNumber}
                       onChange={(e) => setAddress((prev) => ({ ...prev, houseNumber: e.target.value }))}
-                      placeholder="Hausnummer"
+                      placeholder="Hausnr"
                       autoComplete="address-line2"
                     />
                   </label>

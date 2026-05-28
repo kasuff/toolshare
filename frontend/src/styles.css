@@ -969,6 +969,20 @@ summary {
   margin-bottom: 4px;
 }
 
+.auth-form .form-label {
+  gap: 0;
+}
+
+.auth-form .form-label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .auth-switch {
   color: var(--color-text) !important;
   background: transparent !important;
@@ -1027,6 +1041,13 @@ summary {
 
 .password-input-wrapper input {
   padding-right: 48px;
+}
+
+.password-input-wrapper input[type="password"]::-ms-reveal,
+.password-input-wrapper input[type="password"]::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .password-toggle-btn {
