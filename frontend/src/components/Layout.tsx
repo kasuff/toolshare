@@ -84,7 +84,7 @@ export function Layout({ users, currentUser, onSwitchUser, onLogout }: Props) {
               </div>
             </details>
           ) : (
-            <Link className="btn secondary" to="/auth">
+            <Link className="btn ghost" to="/auth">
               Einloggen
             </Link>
           )}
