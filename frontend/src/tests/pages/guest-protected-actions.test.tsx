@@ -74,6 +74,8 @@ describe("Guest protected actions", () => {
           description: "Mit Betreuung",
           location: "Muenchen",
           maxCapacity: 5,
+          extras: [],
+          equipmentItems: [],
           imageUrls: [],
           toolIds: []
         },

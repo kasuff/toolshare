@@ -121,6 +121,17 @@ describe("bookingsService", () => {
     ).rejects.toMatchObject({ code: "BOOKING_CONFLICT", status: 409 });
   });
 
+  it("rejects workshop booking when timeslot is owner blocked", async () => {
+    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("BLOCKED" as any);
+
+    await expect(
+      bookingsService.createWorkshopBooking({
+        requesterId: "u1",
+        timeslotId: "slot-1"
+      })
+    ).rejects.toMatchObject({ code: "TIMESLOT_BLOCKED", status: 409 });
+  });
+
   it("returns created workshop booking", async () => {
     mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce({ id: "b2" } as any);
 
