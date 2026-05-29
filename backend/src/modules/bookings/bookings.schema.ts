@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+/** Zod's .datetime() ist streng (z. B. nur mit Z); Browser/Inputs liefern oft parsebare Strings ohne Offset. */
+const flexibleIsoDateTime = z
+  .string()
+  .min(1)
+  .transform((s, ctx) => {
+    const d = new Date(s.trim());
+    if (Number.isNaN(d.getTime())) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid datetime" });
+      return z.NEVER;
+    }
+    return d.toISOString();
+  });
+
 export const createToolBookingSchema = z.object({
   body: z.object({
     toolId: z.string().uuid(),
@@ -25,6 +38,27 @@ export const updateBookingStatusSchema = z.object({
   }),
   params: z.object({
     id: z.string().uuid()
+  }),
+  query: z.object({})
+});
+
+export const createPickupProposalSchema = z.object({
+  body: z.object({
+    pickupTime: flexibleIsoDateTime
+  }),
+  params: z.object({
+    id: z.string().uuid()
+  }),
+  query: z.object({})
+});
+
+export const respondPickupProposalSchema = z.object({
+  body: z.object({
+    decision: z.enum(["ACCEPT", "DECLINE"])
+  }),
+  params: z.object({
+    id: z.string().uuid(),
+    proposalId: z.string().uuid()
   }),
   query: z.object({})
 });

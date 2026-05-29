@@ -287,11 +287,18 @@ function AppWithProviders() {
     <Routes>
       <Route
         path="/"
-        element={<Layout users={users} currentUser={currentUser ?? undefined} onSwitchUser={() => undefined} onLogout={logout} />}
+        element={
+          <Layout
+            users={users}
+            currentUser={currentUser ?? undefined}
+            token={token}
+            onSwitchUser={() => undefined}
+            onLogout={logout}
+          />
+        }
       >
         <Route index element={<DashboardPage />} />
         <Route path="tools" element={<ToolsPage token={token ?? undefined} />} />
-        <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route
           path="tools/new"

@@ -12,7 +12,7 @@ const userFriendlyMessageByCode: Record<string, string> = {
   WORKSHOP_NOT_FOUND: "Der Workshop wurde nicht gefunden.",
   TIMESLOT_NOT_FOUND: "Der Zeitslot wurde nicht gefunden.",
   BOOKING_NOT_FOUND: "Die Buchung wurde nicht gefunden.",
-  BOOKING_CONFLICT: "Dieser Zeitslot ist bereits gebucht.",
+  BOOKING_CONFLICT: "Im gewaehlten Zeitraum ist bereits eine Buchung vorhanden.",
   TIMESLOT_CONFLICT: "Der Zeitslot ueberschneidet sich mit einem bestehenden Termin.",
   INVALID_TIME_RANGE: "Der angegebene Zeitraum ist ungueltig.",
   ACTIVE_BOOKING_EXISTS: "Das Werkzeug kann nicht geloescht werden, weil noch aktive Buchungen existieren.",
@@ -73,10 +73,23 @@ export const errorHandler = (
     });
   }
 
+  const exposeInternalDetails =
+    process.env.NODE_ENV !== "production" || process.env.SHOW_INTERNAL_ERRORS === "true";
+
+  if (exposeInternalDetails) {
+    // eslint-disable-next-line no-console
+    console.error("[INTERNAL_SERVER_ERROR]", error);
+  }
+
+  const internalMessage =
+    exposeInternalDetails && error instanceof Error
+      ? error.message
+      : "Es ist ein unerwarteter Serverfehler aufgetreten.";
+
   return res.status(500).json({
     error: {
       code: "INTERNAL_SERVER_ERROR",
-      message: "Es ist ein unerwarteter Serverfehler aufgetreten.",
+      message: internalMessage,
       status: 500
     }
   });

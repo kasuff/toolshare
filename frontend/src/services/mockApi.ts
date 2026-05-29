@@ -139,6 +139,19 @@ export const api = {
     const db = loadDb();
     const tool = db.tools.find((t) => t.id === input.toolId);
     if (!tool || tool.status !== "VERFUEGBAR") return null;
+
+    const startMs = new Date(input.startIso).getTime();
+    const endMs = new Date(input.endIso).getTime();
+    const overlap = db.bookings.some(
+      (b) =>
+        b.type === "TOOL" &&
+        b.toolId === tool.id &&
+        (b.status === "OFFEN" || b.status === "BESTAETIGT") &&
+        new Date(b.startIso).getTime() < endMs &&
+        new Date(b.endIso).getTime() > startMs
+    );
+    if (overlap) return null;
+
     const booking: Booking = {
       id: uid("b"),
       type: "TOOL",
