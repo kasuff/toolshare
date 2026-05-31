@@ -8,15 +8,22 @@ export const bookingsRepository = {
   listForUserContext(userId: string) {
     return prisma.booking.findMany({
       where: {
-        OR: [{ userId }, { tool: { ownerId: userId } }]
+        OR: [{ userId }, { tool: { ownerId: userId } }, { timeslot: { workshop: { managerId: userId } } }]
       },
       include: {
         user: true,
         tool: { include: { owner: true } },
         timeslot: { include: { workshop: { include: { manager: true } } } },
+        selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
           orderBy: { createdAt: "asc" },
           include: { proposedBy: { select: { id: true, name: true } } }
+        },
+        timeslotProposals: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            proposedBy: { select: { id: true, name: true } }
+          }
         }
       },
       orderBy: { startDate: "desc" }
@@ -32,7 +39,8 @@ export const bookingsRepository = {
       where: { id },
       include: {
         tool: true,
-        timeslot: { include: { workshop: true } }
+        timeslot: { include: { workshop: true } },
+        selectedTools: { include: { workshopTool: true } }
       }
     });
   },
@@ -43,9 +51,27 @@ export const bookingsRepository = {
       include: {
         tool: true,
         timeslot: { include: { workshop: true } },
+        selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
           orderBy: { createdAt: "asc" },
           include: { proposedBy: { select: { id: true, name: true } } }
+        }
+      }
+    });
+  },
+
+  findBookingForTimeslotProposal(bookingId: string) {
+    return prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        tool: true,
+        timeslot: { include: { workshop: true } },
+        selectedTools: { include: { workshopTool: true } },
+        timeslotProposals: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            proposedBy: { select: { id: true, name: true } }
+          }
         }
       }
     });
@@ -73,6 +99,38 @@ export const bookingsRepository = {
         proposedByUserId: input.proposedByUserId,
         proposedPickupTime: input.proposedPickupTime,
         previousPickupTime: input.previousPickupTime,
+        status: "PENDING"
+      },
+      include: { proposedBy: { select: { id: true, name: true } } }
+    });
+  },
+
+  declinePendingTimeslotProposals(tx: Prisma.TransactionClient, bookingId: string) {
+    return tx.bookingTimeslotProposal.updateMany({
+      where: { bookingId, status: "PENDING" },
+      data: { status: "DECLINED" }
+    });
+  },
+
+  createTimeslotProposal(
+    tx: Prisma.TransactionClient,
+    input: {
+      bookingId: string;
+      proposedByUserId: string;
+      proposedStartDate: Date;
+      proposedEndDate: Date;
+      previousStartDate: Date | null;
+      previousEndDate: Date | null;
+    }
+  ) {
+    return tx.bookingTimeslotProposal.create({
+      data: {
+        bookingId: input.bookingId,
+        proposedByUserId: input.proposedByUserId,
+        proposedStartDate: input.proposedStartDate,
+        proposedEndDate: input.proposedEndDate,
+        previousStartDate: input.previousStartDate,
+        previousEndDate: input.previousEndDate,
         status: "PENDING"
       },
       include: { proposedBy: { select: { id: true, name: true } } }
@@ -120,37 +178,57 @@ export const bookingsRepository = {
     });
   },
 
-  createWorkshopBookingTransaction(input: { userId: string; timeslotId: string }) {
+  createWorkshopBookingTransaction(input: {
+    userId: string;
+    workshopId: string;
+    startDate: Date;
+    endDate: Date;
+    workshopToolIds: string[];
+  }) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const slot = await tx.timeSlot.findUnique({
-        where: { id: input.timeslotId }
-      });
-
-      if (!slot) {
-        return null;
+      const uniqueWorkshopToolIds = Array.from(new Set(input.workshopToolIds));
+      if (uniqueWorkshopToolIds.length === 0) {
+        return "TOOLS_REQUIRED" as const;
       }
 
-      if (slot.blockedByOwner) {
-        return "BLOCKED" as const;
+      const workshop = await tx.workshop.findUnique({
+        where: { id: input.workshopId }
+      });
+      if (!workshop) {
+        return "WORKSHOP_NOT_FOUND" as const;
       }
 
       const overlappingBlockedSlot = await tx.timeSlot.findFirst({
         where: {
-          workshopId: slot.workshopId,
+          workshopId: input.workshopId,
           blockedByOwner: true,
-          id: { not: slot.id },
-          startTime: { lt: slot.endTime },
-          endTime: { gt: slot.startTime }
+          startTime: { lt: input.endDate },
+          endTime: { gt: input.startDate }
         }
       });
       if (overlappingBlockedSlot) {
         return "BLOCKED" as const;
       }
 
+      const requestedInAvailability = await tx.timeSlot.findFirst({
+        where: {
+          workshopId: input.workshopId,
+          blockedByOwner: false,
+          startTime: { lte: input.startDate },
+          endTime: { gte: input.endDate }
+        },
+        orderBy: { startTime: "asc" }
+      });
+      if (!requestedInAvailability) {
+        return "OUTSIDE_AVAILABILITY" as const;
+      }
+
       const existing = await tx.booking.findFirst({
         where: {
-          timeslotId: input.timeslotId,
-          status: { in: BLOCKING_BOOKING_STATUSES }
+          timeslot: { workshopId: input.workshopId },
+          status: { in: BLOCKING_BOOKING_STATUSES },
+          startDate: { lt: input.endDate },
+          endDate: { gt: input.startDate }
         }
       });
 
@@ -158,17 +236,40 @@ export const bookingsRepository = {
         return "CONFLICT" as const;
       }
 
+      const selectedWorkshopTools = await tx.workshopTool.findMany({
+        where: {
+          id: { in: uniqueWorkshopToolIds },
+          workshopId: input.workshopId
+        }
+      });
+      if (selectedWorkshopTools.length !== uniqueWorkshopToolIds.length) {
+        return "TOOLS_INVALID" as const;
+      }
+
       const booking = await tx.booking.create({
         data: {
           userId: input.userId,
-          timeslotId: input.timeslotId,
-          startDate: slot.startTime,
-          endDate: slot.endTime,
+          timeslotId: requestedInAvailability.id,
+          startDate: input.startDate,
+          endDate: input.endDate,
           status: "PENDING"
         }
       });
 
-      return booking;
+      await tx.bookingSelectedTool.createMany({
+        data: uniqueWorkshopToolIds.map((workshopToolId) => ({
+          bookingId: booking.id,
+          workshopToolId
+        }))
+      });
+
+      return tx.booking.findUnique({
+        where: { id: booking.id },
+        include: {
+          timeslot: { include: { workshop: true } },
+          selectedTools: { include: { workshopTool: true } }
+        }
+      });
     });
   },
 

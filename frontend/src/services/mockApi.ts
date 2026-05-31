@@ -147,8 +147,8 @@ export const api = {
         b.type === "TOOL" &&
         b.toolId === tool.id &&
         (b.status === "OFFEN" || b.status === "BESTAETIGT") &&
-        new Date(b.startIso).getTime() < endMs &&
-        new Date(b.endIso).getTime() > startMs
+        new Date(b.startIso ?? "").getTime() < endMs &&
+        new Date(b.endIso ?? "").getTime() > startMs
     );
     if (overlap) return null;
 
@@ -170,14 +170,51 @@ export const api = {
     return booking;
   },
 
-  createWorkshopBooking(input: { requesterId: string; workshopId: string; slotId: string }): Booking | null {
+  createWorkshopBooking(input: {
+    requesterId: string;
+    workshopId: string;
+    startIso: string;
+    endIso: string;
+    workshopToolIds: string[];
+  }): Booking | null {
     const db = loadDb();
     const workshop = db.workshops.find((w) => w.id === input.workshopId);
-    const slot = db.slots.find((s) => s.id === input.slotId);
-    if (!workshop || !slot) return null;
-    if (slot.blockedByOwner) return null;
+    if (!workshop) return null;
+    if (!input.workshopToolIds.length) return null;
+
+    const startMs = new Date(input.startIso).getTime();
+    const endMs = new Date(input.endIso).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || startMs >= endMs) return null;
+
+    const blockedOverlap = db.slots.some(
+      (slot) =>
+        slot.workshopId === workshop.id &&
+        slot.blockedByOwner &&
+        new Date(slot.startIso).getTime() < endMs &&
+        new Date(slot.endIso).getTime() > startMs
+    );
+    if (blockedOverlap) return null;
+
+    const availabilitySlot = db.slots.find((slot) => {
+      if (slot.workshopId !== workshop.id || slot.blockedByOwner) return false;
+      const slotStartMs = new Date(slot.startIso).getTime();
+      const slotEndMs = new Date(slot.endIso).getTime();
+      return slotStartMs <= startMs && slotEndMs >= endMs;
+    });
+    if (!availabilitySlot) return null;
+
+    const selectedTools = workshop.equipmentItems.filter((tool) => input.workshopToolIds.includes(tool.id));
+    if (selectedTools.length !== input.workshopToolIds.length) {
+      return null;
+    }
+
     const conflict = db.bookings.some(
-      (b) => b.type === "WORKSHOP" && b.slotId === slot.id && (b.status === "OFFEN" || b.status === "BESTAETIGT"),
+      (b) =>
+        b.type === "WORKSHOP" &&
+        b.workshopId === workshop.id &&
+        (b.status === "OFFEN" || b.status === "BESTAETIGT") &&
+        new Date(b.startIso ?? "").getTime() < endMs &&
+        new Date(b.endIso ?? "").getTime() > startMs,
     );
     if (conflict) return null;
     const booking: Booking = {
@@ -186,9 +223,16 @@ export const api = {
       requesterId: input.requesterId,
       providerId: workshop.ownerId,
       workshopId: workshop.id,
-      slotId: slot.id,
+      slotId: availabilitySlot.id,
+      startIso: input.startIso,
+      endIso: input.endIso,
       status: "OFFEN",
       createdIso: new Date().toISOString(),
+      selectedWorkshopTools: selectedTools.map((tool) => ({
+        id: tool.id,
+        name: tool.name,
+        category: tool.category
+      }))
     };
     db.bookings.unshift(booking);
     saveDb(db);
