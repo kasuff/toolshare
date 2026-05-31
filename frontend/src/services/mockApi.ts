@@ -147,8 +147,8 @@ export const api = {
         b.type === "TOOL" &&
         b.toolId === tool.id &&
         (b.status === "OFFEN" || b.status === "BESTAETIGT") &&
-        new Date(b.startIso).getTime() < endMs &&
-        new Date(b.endIso).getTime() > startMs
+        new Date(b.startIso ?? "").getTime() < endMs &&
+        new Date(b.endIso ?? "").getTime() > startMs
     );
     if (overlap) return null;
 
