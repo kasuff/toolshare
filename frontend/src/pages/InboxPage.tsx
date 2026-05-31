@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import type { Booking, BookingStatus, BookingType, PickupProposal, User } from "../types/domain";
+import type { Booking, BookingStatus, BookingType, PickupProposal, TimeslotProposal, User } from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 import {
   bookingHasUnreadForUser,
@@ -34,9 +34,11 @@ const bookingStatusLabel: Record<BookingStatus, string> = {
 };
 
 type DraftPickupParts = { date: string; time: string };
+type DraftWorkshopRangeParts = { date: string; time: string; durationDays: number };
 
 type BookingRow = Booking & {
   pickupProposals: PickupProposal[];
+  timeslotProposals: TimeslotProposal[];
 };
 
 export function InboxPage({ currentUser, token }: Props) {
@@ -44,6 +46,9 @@ export function InboxPage({ currentUser, token }: Props) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftPickupParts>>({});
+  const [draftWorkshopRangeByBooking, setDraftWorkshopRangeByBooking] = useState<
+    Record<string, DraftWorkshopRangeParts>
+  >({});
   const [isLoading, setIsLoading] = useState(false);
   const draftSeededForThreadRef = useRef<Set<string>>(new Set());
   const [readMessageIds, setReadMessageIds] = useState<Set<string>>(new Set());
@@ -91,7 +96,12 @@ export function InboxPage({ currentUser, token }: Props) {
   }, [currentUser?.id, bookings]);
 
   const bookingRows: BookingRow[] = useMemo(
-    () => bookings.map((booking) => ({ ...booking, pickupProposals: booking.pickupProposals ?? [] })),
+    () =>
+      bookings.map((booking) => ({
+        ...booking,
+        pickupProposals: booking.pickupProposals ?? [],
+        timeslotProposals: booking.timeslotProposals ?? []
+      })),
     [bookings]
   );
 
@@ -136,13 +146,30 @@ export function InboxPage({ currentUser, token }: Props) {
       ...prev,
       [selectedBookingId]: splitIsoToLocalParts(baseIso),
     }));
+    if (row.type === "WORKSHOP") {
+      setDraftWorkshopRangeByBooking((prev) => ({
+        ...prev,
+        [selectedBookingId]: toWorkshopDraft(row),
+      }));
+    }
   }, [selectedBookingId, sortedRows]);
 
-  const pendingProposal = selectedBooking ? getPendingProposal(selectedBooking) : null;
+  const pendingPickupProposal =
+    selectedBooking?.type === "TOOL" ? getPendingPickupProposal(selectedBooking) : null;
+  const pendingTimeslotProposal =
+    selectedBooking?.type === "WORKSHOP" ? getPendingTimeslotProposal(selectedBooking) : null;
 
-  const canRespondToCounter =
-    Boolean(selectedBooking && pendingProposal && currentUser && pendingProposal.proposedById !== currentUser.id);
+  const canRespondToPickupCounter =
+    Boolean(selectedBooking && pendingPickupProposal && currentUser && pendingPickupProposal.proposedById !== currentUser.id);
+  const canRespondToTimeslotCounter =
+    Boolean(
+      selectedBooking &&
+        pendingTimeslotProposal &&
+        currentUser &&
+        pendingTimeslotProposal.proposedById !== currentUser.id
+    );
   const counterDraft = selectedBooking ? draftPickupByBooking[selectedBooking.id] : undefined;
+  const workshopRangeDraft = selectedBooking ? draftWorkshopRangeByBooking[selectedBooking.id] : undefined;
 
   const isProvider = (b: Booking) => (currentUser ? b.providerId === currentUser.id : false);
 
@@ -169,7 +196,7 @@ export function InboxPage({ currentUser, token }: Props) {
     }
   };
 
-  const sendCounterProposal = async (booking: Booking) => {
+  const sendPickupCounterProposal = async (booking: Booking) => {
     if (!token || !currentUser) return;
     if (booking.type !== "TOOL" || !booking.pickupTimeIso) {
       pushToast("Alternativvorschlag ist nur bei Ausleihanfragen mit Abholzeit möglich.", "error");
@@ -185,7 +212,7 @@ export function InboxPage({ currentUser, token }: Props) {
     if (payloadIso !== iso) {
       pushToast("Abholzeit wurde auf den Buchungszeitraum begrenzt.", "info");
     }
-    const pendingIncoming = getPendingProposal(booking);
+    const pendingIncoming = getPendingPickupProposal(booking);
     if (pendingIncoming && pendingIncoming.proposedById !== currentUser.id) {
       markIncomingRead(proposalMessageKey(booking.id, pendingIncoming.id));
     }
@@ -202,8 +229,40 @@ export function InboxPage({ currentUser, token }: Props) {
     }
   };
 
+  const sendTimeslotCounterProposal = async (booking: Booking) => {
+    if (!token || !currentUser) return;
+    if (booking.type !== "WORKSHOP") {
+      pushToast("Alternativvorschlag ist hier nicht verfügbar.", "error");
+      return;
+    }
+    const draft = draftWorkshopRangeByBooking[booking.id];
+    const startIso = combineLocalDateTimeToIso(draft?.date ?? "", draft?.time ?? "");
+    if (!startIso) {
+      pushToast("Bitte Datum und Uhrzeit für den Alternativvorschlag wählen.", "error");
+      return;
+    }
+    const durationDays = Math.max(1, draft?.durationDays ?? 1);
+    const endIso = addDaysToIso(startIso, durationDays);
+    if (!endIso) {
+      pushToast("Der gewählte Zeitraum ist ungültig.", "error");
+      return;
+    }
+    const pendingIncoming = getPendingTimeslotProposal(booking);
+    if (pendingIncoming && pendingIncoming.proposedById !== currentUser.id) {
+      markIncomingRead(proposalMessageKey(booking.id, pendingIncoming.id));
+    }
+    try {
+      await api.createTimeslotProposal(booking.id, startIso, endIso, token);
+      await loadData();
+      setDraftWorkshopRangeByBooking((prev) => ({ ...prev, [booking.id]: toWorkshopDraft(booking) }));
+      pushToast("Alternativzeitraum gesendet.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Alternativzeitraum konnte nicht gesendet werden.", "error");
+    }
+  };
+
   const acceptLatestCounterProposal = async (booking: Booking) => {
-    const pending = getPendingProposal(booking);
+    const pending = getPendingPickupProposal(booking);
     if (!token || !pending) return;
     markIncomingRead(proposalMessageKey(booking.id, pending.id));
     try {
@@ -216,7 +275,7 @@ export function InboxPage({ currentUser, token }: Props) {
   };
 
   const declineLatestCounterProposal = async (booking: Booking) => {
-    const pending = getPendingProposal(booking);
+    const pending = getPendingPickupProposal(booking);
     if (!token || !pending) return;
     markIncomingRead(proposalMessageKey(booking.id, pending.id));
     try {
@@ -225,6 +284,32 @@ export function InboxPage({ currentUser, token }: Props) {
       pushToast("Alternativvorschlag abgelehnt.", "info");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Vorschlag konnte nicht abgelehnt werden.", "error");
+    }
+  };
+
+  const acceptLatestTimeslotProposal = async (booking: Booking) => {
+    const pending = getPendingTimeslotProposal(booking);
+    if (!token || !pending) return;
+    markIncomingRead(proposalMessageKey(booking.id, pending.id));
+    try {
+      await api.respondTimeslotProposal(booking.id, pending.id, "ACCEPT", token);
+      await loadData();
+      pushToast("Alternativzeit angenommen.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Alternativzeit konnte nicht angenommen werden.", "error");
+    }
+  };
+
+  const declineLatestTimeslotProposal = async (booking: Booking) => {
+    const pending = getPendingTimeslotProposal(booking);
+    if (!token || !pending) return;
+    markIncomingRead(proposalMessageKey(booking.id, pending.id));
+    try {
+      await api.respondTimeslotProposal(booking.id, pending.id, "DECLINE", token);
+      await loadData();
+      pushToast("Alternativzeit abgelehnt.", "info");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Alternativzeit konnte nicht abgelehnt werden.", "error");
     }
   };
 
@@ -357,18 +442,37 @@ export function InboxPage({ currentUser, token }: Props) {
                             className="request-bubble-thumb"
                           />
                           <div className="request-bubble-intro">
-                            <span className="request-bubble-badge">Ausleihanfrage</span>
-                            <p className="request-bubble-title">{selectedBooking.toolName ?? "Werkzeug"}</p>
+                            <span className="request-bubble-badge">
+                              {selectedBooking.type === "WORKSHOP" ? "Werkstattbuchung" : "Ausleihanfrage"}
+                            </span>
+                            <p className="request-bubble-title">
+                              {selectedBooking.toolName ?? (selectedBooking.type === "WORKSHOP" ? "Werkstatt" : "Werkzeug")}
+                            </p>
                             <p
-                              className={`request-bubble-line${selectedBooking.pickupProposals.length > 0 ? " is-struck" : ""}`}
+                              className={`request-bubble-line${
+                                (selectedBooking.type === "TOOL"
+                                  ? selectedBooking.pickupProposals.length > 0
+                                  : selectedBooking.timeslotProposals.length > 0)
+                                  ? " is-struck"
+                                  : ""
+                              }`}
                             >
                               Zeitraum: {formatDateTime(selectedBooking.startIso)} – {formatDateTime(selectedBooking.endIso)}
                             </p>
-                            <p
-                              className={`request-bubble-line${selectedBooking.pickupProposals.length > 0 ? " is-struck" : ""}`}
-                            >
-                              Abholung: {formatDateTime(selectedBooking.pickupTimeIso)}
-                            </p>
+                            {selectedBooking.type === "TOOL" && (
+                              <p
+                                className={`request-bubble-line${
+                                  selectedBooking.pickupProposals.length > 0 ? " is-struck" : ""
+                                }`}
+                              >
+                                Abholung: {formatDateTime(selectedBooking.pickupTimeIso)}
+                              </p>
+                            )}
+                            {selectedBooking.type === "WORKSHOP" && selectedBooking.selectedWorkshopTools?.length ? (
+                              <p className="request-bubble-line">
+                                Gewünschte Werkzeuge: {selectedBooking.selectedWorkshopTools.map((tool) => tool.name).join(", ")}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                         <p className="request-bubble-status">
@@ -377,7 +481,7 @@ export function InboxPage({ currentUser, token }: Props) {
 
                         {selectedBooking.status === "OFFEN" &&
                           isProvider(selectedBooking) &&
-                          !pendingProposal &&
+                          !pendingPickupProposal &&
                           selectedBooking.type === "TOOL" &&
                           Boolean(selectedBooking.pickupTimeIso) && (
                           <>
@@ -422,13 +526,113 @@ export function InboxPage({ currentUser, token }: Props) {
                                     }))
                                   }
                                 />
-                                <button type="button" onClick={() => void sendCounterProposal(selectedBooking)}>
+                                <button type="button" onClick={() => void sendPickupCounterProposal(selectedBooking)}>
                                   Senden
                                 </button>
                               </div>
                             </div>
                           </>
                         )}
+
+                        {selectedBooking.status === "OFFEN" &&
+                          isProvider(selectedBooking) &&
+                          !pendingTimeslotProposal &&
+                          selectedBooking.type === "WORKSHOP" && (
+                            <>
+                              <div className="request-bubble-actions">
+                                <button type="button" onClick={() => void decide(selectedBooking.id, true)}>
+                                  Akzeptieren
+                                </button>
+                                <button type="button" className="ghost" onClick={() => void decide(selectedBooking.id, false)}>
+                                  Ablehnen
+                                </button>
+                              </div>
+                              <div className="request-bubble-counter">
+                                <span className="request-bubble-counter-label">Alternativzeitraum vorschlagen</span>
+                                <div className="request-bubble-counter-row request-bubble-counter-datetime">
+                                  <input
+                                    aria-label="Alternativdatum für Werkstattvorschlag"
+                                    type="date"
+                                    className="booking-input"
+                                    value={workshopRangeDraft?.date ?? ""}
+                                    onChange={(event) =>
+                                      setDraftWorkshopRangeByBooking((prev) => ({
+                                        ...prev,
+                                        [selectedBooking.id]: {
+                                          ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                          date: event.target.value
+                                        }
+                                      }))
+                                    }
+                                  />
+                                  <input
+                                    aria-label="Alternativuhrzeit für Werkstattvorschlag"
+                                    type="time"
+                                    className="booking-input"
+                                    value={workshopRangeDraft?.time ?? ""}
+                                    onChange={(event) =>
+                                      setDraftWorkshopRangeByBooking((prev) => ({
+                                        ...prev,
+                                        [selectedBooking.id]: {
+                                          ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                          time: event.target.value
+                                        }
+                                      }))
+                                    }
+                                  />
+                                  <div className="duration-picker">
+                                    <button
+                                      type="button"
+                                      className="duration-btn"
+                                      onClick={() =>
+                                        setDraftWorkshopRangeByBooking((prev) => ({
+                                          ...prev,
+                                          [selectedBooking.id]: {
+                                            ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                            durationDays: Math.max(
+                                              1,
+                                              (prev[selectedBooking.id]?.durationDays ??
+                                                toWorkshopDraft(selectedBooking).durationDays) - 1
+                                            )
+                                          }
+                                        }))
+                                      }
+                                    >
+                                      −
+                                    </button>
+                                    <div className="duration-display">
+                                      <strong>{workshopRangeDraft?.durationDays ?? 1}</strong>
+                                      <span className="duration-label">
+                                        {(workshopRangeDraft?.durationDays ?? 1) === 1 ? "Tag" : "Tage"}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="duration-btn"
+                                      onClick={() =>
+                                        setDraftWorkshopRangeByBooking((prev) => ({
+                                          ...prev,
+                                          [selectedBooking.id]: {
+                                            ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                            durationDays: Math.min(
+                                              30,
+                                              (prev[selectedBooking.id]?.durationDays ??
+                                                toWorkshopDraft(selectedBooking).durationDays) + 1
+                                            )
+                                          }
+                                        }))
+                                      }
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                  <button type="button" onClick={() => void sendTimeslotCounterProposal(selectedBooking)}>
+                                    Senden
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
                       </div>
                     </div>
                   </MessengerRow>
@@ -474,8 +678,8 @@ export function InboxPage({ currentUser, token }: Props) {
                               : "Abgelehnt"}
                         </small>
 
-                        {canRespondToCounter &&
-                          proposal.id === pendingProposal?.id &&
+                        {canRespondToPickupCounter &&
+                          proposal.id === pendingPickupProposal?.id &&
                           selectedBooking.status === "OFFEN" && (
                             <div className="proposal-reply-block" onClick={(event) => event.stopPropagation()}>
                               <div className="request-bubble-actions proposal-reply-actions">
@@ -520,7 +724,7 @@ export function InboxPage({ currentUser, token }: Props) {
                                         }))
                                       }
                                     />
-                                    <button type="button" onClick={() => void sendCounterProposal(selectedBooking)}>
+                                    <button type="button" onClick={() => void sendPickupCounterProposal(selectedBooking)}>
                                       Senden
                                     </button>
                                   </div>
@@ -529,6 +733,158 @@ export function InboxPage({ currentUser, token }: Props) {
                             </div>
                           )}
                       </div>
+                      </MessengerRow>
+                    );
+                  })}
+
+                  {selectedBooking.timeslotProposals.map((proposal) => {
+                    const propIncoming = proposal.proposedById !== currentUser.id;
+                    const propKey = proposalMessageKey(selectedBooking.id, proposal.id);
+                    const propUnread =
+                      propIncoming && proposal.status === "PENDING" && !readMessageIds.has(propKey);
+                    return (
+                      <MessengerRow
+                        key={proposal.id}
+                        variant={proposal.proposedById === currentUser.id ? "outgoing" : "incoming"}
+                        avatar={
+                          proposal.proposedById !== currentUser.id ? (
+                            <UserAvatar
+                              name={
+                                proposal.proposedById === selectedBooking.requesterId
+                                  ? (selectedBooking.requesterName ?? "Anfrage")
+                                  : (selectedBooking.providerName ?? "Anbieter")
+                              }
+                              imageUrl={null}
+                              size="sm"
+                            />
+                          ) : undefined
+                        }
+                      >
+                        <div
+                          className={`chat-bubble ${proposal.proposedById === currentUser.id ? "outgoing" : "incoming"}${
+                            propUnread ? " chat-bubble--unread" : ""
+                          }`}
+                          onClick={propIncoming ? () => markIncomingRead(propKey) : undefined}
+                        >
+                          <p>
+                            Alternativvorschlag: Zeitraum {formatSlotRange(proposal.proposedStartIso, proposal.proposedEndIso)}
+                            {proposal.previousStartIso && proposal.previousEndIso
+                              ? ` (statt ${formatSlotRange(proposal.previousStartIso, proposal.previousEndIso)})`
+                              : ""}
+                          </p>
+                          <small>
+                            {proposal.status === "PENDING"
+                              ? "Warte auf Antwort"
+                              : proposal.status === "ACCEPTED"
+                                ? "Angenommen"
+                                : "Abgelehnt"}
+                          </small>
+
+                          {canRespondToTimeslotCounter &&
+                            proposal.id === pendingTimeslotProposal?.id &&
+                            selectedBooking.status === "OFFEN" && (
+                              <div className="proposal-reply-block" onClick={(event) => event.stopPropagation()}>
+                                <div className="request-bubble-actions proposal-reply-actions">
+                                  <button type="button" onClick={() => void acceptLatestTimeslotProposal(selectedBooking)}>
+                                    Annehmen
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="ghost"
+                                    onClick={() => void declineLatestTimeslotProposal(selectedBooking)}
+                                  >
+                                    Ablehnen
+                                  </button>
+                                </div>
+                                {selectedBooking.type === "WORKSHOP" && (
+                                  <div className="request-bubble-counter proposal-counter-inline">
+                                    <span className="request-bubble-counter-label">Mit Alternativzeitraum antworten</span>
+                                    <div className="request-bubble-counter-row request-bubble-counter-datetime">
+                                      <input
+                                        aria-label="Alternativdatum für Werkstattantwort"
+                                        type="date"
+                                        className="booking-input"
+                                        value={workshopRangeDraft?.date ?? ""}
+                                        onChange={(event) =>
+                                          setDraftWorkshopRangeByBooking((prev) => ({
+                                            ...prev,
+                                            [selectedBooking.id]: {
+                                              ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                              date: event.target.value
+                                            }
+                                          }))
+                                        }
+                                      />
+                                      <input
+                                        aria-label="Alternativuhrzeit für Werkstattantwort"
+                                        type="time"
+                                        className="booking-input"
+                                        value={workshopRangeDraft?.time ?? ""}
+                                        onChange={(event) =>
+                                          setDraftWorkshopRangeByBooking((prev) => ({
+                                            ...prev,
+                                            [selectedBooking.id]: {
+                                              ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                              time: event.target.value
+                                            }
+                                          }))
+                                        }
+                                      />
+                                      <div className="duration-picker">
+                                        <button
+                                          type="button"
+                                          className="duration-btn"
+                                          onClick={() =>
+                                            setDraftWorkshopRangeByBooking((prev) => ({
+                                              ...prev,
+                                              [selectedBooking.id]: {
+                                                ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                                durationDays: Math.max(
+                                                  1,
+                                                  (prev[selectedBooking.id]?.durationDays ??
+                                                    toWorkshopDraft(selectedBooking).durationDays) - 1
+                                                )
+                                              }
+                                            }))
+                                          }
+                                        >
+                                          −
+                                        </button>
+                                        <div className="duration-display">
+                                          <strong>{workshopRangeDraft?.durationDays ?? 1}</strong>
+                                          <span className="duration-label">
+                                            {(workshopRangeDraft?.durationDays ?? 1) === 1 ? "Tag" : "Tage"}
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          className="duration-btn"
+                                          onClick={() =>
+                                            setDraftWorkshopRangeByBooking((prev) => ({
+                                              ...prev,
+                                              [selectedBooking.id]: {
+                                                ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                                durationDays: Math.min(
+                                                  30,
+                                                  (prev[selectedBooking.id]?.durationDays ??
+                                                    toWorkshopDraft(selectedBooking).durationDays) + 1
+                                                )
+                                              }
+                                            }))
+                                          }
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                      <button type="button" onClick={() => void sendTimeslotCounterProposal(selectedBooking)}>
+                                        Senden
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                        </div>
                       </MessengerRow>
                     );
                   })}
@@ -607,19 +963,36 @@ function counterparty(booking: Booking, currentUserId: string): { name: string }
 }
 
 function getThreadPreview(row: BookingRow, currentUserId: string): string {
-  const proposals = row.pickupProposals;
-  if (proposals.length > 0) {
-    const last = proposals[proposals.length - 1];
-    const short = formatShortDateTime(last.proposedPickupIso);
-    if (last.proposedById === currentUserId) {
+  const latestPickup =
+    row.pickupProposals.length > 0 ? row.pickupProposals[row.pickupProposals.length - 1] : null;
+  const latestTimeslot =
+    row.timeslotProposals.length > 0 ? row.timeslotProposals[row.timeslotProposals.length - 1] : null;
+
+  const latestPickupMs = latestPickup ? new Date(latestPickup.createdIso).getTime() : 0;
+  const latestTimeslotMs = latestTimeslot ? new Date(latestTimeslot.createdIso).getTime() : 0;
+
+  if (latestPickup && latestPickupMs >= latestTimeslotMs) {
+    const short = formatShortDateTime(latestPickup.proposedPickupIso);
+    if (latestPickup.proposedById === currentUserId) {
       return `Du: Alternativ ${short}`;
     }
     return `Alternativvorschlag · ${short}`;
   }
-  if (row.requesterId === currentUserId) {
-    return "Du hast eine Ausleihe angefragt";
+
+  if (latestTimeslot) {
+    const short = formatShortDateTime(latestTimeslot.proposedStartIso);
+    if (latestTimeslot.proposedById === currentUserId) {
+      return `Du: Alternativzeit ${short}`;
+    }
+    return `Alternativzeit · ${short}`;
   }
-  return `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "dein Angebot"}“ ausleihen`;
+
+  if (row.requesterId === currentUserId) {
+    return row.type === "WORKSHOP" ? "Du hast eine Werkstatt angefragt" : "Du hast eine Ausleihe angefragt";
+  }
+  return row.type === "WORKSHOP"
+    ? `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "deine Werkstatt"}“ buchen`
+    : `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "dein Angebot"}“ ausleihen`;
 }
 
 function getLastActivityMs(booking: BookingRow): number {
@@ -628,6 +1001,9 @@ function getLastActivityMs(booking: BookingRow): number {
     if (c) t = Math.max(t, new Date(c).getTime());
   }
   for (const p of booking.pickupProposals) {
+    t = Math.max(t, new Date(p.createdIso).getTime());
+  }
+  for (const p of booking.timeslotProposals) {
     t = Math.max(t, new Date(p.createdIso).getTime());
   }
   return t;
@@ -660,9 +1036,18 @@ function formatDateTime(value?: string) {
   return new Date(value).toLocaleString();
 }
 
-function getPendingProposal(booking: Booking): PickupProposal | null {
+function formatSlotRange(startIso?: string, endIso?: string) {
+  return `${formatDateTime(startIso)} – ${formatDateTime(endIso)}`;
+}
+
+function getPendingPickupProposal(booking: Booking): PickupProposal | null {
   const pending = (booking.pickupProposals ?? []).filter((p) => p.status === "PENDING");
-  return pending.at(-1) ?? null;
+  return pending.length > 0 ? pending[pending.length - 1] : null;
+}
+
+function getPendingTimeslotProposal(booking: Booking): TimeslotProposal | null {
+  const pending = (booking.timeslotProposals ?? []).filter((p) => p.status === "PENDING");
+  return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
 function getEffectivePickupIso(booking: Booking): string | undefined {
@@ -694,6 +1079,50 @@ function combineLocalDateTimeToIso(date: string, time: string): string | null {
   const dt = new Date(y, m - 1, day, hh, mm, 0, 0);
   if (Number.isNaN(dt.getTime())) return null;
   return dt.toISOString();
+}
+
+function addDaysToIso(startIso: string, days: number): string | null {
+  const start = new Date(startIso);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = new Date(start);
+  end.setDate(end.getDate() + Math.max(1, days));
+  if (Number.isNaN(end.getTime()) || end <= start) return null;
+  return end.toISOString();
+}
+
+function toWorkshopDraft(booking: Booking): DraftWorkshopRangeParts {
+  const latest = booking.timeslotProposals?.length
+    ? booking.timeslotProposals[booking.timeslotProposals.length - 1]
+    : null;
+  const startIso = latest?.proposedStartIso ?? booking.startIso ?? "";
+  const endIso = latest?.proposedEndIso ?? booking.endIso ?? "";
+  const startParts = splitIsoToLocalParts(startIso);
+  const durationDays = getDurationDays(startIso, endIso);
+  if (!startParts.date) {
+    const now = new Date();
+    now.setDate(now.getDate() + 1);
+    const pad = (value: number) => `${value}`.padStart(2, "0");
+    return {
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      time: "10:00",
+      durationDays
+    };
+  }
+  return {
+    date: startParts.date,
+    time: startParts.time || "10:00",
+    durationDays
+  };
+}
+
+function getDurationDays(startIso?: string, endIso?: string): number {
+  if (!startIso || !endIso) return 1;
+  const startMs = new Date(startIso).getTime();
+  const endMs = new Date(endIso).getTime();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return 1;
+  const diffMs = endMs - startMs;
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.max(1, Math.ceil(diffMs / dayMs));
 }
 
 function clampPickupIsoToBooking(iso: string, booking: Booking): string {
