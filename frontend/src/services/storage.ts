@@ -22,6 +22,8 @@ const DEFAULT_DB: AppDb = {
       description: "Gut erhalten, inkl. Ladegerät und Bits.",
       category: "Bohrmaschine",
       imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+      pickupLocation: "Heidemannstraße 20, 80939 München, Deutschland",
+      pickupLocationNote: "Klingeln bei Nina",
       status: "VERFUEGBAR",
     },
     {
@@ -31,6 +33,8 @@ const DEFAULT_DB: AppDb = {
       description: "Für Holz und Kunststoff, 3 Sägeblätter inklusive.",
       category: "Säge",
       imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+      pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland",
+      pickupLocationNote: "",
       status: "VERFUEGBAR",
     },
   ],
@@ -73,7 +77,13 @@ export function loadDb(): AppDb {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DB));
     return structuredClone(DEFAULT_DB);
   }
-  return JSON.parse(raw) as AppDb;
+  const parsed = JSON.parse(raw) as AppDb;
+  parsed.tools = parsed.tools.map((tool) => ({
+    ...tool,
+    pickupLocation: tool.pickupLocation ?? "",
+    pickupLocationNote: tool.pickupLocationNote ?? ""
+  }));
+  return parsed;
 }
 
 export function saveDb(db: AppDb): void {
