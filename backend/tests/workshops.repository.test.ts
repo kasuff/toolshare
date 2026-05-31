@@ -5,13 +5,15 @@ const mocks = vi.hoisted(() => ({
   workshopFindMany: vi.fn(),
   workshopFindUnique: vi.fn(),
   workshopCreate: vi.fn(),
-  workshopUpdate: vi.fn(),
   workshopDelete: vi.fn(),
+  txWorkshopToolDeleteMany: vi.fn(),
+  txWorkshopUpdate: vi.fn(),
   timeSlotFindFirst: vi.fn(),
   timeSlotCreate: vi.fn(),
   timeSlotFindUnique: vi.fn(),
   timeSlotDelete: vi.fn(),
-  bookingFindFirst: vi.fn()
+  bookingFindFirst: vi.fn(),
+  prismaTransaction: vi.fn()
 }));
 
 vi.mock("../src/config/prisma", () => ({
@@ -20,7 +22,6 @@ vi.mock("../src/config/prisma", () => ({
       findMany: mocks.workshopFindMany,
       findUnique: mocks.workshopFindUnique,
       create: mocks.workshopCreate,
-      update: mocks.workshopUpdate,
       delete: mocks.workshopDelete
     },
     timeSlot: {
@@ -31,7 +32,8 @@ vi.mock("../src/config/prisma", () => ({
     },
     booking: {
       findFirst: mocks.bookingFindFirst
-    }
+    },
+    $transaction: mocks.prismaTransaction
   }
 }));
 
@@ -65,6 +67,13 @@ describe("workshopsRepository", () => {
             id: true,
             name: true
           }
+        },
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
         }
       },
       orderBy: { name: "asc" }
@@ -88,6 +97,13 @@ describe("workshopsRepository", () => {
         },
         timeslots: {
           orderBy: { startTime: "asc" }
+        },
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
         }
       }
     });
@@ -96,7 +112,14 @@ describe("workshopsRepository", () => {
 
   it("creates, updates and removes workshops", async () => {
     mocks.workshopCreate.mockResolvedValueOnce({ id: "w2" });
-    mocks.workshopUpdate.mockResolvedValueOnce({ id: "w2", name: "Neu" });
+    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
+      handler({
+        workshopTool: { deleteMany: mocks.txWorkshopToolDeleteMany },
+        workshop: { update: mocks.txWorkshopUpdate }
+      })
+    );
+    mocks.txWorkshopToolDeleteMany.mockResolvedValueOnce({ count: 1 });
+    mocks.txWorkshopUpdate.mockResolvedValueOnce({ id: "w2", name: "Neu" });
     mocks.workshopDelete.mockResolvedValueOnce({ id: "w2" });
 
     const created = await workshopsRepository.create({
@@ -104,9 +127,16 @@ describe("workshopsRepository", () => {
       name: "Werkstatt",
       description: "desc",
       location: "Muenchen",
-      maxCapacity: 4
+      maxCapacity: 4,
+      extras: ["WLAN"],
+      workshopTools: [{ name: "Akkuschrauber", category: "elektro" }],
+      imageUrls: ["https://example.com/workshop.png"]
     });
-    const updated = await workshopsRepository.update("w2", { name: "Neu" });
+    const updated = await workshopsRepository.update("w2", {
+      name: "Neu",
+      extras: ["Starkstrom"],
+      workshopTools: [{ name: "Stichsaege", category: "holz" }]
+    });
     const removed = await workshopsRepository.remove("w2");
 
     expect(mocks.workshopCreate).toHaveBeenCalledWith({
@@ -115,12 +145,44 @@ describe("workshopsRepository", () => {
         name: "Werkstatt",
         description: "desc",
         location: "Muenchen",
-        maxCapacity: 4
+        maxCapacity: 4,
+        equipment: ["WLAN"],
+        imageUrls: ["https://example.com/workshop.png"],
+        workshopTools: {
+          create: [{ name: "Akkuschrauber", category: "elektro" }]
+        }
+      },
+      include: {
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
+        }
       }
     });
-    expect(mocks.workshopUpdate).toHaveBeenCalledWith({
+    expect(mocks.txWorkshopToolDeleteMany).toHaveBeenCalledWith({
+      where: { workshopId: "w2" }
+    });
+    expect(mocks.txWorkshopUpdate).toHaveBeenCalledWith({
       where: { id: "w2" },
-      data: { name: "Neu" }
+      data: {
+        name: "Neu",
+        equipment: ["Starkstrom"],
+        workshopTools: {
+          create: [{ name: "Stichsaege", category: "holz" }]
+        }
+      },
+      include: {
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
+        }
+      }
     });
     expect(mocks.workshopDelete).toHaveBeenCalledWith({ where: { id: "w2" } });
     expect(created).toEqual({ id: "w2" });
@@ -141,7 +203,8 @@ describe("workshopsRepository", () => {
     const created = await workshopsRepository.createTimeslot({
       workshopId: "w1",
       startTime,
-      endTime
+      endTime,
+      blockedByOwner: false
     });
     const found = await workshopsRepository.findTimeslotById("slot-1");
     const activeBooking = await workshopsRepository.findActiveBookingForTimeslot("slot-1");
@@ -158,7 +221,8 @@ describe("workshopsRepository", () => {
       data: {
         workshopId: "w1",
         startTime,
-        endTime
+        endTime,
+        blockedByOwner: false
       }
     });
     expect(mocks.timeSlotFindUnique).toHaveBeenCalledWith({

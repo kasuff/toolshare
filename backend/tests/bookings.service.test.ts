@@ -6,9 +6,7 @@ import { bookingsService } from "../src/modules/bookings/bookings.service";
 vi.mock("../src/modules/bookings/bookings.repository", () => ({
   bookingsRepository: {
     listForUserContext: vi.fn(),
-    findToolById: vi.fn(),
-    findOverlappingToolBooking: vi.fn(),
-    createToolBooking: vi.fn(),
+    createToolBookingTransaction: vi.fn(),
     createWorkshopBookingTransaction: vi.fn(),
     findBookingById: vi.fn(),
     updateStatus: vi.fn()
@@ -39,7 +37,7 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking when tool does not exist", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce(null);
+    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce(null as any);
 
     await expect(
       bookingsService.createToolBooking({
@@ -53,8 +51,6 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking with invalid time range", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-
     await expect(
       bookingsService.createToolBooking({
         requesterId: "u1",
@@ -67,8 +63,7 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking when overlapping booking exists", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-    mockedBookingsRepository.findOverlappingToolBooking.mockResolvedValueOnce({ id: "b-overlap" } as any);
+    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce("CONFLICT" as any);
 
     await expect(
       bookingsService.createToolBooking({
@@ -82,9 +77,10 @@ describe("bookingsService", () => {
   });
 
   it("creates tool booking and notifies owner", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-    mockedBookingsRepository.findOverlappingToolBooking.mockResolvedValueOnce(null);
-    mockedBookingsRepository.createToolBooking.mockResolvedValueOnce({ id: "b1", toolId: "t1" } as any);
+    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce({
+      booking: { id: "b1", toolId: "t1" },
+      tool: { ownerId: "owner-1" }
+    } as any);
 
     const result = await bookingsService.createToolBooking({
       requesterId: "u1",
@@ -94,20 +90,23 @@ describe("bookingsService", () => {
       pickupTime: "2026-06-01T09:00:00.000Z"
     });
 
-    expect(mockedBookingsRepository.createToolBooking).toHaveBeenCalled();
+    expect(mockedBookingsRepository.createToolBookingTransaction).toHaveBeenCalled();
     expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner-1", expect.stringContaining("Ausleihanfrage"));
     expect(result).toMatchObject({ id: "b1" });
   });
 
-  it("rejects workshop booking when timeslot does not exist", async () => {
-    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce(null);
+  it("rejects workshop booking when workshop does not exist", async () => {
+    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("WORKSHOP_NOT_FOUND" as any);
 
     await expect(
       bookingsService.createWorkshopBooking({
         requesterId: "u1",
-        timeslotId: "slot-1"
+        workshopId: "workshop-1",
+        startDate: "2026-06-01T10:00:00.000Z",
+        endDate: "2026-06-03T10:00:00.000Z",
+        workshopToolIds: ["workshop-tool-1"]
       })
-    ).rejects.toMatchObject({ code: "TIMESLOT_NOT_FOUND", status: 404 });
+    ).rejects.toMatchObject({ code: "WORKSHOP_NOT_FOUND", status: 404 });
   });
 
   it("rejects workshop booking conflicts", async () => {
@@ -116,7 +115,10 @@ describe("bookingsService", () => {
     await expect(
       bookingsService.createWorkshopBooking({
         requesterId: "u1",
-        timeslotId: "slot-1"
+        workshopId: "workshop-1",
+        startDate: "2026-06-01T10:00:00.000Z",
+        endDate: "2026-06-03T10:00:00.000Z",
+        workshopToolIds: ["workshop-tool-1"]
       })
     ).rejects.toMatchObject({ code: "BOOKING_CONFLICT", status: 409 });
   });
@@ -127,9 +129,24 @@ describe("bookingsService", () => {
     await expect(
       bookingsService.createWorkshopBooking({
         requesterId: "u1",
-        timeslotId: "slot-1"
+        workshopId: "workshop-1",
+        startDate: "2026-06-01T10:00:00.000Z",
+        endDate: "2026-06-03T10:00:00.000Z",
+        workshopToolIds: ["workshop-tool-1"]
       })
     ).rejects.toMatchObject({ code: "TIMESLOT_BLOCKED", status: 409 });
+  });
+
+  it("rejects workshop booking with invalid time range", async () => {
+    await expect(
+      bookingsService.createWorkshopBooking({
+        requesterId: "u1",
+        workshopId: "workshop-1",
+        startDate: "2026-06-03T10:00:00.000Z",
+        endDate: "2026-06-01T10:00:00.000Z",
+        workshopToolIds: ["workshop-tool-1"]
+      })
+    ).rejects.toMatchObject({ code: "INVALID_TIME_RANGE", status: 400 });
   });
 
   it("returns created workshop booking", async () => {
@@ -137,7 +154,10 @@ describe("bookingsService", () => {
 
     const result = await bookingsService.createWorkshopBooking({
       requesterId: "u1",
-      timeslotId: "slot-1"
+      workshopId: "workshop-1",
+      startDate: "2026-06-01T10:00:00.000Z",
+      endDate: "2026-06-03T10:00:00.000Z",
+      workshopToolIds: ["workshop-tool-1"]
     });
 
     expect(result).toMatchObject({ id: "b2" });
