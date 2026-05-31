@@ -53,7 +53,9 @@ describe("toolsService", () => {
       ownerId: "u1",
       name: "Bohrer",
       description: "desc",
-      category: "Elektro"
+      category: "Elektro",
+      pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+      pickupLocationNote: "Bei Thomas klingeln"
     });
 
     expect(mockedToolsRepository.create).toHaveBeenCalled();
