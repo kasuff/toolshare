@@ -1,9 +1,8 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Field, Surface } from "../components/ui";
+import { Surface } from "../components/ui";
 import { ImageUpload } from "../components/ImageUpload";
 import { CategorySelect } from "../components/CategorySelect";
-import { OwnerContactCard } from "../components/OwnerContactCard";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
@@ -23,10 +22,12 @@ export function NewToolPage({ currentUser, token }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [pickupAddress, setPickupAddress] = useState(currentUser?.address ?? "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<Partial<Record<ToolFormField, boolean>>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const previewImage = uploadedImage || DEFAULT_PLACEHOLDER_IMAGE;
+  const [owner, setOwner] = useState<User | null>(currentUser || null);
+
   const formErrors = {
     name: name.trim() ? null : "Bitte gib einen Namen für das Werkzeug ein.",
     description:
@@ -43,20 +44,23 @@ export function NewToolPage({ currentUser, token }: Props) {
     setTouchedFields((prev) => ({ ...prev, [field]: true }));
   };
 
-  // Fallback for user data if not provided
-  const [owner, setOwner] = useState<User | null>(currentUser || null);
-
   useEffect(() => {
-    // If currentUser is not provided but token exists, fetch it
     if (!currentUser && token && !owner) {
       api.getCurrentUser(token)
-        .then(setOwner)
+        .then((user) => {
+          setOwner(user);
+          setPickupAddress((current) => current || user.address || "");
+        })
         .catch((err) => {
           pushToast("Fehler beim Laden der Benutzerdaten.", "error");
           console.error(err);
         });
     }
   }, [token, currentUser, owner, pushToast]);
+
+  useEffect(() => {
+    setPickupAddress((current) => current || currentUser?.address || "");
+  }, [currentUser?.address]);
 
   if (!token) {
     return (
@@ -92,15 +96,14 @@ export function NewToolPage({ currentUser, token }: Props) {
         },
         token
       );
-      
-      // Reset form
+
       setName("");
       setDescription("");
       setCategory("");
       setUploadedImage(null);
       setTouchedFields({});
       setSubmitAttempted(false);
-      
+
       pushToast("Werkzeug erfolgreich eingestellt!", "success");
       navigate("/tools");
     } catch (error) {
@@ -114,83 +117,87 @@ export function NewToolPage({ currentUser, token }: Props) {
   };
 
   return (
-    <section className="stack">
+    <section className="new-tool-page">
       <h1>Werkzeug einstellen</h1>
-      
-      <Surface title="Neues Werkzeug" subtitle="Teile dein Werkzeug mit der Community">
-        {owner && <OwnerContactCard owner={owner} />}
-        
-        <form className="stack" onSubmit={onSubmit}>
-          {/* Bild Upload */}
-          <ImageUpload
-            onImageSelect={setUploadedImage}
-            currentImage={previewImage}
-            placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
-            label="Werkzeug Foto"
-            hint="Lade ein gutes Foto deines Werkzeugs hoch (JPG, PNG, max. 5MB). Ohne Upload wird das Standard-Hammerbild verwendet."
+
+      <form className="new-tool-form" onSubmit={onSubmit}>
+        <p className="required-note">Pflichtfelder werden mit einem * markiert!</p>
+
+        <ImageUpload
+          onImageSelect={setUploadedImage}
+          currentImage={uploadedImage ?? undefined}
+          placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
+          label="Werkzeug Fotos"
+          hint="Lade gute Fotos von deinem Werkzeug hoch (JPG, PNG, max. 5MB). Ohne Upload wird ein Standard-Bild für deine Kategorie verwendet."
+        />
+
+        <label className="tool-form-field">
+          <span>Name *</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => markFieldTouched("name")}
+            placeholder="z.B. Akku-Bohrmaschine"
+            maxLength={100}
+            className={showFieldError("name") ? "input-invalid" : undefined}
+            aria-invalid={showFieldError("name")}
           />
+          <small>Kurz und konkret, z.B. Akku-Bohrmaschine DeWalt 18V</small>
+          {showFieldError("name") && <p className="field-error">{formErrors.name}</p>}
+        </label>
 
-          {/* Name */}
-          <Field label="Name" hint="Kurz und konkret, z.B. Akku-Bohrmaschine DeWalt 18V">
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onBlur={() => markFieldTouched("name")}
-              placeholder="z.B. Akku-Bohrmaschine 18V"
-              maxLength={100}
-              className={showFieldError("name") ? "input-invalid" : undefined}
-              aria-invalid={showFieldError("name")}
-            />
-            {showFieldError("name") && <p className="field-error">{formErrors.name}</p>}
-          </Field>
-
-          {/* Beschreibung */}
-          <Field label="Beschreibung" hint="Zustand, Lieferumfang, besondere Hinweise. Schreib alles auf, was potenzielle Nutzer wissen sollten!">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onBlur={() => markFieldTouched("description")}
-              placeholder="z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, Ladegerät. Besonderheiten: sehr leise, eingebaute LED"
-              maxLength={1000}
-              minLength={5}
-              rows={5}
-              style={{ minHeight: "150px" }}
-              className={showFieldError("description") ? "input-invalid" : undefined}
-              aria-invalid={showFieldError("description")}
-            />
-            {showFieldError("description") && <p className="field-error">{formErrors.description}</p>}
-            <p style={{ fontSize: "0.85em", color: "#666" }}>
-              {description.length}/1000 Zeichen
-            </p>
-          </Field>
-
-          {/* Kategorie */}
-          <CategorySelect
-            value={category}
-            onChange={setCategory}
-            onBlur={() => markFieldTouched("category")}
-            label="Kategorie"
-            hint="Wähle eine passende Kategorie, damit andere dein Werkzeug leicht finden können."
-            hasError={showFieldError("category")}
-            errorMessage={formErrors.category}
+        <label className="tool-form-field">
+          <span className="field-label-row">
+            <span>Beschreibung *</span>
+            <span className="char-count">{description.length}/1000 Zeichen</span>
+          </span>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onBlur={() => markFieldTouched("description")}
+            placeholder="z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, 1x Ladegerät. Besonderheiten: sehr leise, eingebaute LED"
+            maxLength={1000}
+            minLength={5}
+            rows={5}
+            className={showFieldError("description") ? "input-invalid" : undefined}
+            aria-invalid={showFieldError("description")}
           />
+          <small>Zustand, Lieferumfang, besondere Hinweise. Schreib alles auf, was potenzielle Nutzer wissen sollten!</small>
+          {showFieldError("description") && <p className="field-error">{formErrors.description}</p>}
+        </label>
 
-          {/* Submit Button */}
-          <div className="row" style={{ gap: "12px" }}>
-            <button 
-              type="submit" 
-              disabled={isLoading}
-              style={{ opacity: isLoading ? 0.6 : 1, cursor: isLoading ? "not-allowed" : "pointer" }}
-            >
-              {isLoading ? "Wird gespeichert..." : "✓ Werkzeug einstellen"}
-            </button>
-            <Link to="/tools" className="btn btn-outline">
-              Abbrechen
-            </Link>
-          </div>
-        </form>
-      </Surface>
+        <CategorySelect
+          value={category}
+          onChange={setCategory}
+          onBlur={() => markFieldTouched("category")}
+          label="Kategorie *"
+          hint="Wähle eine passende Kategorie, damit andere dein Werkzeug leicht finden können."
+          hasError={showFieldError("category")}
+          errorMessage={formErrors.category}
+        />
+
+        <label className="tool-form-field">
+          <span>Abholort *</span>
+          <input
+            type="text"
+            value={pickupAddress}
+            onChange={(e) => setPickupAddress(e.target.value)}
+            placeholder="Adresse (mind. 5 Zeichen)"
+            minLength={5}
+          />
+          <small>Gebe die Adresse, an der das Werkzeug abgeholt werden kann, an.</small>
+        </label>
+
+        <div className="new-tool-actions">
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? "Wird gespeichert..." : "Werkzeug einstellen"}
+          </button>
+          <Link to="/tools" className="btn btn-outline">
+            Abbrechen
+          </Link>
+        </div>
+      </form>
     </section>
   );
 }

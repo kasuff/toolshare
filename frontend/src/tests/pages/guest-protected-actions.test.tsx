@@ -74,7 +74,7 @@ describe("Guest protected actions", () => {
           ownerId: "owner-1",
           name: "Holzwerkstatt",
           description: "Mit Betreuung",
-          location: "Muenchen",
+          location: "München",
           maxCapacity: 5,
           imageUrls: [],
           toolIds: []
