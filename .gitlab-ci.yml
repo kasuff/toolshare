@@ -38,7 +38,7 @@ frontend:test:
     - cd frontend
     - npm ci
     - npm run test -- --coverage
-    - node scripts/check-coverage.js frontend/coverage
+    - node ../scripts/check-coverage.js coverage
   only:
     - merge_requests
     - main
@@ -94,7 +94,7 @@ backend:test:
     - npm ci
     - npx prisma db push
     - npm run test -- --coverage
-    - node scripts/check-coverage.js backend/coverage
+    - node ../scripts/check-coverage.js coverage
   only:
     - merge_requests
     - main
