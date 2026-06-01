@@ -663,7 +663,7 @@ function formatDateTime(value?: string) {
 
 function getPendingProposal(booking: Booking): PickupProposal | null {
   const pending = (booking.pickupProposals ?? []).filter((p) => p.status === "PENDING");
-  return pending.at(-1) ?? null;
+  return pending.length > 0 ? pending[pending.length - 1] ?? null : null;
 }
 
 function getEffectivePickupIso(booking: Booking): string | undefined {
