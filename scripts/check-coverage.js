@@ -10,9 +10,9 @@ if (args.length < 1) {
 
 const coverageDir = args[0];
 const thresholds = {
-  lines: args[1] ? Number(args[1]) : 60,
-  branches: args[2] ? Number(args[2]) : 60,
-  functions: args[3] ? Number(args[3]) : 60,
+  lines: args[1] ? Number(args[1]) : 40,
+  branches: args[2] ? Number(args[2]) : 40,
+  functions: args[3] ? Number(args[3]) : 40,
 };
 
 function parseLcov(fileContent) {

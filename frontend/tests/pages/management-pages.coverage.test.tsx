@@ -11,6 +11,7 @@ const {
   pushToast,
   getCurrentUser,
   createTool,
+  validateAddress,
   listUsers,
   getMetrics,
   updateUserRole,
@@ -23,6 +24,7 @@ const {
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
   createTool: vi.fn(),
+  validateAddress: vi.fn(),
   listUsers: vi.fn(),
   getMetrics: vi.fn(),
   updateUserRole: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock("../../src/services/api", () => ({
   api: {
     getCurrentUser,
     createTool,
+    validateAddress,
     listUsers,
     getMetrics,
     updateUserRole,
@@ -182,6 +185,11 @@ describe("management pages", () => {
       role: "NUTZER",
       isSuspended: false
     });
+    validateAddress.mockResolvedValueOnce({
+      isValid: true,
+      normalizedAddress: "Musterstraße 5, 80331 München, Deutschland",
+      normalizedParts: null
+    });
     createTool.mockResolvedValueOnce({ id: "tool-1" });
 
     const { container } = render(
@@ -207,6 +215,12 @@ describe("management pages", () => {
     });
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
 
+    fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
+    fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "München" } });
+    fireEvent.change(screen.getByPlaceholderText("Land"), { target: { value: "Deutschland" } });
+
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(fileInput, {
       target: { files: [new File(["image"], "tool.png", { type: "image/png" })] }
@@ -220,6 +234,7 @@ describe("management pages", () => {
           name: "Akkuschrauber",
           description: "Sehr gut erhalten",
           category: "holz",
+          pickupLocation: "Musterstraße 5, 80331 München, Deutschland",
           imageUrl: "data:image/png;base64,mock-file"
         }),
         "token-123"
