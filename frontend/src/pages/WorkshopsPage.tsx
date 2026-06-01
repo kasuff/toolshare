@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { EmptyState, Field, SkeletonCards, Surface } from "../components/ui";
-import { WORKSHOP_EQUIPMENT } from "../components/WorkshopEquipmentSelect";
+import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
 import { TOOL_CATEGORIES } from "../utils/categories";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";

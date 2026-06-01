@@ -50,7 +50,7 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
           setSelectedWorkshop(ownedWorkshops[0]);
           setSlots(sortSlots(ownedWorkshops[0].slots || []));
         }
-      } catch (error) {
+      } catch {
         pushToast("Werkstätten konnten nicht geladen werden.", "error");
       } finally {
         setLoading(false);
