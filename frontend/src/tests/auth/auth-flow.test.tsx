@@ -81,13 +81,16 @@ describe("Authentication user journey", () => {
     renderApp("/auth");
 
     fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
       target: { value: "Muster" }
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
+    await screen.findByText("Vorschläge - klicken zum Übernehmen");
 
-    expect(screen.getByDisplayValue("Musterstrasse")).toBeInTheDocument();
+    fireEvent.mouseDown(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
+
+    expect(await screen.findByDisplayValue("Musterstrasse")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
     expect(screen.getByDisplayValue("80802")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Muenchen")).toBeInTheDocument();
@@ -99,6 +102,7 @@ describe("Authentication user journey", () => {
 
     renderApp("/auth");
     fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
       target: { value: "zzz" }
     });

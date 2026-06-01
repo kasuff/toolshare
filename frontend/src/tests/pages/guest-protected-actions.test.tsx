@@ -107,7 +107,7 @@ describe("Guest protected actions", () => {
 
     renderWithRoutes(<WorkshopsPage />, "/workshops");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Holzwerkstatt" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Holzwerkstatt/i }));
     fireEvent.click(await screen.findByRole("button", { name: "Login" }));
 
     expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
