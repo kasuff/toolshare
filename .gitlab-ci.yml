@@ -148,7 +148,7 @@ backend:build:
 deploy:production:
   stage: deploy
   tags:
-    - self-hosted
+    - server
     - deploy
   needs:
     - frontend:build

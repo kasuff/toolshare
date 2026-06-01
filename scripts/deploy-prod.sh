@@ -5,12 +5,29 @@ COMPOSE_FILE="docker-compose.prod.yml"
 HEALTHCHECK_TIMEOUT_SECONDS="${HEALTHCHECK_TIMEOUT_SECONDS:-180}"
 HEALTHCHECK_INTERVAL_SECONDS="${HEALTHCHECK_INTERVAL_SECONDS:-5}"
 
+compose_cmd() {
+	if command -v docker-compose >/dev/null 2>&1; then
+		echo "docker-compose"
+		return 0
+	fi
+
+	if docker compose version >/dev/null 2>&1; then
+		echo "docker compose"
+		return 0
+	fi
+
+	echo "Neither docker-compose nor docker compose is available" >&2
+	return 1
+}
+
 wait_for_containers() {
 	echo "Waiting for containers to become healthy/running..."
 
 	local elapsed=0
 	local container_ids
-	container_ids="$(docker-compose -f "$COMPOSE_FILE" ps -q)"
+	local compose
+	compose="$(compose_cmd)"
+	container_ids="$($compose -f "$COMPOSE_FILE" ps -q)"
 
 	if [ -z "$container_ids" ]; then
 		echo "No containers found for compose file: $COMPOSE_FILE"
@@ -63,7 +80,7 @@ wait_for_containers() {
 	done
 
 	echo "Timed out waiting for container health checks"
-	docker-compose -f "$COMPOSE_FILE" ps
+	$compose -f "$COMPOSE_FILE" ps
 	return 1
 }
 
@@ -76,13 +93,14 @@ git pull origin main
 # The -d flag runs the containers in the background
 # --no-deps prevents docker-compose from recreating dependencies (like the database)
 # --build forces a rebuild of the images
-docker-compose -f "$COMPOSE_FILE" up -d --build
+COMPOSE="$(compose_cmd)"
+$COMPOSE -f "$COMPOSE_FILE" up -d --build
 wait_for_containers
 
 # Optional: Run database migrations if you have them
 # This command assumes your backend service is named 'backend' in the docker-compose file
 # and that you have a script for migrations in your package.json
-docker-compose -f "$COMPOSE_FILE" exec -T backend npm run prisma:migrate
+$COMPOSE -f "$COMPOSE_FILE" exec -T backend npm run prisma:migrate
 
 # Run health check again after migrations in case app restarts internally.
 wait_for_containers
