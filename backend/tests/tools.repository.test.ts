@@ -48,7 +48,8 @@ describe("toolsRepository", () => {
         OR: [
           { name: { contains: "bohr", mode: "insensitive" } },
           { description: { contains: "bohr", mode: "insensitive" } },
-          { category: { contains: "bohr", mode: "insensitive" } }
+          { category: { contains: "bohr", mode: "insensitive" } },
+          { pickupLocation: { contains: "bohr", mode: "insensitive" } }
         ]
       },
       include: {
@@ -104,7 +105,9 @@ describe("toolsRepository", () => {
       name: "Bohrer",
       description: "desc",
       category: "Elektro",
-      imageUrl: "https://example.com/tool.png"
+      imageUrl: "https://example.com/tool.png",
+      pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+      pickupLocationNote: "4. Stock"
     });
     const updated = await toolsRepository.update("t2", { name: "Neu" });
     const removed = await toolsRepository.remove("t2");
@@ -116,6 +119,8 @@ describe("toolsRepository", () => {
         description: "desc",
         category: "Elektro",
         imageUrl: "https://example.com/tool.png",
+        pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+        pickupLocationNote: "4. Stock",
         status: "AVAILABLE"
       }
     });

@@ -152,7 +152,9 @@ describe("Controller route integration coverage", () => {
           name: "Bohrmaschine",
           description: "Leistungsstarkes Werkzeug",
           category: "Elektro",
-          imageUrl: "https://example.com/tool.png"
+          imageUrl: "https://example.com/tool.png",
+          pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+          pickupLocationNote: "4. Stock"
         });
 
       const updateResponse = await request(app)
@@ -174,7 +176,9 @@ describe("Controller route integration coverage", () => {
         name: "Bohrmaschine",
         description: "Leistungsstarkes Werkzeug",
         category: "Elektro",
-        imageUrl: "https://example.com/tool.png"
+        imageUrl: "https://example.com/tool.png",
+        pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+        pickupLocationNote: "4. Stock"
       });
       expect(mockedToolsService.update).toHaveBeenCalledWith({
         toolId: TOOL_ID,
@@ -185,6 +189,8 @@ describe("Controller route integration coverage", () => {
           description: "Aktualisierte Beschreibung",
           category: undefined,
           imageUrl: undefined,
+          pickupLocation: undefined,
+          pickupLocationNote: undefined,
           status: undefined
         }
       });
