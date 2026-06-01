@@ -8,6 +8,7 @@ import {
   createWorkshopSchema,
   listWorkshopsSchema,
   removeTimeslotSchema,
+  updateTimeslotSchema,
   updateWorkshopSchema,
   workshopIdParamSchema
 } from "./workshops.schema";
@@ -45,6 +46,13 @@ workshopsRouter.post(
   requireRole("MANAGER", "USER"),
   validate(createTimeslotSchema),
   workshopsController.createTimeslot
+);
+workshopsRouter.patch(
+  "/:id/timeslots/:timeslotId",
+  requireAuth,
+  requireRole("MANAGER", "USER"),
+  validate(updateTimeslotSchema),
+  workshopsController.updateTimeslot
 );
 workshopsRouter.delete(
   "/:id/timeslots/:timeslotId",

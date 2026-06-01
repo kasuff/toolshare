@@ -35,7 +35,7 @@ export function DashboardPage() {
         <h1>Finde Werkzeuge und Werkstätten in deiner Community.</h1>
         <p>
           Toolshare verbindet Nachfrage und Angebot für lokale Projekte. Buche verfügbare
-          Ressourcen, entscheide Anfragen in der Inbox und verwalte deine Angebote in wenigen Klicks.
+          Ressourcen, entscheide Anfragen über die Glocke oben rechts und verwalte deine Angebote in wenigen Klicks.
         </p>
         <div className="row">
           <ButtonLink to="/tools">
@@ -74,13 +74,12 @@ export function DashboardPage() {
             <span className="card-arrow">→</span>
           </Link>
 
-          {/* Inbox Card */}
           <Link to="/inbox" className="quick-start-card">
             <div className="card-icon inbox-icon">
               <InboxBubbleIcon />
             </div>
-            <h3>Anfragen verwalten</h3>
-            <p>Status, Benachrichtigungen und Entscheidungen zentral in der Inbox.</p>
+            <h3>Nachrichten & Anfragen</h3>
+            <p>Zur Inbox für Konversationen und Ausleihanfragen – die Glocke oben rechts geht ebenfalls dorthin.</p>
             <span className="card-arrow">→</span>
           </Link>
         </div>

@@ -1,4 +1,4 @@
-import type { Booking, BookingStatus, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import type { Booking, BookingStatus, PickupProposal, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 
 interface FrontendImportMetaEnv {
@@ -70,7 +70,38 @@ type BackendWorkshop = {
   description: string;
   location: string;
   maxCapacity: number;
-  timeslots?: Array<{ id: string; workshopId: string; startTime: string; endTime: string }>;
+  equipment?: string[];
+  extras?: string[];
+  imageUrls?: string[];
+  workshopTools?: BackendWorkshopTool[];
+  timeslots?: BackendWorkshopTimeslot[];
+};
+
+type BackendWorkshopTool = {
+  id: string;
+  workshopId?: string;
+  name: string;
+  category: string;
+};
+
+type BackendWorkshopTimeslot = {
+  id: string;
+  workshopId: string;
+  startTime: string;
+  endTime: string;
+  blockedByOwner?: boolean;
+};
+
+type BackendPickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
+
+type BackendPickupProposal = {
+  id: string;
+  bookingId: string;
+  proposedByUserId: string;
+  proposedPickupTime: string;
+  previousPickupTime: string | null;
+  status: BackendPickupProposalStatus;
+  createdAt: string;
 };
 
 type BackendBooking = {
@@ -82,7 +113,21 @@ type BackendBooking = {
   endDate: string;
   pickupTime?: string | null;
   status: BackendBookingStatus;
-  tool?: { ownerId: string } | null;
+  user?: BackendUser | null;
+  tool?: (BackendTool & { owner?: BackendUser | null }) | null;
+  timeslot?: {
+    id: string;
+    workshopId: string;
+    startTime: string;
+    endTime: string;
+    workshop?: {
+      id: string;
+      name: string;
+      managerId: string;
+      manager?: BackendUser | null;
+    } | null;
+  } | null;
+  pickupProposals?: BackendPickupProposal[];
 };
 
 const roleMap: Record<BackendRole, User["role"]> = {
@@ -203,6 +248,7 @@ function mapTool(tool: BackendTool): Tool {
 }
 
 function mapWorkshop(workshop: BackendWorkshop): Workshop {
+  const extras = workshop.extras ?? workshop.equipment ?? [];
   return {
     id: workshop.id,
     ownerId: workshop.managerId,
@@ -210,34 +256,73 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
     description: workshop.description,
     location: workshop.location,
     maxCapacity: workshop.maxCapacity,
-    imageUrls: [DEFAULT_PLACEHOLDER_IMAGE],
+    extras,
+    equipmentItems: (workshop.workshopTools ?? []).map((tool) => ({
+      id: tool.id,
+      name: tool.name,
+      category: tool.category
+    })),
+    imageUrls: workshop.imageUrls && workshop.imageUrls.length > 0 ? workshop.imageUrls : [DEFAULT_PLACEHOLDER_IMAGE],
     toolIds: []
   };
 }
 
-function mapWorkshopSlot(slot: { id: string; workshopId: string; startTime: string; endTime: string }): WorkshopSlot {
+function mapWorkshopSlot(slot: BackendWorkshopTimeslot): WorkshopSlot {
   return {
     id: slot.id,
     workshopId: slot.workshopId,
     startIso: toLocalDateTimeInputValue(slot.startTime),
     endIso: toLocalDateTimeInputValue(slot.endTime),
-    blockedByOwner: false
+    blockedByOwner: Boolean(slot.blockedByOwner)
+  };
+}
+
+function mapPickupProposal(p: BackendPickupProposal): PickupProposal {
+  return {
+    id: p.id,
+    proposedById: p.proposedByUserId,
+    proposedPickupIso: p.proposedPickupTime,
+    previousPickupIso: p.previousPickupTime ?? undefined,
+    status: p.status,
+    createdIso: p.createdAt
   };
 }
 
 function mapBooking(booking: BackendBooking): Booking {
+  const tool = booking.tool;
+  const workshop = booking.timeslot?.workshop;
+
+  const providerId = tool?.ownerId ?? workshop?.managerId ?? "";
+  const requesterName = booking.user?.name;
+  const providerName = tool?.owner?.name ?? workshop?.manager?.name;
+
+  let toolName: string | undefined;
+  let toolImageUrl: string | undefined;
+  if (tool) {
+    toolName = tool.name;
+    toolImageUrl = tool.imageUrl ?? undefined;
+  } else if (workshop) {
+    toolName = workshop.name;
+  }
+
   return {
     id: booking.id,
     type: booking.toolId ? "TOOL" : "WORKSHOP",
     requesterId: booking.userId,
-    providerId: booking.tool?.ownerId ?? "",
+    providerId,
     toolId: booking.toolId ?? undefined,
+    workshopId: workshop?.id,
     slotId: booking.timeslotId ?? undefined,
     startIso: booking.startDate,
     endIso: booking.endDate,
     pickupTimeIso: booking.pickupTime ?? undefined,
     status: bookingStatusMap[booking.status],
-    createdIso: booking.startDate
+    createdIso: booking.startDate,
+    requesterName,
+    providerName,
+    toolName,
+    toolImageUrl,
+    pickupProposals: (booking.pickupProposals ?? []).map(mapPickupProposal)
   };
 }
 
@@ -419,8 +504,25 @@ export const api = {
     return withSlots;
   },
 
+  async getWorkshopById(workshopId: string, token: string): Promise<{ workshop: Workshop; slots: WorkshopSlot[] }> {
+    const detail = await request<BackendWorkshop>(`/workshops/${workshopId}`, undefined, token);
+    return {
+      workshop: mapWorkshop(detail),
+      slots: (detail.timeslots ?? []).map(mapWorkshopSlot)
+    };
+  },
+
   async createWorkshop(
-    input: { name: string; description: string; location: string; maxCapacity: number; slots: Array<{ startIso: string; endIso: string }> },
+    input: {
+      name: string;
+      description: string;
+      location: string;
+      maxCapacity: number;
+      extras?: string[];
+      equipmentItems?: Array<{ name: string; category: string }>;
+      imageUrls?: string[];
+      slots: Array<{ startIso: string; endIso: string; blockedByOwner?: boolean }>;
+    },
     token: string
   ) {
     const workshop = await request<BackendWorkshop>(
@@ -431,7 +533,13 @@ export const api = {
           name: input.name,
           description: input.description,
           location: input.location,
-          maxCapacity: input.maxCapacity
+          maxCapacity: input.maxCapacity,
+          extras: input.extras ?? [],
+          workshopTools: (input.equipmentItems ?? []).map((tool) => ({
+            name: tool.name,
+            category: tool.category
+          })),
+          imageUrls: input.imageUrls ?? []
         })
       },
       token
@@ -445,7 +553,8 @@ export const api = {
             method: "POST",
             body: JSON.stringify({
               startTime: new Date(slot.startIso).toISOString(),
-              endTime: new Date(slot.endIso).toISOString()
+              endTime: new Date(slot.endIso).toISOString(),
+              blockedByOwner: Boolean(slot.blockedByOwner)
             })
           },
           token
@@ -454,6 +563,93 @@ export const api = {
     );
 
     return mapWorkshop(workshop);
+  },
+
+  async updateWorkshop(
+    workshopId: string,
+    input: {
+      name: string;
+      description?: string;
+      location: string;
+      maxCapacity: number;
+      extras?: string[];
+      equipmentItems?: Array<{ name: string; category: string }>;
+      imageUrls?: string[];
+    },
+    token: string
+  ): Promise<Workshop> {
+    const updated = await request<BackendWorkshop>(
+      `/workshops/${workshopId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: input.name,
+          description: input.description,
+          location: input.location,
+          maxCapacity: input.maxCapacity,
+          extras: input.extras ?? [],
+          workshopTools: (input.equipmentItems ?? []).map((tool) => ({
+            name: tool.name,
+            category: tool.category
+          })),
+          imageUrls: input.imageUrls ?? []
+        })
+      },
+      token
+    );
+    return mapWorkshop(updated);
+  },
+
+  async createWorkshopTimeslot(
+    workshopId: string,
+    input: { startIso: string; endIso: string; blockedByOwner?: boolean },
+    token: string
+  ): Promise<WorkshopSlot> {
+    const created = await request<BackendWorkshopTimeslot>(
+      `/workshops/${workshopId}/timeslots`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          startTime: new Date(input.startIso).toISOString(),
+          endTime: new Date(input.endIso).toISOString(),
+          blockedByOwner: Boolean(input.blockedByOwner)
+        })
+      },
+      token
+    );
+    return mapWorkshopSlot(created);
+  },
+
+  async updateWorkshopTimeslot(
+    workshopId: string,
+    timeslotId: string,
+    input: { startIso?: string; endIso?: string; blockedByOwner?: boolean },
+    token: string
+  ): Promise<WorkshopSlot> {
+    const payload: { startTime?: string; endTime?: string; blockedByOwner?: boolean } = {};
+    if (input.startIso) payload.startTime = new Date(input.startIso).toISOString();
+    if (input.endIso) payload.endTime = new Date(input.endIso).toISOString();
+    if (typeof input.blockedByOwner === "boolean") payload.blockedByOwner = input.blockedByOwner;
+
+    const updated = await request<BackendWorkshopTimeslot>(
+      `/workshops/${workshopId}/timeslots/${timeslotId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      },
+      token
+    );
+    return mapWorkshopSlot(updated);
+  },
+
+  async deleteWorkshopTimeslot(workshopId: string, timeslotId: string, token: string) {
+    await request<void>(
+      `/workshops/${workshopId}/timeslots/${timeslotId}`,
+      {
+        method: "DELETE"
+      },
+      token
+    );
   },
 
   async createWorkshopBooking(input: { slotId: string }, token: string) {
@@ -479,6 +675,37 @@ export const api = {
       {
         method: "PATCH",
         body: JSON.stringify({ status: bookingStatusReverseMap[status] })
+      },
+      token
+    );
+  },
+
+  async createPickupProposal(bookingId: string, pickupTimeIso: string, token: string) {
+    const d = new Date(pickupTimeIso);
+    if (Number.isNaN(d.getTime())) {
+      throw new Error("Ungültige Abholzeit.");
+    }
+    await request(
+      `/bookings/${bookingId}/pickup-proposals`,
+      {
+        method: "POST",
+        body: JSON.stringify({ pickupTime: d.toISOString() })
+      },
+      token
+    );
+  },
+
+  async respondPickupProposal(
+    bookingId: string,
+    proposalId: string,
+    decision: "ACCEPT" | "DECLINE",
+    token: string
+  ) {
+    await request(
+      `/bookings/${bookingId}/pickup-proposals/${proposalId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ decision })
       },
       token
     );

@@ -23,7 +23,10 @@ export const workshopsController = {
       name: req.body.name,
       description: req.body.description,
       location: req.body.location,
-      maxCapacity: req.body.maxCapacity
+      maxCapacity: req.body.maxCapacity,
+      extras: req.body.extras ?? req.body.equipment,
+      workshopTools: req.body.workshopTools,
+      imageUrls: req.body.imageUrls
     });
     res.status(201).json(workshop);
   }),
@@ -37,7 +40,10 @@ export const workshopsController = {
         name: req.body.name,
         description: req.body.description,
         location: req.body.location,
-        maxCapacity: req.body.maxCapacity
+        maxCapacity: req.body.maxCapacity,
+        extras: req.body.extras ?? req.body.equipment,
+        workshopTools: req.body.workshopTools,
+        imageUrls: req.body.imageUrls
       }
     });
     res.status(200).json(workshop);
@@ -58,9 +64,23 @@ export const workshopsController = {
       managerId: req.authUser!.userId,
       actorRole: req.authUser!.role,
       startTime: req.body.startTime,
-      endTime: req.body.endTime
+      endTime: req.body.endTime,
+      blockedByOwner: req.body.blockedByOwner
     });
     res.status(201).json(timeslot);
+  }),
+
+  updateTimeslot: asyncHandler(async (req: Request, res: Response) => {
+    const timeslot = await workshopsService.updateTimeslot({
+      workshopId: req.params.id,
+      timeslotId: req.params.timeslotId,
+      managerId: req.authUser!.userId,
+      actorRole: req.authUser!.role,
+      startTime: req.body.startTime,
+      endTime: req.body.endTime,
+      blockedByOwner: req.body.blockedByOwner
+    });
+    res.status(200).json(timeslot);
   }),
 
   removeTimeslot: asyncHandler(async (req: Request, res: Response) => {

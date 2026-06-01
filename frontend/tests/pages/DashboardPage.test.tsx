@@ -51,6 +51,7 @@ describe("DashboardPage", () => {
     );
 
     expect(await screen.findByRole("link", { name: /Akkuschrauber Bosch/i })).toHaveAttribute("href", "/tools/t1");
+    expect(screen.getByRole("link", { name: /Nachrichten & Anfragen/i })).toHaveAttribute("href", "/inbox");
     expect(screen.getByText("Werkzeuge")).toBeInTheDocument();
     expect(screen.getByText("Verfügbare Werkstätten")).toBeInTheDocument();
     expect(screen.getByText("Holzwerkstatt")).toBeInTheDocument();

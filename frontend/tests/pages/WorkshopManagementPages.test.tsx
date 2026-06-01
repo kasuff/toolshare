@@ -1,0 +1,163 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "../../src/hooks/useToast";
+import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
+import { EditWorkshopPage } from "../../src/pages/EditWorkshopPage";
+import type { User } from "../../src/types/domain";
+
+const { createWorkshop, getWorkshopById, updateWorkshop } = vi.hoisted(() => ({
+  createWorkshop: vi.fn(),
+  getWorkshopById: vi.fn(),
+  updateWorkshop: vi.fn()
+}));
+
+vi.mock("../../src/services/api", () => ({
+  api: {
+    createWorkshop,
+    getWorkshopById,
+    updateWorkshop
+  }
+}));
+
+class FileReaderMock {
+  public onload: ((event: { target: { result: string } }) => void) | null = null;
+
+  readAsDataURL() {
+    this.onload?.({
+      target: {
+        result: "data:image/png;base64,mock-photo"
+      }
+    });
+  }
+}
+
+const currentUser: User = {
+  id: "owner-1",
+  name: "Lea",
+  email: "lea@example.com",
+  role: "NUTZER",
+  isSuspended: false
+};
+
+describe("Workshop management pages", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("FileReader", FileReaderMock as unknown as typeof FileReader);
+  });
+
+  it("creates workshop with extras, workshop tools and slot payload", async () => {
+    createWorkshop.mockResolvedValueOnce({ id: "workshop-1" });
+
+    const { container } = render(
+      <ToastProvider>
+        <MemoryRouter>
+          <NewWorkshopPage token="token-123" currentUser={currentUser} />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Name"), {
+      target: { value: "Makerspace Nord" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("Adresse oder Gebiet"), {
+      target: { value: "Muenchen Nord" }
+    });
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
+    fireEvent.change(screen.getByPlaceholderText("Werkzeugname (z.B. Bosch Akkuschrauber)"), {
+      target: { value: "Tischkreissaege" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Werkzeug hinzufügen" }));
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /WLAN/i }));
+
+    const fileInput = container.querySelector("input[type=\"file\"]") as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["dummy"], "werkstatt.png", { type: "image/png" })]
+      }
+    });
+    await screen.findByText("1 von 3 Fotos");
+
+    fireEvent.click(screen.getByRole("button", { name: "Schritt 1 von 3" }));
+
+    fireEvent.change(screen.getByLabelText("Startzeit"), {
+      target: { value: "2026-07-01T09:00" }
+    });
+    fireEvent.change(screen.getByLabelText("Endzeit"), {
+      target: { value: "2026-07-01T12:00" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt veröffentlichen" }));
+
+    await waitFor(() => expect(createWorkshop).toHaveBeenCalledTimes(1));
+
+    const [payload, token] = createWorkshop.mock.calls[0] as [Record<string, unknown>, string];
+    expect(token).toBe("token-123");
+    expect(payload).toMatchObject({
+      name: "Makerspace Nord",
+      location: "Muenchen Nord",
+      maxCapacity: 2,
+      extras: ["wlan"],
+      equipmentItems: [{ name: "Tischkreissaege", category: "holz" }],
+      slots: [{ startIso: "2026-07-01T09:00", endIso: "2026-07-01T12:00", blockedByOwner: false }]
+    });
+    expect((payload.imageUrls as string[])[0]).toContain("data:image/png;base64,mock-photo");
+  });
+
+  it("loads and updates existing workshop details", async () => {
+    getWorkshopById.mockResolvedValueOnce({
+      workshop: {
+        id: "workshop-1",
+        ownerId: "owner-1",
+        name: "Alte Werkstatt",
+        description: "Werkstatt",
+        location: "Muenchen Ost",
+        maxCapacity: 5,
+        extras: ["starkstrom"],
+        equipmentItems: [{ id: "tool-1", name: "Akkuschrauber", category: "elektro" }],
+        imageUrls: ["data:image/png;base64,existing"],
+        toolIds: []
+      },
+      slots: []
+    });
+    updateWorkshop.mockResolvedValueOnce({
+      id: "workshop-1"
+    });
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/workshops/workshop-1/edit"]}>
+          <Routes>
+            <Route
+              path="/workshops/:id/edit"
+              element={<EditWorkshopPage token="token-456" currentUser={currentUser} />}
+            />
+            <Route path="/workshops" element={<div>Workshops Home</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByDisplayValue("Alte Werkstatt")).toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue("Alte Werkstatt"), {
+      target: { value: "Neue Werkstatt" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
+
+    await waitFor(() => expect(updateWorkshop).toHaveBeenCalledTimes(1));
+    expect(updateWorkshop).toHaveBeenCalledWith(
+      "workshop-1",
+      expect.objectContaining({
+        name: "Neue Werkstatt",
+        location: "Muenchen Ost",
+        maxCapacity: 5,
+        extras: ["starkstrom"],
+        equipmentItems: [{ name: "Akkuschrauber", category: "elektro" }],
+        imageUrls: ["data:image/png;base64,existing"]
+      }),
+      "token-456"
+    );
+  });
+});

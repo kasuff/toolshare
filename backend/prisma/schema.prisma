@@ -34,6 +34,12 @@ enum ReportStatus {
   REJECTED
 }
 
+enum PickupProposalStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
 model User {
   id            String         @id @default(uuid())
   email         String         @unique
@@ -50,6 +56,7 @@ model User {
   reports       Report[]       @relation("ReporterReports")
   ratingsGiven  Rating[]       @relation("RatingsGiven")
   ratingsReceived Rating[]     @relation("RatingsReceived")
+  pickupProposalsAuthored BookingPickupProposal[] @relation("PickupProposalAuthor")
 }
 
 model Tool {
@@ -72,8 +79,22 @@ model Workshop {
   description String
   location    String
   maxCapacity Int
+  equipment   String[]   @default([])
+  imageUrls   String[]   @default([])
   manager     User       @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  workshopTools WorkshopTool[]
   timeslots   TimeSlot[]
+}
+
+model WorkshopTool {
+  id         String   @id @default(uuid())
+  workshopId String
+  name       String
+  category   String
+  workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId])
+  @@index([category])
 }
 
 model TimeSlot {
@@ -81,6 +102,7 @@ model TimeSlot {
   workshopId String
   startTime  DateTime
   endTime    DateTime
+  blockedByOwner Boolean @default(false)
   workshop   Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
   bookings   Booking[]
 }
@@ -99,9 +121,24 @@ model Booking {
   timeslot   TimeSlot?     @relation(fields: [timeslotId], references: [id], onDelete: SetNull)
   reports    Report[]
   ratings    Rating[]
+  pickupProposals BookingPickupProposal[]
 
   @@index([toolId, startDate, endDate])
   @@index([timeslotId])
+}
+
+model BookingPickupProposal {
+  id                 String               @id @default(uuid())
+  bookingId          String
+  proposedByUserId   String
+  proposedPickupTime DateTime
+  previousPickupTime DateTime?
+  status             PickupProposalStatus @default(PENDING)
+  createdAt          DateTime             @default(now())
+  booking            Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  proposedBy         User                 @relation("PickupProposalAuthor", fields: [proposedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
 }
 
 model Rating {

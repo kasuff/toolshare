@@ -85,7 +85,7 @@ describe("Authentication user journey", () => {
     await user.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
     await user.type(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), "Muster");
 
-    await user.click(await screen.findByRole("button", { name: /Musterstraße 10/i }));
+    await user.click(await screen.findByRole("button", { name: /Muster/i }));
 
     expect(screen.getByDisplayValue("Musterstraße")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
