@@ -2,6 +2,7 @@ stages:
   - lint
   - test
   - build
+  - deploy
   - pages
 
 
@@ -38,7 +39,8 @@ frontend:test:
     - cd frontend
     - npm ci
     - npm run test -- --coverage
-    - node ../scripts/check-coverage.js coverage
+    - cd ..
+    - node scripts/check-coverage.js coverage
   only:
     - merge_requests
     - main
@@ -94,7 +96,8 @@ backend:test:
     - npm ci
     - npx prisma db push
     - npm run test -- --coverage
-    - node ../scripts/check-coverage.js coverage
+    - cd ..
+    - node scripts/check-coverage.js coverage
   only:
     - merge_requests
     - main
@@ -141,6 +144,24 @@ backend:build:
   cache:
     paths:
       - backend/node_modules/
+
+# === DEPLOY JOB ===
+
+deploy:production:
+  stage: deploy
+  tags:
+    - self-hosted
+    - deploy
+  needs:
+    - frontend:build
+    - backend:build
+  only:
+    - main
+  environment:
+    name: production
+  script:
+    - chmod +x scripts/deploy-prod.sh
+    - ./scripts/deploy-prod.sh
 
 # === PAGES JOB ===
 
@@ -620,6 +641,7 @@ pages:
         PAGES_URL: "$CI_PAGES_URL/"
         PAGES_ENV_NAME: "pages/main"
   pages:
+    expire_in: never
     path_prefix: "$PAGES_PREFIX"
   environment:
     name: $PAGES_ENV_NAME
