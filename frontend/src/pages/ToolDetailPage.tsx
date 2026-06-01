@@ -150,6 +150,16 @@ export function ToolDetailPage({ token, currentUser: _currentUser }: Props) {
 
           <p className="tool-description">{tool.description}</p>
 
+          <div className="owner-card">
+            <h3>Abholort</h3>
+            <div className="owner-details">
+              <div className="owner-info">
+                <div className="owner-name">{tool.pickupLocation || "Nicht angegeben"}</div>
+                {tool.pickupLocationNote && <div className="owner-meta">Hinweis: {tool.pickupLocationNote}</div>}
+              </div>
+            </div>
+          </div>
+
           {/* Owner Card */}
           <div className="owner-card">
             <h3>Anbieter</h3>

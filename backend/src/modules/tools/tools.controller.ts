@@ -24,7 +24,9 @@ export const toolsController = {
       name: req.body.name,
       description: req.body.description,
       category: req.body.category,
-      imageUrl: req.body.imageUrl
+      imageUrl: req.body.imageUrl,
+      pickupLocation: req.body.pickupLocation,
+      pickupLocationNote: req.body.pickupLocationNote
     });
     res.status(201).json(tool);
   }),
@@ -39,6 +41,8 @@ export const toolsController = {
         description: req.body.description,
         category: req.body.category,
         imageUrl: req.body.imageUrl,
+        pickupLocation: req.body.pickupLocation,
+        pickupLocationNote: req.body.pickupLocationNote,
         status: req.body.status
       }
     });

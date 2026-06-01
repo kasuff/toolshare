@@ -30,6 +30,8 @@ export interface Tool {
   description: string;
   category: string;
   imageUrl: string;
+  pickupLocation?: string;
+  pickupLocationNote?: string;
   status: ToolStatus;
 }
 

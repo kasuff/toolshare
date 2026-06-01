@@ -60,6 +60,8 @@ type BackendTool = {
   description: string;
   category: string;
   imageUrl?: string | null;
+  pickupLocation?: string | null;
+  pickupLocationNote?: string | null;
   status: BackendToolStatus;
 };
 
@@ -243,7 +245,9 @@ function mapTool(tool: BackendTool): Tool {
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE
+    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE,
+    pickupLocation: tool.pickupLocation ?? "",
+    pickupLocationNote: tool.pickupLocationNote ?? undefined
   };
 }
 
@@ -456,14 +460,24 @@ export const api = {
   },
 
   async createTool(
-    input: { name: string; description: string; category: string; imageUrl?: string },
+    input: {
+      name: string;
+      description: string;
+      category: string;
+      imageUrl?: string;
+      pickupLocation: string;
+      pickupLocationNote?: string;
+    },
     token: string
   ): Promise<Tool> {
     const created = await request<BackendTool>(
       "/tools",
       {
         method: "POST",
-        body: JSON.stringify(input)
+        body: JSON.stringify({
+          ...input,
+          pickupLocationNote: input.pickupLocationNote?.trim() || undefined
+        })
       },
       token
     );

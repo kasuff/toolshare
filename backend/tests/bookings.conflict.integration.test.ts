@@ -46,7 +46,9 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
       .send({
         name: "Bohrmaschine",
         description: "Leistungsstarke Bohrmaschine",
-        category: "elektro"
+        category: "elektro",
+        pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+        pickupLocationNote: "Klingeln bei Owner"
       });
     expect(toolResponse.status).toBe(201);
     toolId = toolResponse.body.id as string;
