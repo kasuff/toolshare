@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => ({
   timeSlotCreate: vi.fn(),
   timeSlotFindUnique: vi.fn(),
   timeSlotDelete: vi.fn(),
-  bookingFindFirst: vi.fn()
+  bookingFindFirst: vi.fn(),
+  prismaTransaction: vi.fn()
 }));
 
 vi.mock("../src/config/prisma", () => ({
@@ -31,7 +32,8 @@ vi.mock("../src/config/prisma", () => ({
     },
     booking: {
       findFirst: mocks.bookingFindFirst
-    }
+    },
+    $transaction: mocks.prismaTransaction
   }
 }));
 
@@ -65,6 +67,13 @@ describe("workshopsRepository", () => {
             id: true,
             name: true
           }
+        },
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
         }
       },
       orderBy: { name: "asc" }
@@ -86,6 +95,13 @@ describe("workshopsRepository", () => {
             name: true
           }
         },
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
+        },
         timeslots: {
           orderBy: { startTime: "asc" }
         }
@@ -95,8 +111,18 @@ describe("workshopsRepository", () => {
   });
 
   it("creates, updates and removes workshops", async () => {
-    mocks.workshopCreate.mockResolvedValueOnce({ id: "w2" });
-    mocks.workshopUpdate.mockResolvedValueOnce({ id: "w2", name: "Neu" });
+    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
+      handler({
+        workshopTool: {
+          deleteMany: vi.fn()
+        },
+        workshop: {
+          update: mocks.workshopUpdate
+        }
+      })
+    );
+    mocks.workshopCreate.mockResolvedValueOnce({ id: "w2", workshopTools: [] });
+    mocks.workshopUpdate.mockResolvedValueOnce({ id: "w2", name: "Neu", workshopTools: [] });
     mocks.workshopDelete.mockResolvedValueOnce({ id: "w2" });
 
     const created = await workshopsRepository.create({
@@ -104,7 +130,10 @@ describe("workshopsRepository", () => {
       name: "Werkstatt",
       description: "desc",
       location: "Muenchen",
-      maxCapacity: 4
+      maxCapacity: 4,
+      extras: ["wlan"],
+      workshopTools: [{ name: "Bohrmaschine", category: "holz" }],
+      imageUrls: ["photo.png"]
     });
     const updated = await workshopsRepository.update("w2", { name: "Neu" });
     const removed = await workshopsRepository.remove("w2");
@@ -115,16 +144,39 @@ describe("workshopsRepository", () => {
         name: "Werkstatt",
         description: "desc",
         location: "Muenchen",
-        maxCapacity: 4
+        maxCapacity: 4,
+        equipment: ["wlan"],
+        imageUrls: ["photo.png"],
+        workshopTools: {
+          create: [{ name: "Bohrmaschine", category: "holz" }]
+        }
+      },
+      include: {
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
+        }
       }
     });
     expect(mocks.workshopUpdate).toHaveBeenCalledWith({
       where: { id: "w2" },
-      data: { name: "Neu" }
+      data: { name: "Neu", extras: undefined, workshopTools: undefined, imageUrls: undefined },
+      include: {
+        workshopTools: {
+          select: {
+            id: true,
+            name: true,
+            category: true
+          }
+        }
+      }
     });
     expect(mocks.workshopDelete).toHaveBeenCalledWith({ where: { id: "w2" } });
-    expect(created).toEqual({ id: "w2" });
-    expect(updated).toEqual({ id: "w2", name: "Neu" });
+    expect(created).toMatchObject({ id: "w2" });
+    expect(updated).toMatchObject({ id: "w2", name: "Neu" });
     expect(removed).toEqual({ id: "w2" });
   });
 

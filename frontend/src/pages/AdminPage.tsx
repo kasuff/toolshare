@@ -45,6 +45,7 @@ export function AdminPage({ currentUser, token }: Props) {
   useEffect(() => {
     if (!token) return;
     void loadData(appliedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, appliedSearch]);
 
   const updateRole = async (userId: string, role: "MODERATOR" | "NUTZER") => {

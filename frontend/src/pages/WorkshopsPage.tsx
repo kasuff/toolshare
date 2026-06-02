@@ -2,8 +2,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, Field, SkeletonCards, Surface } from "../components/ui";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
-import { WORKSHOP_EQUIPMENT } from "../components/WorkshopEquipmentSelect";
 import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories";
+import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../utils/searchFilters";
@@ -100,7 +100,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
         const mapped = workshops.map(({ workshop, slots, tools }) => ({
           workshop,
           slots,
-          tools
+          tools: tools ?? workshop.equipmentItems.map((item) => ({
+            id: item.id,
+            ownerId: workshop.ownerId,
+            ownerName: workshop.ownerName,
+            name: item.name,
+            description: "Werkstatt-Werkzeug",
+            category: item.category,
+            imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+            status: "VERFUEGBAR" as const,
+            selectable: true
+          }))
         }));
         setItems(mapped);
       } catch (error) {
