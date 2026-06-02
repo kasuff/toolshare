@@ -1,9 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
-COMPOSE_FILE="docker-compose.prod.yml"
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+COMPOSE_FILE="$REPO_ROOT/docker-compose.prod.yml"
 HEALTHCHECK_TIMEOUT_SECONDS="${HEALTHCHECK_TIMEOUT_SECONDS:-180}"
 HEALTHCHECK_INTERVAL_SECONDS="${HEALTHCHECK_INTERVAL_SECONDS:-5}"
+
+cd "$REPO_ROOT"
 
 compose_cmd() {
 	if command -v docker-compose >/dev/null 2>&1; then
@@ -88,6 +92,10 @@ echo "Starting production deployment..."
 
 # Pull the latest changes from the main branch
 git pull origin main
+
+echo "Stopping existing containers..."
+COMPOSE="$(compose_cmd)"
+$COMPOSE -f "$COMPOSE_FILE" down --remove-orphans
 
 # Use Docker Compose to build and restart services
 # The -d flag runs the containers in the background
