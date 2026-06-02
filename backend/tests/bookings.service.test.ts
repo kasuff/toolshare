@@ -7,8 +7,7 @@ vi.mock("../src/modules/bookings/bookings.repository", () => ({
   bookingsRepository: {
     listForUserContext: vi.fn(),
     findToolById: vi.fn(),
-    findOverlappingToolBooking: vi.fn(),
-    createToolBooking: vi.fn(),
+    createToolBookingTransaction: vi.fn(),
     createWorkshopBookingTransaction: vi.fn(),
     findBookingById: vi.fn(),
     updateStatus: vi.fn()
@@ -39,7 +38,7 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking when tool does not exist", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce(null);
+    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce(null);
 
     await expect(
       bookingsService.createToolBooking({
@@ -53,8 +52,6 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking with invalid time range", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-
     await expect(
       bookingsService.createToolBooking({
         requesterId: "u1",
@@ -67,8 +64,7 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking when overlapping booking exists", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-    mockedBookingsRepository.findOverlappingToolBooking.mockResolvedValueOnce({ id: "b-overlap" } as any);
+    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce("CONFLICT" as any);
 
     await expect(
       bookingsService.createToolBooking({
@@ -82,9 +78,10 @@ describe("bookingsService", () => {
   });
 
   it("creates tool booking and notifies owner", async () => {
-    mockedBookingsRepository.findToolById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-    mockedBookingsRepository.findOverlappingToolBooking.mockResolvedValueOnce(null);
-    mockedBookingsRepository.createToolBooking.mockResolvedValueOnce({ id: "b1", toolId: "t1" } as any);
+    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce({
+      booking: { id: "b1", toolId: "t1" },
+      tool: { ownerId: "owner-1" }
+    } as any);
 
     const result = await bookingsService.createToolBooking({
       requesterId: "u1",
@@ -94,7 +91,7 @@ describe("bookingsService", () => {
       pickupTime: "2026-06-01T09:00:00.000Z"
     });
 
-    expect(mockedBookingsRepository.createToolBooking).toHaveBeenCalled();
+    expect(mockedBookingsRepository.createToolBookingTransaction).toHaveBeenCalled();
     expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner-1", expect.stringContaining("Ausleihanfrage"));
     expect(result).toMatchObject({ id: "b1" });
   });

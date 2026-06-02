@@ -140,8 +140,8 @@ export const api = {
     const tool = db.tools.find((t) => t.id === input.toolId);
     if (!tool || tool.status !== "VERFUEGBAR") return null;
 
-    const startMs = new Date(input.startIso).getTime();
-    const endMs = new Date(input.endIso).getTime();
+    const startMs = new Date(input.startIso ?? "").getTime();
+    const endMs = new Date(input.endIso ?? "").getTime();
     const overlap = db.bookings.some(
       (b) =>
         b.type === "TOOL" &&

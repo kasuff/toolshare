@@ -20,7 +20,9 @@ beforeEach(() => {
 
 describe("api service", () => {
   it("maps backend users and sends authorization headers", async () => {
-    fetchMock.mockResolvedValueOnce(responseJson({ id: "u1", email: "lea@toolshare.local", name: "Lea", role: "MANAGER" }));
+    fetchMock.mockResolvedValueOnce(
+      responseJson({ id: "u1", email: "lea@toolshare.local", name: "Lea", role: "MANAGER", isSuspended: false })
+    );
 
     const user = await api.getCurrentUser("token-123");
 
@@ -30,7 +32,7 @@ describe("api service", () => {
       name: "Lea",
       role: "ADMIN",
       address: undefined,
-      isSuspended: undefined
+      isSuspended: false
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/users/me",
@@ -103,6 +105,16 @@ describe("api service", () => {
 
       if (url.endsWith("/moderation/reports")) {
         return responseJson([{ id: "r1", reason: "Test", status: "OPEN" }]);
+      }
+
+      if (url.includes("/users/admin/metrics")) {
+        return responseJson({
+          users: 2,
+          tools: 3,
+          workshops: 1,
+          openBookings: 4,
+          openReports: 1
+        });
       }
 
       if (url.endsWith("/users")) {
@@ -194,9 +206,9 @@ describe("api service", () => {
         method: "POST",
         body: JSON.stringify({
           toolId: "t1",
-          startDate: "2026-05-06T08:00:00.000Z",
-          endDate: "2026-05-07T08:00:00.000Z",
-          pickupTime: "2026-05-06T07:00:00.000Z"
+          startDate: new Date("2026-05-06T10:00").toISOString(),
+          endDate: new Date("2026-05-07T10:00").toISOString(),
+          pickupTime: new Date("2026-05-06T09:00").toISOString()
         })
       }
     );
