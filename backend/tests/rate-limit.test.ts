@@ -89,7 +89,7 @@ describe("rate limiting", () => {
     expect(second.statusCode).toBe(200);
     expect(limited.statusCode).toBe(429);
     expect(limited.body).toMatchObject({
-      message: expect.stringMatching(/too many requests/i)
+      message: expect.stringMatching(/Zu viele Anfragen/i)
     });
   });
 
@@ -107,7 +107,7 @@ describe("rate limiting", () => {
     expect(second.statusCode).toBe(200);
     expect(limited.statusCode).toBe(429);
     expect(limited.body).toMatchObject({
-      message: expect.stringMatching(/authentication attempts/i)
+      message: expect.stringMatching(/Anmeldeversuche/i)
     });
   });
 });

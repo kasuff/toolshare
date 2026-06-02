@@ -230,8 +230,16 @@ describe("api service", () => {
       { status: 400 }
     ));
 
-    await expect(api.createTool({ name: "", description: "Test", category: "holz" }, "token-123")).rejects.toThrow(
-      /name: required/
-    );
+    await expect(
+      api.createTool(
+        {
+          name: "",
+          description: "Test",
+          category: "holz",
+          pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland"
+        },
+        "token-123"
+      )
+    ).rejects.toThrow(/name: Pflichtfeld fehlt/);
   });
 });

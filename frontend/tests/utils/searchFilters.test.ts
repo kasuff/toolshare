@@ -39,8 +39,8 @@ describe("searchFilters", () => {
     expect(distanceBetweenLocations("", "Leopoldstraße 120, München")).toBeNull();
     expect(isWithinRadius("München Zentrum", "Leopoldstraße 120, München", 5)).toBe(true);
     expect(isWithinRadius("München Zentrum", "Heidemannstraße 20, München", 1)).toBe(false);
-    expect(isWithinRadius("München Zentrum", "", 5)).toBe(true);
-    expect(isWithinRadius("München Zentrum", undefined, 5)).toBe(true);
+    expect(isWithinRadius("München Zentrum", "", 5)).toBe(false);
+    expect(isWithinRadius("München Zentrum", undefined, 5)).toBe(false);
   });
 
   it("matches only unblocked workshop slots against date ranges", () => {

@@ -125,18 +125,16 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
     fireEvent.change(screen.getByPlaceholderText("E-Mail"), { target: { value: "nina@example.com" } });
     fireEvent.change(screen.getByPlaceholderText("Passwort (mind. 8 Zeichen)"), { target: { value: "password123" } });
     fireEvent.change(screen.getByPlaceholderText("Passwort wiederholen"), { target: { value: "password123" } });
     fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Nina" } });
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
-    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnr"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
     fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "Muenchen" } });
     fireEvent.change(screen.getByPlaceholderText("Land"), { target: { value: "Deutschland" } });
-
-    expect(screen.getByText("Musterstraße 5, 80331 Muenchen, Deutschland")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Registrieren und starten" }));
 

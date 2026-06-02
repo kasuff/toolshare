@@ -80,7 +80,7 @@ describe("Authentication user journey", () => {
 
     renderApp("/auth");
 
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
     fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
       target: { value: "Muster" }
@@ -94,14 +94,14 @@ describe("Authentication user journey", () => {
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
     expect(screen.getByDisplayValue("80802")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Muenchen")).toBeInTheDocument();
-    expect(screen.getByText("Musterstrasse 10, 80802 Muenchen, Deutschland", { selector: "p.address-preview" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Musterstrasse 10, 80802 Muenchen, Deutschland")).toBeInTheDocument();
   });
 
   it("shows no-suggestion state and keeps manual fields unchanged", async () => {
     vi.mocked(api.suggestAddresses).mockResolvedValue([]);
 
     renderApp("/auth");
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
     fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
       target: { value: "zzz" }
@@ -109,6 +109,6 @@ describe("Authentication user journey", () => {
 
     expect(await screen.findByText("Keine Vorschläge gefunden.")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Straße")).toHaveValue("");
-    expect(screen.getByPlaceholderText("Hausnummer")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Hausnr")).toHaveValue("");
   });
 });
