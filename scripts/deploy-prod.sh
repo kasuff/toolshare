@@ -90,9 +90,6 @@ wait_for_containers() {
 
 echo "Starting production deployment..."
 
-# Pull the latest changes from the main branch
-git pull origin main
-
 echo "Stopping existing containers..."
 COMPOSE="$(compose_cmd)"
 $COMPOSE -f "$COMPOSE_FILE" down --remove-orphans
