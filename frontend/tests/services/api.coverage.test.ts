@@ -295,7 +295,7 @@ describe("api coverage", () => {
       id: "w1",
       ownerId: "u2"
     });
-    expect(workshops[0].workshop.imageUrls[0]).toContain("data:image/svg+xml;charset=UTF-8,");
+    expect(workshops[0].workshop.imageUrls[0]).toBe("workshop.png");
     expect(workshops[0].slots[0]).toMatchObject({ id: "s1" });
     expect(workshops[0].slots[0].blockedByOwner).toBe(true);
     expect(workshops[0].slots[0].startIso).toMatch(/^2026-05-06T/);

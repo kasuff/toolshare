@@ -69,11 +69,11 @@ describe("Authentication user journey", () => {
   it("autofills address fields when suggestions exist", async () => {
     vi.mocked(api.suggestAddresses).mockResolvedValue([
       {
-        label: "Musterstrasse 10, 80802 Muenchen, Deutschland",
-        street: "Musterstrasse",
+        label: "Musterstraße 10, 80802 München, Deutschland",
+        street: "Musterstraße",
         houseNumber: "10",
         postalCode: "80802",
-        city: "Muenchen",
+        city: "München",
         country: "Deutschland"
       }
     ]);
@@ -88,13 +88,13 @@ describe("Authentication user journey", () => {
 
     await screen.findByText("Vorschläge - klicken zum Übernehmen");
 
-    fireEvent.mouseDown(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
+    fireEvent.mouseDown(await screen.findByRole("button", { name: /Musterstraße 10/i }));
 
-    expect(await screen.findByDisplayValue("Musterstrasse")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Musterstraße")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
     expect(screen.getByDisplayValue("80802")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Muenchen")).toBeInTheDocument();
-    expect(screen.getByText("Musterstrasse 10, 80802 Muenchen, Deutschland", { selector: "p.address-preview" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("München")).toBeInTheDocument();
+    expect(screen.getByText("Musterstraße 10, 80802 München, Deutschland", { selector: "p.address-preview" })).toBeInTheDocument();
   });
 
   it("shows no-suggestion state and keeps manual fields unchanged", async () => {
