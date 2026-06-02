@@ -61,8 +61,17 @@ export function distanceBetweenLocations(origin: string, target?: string): numbe
 }
 
 export function isWithinRadius(origin: string, target: string | undefined, radiusKm: number): boolean {
+  const normalized = target?.trim();
+  if (!normalized) {
+    // Kein Abholort hinterlegt (ältere Einträge): nicht per Umkreis ausschließen.
+    return true;
+  }
   const distance = distanceBetweenLocations(origin, target);
-  return distance !== null && distance <= radiusKm;
+  if (distance === null) {
+    // Adresse nicht zuordenbar → trotzdem anzeigen („Distanz offen“).
+    return true;
+  }
+  return distance <= radiusKm;
 }
 
 function startsBeforeOrAt(slotStart: string, filterEnd?: string) {
