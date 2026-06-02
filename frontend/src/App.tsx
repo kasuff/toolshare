@@ -460,7 +460,7 @@ function AppWithProviders() {
           }
         />
         {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && (
-          <Route path="moderation" element={<ModerationPage currentUser={currentUser} token={token ?? undefined} />} />
+          <Route path="moderation" element={<ModerationPage token={token ?? undefined} />} />
         )}
         {currentUser?.role === "ADMIN" && (
           <Route path="admin" element={<AdminPage currentUser={currentUser} token={token ?? undefined} />} />
