@@ -26,6 +26,7 @@ export interface User {
 export interface Tool {
   id: string;
   ownerId: string;
+  ownerName?: string;
   name: string;
   description: string;
   category: string;
@@ -52,6 +53,7 @@ export interface WorkshopToolItem {
 export interface Workshop {
   id: string;
   ownerId: string;
+  ownerName?: string;
   name: string;
   description: string;
   location: string;

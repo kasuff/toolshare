@@ -298,7 +298,7 @@ function AppWithProviders() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="tools" element={<ToolsPage token={token ?? undefined} />} />
+        <Route path="tools" element={<ToolsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route
           path="tools/new"
@@ -309,6 +309,7 @@ function AppWithProviders() {
           }
         />
         <Route path="workshops" element={<WorkshopsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
+        <Route path="workshops/:id" element={<WorkshopsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route
           path="workshops/new"
           element={

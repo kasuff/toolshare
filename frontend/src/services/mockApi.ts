@@ -60,14 +60,19 @@ export const api = {
     const db = loadDb();
     const q = (filters.q || "").trim().toLowerCase();
     const category = (filters.category || "").trim().toLowerCase();
-    return db.tools.filter((t) => {
-      const qMatch =
-        !q ||
-        t.name.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q);
-      const cMatch = !category || t.category.toLowerCase().includes(category);
-      return qMatch && cMatch;
-    });
+    return db.tools
+      .filter((t) => {
+        const qMatch =
+          !q ||
+          t.name.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q);
+        const cMatch = !category || t.category.toLowerCase().includes(category);
+        return qMatch && cMatch;
+      })
+      .map((tool) => ({
+        ...tool,
+        ownerName: db.users.find((user) => user.id === tool.ownerId)?.name
+      }));
   },
 
   createTool(input: Omit<Tool, "id" | "status">): Tool {
@@ -108,7 +113,14 @@ export const api = {
               ? true
               : `${t.name} ${t.category}`.toLowerCase().includes(toolFilter),
           );
-        return { workshop, slots, tools };
+        return {
+          workshop: {
+            ...workshop,
+            ownerName: db.users.find((user) => user.id === workshop.ownerId)?.name
+          },
+          slots,
+          tools
+        };
       });
   },
 
