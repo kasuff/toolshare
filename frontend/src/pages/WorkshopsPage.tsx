@@ -1,9 +1,11 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, Field, SkeletonCards, Surface } from "../components/ui";
+import { DetailTopBar } from "../components/DetailTopBar";
+import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
-import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories";
+import { EmptyState, Field, SkeletonCards, Surface } from "../components/ui";
 import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
+import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../utils/searchFilters";
@@ -81,6 +83,8 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const { id: selectedWorkshopId } = useParams<{ id?: string }>();
+  const [searchParams] = useSearchParams();
+  const openWorkshopId = searchParams.get("open");
   const [q, setQ] = useState("");
   const [toolFilter, setToolFilter] = useState("");
   const [maxCapacityFilter, setMaxCapacityFilter] = useState(10);
@@ -91,6 +95,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const [items, setItems] = useState<WorkshopListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -100,17 +108,19 @@ export function WorkshopsPage({ token, currentUser }: Props) {
         const mapped = workshops.map(({ workshop, slots, tools }) => ({
           workshop,
           slots,
-          tools: tools ?? workshop.equipmentItems.map((item) => ({
-            id: item.id,
-            ownerId: workshop.ownerId,
-            ownerName: workshop.ownerName,
-            name: item.name,
-            description: "Werkstatt-Werkzeug",
-            category: item.category,
-            imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
-            status: "VERFUEGBAR" as const,
-            selectable: true
-          }))
+          tools:
+            tools ??
+            workshop.equipmentItems.map((item) => ({
+              id: item.id,
+              ownerId: workshop.ownerId,
+              ownerName: workshop.ownerName,
+              name: item.name,
+              description: "Werkstatt-Werkzeug",
+              category: item.category,
+              imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+              status: "VERFUEGBAR" as const,
+              selectable: true
+            }))
         }));
         setItems(mapped);
       } catch (error) {
@@ -158,9 +168,18 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   }, [candidateItems, defaultLocation, radiusKm]);
 
   const selectedWorkshop = useMemo(() => {
-    if (!selectedWorkshopId) return null;
-    return items.find((item) => item.workshop.id === selectedWorkshopId) ?? null;
-  }, [items, selectedWorkshopId]);
+    const workshopId = selectedWorkshopId ?? openWorkshopId;
+    if (!workshopId) return null;
+    return items.find((item) => item.workshop.id === workshopId) ?? null;
+  }, [items, openWorkshopId, selectedWorkshopId]);
+
+  useEffect(() => {
+    if (!openWorkshopId || selectedWorkshopId === openWorkshopId || items.length === 0) return;
+    const match = items.find((item) => item.workshop.id === openWorkshopId);
+    if (match) {
+      navigate(`/workshops/${openWorkshopId}`, { replace: true });
+    }
+  }, [items, navigate, openWorkshopId, selectedWorkshopId]);
 
   const hasActiveFilters = Boolean(
     q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== 10 || radiusKm !== 5
@@ -179,7 +198,14 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     navigate(`/workshops/${workshop.workshop.id}`);
   };
 
+  const closeReportForm = () => {
+    setShowReportForm(false);
+    setReportReason("");
+    setReportDetails("");
+  };
+
   const closeWorkshop = () => {
+    closeReportForm();
     navigate("/workshops");
   };
 
@@ -200,7 +226,57 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     }
   };
 
-  const publicWorkshops = filteredItems;
+  const openReportForm = () => {
+    if (!token) {
+      navigate("/auth", { state: { redirectHint: "Bitte melde dich an, um ein Angebot zu melden." } });
+      return;
+    }
+    setShowReportForm(true);
+  };
+
+  const reportWorkshop = async (workshopId: string) => {
+    if (reportReason.trim().length < 5) {
+      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
+      return;
+    }
+    setIsReporting(true);
+    try {
+      await api.createReport(
+        {
+          targetType: "WORKSHOP",
+          targetId: workshopId,
+          reason: reportReason.trim(),
+          details: reportDetails.trim() || undefined
+        },
+        token!
+      );
+      closeReportForm();
+      pushToast("Werkstatt wurde gemeldet.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Meldung konnte nicht gesendet werden.", "error");
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
+  const ownedWorkshops = currentUser ? items.filter((item) => item.workshop.ownerId === currentUser.id) : [];
+  const publicWorkshops = currentUser
+    ? filteredItems.filter((item) => item.workshop.ownerId !== currentUser.id)
+    : filteredItems;
+
+  const ownedStats = currentUser
+    ? [
+        { label: "Eigene Werkstätten", value: ownedWorkshops.length },
+        { label: "Zeitfenster", value: ownedWorkshops.reduce((sum, item) => sum + item.slots.length, 0) },
+        {
+          label: "Durchschn. Kapazität",
+          value:
+            ownedWorkshops.length > 0
+              ? Math.round(ownedWorkshops.reduce((sum, item) => sum + item.workshop.maxCapacity, 0) / ownedWorkshops.length)
+              : 0
+        }
+      ]
+    : [];
 
   return (
     <section className="stack search-page">
@@ -219,8 +295,82 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       <div className="page-header">
         <div className="stack">
           <h1>Werkstätten</h1>
+          <p className="subtitle">Klicke auf eine Werkstatt, um Details und Buchungsfenster in einem Fenster zu sehen.</p>
         </div>
       </div>
+
+      {currentUser && (
+        <Surface title="Meine Werkstätten" subtitle="Eigene Räume und Verfügbarkeiten auf einen Blick.">
+          {ownedWorkshops.length > 0 ? (
+            <div className="workshop-dashboard">
+              <div className="workshop-dashboard-stats">
+                {ownedStats.map((stat) => (
+                  <div key={stat.label} className="workshop-dashboard-stat">
+                    <span>{stat.label}</span>
+                    <strong>{stat.value}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className="workshop-dashboard-grid">
+                {ownedWorkshops.map((item) => (
+                  <article
+                    key={item.workshop.id}
+                    className={`workshop-card ${selectedWorkshop?.workshop.id === item.workshop.id ? "selected" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openWorkshop(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openWorkshop(item);
+                      }
+                    }}
+                  >
+                    <div className="workshop-card-media">
+                      <img src={item.workshop.imageUrls[0] ?? DEFAULT_PLACEHOLDER_IMAGE} alt={item.workshop.name} />
+                      <span className="workshop-card-badge">Aktiv</span>
+                    </div>
+                    <div className="workshop-card-content">
+                      <div className="workshop-card-heading">
+                        <h3>{item.workshop.name}</h3>
+                        <span className="workshop-card-rating">{item.slots.length} Slots</span>
+                      </div>
+                      <p>
+                        {item.workshop.location} · {item.workshop.maxCapacity} Plätze
+                      </p>
+                      <div className="workshop-card-footer">
+                        <button
+                          type="button"
+                          className="btn secondary"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/workshops/${item.workshop.id}/edit`);
+                          }}
+                        >
+                          Werkstatt bearbeiten
+                        </button>
+                        <button
+                          type="button"
+                          className="btn secondary"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate("/workshops/availability");
+                          }}
+                        >
+                          Verfügbarkeit verwalten
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <EmptyState title="Noch keine eigenen Werkstätten" text="Erstelle eine Werkstatt, um sie hier zu verwalten." />
+          )}
+        </Surface>
+      )}
 
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
@@ -276,7 +426,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
             </div>
             <SearchRadiusMap
               centerAddress={defaultLocation}
-              points={candidateItems.map((item) => ({ id: item.workshop.id, label: item.workshop.name, location: item.workshop.location }))}
+              points={candidateItems.map((item) => ({
+                id: item.workshop.id,
+                label: item.workshop.name,
+                location: item.workshop.location
+              }))}
               radiusKm={radiusKm}
               onRadiusChange={setRadiusKm}
               sliderId="workshop-radius-slider"
@@ -349,15 +503,37 @@ export function WorkshopsPage({ token, currentUser }: Props) {
             aria-label={selectedWorkshop.workshop.name}
             onClick={(event) => event.stopPropagation()}
           >
+            <div className="workshop-modal-toolbar">
+              <DetailTopBar onBack={closeWorkshop}>
+                {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
+                  <button type="button" className="detail-report-trigger" onClick={openReportForm}>
+                    Werkstatt melden
+                  </button>
+                )}
+              </DetailTopBar>
+            </div>
+
+            {showReportForm && currentUser?.id !== selectedWorkshop.workshop.ownerId && (
+              <ReportFormPanel
+                title="Werkstatt melden"
+                hint="Wenn Regeln verletzt werden, melde diese Werkstatt der Moderation."
+                reason={reportReason}
+                details={reportDetails}
+                isSubmitting={isReporting}
+                submitLabel="Werkstatt melden"
+                onReasonChange={setReportReason}
+                onDetailsChange={setReportDetails}
+                onSubmit={() => void reportWorkshop(selectedWorkshop.workshop.id)}
+                onCancel={closeReportForm}
+              />
+            )}
+
             <div className="workshop-modal-header">
               <div>
                 <p className="eyebrow">Werkstattdetails</p>
                 <h2>{selectedWorkshop.workshop.name}</h2>
                 <p className="subtitle">{selectedWorkshop.workshop.location}</p>
               </div>
-              <button type="button" className="icon-button workshop-modal-close" onClick={closeWorkshop} aria-label="Fenster schließen">
-                <span className="material-symbols-outlined">close</span>
-              </button>
             </div>
 
             <div className="workshop-modal-body">
@@ -372,7 +548,9 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
               {selectedWorkshop.tools.length > 0 && (
                 <>
-                  <p className="hint"><strong>Werkzeuge in dieser Werkstatt</strong></p>
+                  <p className="hint">
+                    <strong>Werkzeuge in dieser Werkstatt</strong>
+                  </p>
                   <div className="workshop-equipment-list">
                     {selectedWorkshop.tools.map((tool) => {
                       const category = toolCategoryByValue.get(tool.category);
@@ -384,7 +562,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                         >
                           <span className="material-symbols-outlined">{toolCategoryIcons[tool.category] ?? "construction"}</span>
                           <span>{tool.name}</span>
-                          <small>{tool.selectable ? category?.label ?? tool.category : "Ausgeliehen"}</small>
+                          <small>{tool.selectable ? (category?.label ?? tool.category) : "Ausgeliehen"}</small>
                         </span>
                       );
                     })}
@@ -394,7 +572,9 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
               {getWorkshopExtras(selectedWorkshop.workshop).length > 0 && (
                 <>
-                  <p className="hint"><strong>Extras</strong></p>
+                  <p className="hint">
+                    <strong>Extras</strong>
+                  </p>
                   <div className="workshop-equipment-list">
                     {getWorkshopExtras(selectedWorkshop.workshop).map((extraValue) => {
                       const extra = extrasByValue.get(extraValue);
@@ -433,6 +613,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                 )}
               </div>
             </div>
+
+            {currentUser && selectedWorkshop.workshop.ownerId === currentUser.id && (
+              <div className="workshop-modal-footer">
+                <Link className="btn secondary" to={`/workshops/${selectedWorkshop.workshop.id}/edit`} onClick={closeWorkshop}>
+                  Werkstatt bearbeiten
+                </Link>
+                <Link className="btn" to="/workshops/availability" onClick={closeWorkshop}>
+                  Verfügbarkeit verwalten
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -29,6 +29,41 @@ type BackendMetrics = {
   workshops: number;
   openBookings: number;
   openReports: number;
+  openSuspensionRequests: number;
+};
+
+export type ModerationReport = {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  targetType: "TOOL" | "WORKSHOP" | "USER";
+  targetId: string;
+  targetLabel: string;
+  targetHref: string | null;
+  subjectUserId: string | null;
+  subjectUserName: string | null;
+  reason: string;
+  details?: string;
+  conversationContext?: string;
+  status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+  decisionNote?: string | null;
+  decisionAt?: string | null;
+  moderatorId?: string | null;
+  moderatorName?: string | null;
+  createdAt: string;
+};
+
+export type SuspensionRequestItem = {
+  id: string;
+  userId: string;
+  requestedById: string;
+  reportId: string | null;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  user: { id: string; name: string; email: string; isSuspended: boolean };
+  requestedBy: { id: string; name: string };
+  report?: { id: string; reason: string; targetType: string; targetId: string } | null;
 };
 
 export type AddressSuggestion = {
@@ -170,6 +205,26 @@ function toLocalDateTimeInputValue(input: string) {
   )}:${pad(date.getMinutes())}`;
 }
 
+function translateValidationMessage(raw: string): string {
+  const minCharsMatch = raw.match(/at least (\d+) character/i);
+  if (raw.includes("at least 8 character") || raw.match(/at least 8/i)) {
+    return "Passwort muss mindestens 8 Zeichen lang sein.";
+  }
+  if (minCharsMatch) {
+    return `Eingabe muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`;
+  }
+  if (/invalid.*uuid/i.test(raw)) return "Ungültige ID.";
+  if (/invalid.*email/i.test(raw)) return "Ungültige E-Mail-Adresse.";
+  if (/invalid.*datetime/i.test(raw)) return "Ungültiges Datum oder Uhrzeit.";
+  if (/required/i.test(raw)) return "Pflichtfeld fehlt.";
+  if (/expected string/i.test(raw)) return "Text erwartet.";
+  if (/expected number/i.test(raw)) return "Zahl erwartet.";
+  if (/expected boolean/i.test(raw)) return "Ja/Nein-Wert erwartet.";
+  if (raw.includes("Mindestens ein Feld")) return raw;
+  if (raw.includes("Ungültig")) return raw;
+  return raw;
+}
+
 async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
   let response: Response;
   try {
@@ -186,7 +241,7 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
   }
 
   if (!response.ok) {
-    let message = `Request failed: ${response.status}`;
+    let message = `Anfrage fehlgeschlagen (Fehler ${response.status}).`;
     try {
       const payload = (await response.json()) as {
         message?: string;
@@ -213,22 +268,10 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
       if (fieldErrorEntries.length > 0) {
         const [field, errors] = fieldErrorEntries[0];
         const rawError = errors?.[0] ?? "Ungültige Eingabe.";
-        const minCharsMatch = rawError.match(/at least (\d+) character/);
-        if (field === "body") {
-          if (rawError.includes("at least 8 character")) {
-            message = "Passwort muss mindestens 8 Zeichen lang sein.";
-          } else if (minCharsMatch) {
-            message = `Eingabe muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`;
-          } else {
-            message = rawError;
-          }
-        } else {
-          message = minCharsMatch
-            ? `${field}: Muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`
-            : `${field}: ${rawError}`;
-        }
+        const translated = translateValidationMessage(rawError);
+        message = field === "body" ? translated : `${field}: ${translated}`;
       } else if (payload.error?.details?.formErrors?.length) {
-        message = payload.error.details.formErrors[0];
+        message = translateValidationMessage(payload.error.details.formErrors[0]);
       }
     } catch {
       // keep fallback message
@@ -758,19 +801,70 @@ export const api = {
   },
 
   async listReports(token: string) {
-    return request<Array<{ id: string; reason: string; details?: string; status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED" }>>(
+    return request<ModerationReport[]>("/moderation/reports", undefined, token);
+  },
+
+  async listClosedReports(token: string) {
+    return request<ModerationReport[]>("/moderation/reports/closed", undefined, token);
+  },
+
+  async createReport(
+    input: {
+      targetType: "TOOL" | "WORKSHOP" | "USER";
+      targetId: string;
+      reason: string;
+      details?: string;
+      bookingId?: string;
+      conversationContext?: string;
+    },
+    token: string
+  ) {
+    return request(
       "/moderation/reports",
-      undefined,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      },
       token
     );
   },
 
-  async updateReportStatus(reportId: string, status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED", token: string) {
+  async updateReportStatus(
+    reportId: string,
+    input: {
+      status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+      decisionNote?: string;
+      warnUserId?: string;
+      warningReason?: string;
+      requestSuspensionUserId?: string;
+      suspensionReason?: string;
+    },
+    token: string
+  ) {
     await request(
       `/moderation/reports/${reportId}`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status })
+        body: JSON.stringify(input)
+      },
+      token
+    );
+  },
+
+  async listSuspensionRequests(token: string) {
+    return request<SuspensionRequestItem[]>("/users/admin/suspension-requests", undefined, token);
+  },
+
+  async decideSuspensionRequest(
+    requestId: string,
+    input: { approve: boolean; decisionNote?: string },
+    token: string
+  ) {
+    return request<SuspensionRequestItem>(
+      `/users/admin/suspension-requests/${requestId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input)
       },
       token
     );

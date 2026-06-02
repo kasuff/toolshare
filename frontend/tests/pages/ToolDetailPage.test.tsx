@@ -4,15 +4,17 @@ import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { ToolDetailPage } from "../../src/pages/ToolDetailPage";
 
-const { getTools, createToolRequest } = vi.hoisted(() => ({
+const { getTools, createToolRequest, createReport } = vi.hoisted(() => ({
   getTools: vi.fn(),
-  createToolRequest: vi.fn()
+  createToolRequest: vi.fn(),
+  createReport: vi.fn()
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
     getTools,
-    createToolRequest
+    createToolRequest,
+    createReport
   }
 }));
 

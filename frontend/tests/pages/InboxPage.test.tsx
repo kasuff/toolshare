@@ -5,10 +5,12 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, decideBooking, createPickupProposal } = vi.hoisted(() => ({
+const { getBookingsForUser, decideBooking, createPickupProposal, getNotifications, createReport } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   decideBooking: vi.fn(),
   createPickupProposal: vi.fn(),
+  getNotifications: vi.fn(),
+  createReport: vi.fn(),
 }));
 
 vi.mock("../../src/services/api", () => ({
@@ -16,6 +18,8 @@ vi.mock("../../src/services/api", () => ({
     getBookingsForUser,
     decideBooking,
     createPickupProposal,
+    getNotifications,
+    createReport,
   },
 }));
 
@@ -46,6 +50,7 @@ const baseOpenBooking = {
 describe("InboxPage", () => {
   beforeEach(() => {
     localStorage.clear();
+    getNotifications.mockResolvedValue([]);
   });
 
   it("shows messenger thread list with counterpart name, preview and actions inside request bubble", async () => {

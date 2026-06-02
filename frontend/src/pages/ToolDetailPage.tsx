@@ -1,5 +1,7 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { DetailTopBar } from "../components/DetailTopBar";
+import { ReportFormPanel } from "../components/ReportFormPanel";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { getPlaceholderImageForCategory } from "../utils/categories";
@@ -22,6 +24,10 @@ export function ToolDetailPage({ token, currentUser: _currentUser }: Props) {
   const [durationDays, setDurationDays] = useState(1);
   const [pickupTime, setPickupTime] = useState("10:00");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     const loadTool = async () => {
@@ -111,6 +117,50 @@ export function ToolDetailPage({ token, currentUser: _currentUser }: Props) {
     }
   };
 
+  const closeReportForm = () => {
+    setShowReportForm(false);
+    setReportReason("");
+    setReportDetails("");
+  };
+
+  const openReportForm = () => {
+    if (!token) {
+      navigate("/auth", {
+        state: {
+          redirectHint: "Bitte melde dich an, um ein Angebot zu melden."
+        }
+      });
+      return;
+    }
+    setShowReportForm(true);
+  };
+
+  const reportTool = async () => {
+    if (!tool) return;
+    if (reportReason.trim().length < 5) {
+      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
+      return;
+    }
+    setIsReporting(true);
+    try {
+      await api.createReport(
+        {
+          targetType: "TOOL",
+          targetId: tool.id,
+          reason: reportReason.trim(),
+          details: reportDetails.trim() || undefined
+        },
+        token!
+      );
+      closeReportForm();
+      pushToast("Meldung wurde erfasst.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Meldung konnte nicht gesendet werden.", "error");
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
   if (isLoading) {
     return <section className="stack"><p>Laden...</p></section>;
   }
@@ -124,10 +174,26 @@ export function ToolDetailPage({ token, currentUser: _currentUser }: Props) {
 
   return (
     <section className="stack tool-detail-page">
-      {/* Back Button */}
-      <button onClick={() => navigate("/tools")} className="back-button">
-        ← Zurück
-      </button>
+      <DetailTopBar onBack={() => navigate("/tools")}>
+        <button type="button" className="detail-report-trigger" onClick={openReportForm}>
+          Angebot melden
+        </button>
+      </DetailTopBar>
+
+      {showReportForm && (
+        <ReportFormPanel
+          title="Angebot melden"
+          hint="Melde unangemessene Inhalte an die Moderation."
+          reason={reportReason}
+          details={reportDetails}
+          isSubmitting={isReporting}
+          submitLabel="Angebot melden"
+          onReasonChange={setReportReason}
+          onDetailsChange={setReportDetails}
+          onSubmit={() => void reportTool()}
+          onCancel={closeReportForm}
+        />
+      )}
 
       {/* Hero Image with Status */}
       <div className="tool-hero">
@@ -170,6 +236,7 @@ export function ToolDetailPage({ token, currentUser: _currentUser }: Props) {
               </div>
             </div>
           </div>
+
         </div>
 
         {/* Right Column - Booking */}

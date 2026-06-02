@@ -4,6 +4,7 @@ import { requireRole } from "../../middleware/require-role";
 import { validate } from "../../middleware/validate";
 import { usersController } from "./users.controller";
 import {
+  decideSuspensionRequestSchema,
   listUsersSchema,
   updateMyProfileSchema,
   updateUserRoleSchema,
@@ -17,6 +18,17 @@ usersRouter.use(requireAuth);
 usersRouter.get("/me", usersController.getMine);
 usersRouter.patch("/me", validate(updateMyProfileSchema), usersController.updateMine);
 usersRouter.get("/admin/metrics", requireRole("MANAGER"), usersController.adminMetrics);
+usersRouter.get(
+  "/admin/suspension-requests",
+  requireRole("MANAGER"),
+  usersController.listSuspensionRequests
+);
+usersRouter.patch(
+  "/admin/suspension-requests/:requestId",
+  requireRole("MANAGER"),
+  validate(decideSuspensionRequestSchema),
+  usersController.decideSuspensionRequest
+);
 
 usersRouter.get("/", requireRole("MODERATOR", "MANAGER"), validate(listUsersSchema), usersController.list);
 usersRouter.get(
