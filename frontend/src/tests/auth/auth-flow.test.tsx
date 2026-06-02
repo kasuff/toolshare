@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../App";
@@ -67,41 +68,39 @@ describe("Authentication user journey", () => {
   });
 
   it("autofills address fields when suggestions exist", async () => {
+    const user = userEvent.setup();
     vi.mocked(api.suggestAddresses).mockResolvedValue([
       {
-        label: "Musterstrasse 10, 80802 Muenchen, Deutschland",
-        street: "Musterstrasse",
+        label: "Musterstraße 10, 80802 München, Deutschland",
+        street: "Musterstraße",
         houseNumber: "10",
         postalCode: "80802",
-        city: "Muenchen",
+        city: "München",
         country: "Deutschland"
       }
     ]);
 
     renderApp("/auth");
 
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
-    fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
-      target: { value: "Muster" }
-    });
+    await user.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    await user.type(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), "Muster");
 
-    fireEvent.click(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
+    await user.click(await screen.findByRole("button", { name: /Musterstraße 10/i }));
 
-    expect(screen.getByDisplayValue("Musterstrasse")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Musterstraße")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
     expect(screen.getByDisplayValue("80802")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Muenchen")).toBeInTheDocument();
-    expect(screen.getByText("Musterstrasse 10, 80802 Muenchen, Deutschland", { selector: "p.address-preview" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("München")).toBeInTheDocument();
+    expect(screen.getByText("Musterstraße 10, 80802 München, Deutschland", { selector: "p.address-preview" })).toBeInTheDocument();
   });
 
   it("shows no-suggestion state and keeps manual fields unchanged", async () => {
+    const user = userEvent.setup();
     vi.mocked(api.suggestAddresses).mockResolvedValue([]);
 
     renderApp("/auth");
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
-    fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
-      target: { value: "zzz" }
-    });
+    await user.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    await user.type(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), "zzz");
 
     expect(await screen.findByText("Keine Vorschläge gefunden.")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Straße")).toHaveValue("");
