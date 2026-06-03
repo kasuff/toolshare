@@ -10,7 +10,8 @@ vi.mock("../src/modules/bookings/bookings.repository", () => ({
     createToolBookingTransaction: vi.fn(),
     createWorkshopBookingTransaction: vi.fn(),
     findBookingById: vi.fn(),
-    updateStatus: vi.fn()
+    updateStatus: vi.fn(),
+    markToolAvailable: vi.fn()
   }
 }));
 
@@ -206,5 +207,87 @@ describe("bookingsService", () => {
     });
 
     expect(result).toMatchObject({ id: "b1", status: "REJECTED" });
+  });
+
+  it("completes an accepted tool booking as provider and marks the tool available", async () => {
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b1",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date("2026-05-01T10:00:00.000Z"),
+      tool: { id: "tool-1", ownerId: "owner-1" }
+    } as any);
+    mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
+    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
+
+    const result = await bookingsService.updateBookingStatus({
+      actorId: "owner-1",
+      actorRole: "USER",
+      bookingId: "b1",
+      status: "RETURNED"
+    });
+
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "RETURNED");
+    expect(mockedBookingsRepository.markToolAvailable).toHaveBeenCalledWith("tool-1");
+    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("requester-1", expect.stringContaining("RETURNED"));
+    expect(result).toMatchObject({ id: "b1", status: "RETURNED" });
+  });
+
+  it("completes an accepted workshop booking as workshop provider", async () => {
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b2",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date("2026-05-01T12:00:00.000Z"),
+      timeslot: { workshop: { managerId: "manager-1" } }
+    } as any);
+    mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b2", status: "RETURNED" } as any);
+
+    const result = await bookingsService.updateBookingStatus({
+      actorId: "manager-1",
+      actorRole: "USER",
+      bookingId: "b2",
+      status: "RETURNED"
+    });
+
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b2", "RETURNED");
+    expect(mockedBookingsRepository.markToolAvailable).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: "b2", status: "RETURNED" });
+  });
+
+  it("rejects completion by requester and before the accepted period ended", async () => {
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b1",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date("2026-05-01T10:00:00.000Z"),
+      tool: { id: "tool-1", ownerId: "owner-1" }
+    } as any);
+
+    await expect(
+      bookingsService.updateBookingStatus({
+        actorId: "requester-1",
+        actorRole: "USER",
+        bookingId: "b1",
+        status: "RETURNED"
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b1",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date(Date.now() + 60_000),
+      tool: { id: "tool-1", ownerId: "owner-1" }
+    } as any);
+
+    await expect(
+      bookingsService.updateBookingStatus({
+        actorId: "owner-1",
+        actorRole: "USER",
+        bookingId: "b1",
+        status: "RETURNED"
+      })
+    ).rejects.toMatchObject({ code: "BOOKING_NOT_ENDED", status: 400 });
   });
 });

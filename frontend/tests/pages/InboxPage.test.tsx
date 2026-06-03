@@ -46,6 +46,7 @@ const baseOpenBooking = {
 describe("InboxPage", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.clearAllMocks();
   });
 
   it("shows messenger thread list with counterpart name, preview and actions inside request bubble", async () => {
@@ -133,5 +134,121 @@ describe("InboxPage", () => {
 
     expect(await screen.findByText(/Alternativvorschlag: Abholung/)).toBeInTheDocument();
     expect(screen.getByText(/Zeitraum:/)).toHaveClass("is-struck");
+  });
+
+  it("lets the provider complete a confirmed tool booking and shows the completed status after reload", async () => {
+    getBookingsForUser
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          status: "BESTAETIGT" as const,
+          pickupProposals: []
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          status: "ABGESCHLOSSEN" as const,
+          pickupProposals: []
+        }
+      ]);
+    decideBooking.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Als abgeschlossen markieren" }));
+
+    await waitFor(() => {
+      expect(decideBooking).toHaveBeenCalledWith("b1", "ABGESCHLOSSEN", "token-123");
+    });
+    expect((await screen.findAllByText("Abgeschlossen")).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Status:/).closest(".request-bubble-card")).toHaveTextContent("Abgeschlossen");
+  });
+
+  it("lets the workshop provider complete a confirmed workshop booking", async () => {
+    getBookingsForUser
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          id: "w-booking-1",
+          type: "WORKSHOP" as const,
+          requesterId: "requester-1",
+          providerId: "provider-1",
+          workshopId: "workshop-1",
+          toolId: undefined,
+          toolName: "Holzwerkstatt",
+          status: "BESTAETIGT" as const,
+          pickupTimeIso: undefined,
+          pickupProposals: []
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          id: "w-booking-1",
+          type: "WORKSHOP" as const,
+          requesterId: "requester-1",
+          providerId: "provider-1",
+          workshopId: "workshop-1",
+          toolId: undefined,
+          toolName: "Holzwerkstatt",
+          status: "ABGESCHLOSSEN" as const,
+          pickupTimeIso: undefined,
+          pickupProposals: []
+        }
+      ]);
+    decideBooking.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Als abgeschlossen markieren" }));
+
+    await waitFor(() => {
+      expect(decideBooking).toHaveBeenCalledWith("w-booking-1", "ABGESCHLOSSEN", "token-123");
+    });
+    expect((await screen.findAllByText("Abgeschlossen")).length).toBeGreaterThan(0);
+  });
+
+  it("shows confirmed workshop bookings to requesters without provider-only completion action", async () => {
+    getBookingsForUser.mockResolvedValueOnce([
+      {
+        ...baseOpenBooking,
+        id: "w-booking-1",
+        type: "WORKSHOP" as const,
+        requesterId: "requester-1",
+        providerId: "provider-1",
+        workshopId: "workshop-1",
+        toolId: undefined,
+        toolName: "Holzwerkstatt",
+        status: "BESTAETIGT" as const,
+        pickupTimeIso: undefined,
+        pickupProposals: []
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={{ ...currentUser, id: "requester-1" }} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Als abgeschlossen markieren" })).not.toBeInTheDocument();
   });
 });

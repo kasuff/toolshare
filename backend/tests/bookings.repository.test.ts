@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   bookingFindFirst: vi.fn(),
   bookingCreate: vi.fn(),
   bookingUpdate: vi.fn(),
+  toolUpdate: vi.fn(),
   txToolFindUnique: vi.fn(),
   txTimeSlotFindUnique: vi.fn(),
   txTimeSlotFindFirst: vi.fn(),
@@ -26,7 +27,8 @@ vi.mock("../src/config/prisma", () => ({
       update: mocks.bookingUpdate
     },
     tool: {
-      findUnique: mocks.toolFindUnique
+      findUnique: mocks.toolFindUnique,
+      update: mocks.toolUpdate
     },
     $transaction: mocks.prismaTransaction
   }
@@ -37,14 +39,18 @@ describe("bookingsRepository", () => {
     vi.clearAllMocks();
   });
 
-  it("lists bookings for requester and tool owner context", async () => {
+  it("lists bookings for requester, tool owner and workshop manager context", async () => {
     mocks.bookingFindMany.mockResolvedValueOnce([{ id: "b1" }]);
 
     const result = await bookingsRepository.listForUserContext("user-1");
 
     expect(mocks.bookingFindMany).toHaveBeenCalledWith({
       where: {
-        OR: [{ userId: "user-1" }, { tool: { ownerId: "user-1" } }]
+        OR: [
+          { userId: "user-1" },
+          { tool: { ownerId: "user-1" } },
+          { timeslot: { workshop: { managerId: "user-1" } } }
+        ]
       },
       include: {
         user: true,
@@ -118,6 +124,7 @@ describe("bookingsRepository", () => {
     mocks.txBookingFindFirst.mockResolvedValueOnce(null);
     mocks.txBookingCreate.mockResolvedValueOnce({ id: "booking-created" });
     mocks.bookingUpdate.mockResolvedValueOnce({ id: "booking-created", status: "ACCEPTED" });
+    mocks.toolUpdate.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" });
 
     const created = await bookingsRepository.createToolBookingTransaction({
       userId: "user-1",
@@ -127,6 +134,7 @@ describe("bookingsRepository", () => {
       pickupTime: new Date("2026-06-01T09:30:00.000Z")
     });
     const updated = await bookingsRepository.updateStatus("booking-created", "ACCEPTED");
+    const releasedTool = await bookingsRepository.markToolAvailable("tool-1");
 
     expect(mocks.txBookingCreate).toHaveBeenCalledWith({
       data: {
@@ -142,8 +150,13 @@ describe("bookingsRepository", () => {
       where: { id: "booking-created" },
       data: { status: "ACCEPTED" }
     });
+    expect(mocks.toolUpdate).toHaveBeenCalledWith({
+      where: { id: "tool-1" },
+      data: { status: "AVAILABLE" }
+    });
     expect(created).toEqual({ booking: { id: "booking-created" }, tool: { id: "tool-1" } });
     expect(updated).toEqual({ id: "booking-created", status: "ACCEPTED" });
+    expect(releasedTool).toEqual({ id: "tool-1", status: "AVAILABLE" });
   });
 
   it("creates workshop booking transaction for free timeslot", async () => {
