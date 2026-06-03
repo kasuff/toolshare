@@ -1148,6 +1148,12 @@ button.mini {
   font-size: 0.82rem;
 }
 
+.field-success {
+  margin: 0;
+  color: var(--color-success);
+  font-size: 0.82rem;
+}
+
 details {
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-sm);
