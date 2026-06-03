@@ -147,7 +147,6 @@ backend:build:
 
 deploy:production:
   stage: deploy
-  image: alpine:latest
   tags:
     - server
     - deploy
@@ -156,10 +155,6 @@ deploy:production:
     - backend:build
   only:
     - main
-  environment:
-    name: production
-  before_script:
-    - apk add --no-cache docker-cli docker-cli-compose
   script:
     - chmod +x scripts/deploy-prod.sh
     - ./scripts/deploy-prod.sh
