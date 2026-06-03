@@ -100,22 +100,27 @@ export const bookingsService = {
     const isModeratorOrManager = input.actorRole === "MODERATOR" || input.actorRole === "MANAGER";
 
     if (input.status === "RETURNED") {
-      if (!isRequester && !isProvider && !isModeratorOrManager) {
-        throw new AppError("FORBIDDEN", "Only booking participants can complete a booking", 403);
+      if (!isProvider && !isModeratorOrManager) {
+        throw new AppError("FORBIDDEN", "Only the provider can complete a booking", 403);
+      }
+      if (booking.status !== "ACCEPTED") {
+        throw new AppError("INVALID_STATE", "Only accepted bookings can be completed", 400);
+      }
+      if (booking.endDate.getTime() > Date.now()) {
+        throw new AppError("BOOKING_NOT_ENDED", "Booking can only be completed after the usage period has ended", 400);
       }
     } else if (!isProvider && !isModeratorOrManager) {
       throw new AppError("FORBIDDEN", "Only provider or moderation roles can update booking", 403);
     }
 
     const updated = await bookingsRepository.updateStatus(input.bookingId, input.status);
+    if (input.status === "RETURNED" && booking.tool?.id) {
+      await bookingsRepository.markToolAvailable(booking.tool.id);
+    }
 
     let notifyUserId: string | null = null;
     if (input.status === "RETURNED") {
-      if (isRequester && providerId) {
-        notifyUserId = providerId;
-      } else {
-        notifyUserId = booking.userId;
-      }
+      notifyUserId = booking.userId;
     } else {
       notifyUserId = booking.userId;
     }

@@ -196,7 +196,7 @@ export const api = {
     return booking;
   },
 
-  decideBooking(bookingId: string, status: Extract<BookingStatus, "BESTAETIGT" | "ABGELEHNT">): void {
+  decideBooking(bookingId: string, status: Extract<BookingStatus, "BESTAETIGT" | "ABGELEHNT" | "ABGESCHLOSSEN">): void {
     const db = loadDb();
     const b = db.bookings.find((it) => it.id === bookingId);
     if (!b) return;
@@ -204,6 +204,10 @@ export const api = {
     if (b.type === "TOOL" && b.toolId && status === "BESTAETIGT") {
       const t = db.tools.find((it) => it.id === b.toolId);
       if (t) t.status = "AUSGELIEHEN";
+    }
+    if (b.type === "TOOL" && b.toolId && status === "ABGESCHLOSSEN") {
+      const t = db.tools.find((it) => it.id === b.toolId);
+      if (t) t.status = "VERFUEGBAR";
     }
     saveDb(db);
     addNotification(b.requesterId, `Buchung ${bookingId} wurde ${status.toLowerCase()}`);

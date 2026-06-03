@@ -8,7 +8,7 @@ export const bookingsRepository = {
   listForUserContext(userId: string) {
     return prisma.booking.findMany({
       where: {
-        OR: [{ userId }, { tool: { ownerId: userId } }]
+        OR: [{ userId }, { tool: { ownerId: userId } }, { timeslot: { workshop: { managerId: userId } } }]
       },
       include: {
         user: true,
@@ -176,6 +176,13 @@ export const bookingsRepository = {
     return prisma.booking.update({
       where: { id },
       data: { status }
+    });
+  },
+
+  markToolAvailable(toolId: string) {
+    return prisma.tool.update({
+      where: { id: toolId },
+      data: { status: "AVAILABLE" }
     });
   }
 };

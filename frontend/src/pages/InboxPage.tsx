@@ -535,7 +535,7 @@ export function InboxPage({ currentUser, token }: Props) {
                   })}
                 </div>
 
-                {selectedBooking.status === "BESTAETIGT" && (
+                {selectedBooking.status === "BESTAETIGT" && isProvider(selectedBooking) && (
                   <footer className="messenger-chat-footer">
                     <button type="button" onClick={() => void close(selectedBooking.id)}>
                       Als abgeschlossen markieren
