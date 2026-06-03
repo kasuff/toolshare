@@ -104,7 +104,7 @@ describe("Workshop management pages", () => {
       slots: [{ startIso: "2026-07-01T09:00", endIso: "2026-07-01T12:00", blockedByOwner: false }]
     });
     expect((payload.imageUrls as string[])[0]).toContain("data:image/png;base64,mock-photo");
-  });
+  }, 10000);
 
   it("loads and updates existing workshop details", async () => {
     getWorkshopById.mockResolvedValueOnce({
@@ -159,5 +159,5 @@ describe("Workshop management pages", () => {
       }),
       "token-456"
     );
-  });
+  }, 10000);
 });

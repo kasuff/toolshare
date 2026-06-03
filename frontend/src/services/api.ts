@@ -56,16 +56,20 @@ type AuthPayload = {
 type BackendTool = {
   id: string;
   ownerId: string;
+  owner?: Pick<BackendUser, "id" | "name"> | null;
   name: string;
   description: string;
   category: string;
   imageUrl?: string | null;
+  pickupLocation?: string | null;
+  pickupLocationNote?: string | null;
   status: BackendToolStatus;
 };
 
 type BackendWorkshop = {
   id: string;
   managerId: string;
+  manager?: Pick<BackendUser, "id" | "name"> | null;
   name: string;
   description: string;
   location: string;
@@ -82,6 +86,7 @@ type BackendWorkshopTool = {
   workshopId?: string;
   name: string;
   category: string;
+  status?: BackendToolStatus;
 };
 
 type BackendWorkshopTimeslot = {
@@ -239,11 +244,14 @@ function mapTool(tool: BackendTool): Tool {
   return {
     id: tool.id,
     ownerId: tool.ownerId,
+    ownerName: tool.owner?.name,
     name: tool.name,
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE
+    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE,
+    pickupLocation: tool.pickupLocation ?? "",
+    pickupLocationNote: tool.pickupLocationNote ?? undefined
   };
 }
 
@@ -252,6 +260,7 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
   return {
     id: workshop.id,
     ownerId: workshop.managerId,
+    ownerName: workshop.manager?.name,
     name: workshop.name,
     description: workshop.description,
     location: workshop.location,
@@ -379,7 +388,7 @@ export const api = {
       email: user.email,
       address: user.address,
       role: roleMap[user.role],
-      isSuspended: user.isSuspended
+      isSuspended: user.isSuspended ?? false
     };
   },
 
@@ -456,14 +465,24 @@ export const api = {
   },
 
   async createTool(
-    input: { name: string; description: string; category: string; imageUrl?: string },
+    input: {
+      name: string;
+      description: string;
+      category: string;
+      imageUrl?: string;
+      pickupLocation: string;
+      pickupLocationNote?: string;
+    },
     token: string
   ): Promise<Tool> {
     const created = await request<BackendTool>(
       "/tools",
       {
         method: "POST",
-        body: JSON.stringify(input)
+        body: JSON.stringify({
+          ...input,
+          pickupLocationNote: input.pickupLocationNote?.trim() || undefined
+        })
       },
       token
     );
@@ -490,7 +509,10 @@ export const api = {
     return mapBooking(created);
   },
 
-  async getWorkshops(filters: { q?: string }, token: string): Promise<Array<{ workshop: Workshop; slots: WorkshopSlot[] }>> {
+  async getWorkshops(
+    filters: { q?: string },
+    token: string
+  ): Promise<Array<{ workshop: Workshop; slots: WorkshopSlot[]; tools: Array<Tool & { selectable: boolean }> }>> {
     const params = new URLSearchParams();
     if (filters.q) params.set("search", filters.q);
     const workshops = await request<BackendWorkshop[]>(`/workshops?${params.toString()}`, undefined, token);
@@ -498,7 +520,22 @@ export const api = {
       workshops.map(async (workshop) => {
         const detail = await request<BackendWorkshop>(`/workshops/${workshop.id}`, undefined, token);
         const slots = (detail.timeslots ?? []).map(mapWorkshopSlot);
-        return { workshop: mapWorkshop(workshop), slots };
+        const mappedWorkshop = mapWorkshop(detail);
+        const tools = mappedWorkshop.equipmentItems.map((tool) => {
+          const backendTool = detail.workshopTools?.find((entry) => entry.id === tool.id);
+          const status = backendTool?.status ? toolStatusMap[backendTool.status] : ("VERFUEGBAR" as const);
+          return {
+            id: tool.id,
+            ownerId: mappedWorkshop.ownerId,
+            name: tool.name,
+            description: "Werkstatt-Werkzeug",
+            category: tool.category,
+            imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+            status,
+            selectable: status === "VERFUEGBAR",
+          };
+        });
+        return { workshop: mappedWorkshop, slots, tools };
       })
     );
     return withSlots;

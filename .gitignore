@@ -8,11 +8,10 @@ dist/
 build/
 public/
 *.tsbuildinfo
+junit.xml
 
 # Environment
-.env
-.env.local
-.env.*.local
+.env*
 
 # IDE
 .vscode/

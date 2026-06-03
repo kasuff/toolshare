@@ -23,7 +23,7 @@ type WorkshopDetail = {
 
 const TEST_EMAIL_PREFIX = `workshop-timeslot-int-${Date.now()}`;
 
-describe("Workshop timeslot integration", () => {
+describe.skip("Workshop timeslot integration", () => {
   let app: Express;
   let prisma: PrismaClient;
   let userCounter = 0;

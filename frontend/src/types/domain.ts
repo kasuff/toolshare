@@ -26,10 +26,13 @@ export interface User {
 export interface Tool {
   id: string;
   ownerId: string;
+  ownerName?: string;
   name: string;
   description: string;
   category: string;
   imageUrl: string;
+  pickupLocation?: string;
+  pickupLocationNote?: string;
   status: ToolStatus;
 }
 
@@ -50,6 +53,7 @@ export interface WorkshopToolItem {
 export interface Workshop {
   id: string;
   ownerId: string;
+  ownerName?: string;
   name: string;
   description: string;
   location: string;

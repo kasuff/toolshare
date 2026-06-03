@@ -1,8 +1,7 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
-import { StatusPill } from "../components/ui";
 import { getPlaceholderImageForCategory } from "../utils/categories";
 import type { Tool, User } from "../types/domain";
 
@@ -11,12 +10,7 @@ type Props = {
   currentUser?: User;
 };
 
-const statusLabel: Record<"VERFUEGBAR" | "AUSGELIEHEN", string> = {
-  VERFUEGBAR: "Verfügbar",
-  AUSGELIEHEN: "Ausgeliehen",
-};
-
-export function ToolDetailPage({ token, currentUser }: Props) {
+export function ToolDetailPage({ token, currentUser: _currentUser }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { pushToast } = useToast();
@@ -156,6 +150,16 @@ export function ToolDetailPage({ token, currentUser }: Props) {
 
           <p className="tool-description">{tool.description}</p>
 
+          <div className="owner-card">
+            <h3>Abholort</h3>
+            <div className="owner-details">
+              <div className="owner-info">
+                <div className="owner-name">{tool.pickupLocation || "Nicht angegeben"}</div>
+                {tool.pickupLocationNote && <div className="owner-meta">Hinweis: {tool.pickupLocationNote}</div>}
+              </div>
+            </div>
+          </div>
+
           {/* Owner Card */}
           <div className="owner-card">
             <h3>Anbieter</h3>
@@ -251,9 +255,13 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               <p className="booking-hint">
                 <strong>Einloggen, um zu buchen</strong>
               </p>
-              <a href="/auth" className="booking-button">
+              <Link
+                to="/auth"
+                state={{ redirectHint: "Bitte melde dich an, um eine Ausleihe anzufragen." }}
+                className="booking-button"
+              >
                 Jetzt einloggen
-              </a>
+              </Link>
             </div>
           ) : (
             <div className="playtomic-booking-panel unavailable">

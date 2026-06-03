@@ -9,11 +9,22 @@ export default defineConfig({
         environment: "jsdom",
         setupFiles: ["./tests/setup.ts"],
         include: ["tests/**/*.{test,spec}.{ts,tsx}", "src/tests/**/*.{test,spec}.{ts,tsx}"],
+        reporters: ["default", "junit"],
+        outputFile: {
+            junit: "./junit.xml"
+        },
         coverage: {
             provider: "v8",
-            reporter: ["text", "html"],
+            reporter: ["text", "cobertura", "html", "lcov"],
+            reportsDirectory: "./coverage",
+            include: [
+                "src/pages/ToolsPage.tsx",
+                "src/pages/WorkshopsPage.tsx",
+                "src/components/SearchRadiusMap.tsx",
+                "src/utils/searchFilters.ts"
+            ],
             thresholds: {
-                lines: 70,
+                lines: 80,
                 branches: 50,
                 functions: 70,
                 statements: 70

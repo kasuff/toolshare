@@ -18,7 +18,8 @@ export const toolsRepository = {
           ? [
               { name: { contains: filters.search, mode: "insensitive" } },
               { description: { contains: filters.search, mode: "insensitive" } },
-              { category: { contains: filters.search, mode: "insensitive" } }
+              { category: { contains: filters.search, mode: "insensitive" } },
+              { pickupLocation: { contains: filters.search, mode: "insensitive" } }
             ]
           : undefined
       },
@@ -59,7 +60,15 @@ export const toolsRepository = {
     });
   },
 
-  create(input: { ownerId: string; name: string; description: string; category: string; imageUrl?: string }) {
+  create(input: {
+    ownerId: string;
+    name: string;
+    description: string;
+    category: string;
+    imageUrl?: string;
+    pickupLocation: string;
+    pickupLocationNote?: string;
+  }) {
     return prisma.tool.create({
       data: {
         ownerId: input.ownerId,
@@ -67,6 +76,8 @@ export const toolsRepository = {
         description: input.description,
         category: input.category,
         imageUrl: input.imageUrl,
+        pickupLocation: input.pickupLocation,
+        pickupLocationNote: input.pickupLocationNote,
         status: "AVAILABLE"
       }
     });
@@ -79,6 +90,8 @@ export const toolsRepository = {
       description?: string;
       category?: string;
       imageUrl?: string;
+      pickupLocation?: string;
+      pickupLocationNote?: string;
       status?: "AVAILABLE" | "REQUESTED" | "BORROWED";
     }
   ) {

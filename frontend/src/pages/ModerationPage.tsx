@@ -29,6 +29,7 @@ export function ModerationPage({ token }: Props) {
   useEffect(() => {
     if (!token) return;
     void loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const resolve = async (id: string) => {

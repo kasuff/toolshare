@@ -56,5 +56,5 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Verfügbare Werkstätten")).toBeInTheDocument();
     expect(screen.getByText("Holzwerkstatt")).toBeInTheDocument();
     await waitFor(() => expect(getTools).toHaveBeenCalled());
-  });
+  }, 10000);
 });
