@@ -79,12 +79,10 @@ function Sparkline({
 
 function CircularGauge({
   value,
-  label,
-  color = "var(--color-brand)"
+  label
 }: {
   value: number | null;
   label: string;
-  color?: string;
 }) {
   const pct = Math.min(100, Math.max(0, value ?? 0));
   const R = 15.9;
@@ -136,15 +134,13 @@ function KpiCard({
   value,
   unit,
   history,
-  tone = "neutral",
-  color = "var(--color-brand)"
+  tone = "neutral"
 }: {
   label: string;
   value: string;
   unit?: string;
   history: number[];
   tone?: "neutral" | "success" | "warning" | "danger";
-  color?: string;
 }) {
   const toneColor: Record<string, string> = {
     success: "var(--color-success)",
@@ -464,7 +460,6 @@ export function MonitoringSection({ token }: Props) {
                     unit="%"
                     history={hist.errorRate}
                     tone={toneOf(http?.errorRatePercent ?? null, 1, 5)}
-                    color={toneOf(http?.errorRatePercent ?? null, 1, 5) === "danger" ? "var(--color-danger)" : toneOf(http?.errorRatePercent ?? null, 1, 5) === "warning" ? "#d97706" : "var(--color-success)"}
                   />
                   <KpiCard
                     label="P95 Latenz"
@@ -475,7 +470,6 @@ export function MonitoringSection({ token }: Props) {
                       http?.p95LatencySeconds != null ? http.p95LatencySeconds * 1000 : null,
                       500, 2000
                     )}
-                    color={toneOf(http?.p95LatencySeconds != null ? http.p95LatencySeconds * 1000 : null, 500, 2000) === "danger" ? "var(--color-danger)" : toneOf(http?.p95LatencySeconds != null ? http.p95LatencySeconds * 1000 : null, 500, 2000) === "warning" ? "#d97706" : "var(--color-success)"}
                   />
                 </div>
               </Surface>
