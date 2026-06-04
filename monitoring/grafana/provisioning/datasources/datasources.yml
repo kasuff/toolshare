@@ -14,14 +14,15 @@ datasources:
     editable: false
     jsonData:
       httpMethod: POST
-      # Prometheus-Version für korrektes Query-Verhalten
       prometheusVersion: "2.53.0"
-      # Zeitintervall für Query-Auflösung
       timeInterval: "15s"
-      # Query-Optimierungen
       incrementalQuerying: true
       incrementalQueryOverlapWindow: "10m"
       exemplarTraceIdDestinations: []
+      # Query-Timeout in Grafana (unabhängig vom Prometheus-seitigen Timeout)
+      queryTimeout: "60s"
+      # Maximale Datenpunkte pro Panel – begrenzt Speicher- und CPU-Last
+      defaultEditor: "builder"
 
   # ── Loki ────────────────────────────────────────────────────────────────────
   - name: Loki
@@ -32,9 +33,8 @@ datasources:
     isDefault: false
     editable: false
     jsonData:
-      # Maximale Anzahl Zeilen in der Log-Ansicht
-      maxLines: 5000
-      # Automatische Korrelation: Loki-Logs → Prometheus-Trace
+      maxLines: 1000          # Weniger als vorher (5000) → deutlich weniger Last
+      timeout: "30"           # Sekunden bis Loki-Query-Timeout
       derivedFields:
         - datasourceUid: prometheus
           matcherRegex: "requestId=(\\w+)"

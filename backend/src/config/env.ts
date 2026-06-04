@@ -49,5 +49,7 @@ export const env = {
   corsOrigin: parseCorsOrigins(process.env.CORS_ORIGIN),
   rateLimitWindowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 10 * 60 * 1000),
   rateLimitMax: parsePositiveInt(process.env.RATE_LIMIT_MAX, 600),
-  rateLimitAuthMax: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, 100)
+  rateLimitAuthMax: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, 100),
+  prometheusUrl: process.env.PROMETHEUS_URL ?? "http://prometheus:9090",
+  lokiUrl: process.env.LOKI_URL ?? "http://loki:3100"
 };

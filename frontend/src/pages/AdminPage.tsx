@@ -1,9 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { MonitoringSection } from "../components/MonitoringSection";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api, type SuspensionRequestItem } from "../services/api";
 import type { User } from "../types/domain";
+
+type AdminTab = "management" | "monitoring";
 
 type Props = {
   currentUser?: User;
@@ -12,6 +15,7 @@ type Props = {
 
 export function AdminPage({ currentUser, token }: Props) {
   const { pushToast } = useToast();
+  const [adminTab, setAdminTab] = useState<AdminTab>("management");
   const [users, setUsers] = useState<User[]>([]);
   const [suspensionRequests, setSuspensionRequests] = useState<SuspensionRequestItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
@@ -127,9 +131,39 @@ export function AdminPage({ currentUser, token }: Props) {
     );
   }
 
+  const tabNav = (
+    <nav className="monitoring-tabs">
+      <button
+        type="button"
+        className={`monitoring-tab ${adminTab === "management" ? "active" : ""}`}
+        onClick={() => setAdminTab("management")}
+      >
+        Verwaltung
+      </button>
+      <button
+        type="button"
+        className={`monitoring-tab ${adminTab === "monitoring" ? "active" : ""}`}
+        onClick={() => setAdminTab("monitoring")}
+      >
+        Monitoring
+      </button>
+    </nav>
+  );
+
+  if (adminTab === "monitoring") {
+    return (
+      <section className="stack">
+        <h1>Admin</h1>
+        {tabNav}
+        <MonitoringSection token={token} />
+      </section>
+    );
+  }
+
   return (
     <section className="stack">
       <h1>Admin</h1>
+      {tabNav}
       <Surface title="Systemnutzung" subtitle="Schnellüberblick über die aktuelle Plattformaktivität.">
         <ul className="meta-list">
           <li>Nutzer: {metrics.users}</li>

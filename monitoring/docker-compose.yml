@@ -20,21 +20,52 @@ services:
       # Admin-Zugangsdaten
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      # Anonymen Zugriff deaktivieren
-      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # Anonymer Viewer-Zugriff: erlaubt iframe-Embedding ohne Login
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
       # Grafana URL (für Embedding und Alerts)
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
       # Embedding per iframe erlauben (für Admin-Portal)
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       # Plugins
       GF_INSTALL_PLUGINS: ""
-      # Reporting vorbereiten (Grafana Enterprise Feature – hier als Platzhalter)
+      # Reporting vorbereiten
       GF_FEATURE_TOGGLES_ENABLE: "publicDashboards"
       # Logging
       GF_LOG_MODE: console
       GF_LOG_LEVEL: warn
       # Provisioning
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+
+      # ── Ressourcenschutz ──────────────────────────────────────────────────
+      # Max. gleichzeitige HTTP-Verbindungen zum Grafana-Server
+      GF_SERVER_ROUTER_LOGGING: "false"
+
+      # Datenbankverbindungen begrenzen (SQLite intern)
+      GF_DATABASE_MAX_OPEN_CONN: "10"
+      GF_DATABASE_MAX_IDLE_CONN: "5"
+      GF_DATABASE_CONN_MAX_LIFETIME: "14400"   # 4h in Sekunden
+
+      # Dashboard-Query-Limits: verhindert teure Abfragen
+      GF_DATAPROXY_TIMEOUT: "30"               # Sekunden bis Datasource-Timeout
+      GF_DATAPROXY_KEEP_ALIVE_SECONDS: "30"
+      GF_DATAPROXY_MAX_IDLE_CONNECTIONS: "64"
+
+      # Rendering-Limit (PNG/PDF-Export, sehr CPU-intensiv)
+      GF_RENDERING_CONCURRENT_RENDER_LIMIT: "2"
+      GF_RENDERING_RENDER_KEY_LIFETIME: "5m"
+
+      # Rate Limiting (ab Grafana 9.x)
+      GF_RATE_LIMITING_ENABLED: "true"
+      GF_RATE_LIMITING_RATE: "${GRAFANA_RATE_LIMIT:-50}"      # Req/s pro IP
+      GF_RATE_LIMITING_BURST_SIZE: "${GRAFANA_BURST_SIZE:-100}"
+
+      # Alert-History-Bereinigung verhindert Datenbankaufblähung
+      GF_ALERTING_MAX_ANNOTATION_AGE: "30d"
+      GF_ANNOTATIONS_MAX_AGE: "30d"
+
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -49,6 +80,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # ── Docker-Ressourcenlimits ──────────────────────────────────────────────
+    deploy:
+      resources:
+        limits:
+          cpus: "${GRAFANA_CPU_LIMIT:-0.50}"    # max. 50% eines CPU-Kerns
+          memory: "${GRAFANA_MEM_LIMIT:-512M}"
+        reservations:
+          cpus: "0.05"
+          memory: "128M"
     networks:
       - monitoring-network
       - toolshare-network
@@ -67,8 +107,17 @@ services:
       - "--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-10GB}"
       - "--web.console.libraries=/usr/share/prometheus/console_libraries"
       - "--web.console.templates=/usr/share/prometheus/consoles"
-      - "--web.enable-lifecycle"       # POST /-/reload für Hot-Reload
-      - "--web.enable-admin-api"       # Für direkte API-Abfragen aus dem Admin-Portal
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+      # ── Query-Throttling ────────────────────────────────────────────────
+      # Max. parallele Queries (default: 20 – für kleinen Server reduzieren)
+      - "--query.max-concurrency=${PROMETHEUS_MAX_CONCURRENCY:-10}"
+      # Max. Ausführungszeit pro Query (verhindert hängende Abfragen)
+      - "--query.timeout=${PROMETHEUS_QUERY_TIMEOUT:-60s}"
+      # Max. Samples pro Query (verhindert Memory-Spikes bei großen Ranges)
+      - "--query.max-samples=${PROMETHEUS_MAX_SAMPLES:-5000000}"
+      # Max. gleichzeitige HTTP-Verbindungen
+      - "--web.max-connections=${PROMETHEUS_MAX_CONNECTIONS:-100}"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alerts:/etc/prometheus/alerts:ro
@@ -78,6 +127,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "${PROMETHEUS_CPU_LIMIT:-0.50}"
+          memory: "${PROMETHEUS_MEM_LIMIT:-512M}"
+        reservations:
+          cpus: "0.05"
+          memory: "128M"
     networks:
       - monitoring-network
       - toolshare-network
@@ -98,6 +155,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "${LOKI_CPU_LIMIT:-0.50}"
+          memory: "${LOKI_MEM_LIMIT:-512M}"
+        reservations:
+          cpus: "0.05"
+          memory: "128M"
     networks:
       - monitoring-network
 
@@ -109,17 +174,21 @@ services:
     command: -config.file=/etc/promtail/promtail-config.yml
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
-      # Docker-Socket für Container-Discovery
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Docker-Container-Logs (Linux-Pfad)
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      # Systemlogs (optional, Linux)
       - /var/log:/var/log:ro
-      # Positions-Datei: merkt sich gelesene Log-Positionen
       - promtail-positions:/tmp/positions
     depends_on:
       loki:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: "128M"
+        reservations:
+          cpus: "0.02"
+          memory: "32M"
     networks:
       - monitoring-network
       - toolshare-network
@@ -129,7 +198,6 @@ services:
     image: prom/node-exporter:v1.8.1
     container_name: toolshare-node-exporter
     restart: unless-stopped
-    # Kein Host-Port nötig: nur intern von Prometheus abgefragt
     command:
       - "--path.procfs=/host/proc"
       - "--path.rootfs=/rootfs"
@@ -140,6 +208,14 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     pid: host
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: "64M"
+        reservations:
+          cpus: "0.01"
+          memory: "16M"
     networks:
       - monitoring-network
 
