@@ -9,6 +9,8 @@ services:
       - "3000:80"
     depends_on:
       - backend
+    networks:
+      - toolshare-network
 
   backend:
     build:
@@ -22,12 +24,13 @@ services:
       PORT: 4000
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
-
     depends_on:
       db:
         condition: service_healthy
     command: sh -c "npx prisma db push && node dist/index.js"
     restart: unless-stopped
+    networks:
+      - toolshare-network
 
   db:
     image: postgres:16-alpine
@@ -43,6 +46,13 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - toolshare-network
 
 volumes:
   pgdata:
+
+networks:
+  toolshare-network:
+    name: toolshare-network
+    driver: bridge
