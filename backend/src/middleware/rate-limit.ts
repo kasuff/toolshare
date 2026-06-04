@@ -24,3 +24,22 @@ export const authRateLimiter = rateLimit({
     });
   }
 });
+
+// Monitoring-Proxy: max. 30 Req/min pro IP.
+// Jeder Request löst eine Prometheus-/Loki-Abfrage aus — daher strenger begrenzt.
+export const monitoringRateLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip ?? "unknown",
+  handler: (_req, res) => {
+    res.status(429).json({
+      error: {
+        code: "RATE_LIMIT",
+        message: "Monitoring-API: zu viele Anfragen. Bitte warte eine Minute.",
+        status: 429
+      }
+    });
+  }
+});
