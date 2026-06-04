@@ -55,7 +55,7 @@ export const updateToolSchema = z.object({
         value.pickupLocationNote !== undefined ||
         value.status !== undefined,
       {
-        message: "At least one field must be provided"
+        message: "Mindestens ein Feld muss angegeben werden."
       }
     ),
   params: z.object({

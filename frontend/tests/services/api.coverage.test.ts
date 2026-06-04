@@ -392,9 +392,17 @@ describe("api coverage", () => {
         { status: 400 }
       )
     );
-    await expect(api.createTool({ name: "X", description: "Test", category: "bau" }, "token-123")).rejects.toThrow(
-      "Diese E-Mail ist bereits registriert."
-    );
+    await expect(
+      api.createTool(
+        {
+          name: "X",
+          description: "Test",
+          category: "bau",
+          pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland"
+        },
+        "token-123"
+      )
+    ).rejects.toThrow("Diese E-Mail ist bereits registriert.");
 
     fetchMock.mockResolvedValueOnce(
       responseJson(
@@ -426,9 +434,17 @@ describe("api coverage", () => {
         { status: 400 }
       )
     );
-    await expect(api.createTool({ name: "X", description: "Test", category: "bau" }, "token-123")).rejects.toThrow(
-      "name: Muss mindestens 3 Zeichen lang sein."
-    );
+    await expect(
+      api.createTool(
+        {
+          name: "X",
+          description: "Test",
+          category: "bau",
+          pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland"
+        },
+        "token-123"
+      )
+    ).rejects.toThrow("name: Eingabe muss mindestens 3 Zeichen lang sein.");
 
     fetchMock.mockResolvedValueOnce(
       responseJson(

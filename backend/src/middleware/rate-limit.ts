@@ -8,7 +8,7 @@ export const apiRateLimiter = rateLimit({
   legacyHeaders: false,
   handler: (_req, res) => {
     res.status(429).json({
-      message: "Too many requests, please try again later."
+      message: "Zu viele Anfragen. Bitte versuchen Sie es später erneut."
     });
   }
 });
@@ -20,7 +20,7 @@ export const authRateLimiter = rateLimit({
   legacyHeaders: false,
   handler: (_req, res) => {
     res.status(429).json({
-      message: "Too many authentication attempts, please try again later."
+      message: "Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut."
     });
   }
 });

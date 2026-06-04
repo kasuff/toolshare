@@ -1,13 +1,28 @@
 import { prisma } from "../../config/prisma";
 
+const reportWithReporterInclude = {
+  reporter: { select: { id: true, name: true, email: true } }
+} as const;
+
 export const moderationRepository = {
-  createReport(input: { reporterId: string; bookingId?: string; reason: string; details?: string }) {
+  createReport(input: {
+    reporterId: string;
+    targetType: "TOOL" | "WORKSHOP" | "USER";
+    targetId: string;
+    bookingId?: string;
+    reason: string;
+    details?: string;
+    conversationContext?: string;
+  }) {
     return prisma.report.create({
       data: {
         reporterId: input.reporterId,
+        targetType: input.targetType,
+        targetId: input.targetId,
         bookingId: input.bookingId,
         reason: input.reason,
-        details: input.details
+        details: input.details,
+        conversationContext: input.conversationContext
       }
     });
   },
@@ -15,7 +30,40 @@ export const moderationRepository = {
   listOpenReports() {
     return prisma.report.findMany({
       where: { status: { in: ["OPEN", "IN_REVIEW"] } },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      include: reportWithReporterInclude
+    });
+  },
+
+  listClosedReports() {
+    return prisma.report.findMany({
+      where: { status: { in: ["RESOLVED", "REJECTED"] } },
+      orderBy: { decisionAt: "desc" },
+      include: reportWithReporterInclude
+    });
+  },
+
+  findToolsByIds(ids: string[]) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return prisma.tool.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, ownerId: true, owner: { select: { id: true, name: true } } }
+    });
+  },
+
+  findWorkshopsByIds(ids: string[]) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return prisma.workshop.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, managerId: true, manager: { select: { id: true, name: true } } }
+    });
+  },
+
+  findUsersByIds(ids: string[]) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, email: true }
     });
   },
 
@@ -23,10 +71,20 @@ export const moderationRepository = {
     return prisma.report.findUnique({ where: { id } });
   },
 
-  updateStatus(id: string, status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED", moderatorId: string) {
+  updateStatus(
+    id: string,
+    status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED",
+    moderatorId: string,
+    decisionNote?: string
+  ) {
     return prisma.report.update({
       where: { id },
-      data: { status, moderatorId }
+      data: {
+        status,
+        moderatorId,
+        decisionNote,
+        decisionAt: status === "RESOLVED" || status === "REJECTED" ? new Date() : null
+      }
     });
   }
 };

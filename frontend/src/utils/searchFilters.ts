@@ -61,8 +61,11 @@ export function distanceBetweenLocations(origin: string, target?: string): numbe
 }
 
 export function isWithinRadius(origin: string, target: string | undefined, radiusKm: number): boolean {
+  const normalized = target?.trim();
+  if (!normalized) return false;
   const distance = distanceBetweenLocations(origin, target);
-  return distance !== null && distance <= radiusKm;
+  if (distance === null) return false;
+  return distance <= radiusKm;
 }
 
 function startsBeforeOrAt(slotStart: string, filterEnd?: string) {

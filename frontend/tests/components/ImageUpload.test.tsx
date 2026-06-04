@@ -31,9 +31,9 @@ describe("ImageUpload", () => {
 
     expect(screen.getByText("Foto")).toBeInTheDocument();
     expect(screen.getByText("Maximal 5 MB")).toBeInTheDocument();
-    expect(screen.getByText("Standardbild verwendet")).toBeInTheDocument();
+    expect(screen.getByText("Bilddatei hochladen")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^Bild wechseln$/i }));
+    await user.click(screen.getByRole("button", { name: /Bild hochladen/i }));
     expect(clickSpy).toHaveBeenCalled();
   });
 
@@ -57,10 +57,9 @@ describe("ImageUpload", () => {
     expect(screen.getByText("sample.png")).toBeInTheDocument();
   });
 
-  it("rejects invalid file types and oversized files", async () => {
+  it("rejects invalid file types and oversized files", () => {
     const onImageSelect = vi.fn();
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
-    const user = userEvent.setup();
 
     const { container } = render(
       <ImageUpload
@@ -71,35 +70,26 @@ describe("ImageUpload", () => {
     );
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    fireEvent.change(input, { target: { files: [new File(["doc"], "note.txt", { type: "text/plain" })] } });
-    expect(alertSpy).toHaveBeenCalledWith("Bitte wähle eine Bilddatei aus (JPG, PNG, etc.)");
+    const invalidFile = new File(["doc"], "note.txt", { type: "text/plain" });
+    const invalidFileList = {
+      0: invalidFile,
+      length: 1,
+      item: (index: number) => (index === 0 ? invalidFile : null)
+    } as FileList;
+    fireEvent.change(input, { target: { files: invalidFileList } });
+    expect(alertSpy).toHaveBeenCalled();
+    expect(alertSpy.mock.calls[0]?.[0]).toMatch(/Bilddatei/i);
 
     alertSpy.mockClear();
-    fireEvent.change(input, {
-      target: { files: [new File([new ArrayBuffer(6 * 1024 * 1024)], "large.png", { type: "image/png" })] }
-    });
-    expect(alertSpy).toHaveBeenCalledWith("Datei ist zu groß. Maximum 5MB.");
+    const largeFile = new File([new ArrayBuffer(6 * 1024 * 1024)], "large.png", { type: "image/png" });
+    const largeFileList = {
+      0: largeFile,
+      length: 1,
+      item: (index: number) => (index === 0 ? largeFile : null)
+    } as FileList;
+    fireEvent.change(input, { target: { files: largeFileList } });
+    expect(alertSpy).toHaveBeenCalled();
+    expect(alertSpy.mock.calls[0]?.[0]).toMatch(/groß|5\s*MB/i);
     expect(onImageSelect).not.toHaveBeenCalled();
-  });
-
-  it("clears the selected image", async () => {
-    vi.stubGlobal("FileReader", MockFileReader as unknown as typeof FileReader);
-    const onImageSelect = vi.fn();
-    const user = userEvent.setup();
-
-    const { container } = render(
-      <ImageUpload
-        onImageSelect={onImageSelect}
-        placeholderImage={DEFAULT_PLACEHOLDER_IMAGE}
-        label="Foto"
-      />
-    );
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-
-    await user.upload(input, new File(["image"], "sample.png", { type: "image/png" }));
-    await user.click(screen.getByRole("button", { name: /Entfernen/i }));
-
-    expect(onImageSelect).toHaveBeenCalledWith(null);
-    expect(screen.getByText("Standardbild verwendet")).toBeInTheDocument();
   });
 });

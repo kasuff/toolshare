@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
+import { api, type SuspensionRequestItem } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -13,28 +13,40 @@ type Props = {
 export function AdminPage({ currentUser, token }: Props) {
   const { pushToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
+  const [suspensionRequests, setSuspensionRequests] = useState<SuspensionRequestItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState({
     users: 0,
     tools: 0,
     workshops: 0,
     openBookings: 0,
-    openReports: 0
+    openReports: 0,
+    openSuspensionRequests: 0
   });
 
   const loadData = async (search: string) => {
     if (!token) return;
     setIsLoading(true);
     try {
-      const [nextUsers, nextMetrics] = await Promise.all([
+      const [nextUsers, nextMetrics, nextSuspensionRequests] = await Promise.all([
         api.listUsers(token, { search: search || undefined }),
-        api.getMetrics(token)
+        api.getMetrics(token),
+        api.listSuspensionRequests(token)
       ]);
       setUsers(nextUsers);
-      setMetrics(nextMetrics);
+      setMetrics({
+        users: nextMetrics.users,
+        tools: nextMetrics.tools,
+        workshops: nextMetrics.workshops,
+        openBookings: nextMetrics.openBookings,
+        openReports: nextMetrics.openReports,
+        openSuspensionRequests: nextMetrics.openSuspensionRequests ?? 0
+      });
+      setSuspensionRequests(nextSuspensionRequests);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Admin-Daten konnten nicht geladen werden.", "error");
     } finally {
@@ -76,6 +88,20 @@ export function AdminPage({ currentUser, token }: Props) {
     }
   };
 
+  const decideSuspensionRequest = async (requestId: string, approve: boolean) => {
+    if (!token) return;
+    setBusyRequestId(requestId);
+    try {
+      await api.decideSuspensionRequest(requestId, { approve }, token);
+      await loadData(appliedSearch);
+      pushToast(approve ? "Sperrung wurde durchgeführt." : "Sperranfrage abgelehnt.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Sperranfrage konnte nicht bearbeitet werden.", "error");
+    } finally {
+      setBusyRequestId(null);
+    }
+  };
+
   const onSearchSubmit = (event: FormEvent) => {
     event.preventDefault();
     setAppliedSearch(searchInput.trim());
@@ -111,7 +137,56 @@ export function AdminPage({ currentUser, token }: Props) {
           <li>Werkstätten: {metrics.workshops}</li>
           <li>Offene Buchungen: {metrics.openBookings}</li>
           <li>Offene Meldungen: {metrics.openReports}</li>
+          <li>Offene Sperranfragen: {metrics.openSuspensionRequests}</li>
         </ul>
+      </Surface>
+
+      <Surface
+        title="Sperranfragen"
+        subtitle="Von Moderatoren angeforderte Kontosperrungen – hier annehmen oder ablehnen."
+      >
+        {suspensionRequests.length === 0 ? (
+          <EmptyState title="Keine offenen Sperranfragen" text="Derzeit liegt keine Sperranfrage zur Entscheidung vor." />
+        ) : (
+          <ul className="moderation-report-list">
+            {suspensionRequests.map((request) => (
+              <li key={request.id} className="inbox-item moderation-report">
+                <p>
+                  <strong>{request.user.name}</strong> ({request.user.email})
+                </p>
+                <p className="hint">
+                  Angefragt von {request.requestedBy.name} · {new Date(request.createdAt).toLocaleString("de-DE")}
+                </p>
+                <p>
+                  <strong>Grund:</strong> {request.reason}
+                </p>
+                {request.report && (
+                  <p className="hint">
+                    Bezug: Meldung „{request.report.reason}" ({request.report.targetType})
+                  </p>
+                )}
+                <div className="moderation-actions">
+                  <button
+                    type="button"
+                    className="btn mini"
+                    disabled={busyRequestId === request.id}
+                    onClick={() => void decideSuspensionRequest(request.id, true)}
+                  >
+                    Sperrung annehmen
+                  </button>
+                  <button
+                    type="button"
+                    className="btn secondary mini"
+                    disabled={busyRequestId === request.id}
+                    onClick={() => void decideSuspensionRequest(request.id, false)}
+                  >
+                    Ablehnen
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </Surface>
 
       <Surface title="Nutzerverwaltung" subtitle="Suche nach Nutzern und verwalte Rollen sowie Kontostatus.">
@@ -152,40 +227,40 @@ export function AdminPage({ currentUser, token }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
+                {users.map((user) => (
+                  <tr key={user.id}>
                     <td>
                       <div className="admin-user-meta">
-                        <strong>{u.name}</strong>
-                        <span>{u.email}</span>
+                        <strong>{user.name}</strong>
+                        <span>{user.email}</span>
                       </div>
                     </td>
                     <td>
                       <StatusPill
-                        label={u.role}
-                        tone={u.role === "ADMIN" ? "warning" : u.role === "MODERATOR" ? "success" : "neutral"}
+                        label={user.role}
+                        tone={user.role === "ADMIN" ? "warning" : user.role === "MODERATOR" ? "success" : "neutral"}
                       />
                     </td>
                     <td>
-                      <StatusPill label={u.isSuspended ? "Gesperrt" : "Aktiv"} tone={u.isSuspended ? "danger" : "success"} />
+                      <StatusPill label={user.isSuspended ? "Gesperrt" : "Aktiv"} tone={user.isSuspended ? "danger" : "success"} />
                     </td>
                     <td>
                       <div className="admin-actions">
                         <button
                           type="button"
                           className="btn secondary mini"
-                          onClick={() => updateRole(u.id, u.role === "MODERATOR" ? "NUTZER" : "MODERATOR")}
-                          disabled={busyUserId === u.id || u.role === "ADMIN"}
+                          onClick={() => updateRole(user.id, user.role === "MODERATOR" ? "NUTZER" : "MODERATOR")}
+                          disabled={busyUserId === user.id || user.role === "ADMIN"}
                         >
-                          {u.role === "MODERATOR" ? "Moderator entfernen" : "Zum Moderator machen"}
+                          {user.role === "MODERATOR" ? "Moderator entfernen" : "Zum Moderator machen"}
                         </button>
                         <button
                           type="button"
-                          className={`btn mini ${u.isSuspended ? "secondary" : ""}`.trim()}
-                          onClick={() => updateSuspension(u.id, !u.isSuspended)}
-                          disabled={busyUserId === u.id || u.role === "ADMIN" || u.id === currentUser?.id}
+                          className={`btn mini ${user.isSuspended ? "secondary" : ""}`.trim()}
+                          onClick={() => updateSuspension(user.id, !user.isSuspended)}
+                          disabled={busyUserId === user.id || user.role === "ADMIN" || user.id === currentUser?.id}
                         >
-                          {u.isSuspended ? "Entsperren" : "Sperren"}
+                          {user.isSuspended ? "Entsperren" : "Sperren"}
                         </button>
                       </div>
                     </td>

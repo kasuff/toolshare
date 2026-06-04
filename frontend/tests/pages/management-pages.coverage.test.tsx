@@ -17,8 +17,11 @@ const {
   updateUserRole,
   updateUserSuspension,
   listReports,
+  listClosedReports,
   getRatingsReceived,
   updateReportStatus,
+  listSuspensionRequests,
+  decideSuspensionRequest,
   createWorkshop
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
@@ -30,8 +33,11 @@ const {
   updateUserRole: vi.fn(),
   updateUserSuspension: vi.fn(),
   listReports: vi.fn(),
+  listClosedReports: vi.fn(),
   getRatingsReceived: vi.fn(),
   updateReportStatus: vi.fn(),
+  listSuspensionRequests: vi.fn(),
+  decideSuspensionRequest: vi.fn(),
   createWorkshop: vi.fn()
 }));
 
@@ -51,8 +57,11 @@ vi.mock("../../src/services/api", () => ({
     updateUserRole,
     updateUserSuspension,
     listReports,
+    listClosedReports,
     getRatingsReceived,
     updateReportStatus,
+    listSuspensionRequests,
+    decideSuspensionRequest,
     createWorkshop
   }
 }));
@@ -110,7 +119,28 @@ describe("management pages", () => {
   });
 
   it("loads, searches and updates admin users", async () => {
-    getMetrics.mockResolvedValue({ users: 3, tools: 4, workshops: 2, openBookings: 1, openReports: 0 });
+    getMetrics.mockResolvedValue({
+      users: 3,
+      tools: 4,
+      workshops: 2,
+      openBookings: 1,
+      openReports: 0,
+      openSuspensionRequests: 1
+    });
+    listSuspensionRequests.mockResolvedValue([
+      {
+        id: "sr1",
+        userId: "u2",
+        requestedById: "u4",
+        reportId: "r9",
+        reason: "Wiederholte Verstoesse",
+        status: "PENDING",
+        createdAt: "2026-05-05T11:00:00.000Z",
+        user: { id: "u2", name: "Murat", email: "murat@toolshare.local", isSuspended: false },
+        requestedBy: { id: "u4", name: "Tobias" },
+        report: { id: "r9", reason: "Beleidigung", targetType: "USER", targetId: "u2" }
+      }
+    ]);
     listUsers.mockImplementation(async (_token, filters) => {
       if (filters?.search === "nichts") {
         return [];
@@ -127,8 +157,9 @@ describe("management pages", () => {
     );
 
     expect(await screen.findByText("Nutzer: 3")).toBeInTheDocument();
-    expect(screen.getByText("Murat")).toBeInTheDocument();
-    expect(screen.getByText("Tobias")).toBeInTheDocument();
+    expect(screen.getByText(/Wiederholte Verstoesse/)).toBeInTheDocument();
+    expect(screen.getAllByText("Murat").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Tobias").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("Nutzer suchen"), { target: { value: "nichts" } });
     fireEvent.click(screen.getByRole("button", { name: "Suchen" }));
@@ -139,7 +170,11 @@ describe("management pages", () => {
     fireEvent.change(screen.getByLabelText("Nutzer suchen"), { target: { value: "mur" } });
     fireEvent.click(screen.getByRole("button", { name: "Suchen" }));
 
-    expect(await screen.findByText("Murat")).toBeInTheDocument();
+    decideSuspensionRequest.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole("button", { name: "Sperrung annehmen" }));
+    await waitFor(() => {
+      expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: true }, "token-123");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
 
     expect(await screen.findByText("Tobias")).toBeInTheDocument();
@@ -150,12 +185,25 @@ describe("management pages", () => {
     expect(updateUserSuspension).toHaveBeenCalledWith("u2", false, "token-123");
   });
 
-  it("loads reports and ratings and resolves a moderation item", async () => {
+  it("loads reports and ratings and rejects a moderation item", async () => {
+    listClosedReports.mockResolvedValue([]);
     listReports.mockResolvedValueOnce([
-      { id: "r1", reason: "Defekt", details: "Gehäuse gebrochen", status: "OPEN" }
-    ]).mockResolvedValueOnce([
-      { id: "r1", reason: "Defekt", details: "Gehäuse gebrochen", status: "RESOLVED" }
-    ]);
+      {
+        id: "r1",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Gehäuse gebrochen",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z"
+      }
+    ]).mockResolvedValueOnce([]);
     getRatingsReceived.mockResolvedValue([
       { id: "rt1", score: 5, comment: "Top", createdAt: "2026-05-05T10:00:00.000Z", fromUser: { name: "Lea" } }
     ]);
@@ -169,10 +217,20 @@ describe("management pages", () => {
 
     expect(await screen.findByText(/Gehäuse gebrochen/)).toBeInTheDocument();
     expect(screen.getByText(/Score 5/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Als bearbeitet markieren" }));
+    fireEvent.change(screen.getByPlaceholderText(/Begründung beim Verwerfen/), {
+      target: { value: "Kein Verstoss erkennbar" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
 
     await waitFor(() => {
-      expect(updateReportStatus).toHaveBeenCalledWith("r1", "RESOLVED", "token-123");
+      expect(updateReportStatus).toHaveBeenCalledWith(
+        "r1",
+        {
+          status: "REJECTED",
+          decisionNote: "Kein Verstoss erkennbar"
+        },
+        "token-123"
+      );
     });
     expect(await screen.findByText(/Top/)).toBeInTheDocument();
   });

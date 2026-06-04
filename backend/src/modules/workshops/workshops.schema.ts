@@ -60,7 +60,7 @@ export const updateWorkshopSchema = z.object({
         value.equipment !== undefined ||
         value.workshopTools !== undefined ||
         value.imageUrls !== undefined,
-      { message: "At least one field must be provided" }
+      { message: "Mindestens ein Feld muss angegeben werden." }
     ),
   params: z.object({
     id: z.string().uuid()
@@ -89,7 +89,7 @@ export const updateTimeslotSchema = z.object({
     })
     .refine(
       (value) => value.startTime !== undefined || value.endTime !== undefined || value.blockedByOwner !== undefined,
-      { message: "At least one field must be provided" }
+      { message: "Mindestens ein Feld muss angegeben werden." }
     ),
   params: z.object({
     id: z.string().uuid(),

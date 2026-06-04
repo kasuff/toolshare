@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { KebabMenu } from "../components/KebabMenu";
+import { ReportFormPanel } from "../components/ReportFormPanel";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
@@ -42,9 +44,14 @@ type BookingRow = Booking & {
 export function InboxPage({ currentUser, token }: Props) {
   const { pushToast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; message: string; read: boolean; createdIso: string }>>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftPickupParts>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showUserReportForm, setShowUserReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const [isReportingUser, setIsReportingUser] = useState(false);
   const draftSeededForThreadRef = useRef<Set<string>>(new Set());
   const [readMessageIds, setReadMessageIds] = useState<Set<string>>(new Set());
 
@@ -52,8 +59,9 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!token) return;
     setIsLoading(true);
     try {
-      const bookingResult = await api.getBookingsForUser(token);
+      const [bookingResult, notificationResult] = await Promise.all([api.getBookingsForUser(token), api.getNotifications(token)]);
       setBookings(bookingResult);
+      setNotifications(notificationResult);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
     } finally {
@@ -117,6 +125,12 @@ export function InboxPage({ currentUser, token }: Props) {
     }
   }, [sortedRows, selectedBookingId]);
 
+  useEffect(() => {
+    setShowUserReportForm(false);
+    setReportReason("");
+    setReportDetails("");
+  }, [selectedBookingId]);
+
   const selectedBooking =
     sortedRows.find((booking) => booking.id === selectedBookingId) ?? (sortedRows.length > 0 ? sortedRows[0] : null);
 
@@ -146,6 +160,8 @@ export function InboxPage({ currentUser, token }: Props) {
   const counterDraft = selectedBooking ? draftPickupByBooking[selectedBooking.id] : undefined;
 
   const isProvider = (b: Booking) => (currentUser ? b.providerId === currentUser.id : false);
+
+  const warningNotifications = notifications.filter((n) => n.message.startsWith("ERMAHNUNG:"));
 
   const markIncomingRead = (messageKey: string) => {
     if (!currentUser?.id) return;
@@ -240,6 +256,43 @@ export function InboxPage({ currentUser, token }: Props) {
     }
   };
 
+  const closeUserReportForm = () => {
+    setShowUserReportForm(false);
+    setReportReason("");
+    setReportDetails("");
+  };
+
+  const reportCurrentCounterparty = async () => {
+    if (!token || !currentUser || !selectedBooking) return;
+    if (reportReason.trim().length < 5) {
+      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
+      return;
+    }
+    const counterpartId = selectedBooking.providerId === currentUser.id ? selectedBooking.requesterId : selectedBooking.providerId;
+    const conversationContext = buildConversationContext(selectedBooking, currentUser.id);
+
+    setIsReportingUser(true);
+    try {
+      await api.createReport(
+        {
+          targetType: "USER",
+          targetId: counterpartId,
+          bookingId: selectedBooking.id,
+          reason: reportReason.trim(),
+          details: reportDetails.trim() || undefined,
+          conversationContext
+        },
+        token
+      );
+      closeUserReportForm();
+      pushToast("Nutzer wurde gemeldet. Der Chatverlauf wurde als Kontext übermittelt.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Nutzer konnte nicht gemeldet werden.", "error");
+    } finally {
+      setIsReportingUser(false);
+    }
+  };
+
   if (!token || !currentUser) {
     return (
       <section className="stack">
@@ -263,6 +316,17 @@ export function InboxPage({ currentUser, token }: Props) {
       </header>
 
       <div className="messenger-shell">
+        {warningNotifications.length > 0 && (
+          <Surface title="Moderationshinweise">
+            <ul className="meta-list">
+              {warningNotifications.map((notification) => (
+                <li key={notification.id}>
+                  <strong>{new Date(notification.createdIso).toLocaleString()}:</strong> {notification.message}
+                </li>
+              ))}
+            </ul>
+          </Surface>
+        )}
         {sortedRows.length === 0 ? (
           <Surface title="Keine Konversationen">
             <EmptyState title="Noch nichts hier" text="Sobald jemand eine Ausleihe anfragt oder du eine sendest, erscheint die Unterhaltung hier." />
@@ -313,20 +377,47 @@ export function InboxPage({ currentUser, token }: Props) {
                             {selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`}
                           </span>
                         </div>
-                        <StatusPill
-                          label={bookingStatusLabel[selectedBooking.status]}
-                          tone={
-                            selectedBooking.status === "BESTAETIGT"
-                              ? "success"
-                              : selectedBooking.status === "ABGELEHNT"
-                                ? "danger"
-                                : "neutral"
-                          }
-                        />
+                        <div className="messenger-chat-header-actions">
+                          <StatusPill
+                            label={bookingStatusLabel[selectedBooking.status]}
+                            tone={
+                              selectedBooking.status === "BESTAETIGT"
+                                ? "success"
+                                : selectedBooking.status === "ABGELEHNT"
+                                  ? "danger"
+                                  : "neutral"
+                            }
+                          />
+                          <KebabMenu
+                            ariaLabel="Konversationsaktionen"
+                            items={[
+                              {
+                                id: "report-user",
+                                label: "Nutzer melden",
+                                onSelect: () => setShowUserReportForm(true)
+                              }
+                            ]}
+                          />
+                        </div>
                       </>
                     );
                   })()}
                 </header>
+
+                {showUserReportForm && (
+                  <ReportFormPanel
+                    title="Nutzer melden"
+                    hint="Der komplette Chatverlauf wird als Kontext zur Meldung gespeichert."
+                    reason={reportReason}
+                    details={reportDetails}
+                    isSubmitting={isReportingUser}
+                    submitLabel="Nutzer melden"
+                    onReasonChange={setReportReason}
+                    onDetailsChange={setReportDetails}
+                    onSubmit={() => void reportCurrentCounterparty()}
+                    onCancel={closeUserReportForm}
+                  />
+                )}
 
                 <div className="messenger-chat-scroll">
                   {/* Ausleihanfrage (wie erste Chat-Nachricht vom Anfragenden) */}
@@ -551,6 +642,28 @@ export function InboxPage({ currentUser, token }: Props) {
   );
 }
 
+function buildConversationContext(booking: Booking, currentUserId: string): string {
+  const lines: string[] = [];
+  lines.push(`Booking ${booking.id} (${booking.type})`);
+  lines.push(`Anfrage von ${booking.requesterName ?? booking.requesterId} an ${booking.providerName ?? booking.providerId}`);
+  lines.push(`Status: ${booking.status}`);
+  lines.push(`Zeitraum: ${formatDateTime(booking.startIso)} - ${formatDateTime(booking.endIso)}`);
+  lines.push(`Abholung: ${formatDateTime(booking.pickupTimeIso)}`);
+  lines.push(
+    booking.requesterId === currentUserId
+      ? "Nachricht 1 (Du): Ausleihanfrage erstellt"
+      : `Nachricht 1 (${booking.requesterName ?? booking.requesterId}): Ausleihanfrage erstellt`
+  );
+
+  for (const proposal of booking.pickupProposals ?? []) {
+    const sender = proposal.proposedById === currentUserId ? "Du" : proposal.proposedById;
+    lines.push(
+      `Alternativvorschlag (${sender}) ${formatDateTime(proposal.createdIso)}: ${formatDateTime(proposal.proposedPickupIso)} [${proposal.status}]`
+    );
+  }
+  return lines.join("\n");
+}
+
 function UserAvatar({
   name,
   imageUrl,
@@ -663,7 +776,7 @@ function formatDateTime(value?: string) {
 
 function getPendingProposal(booking: Booking): PickupProposal | null {
   const pending = (booking.pickupProposals ?? []).filter((p) => p.status === "PENDING");
-  return pending.length > 0 ? pending[pending.length - 1] ?? null : null;
+  return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
 function getEffectivePickupIso(booking: Booking): string | undefined {

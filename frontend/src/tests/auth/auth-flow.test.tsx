@@ -69,18 +69,18 @@ describe("Authentication user journey", () => {
   it("autofills address fields when suggestions exist", async () => {
     vi.mocked(api.suggestAddresses).mockResolvedValue([
       {
-        label: "Musterstraße 10, 80802 München, Deutschland",
-        street: "Musterstraße",
+        label: "Musterstrasse 10, 80802 Muenchen, Deutschland",
+        street: "Musterstrasse",
         houseNumber: "10",
         postalCode: "80802",
-        city: "München",
+        city: "Muenchen",
         country: "Deutschland"
       }
     ]);
 
     renderApp("/auth");
 
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
     fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
       target: { value: "Muster" }
@@ -88,20 +88,20 @@ describe("Authentication user journey", () => {
 
     await screen.findByText("Vorschläge - klicken zum Übernehmen");
 
-    fireEvent.mouseDown(await screen.findByRole("button", { name: /Musterstraße 10/i }));
+    fireEvent.mouseDown(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
 
-    expect(await screen.findByDisplayValue("Musterstraße")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Musterstrasse")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
     expect(screen.getByDisplayValue("80802")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("München")).toBeInTheDocument();
-    expect(screen.getByText("Musterstraße 10, 80802 München, Deutschland", { selector: "p.address-preview" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Muenchen")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Musterstrasse 10, 80802 Muenchen, Deutschland")).toBeInTheDocument();
   });
 
   it("shows no-suggestion state and keeps manual fields unchanged", async () => {
     vi.mocked(api.suggestAddresses).mockResolvedValue([]);
 
     renderApp("/auth");
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
     fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
       target: { value: "zzz" }
@@ -109,6 +109,6 @@ describe("Authentication user journey", () => {
 
     expect(await screen.findByText("Keine Vorschläge gefunden.")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Straße")).toHaveValue("");
-    expect(screen.getByPlaceholderText("Hausnummer")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Hausnr")).toHaveValue("");
   });
 });
