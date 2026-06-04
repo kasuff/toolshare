@@ -1,0 +1,61 @@
+groups:
+  - name: application.alerts
+    interval: 30s
+    rules:
+
+      # ── HTTP Fehlerrate ────────────────────────────────────────────────────
+      - alert: HighHttpErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Erhöhte HTTP 5xx Fehlerrate"
+          description: "Fehlerrate liegt bei {{ printf \"%.1f\" (mul $value 100) }}% (Schwellwert: 5%)."
+
+      - alert: CriticalHttpErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.20
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kritische HTTP 5xx Fehlerrate"
+          description: "Fehlerrate liegt bei {{ printf \"%.1f\" (mul $value 100) }}% (Schwellwert: 20%)."
+
+      # ── Antwortzeit ────────────────────────────────────────────────────────
+      - alert: SlowApiResponses
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, route) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Langsame API-Antworten auf Route {{ $labels.route }}"
+          description: "P95 Antwortzeit liegt bei {{ printf \"%.2f\" $value }}s (Schwellwert: 2s)."
+
+      # ── Backend nicht verfügbar ────────────────────────────────────────────
+      - alert: BackendDown
+        expr: up{job="toolshare-backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Toolshare Backend nicht erreichbar"
+          description: "Der Backend-Service antwortet seit 30 Sekunden nicht mehr auf /metrics."
+
+      # ── Hohe Request-Rate (Anomalie-Detektion) ────────────────────────────
+      - alert: UnusuallyHighRequestRate
+        expr: |
+          sum(rate(http_requests_total[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ungewöhnlich hohe Request-Rate"
+          description: "Mehr als 1000 Requests/Sekunde im 5-Minuten-Schnitt – möglicher Angriff oder Traffic-Spike."

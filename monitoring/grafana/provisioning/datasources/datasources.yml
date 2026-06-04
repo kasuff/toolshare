@@ -1,0 +1,42 @@
+apiVersion: 1
+
+# Automatische Datasource-Provisionierung beim Grafana-Start.
+# Änderungen hier werden beim nächsten Start übernommen.
+
+datasources:
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      # Prometheus-Version für korrektes Query-Verhalten
+      prometheusVersion: "2.53.0"
+      # Zeitintervall für Query-Auflösung
+      timeInterval: "15s"
+      # Query-Optimierungen
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: "10m"
+      exemplarTraceIdDestinations: []
+
+  # ── Loki ────────────────────────────────────────────────────────────────────
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: false
+    jsonData:
+      # Maximale Anzahl Zeilen in der Log-Ansicht
+      maxLines: 5000
+      # Automatische Korrelation: Loki-Logs → Prometheus-Trace
+      derivedFields:
+        - datasourceUid: prometheus
+          matcherRegex: "requestId=(\\w+)"
+          name: RequestID
+          url: ""

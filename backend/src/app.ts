@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/error-handler";
+import { metricsMiddleware } from "./middleware/metrics.middleware";
 import { apiRateLimiter } from "./middleware/rate-limit";
 import { addressRouter } from "./modules/address/address.routes";
 import { authRouter } from "./modules/auth/auth.routes";
@@ -14,6 +15,7 @@ import { ratingsRouter } from "./modules/ratings/ratings.routes";
 import { toolsRouter } from "./modules/tools/tools.routes";
 import { usersRouter } from "./modules/users/users.routes";
 import { workshopsRouter } from "./modules/workshops/workshops.routes";
+import { metricsRegistry } from "./utils/metrics";
 
 export const createApp = () => {
   const app = express();
@@ -28,8 +30,17 @@ export const createApp = () => {
   app.use(morgan("dev"));
   app.use(express.json({ limit: "10mb" }));
 
+  // Prometheus-Metriken: vor den API-Routen, damit alle Requests erfasst werden
+  app.use(metricsMiddleware);
+
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
+  });
+
+  // Prometheus scrape endpoint – nur intern erreichbar (kein Rate-Limit nötig)
+  app.get("/metrics", async (_req, res) => {
+    res.set("Content-Type", metricsRegistry.contentType);
+    res.end(await metricsRegistry.metrics());
   });
 
   app.use("/api", apiRateLimiter);
