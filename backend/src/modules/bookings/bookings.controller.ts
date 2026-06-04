@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
+import { bookingsCreatedTotal } from "../../utils/metrics";
 import { bookingsService } from "./bookings.service";
 
 export const bookingsController = {
@@ -16,6 +17,7 @@ export const bookingsController = {
       endDate: req.body.endDate,
       pickupTime: req.body.pickupTime
     });
+    bookingsCreatedTotal.inc();
     res.status(201).json(booking);
   }),
 
@@ -27,6 +29,7 @@ export const bookingsController = {
       endDate: req.body.endDate,
       workshopToolIds: req.body.workshopToolIds
     });
+    bookingsCreatedTotal.inc();
     res.status(201).json(booking);
   }),
 
