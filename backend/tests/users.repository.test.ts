@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   workshopCount: vi.fn(),
   bookingCount: vi.fn(),
   reportCount: vi.fn(),
+  suspensionRequestCount: vi.fn(),
   transaction: vi.fn()
 }));
 
@@ -32,6 +33,9 @@ vi.mock("../src/config/prisma", () => ({
     },
     report: {
       count: mocks.reportCount
+    },
+    suspensionRequest: {
+      count: mocks.suspensionRequestCount
     },
     $transaction: mocks.transaction
   }
@@ -115,14 +119,15 @@ describe("usersRepository", () => {
       await queries[1];
       await queries[2];
       await queries[3];
-      await queries[4];
-      return [10, 20, 5, 3, 2];
+      await queries[5];
+      return [10, 20, 5, 3, 2, 1];
     });
     mocks.userCount.mockResolvedValueOnce(10);
     mocks.toolCount.mockResolvedValueOnce(20);
     mocks.workshopCount.mockResolvedValueOnce(5);
     mocks.bookingCount.mockResolvedValueOnce(3);
     mocks.reportCount.mockResolvedValueOnce(2);
+    mocks.suspensionRequestCount.mockResolvedValueOnce(1);
 
     const result = await usersRepository.getSystemMetrics();
 
@@ -131,7 +136,8 @@ describe("usersRepository", () => {
       tools: 20,
       workshops: 5,
       openBookings: 3,
-      openReports: 2
+      openReports: 2,
+      openSuspensionRequests: 1
     });
   });
 });

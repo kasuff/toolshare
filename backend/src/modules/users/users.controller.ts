@@ -1,11 +1,27 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
+import { suspensionService } from "./suspension.service";
 import { usersService } from "./users.service";
 
 export const usersController = {
   adminMetrics: asyncHandler(async (_req: Request, res: Response) => {
     const result = await usersService.getAdminMetrics();
     res.status(200).json(result);
+  }),
+
+  listSuspensionRequests: asyncHandler(async (_req: Request, res: Response) => {
+    const requests = await suspensionService.listPending();
+    res.status(200).json(requests);
+  }),
+
+  decideSuspensionRequest: asyncHandler(async (req: Request, res: Response) => {
+    const request = await suspensionService.decide({
+      requestId: req.params.requestId,
+      adminId: req.authUser!.userId,
+      approve: req.body.approve as boolean,
+      decisionNote: req.body.decisionNote
+    });
+    res.status(200).json(request);
   }),
 
   list: asyncHandler(async (req: Request, res: Response) => {

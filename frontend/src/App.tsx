@@ -69,6 +69,10 @@ function AuthScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [showRepeatPassword, setShowRepeatPassword] = useState(false);
 
+  const repeatPasswordTouched = repeatPassword.length > 0;
+  const passwordsMatch = password.length > 0 && password === repeatPassword;
+  const passwordsMismatch = repeatPasswordTouched && password !== repeatPassword;
+
   useEffect(() => {
     if (!isRegister || addressSearch.trim().length < 3) {
       setAddressSuggestions([]);
@@ -92,7 +96,7 @@ function AuthScreen({
     setIsSubmitting(true);
     try {
       if (isRegister) {
-        if (password !== repeatPassword) {
+        if (passwordsMismatch) {
           throw new Error("Passwörter stimmen nicht überein.");
         }
         if (!address.street.trim() || !address.houseNumber.trim() || !address.postalCode.trim() || !address.city.trim()) {
@@ -320,7 +324,11 @@ function AuthScreen({
                       placeholder="Passwort wiederholen"
                       type={showRepeatPassword ? "text" : "password"}
                       autoComplete="new-password"
+                      minLength={8}
                       required
+                      className={passwordsMismatch ? "input-invalid" : undefined}
+                      aria-invalid={passwordsMismatch}
+                      aria-describedby={passwordsMismatch || passwordsMatch ? "repeat-password-feedback" : undefined}
                     />
                     <button
                       type="button"
@@ -340,12 +348,22 @@ function AuthScreen({
                       )}
                     </button>
                   </div>
+                  {passwordsMismatch && (
+                    <p id="repeat-password-feedback" className="field-error" role="alert">
+                      Passwörter stimmen nicht überein.
+                    </p>
+                  )}
+                  {passwordsMatch && repeatPasswordTouched && (
+                    <p id="repeat-password-feedback" className="field-success" role="status">
+                      Passwörter stimmen überein.
+                    </p>
+                  )}
                 </label>
               </>
             )}
             {redirectHint && <p className="status-pill">{redirectHint}</p>}
             {error && <p className="status-pill danger">{error}</p>}
-            <button type="submit" disabled={isSubmitting}>
+            <button type="submit" disabled={isSubmitting || (isRegister && passwordsMismatch)}>
               {isSubmitting ? "Bitte warten..." : isRegister ? "Registrieren und starten" : "Einloggen"}
             </button>
           </form>
@@ -460,7 +478,7 @@ function AppWithProviders() {
           }
         />
         {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && (
-          <Route path="moderation" element={<ModerationPage currentUser={currentUser} token={token ?? undefined} />} />
+          <Route path="moderation" element={<ModerationPage token={token ?? undefined} />} />
         )}
         {currentUser?.role === "ADMIN" && (
           <Route path="admin" element={<AdminPage currentUser={currentUser} token={token ?? undefined} />} />

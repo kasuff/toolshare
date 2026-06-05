@@ -62,14 +62,16 @@ export const usersRepository = {
   },
 
   async getSystemMetrics() {
-    const [users, tools, workshops, openBookings, openReports] = await prisma.$transaction([
-      prisma.user.count(),
-      prisma.tool.count(),
-      prisma.workshop.count(),
-      prisma.booking.count({ where: { status: "PENDING" } }),
-      prisma.report.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] } } })
-    ]);
+    const [users, tools, workshops, openBookings, openReports, openSuspensionRequests] =
+      await prisma.$transaction([
+        prisma.user.count(),
+        prisma.tool.count(),
+        prisma.workshop.count(),
+        prisma.booking.count({ where: { status: "PENDING" } }),
+        prisma.report.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] } } }),
+        prisma.suspensionRequest.count({ where: { status: "PENDING" } })
+      ]);
 
-    return { users, tools, workshops, openBookings, openReports };
+    return { users, tools, workshops, openBookings, openReports, openSuspensionRequests };
   }
 };

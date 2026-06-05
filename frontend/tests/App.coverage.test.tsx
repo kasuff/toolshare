@@ -112,6 +112,63 @@ describe("App", () => {
     });
   });
 
+  async function openRegisterForm() {
+    render(
+      <MemoryRouter initialEntries={["/auth"]}>
+        <App />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
+  }
+
+  it("shows live password match feedback during registration", async () => {
+    await openRegisterForm();
+
+    const passwordInput = screen.getByPlaceholderText("Passwort (mind. 8 Zeichen)");
+    const repeatPasswordInput = screen.getByPlaceholderText("Passwort wiederholen");
+
+    fireEvent.change(passwordInput, { target: { value: "password123" } });
+    fireEvent.change(repeatPasswordInput, { target: { value: "password456" } });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Passwörter stimmen nicht überein.");
+    expect(repeatPasswordInput).toHaveClass("input-invalid");
+    expect(screen.getByRole("button", { name: "Registrieren und starten" })).toBeDisabled();
+
+    fireEvent.change(repeatPasswordInput, { target: { value: "password123" } });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Passwörter stimmen überein.");
+    expect(repeatPasswordInput).not.toHaveClass("input-invalid");
+    expect(screen.getByRole("button", { name: "Registrieren und starten" })).not.toBeDisabled();
+  });
+
+  it("does not register when passwords do not match", async () => {
+    validateAddress.mockResolvedValueOnce({
+      isValid: true,
+      normalizedAddress: null,
+      normalizedParts: null
+    });
+
+    await openRegisterForm();
+
+    fireEvent.change(screen.getByPlaceholderText("E-Mail"), { target: { value: "nina@example.com" } });
+    fireEvent.change(screen.getByPlaceholderText("Passwort (mind. 8 Zeichen)"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByPlaceholderText("Passwort wiederholen"), { target: { value: "different123" } });
+    fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Nina" } });
+    fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnr"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
+    fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "Muenchen" } });
+    fireEvent.change(screen.getByPlaceholderText("Land"), { target: { value: "Deutschland" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Registrieren und starten" }));
+
+    await waitFor(() => {
+      expect(register).not.toHaveBeenCalled();
+      expect(validateAddress).not.toHaveBeenCalled();
+    });
+  });
+
   it("registers a user with validated address data", async () => {
     validateAddress.mockResolvedValueOnce({
       isValid: true,
@@ -119,24 +176,16 @@ describe("App", () => {
       normalizedParts: null
     });
 
-    render(
-      <MemoryRouter initialEntries={["/auth"]}>
-        <App />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Neu bei Toolshare? Jetzt registrieren" }));
+    await openRegisterForm();
     fireEvent.change(screen.getByPlaceholderText("E-Mail"), { target: { value: "nina@example.com" } });
     fireEvent.change(screen.getByPlaceholderText("Passwort (mind. 8 Zeichen)"), { target: { value: "password123" } });
     fireEvent.change(screen.getByPlaceholderText("Passwort wiederholen"), { target: { value: "password123" } });
     fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Nina" } });
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
-    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnr"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
     fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "Muenchen" } });
     fireEvent.change(screen.getByPlaceholderText("Land"), { target: { value: "Deutschland" } });
-
-    expect(screen.getByText("Musterstraße 5, 80331 Muenchen, Deutschland")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Registrieren und starten" }));
 

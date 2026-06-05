@@ -8,6 +8,22 @@ const mocks = vi.hoisted(() => ({
   reportUpdate: vi.fn()
 }));
 
+const openReportsQuery = {
+  where: { status: { in: ["OPEN", "IN_REVIEW"] } },
+  orderBy: { createdAt: "desc" },
+  include: {
+    reporter: { select: { id: true, name: true, email: true } }
+  }
+};
+
+const closedReportsQuery = {
+  where: { status: { in: ["RESOLVED", "REJECTED"] } },
+  orderBy: { decisionAt: "desc" },
+  include: {
+    reporter: { select: { id: true, name: true, email: true } }
+  }
+};
+
 vi.mock("../src/config/prisma", () => ({
   prisma: {
     report: {
@@ -24,22 +40,28 @@ describe("moderationRepository", () => {
     vi.clearAllMocks();
   });
 
-  it("creates reports with optional booking reference", async () => {
+  it("creates reports with generic target reference", async () => {
     mocks.reportCreate.mockResolvedValueOnce({ id: "r1", reason: "Spam" });
 
     const result = await moderationRepository.createReport({
       reporterId: "user-1",
+      targetType: "USER",
+      targetId: "22222222-2222-2222-2222-222222222222",
       bookingId: "booking-1",
       reason: "Spam",
-      details: "Details"
+      details: "Details",
+      conversationContext: "chat context"
     });
 
     expect(mocks.reportCreate).toHaveBeenCalledWith({
       data: {
         reporterId: "user-1",
+        targetType: "USER",
+        targetId: "22222222-2222-2222-2222-222222222222",
         bookingId: "booking-1",
         reason: "Spam",
-        details: "Details"
+        details: "Details",
+        conversationContext: "chat context"
       }
     });
     expect(result).toEqual({ id: "r1", reason: "Spam" });
@@ -50,11 +72,17 @@ describe("moderationRepository", () => {
 
     const result = await moderationRepository.listOpenReports();
 
-    expect(mocks.reportFindMany).toHaveBeenCalledWith({
-      where: { status: { in: ["OPEN", "IN_REVIEW"] } },
-      orderBy: { createdAt: "desc" }
-    });
+    expect(mocks.reportFindMany).toHaveBeenCalledWith(openReportsQuery);
     expect(result).toEqual([{ id: "r1" }, { id: "r2" }]);
+  });
+
+  it("lists closed reports by decision date", async () => {
+    mocks.reportFindMany.mockResolvedValueOnce([{ id: "r9", status: "REJECTED" }]);
+
+    const result = await moderationRepository.listClosedReports();
+
+    expect(mocks.reportFindMany).toHaveBeenCalledWith(closedReportsQuery);
+    expect(result).toEqual([{ id: "r9", status: "REJECTED" }]);
   });
 
   it("finds reports by id", async () => {
@@ -69,11 +97,16 @@ describe("moderationRepository", () => {
   it("updates report status and moderator assignment", async () => {
     mocks.reportUpdate.mockResolvedValueOnce({ id: "r1", status: "RESOLVED", moderatorId: "mod-1" });
 
-    const result = await moderationRepository.updateStatus("r1", "RESOLVED", "mod-1");
+    const result = await moderationRepository.updateStatus("r1", "RESOLVED", "mod-1", "Entscheidung");
 
     expect(mocks.reportUpdate).toHaveBeenCalledWith({
       where: { id: "r1" },
-      data: { status: "RESOLVED", moderatorId: "mod-1" }
+      data: {
+        status: "RESOLVED",
+        moderatorId: "mod-1",
+        decisionNote: "Entscheidung",
+        decisionAt: expect.any(Date)
+      }
     });
     expect(result).toEqual({ id: "r1", status: "RESOLVED", moderatorId: "mod-1" });
   });

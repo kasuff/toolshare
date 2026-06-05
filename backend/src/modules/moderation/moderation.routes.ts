@@ -9,6 +9,11 @@ export const moderationRouter = Router();
 
 moderationRouter.use(requireAuth);
 moderationRouter.post("/reports", validate(createReportSchema), moderationController.createReport);
+moderationRouter.get(
+  "/reports/closed",
+  requireRole("MODERATOR", "MANAGER"),
+  moderationController.listClosedReports
+);
 moderationRouter.get("/reports", requireRole("MODERATOR", "MANAGER"), moderationController.listReports);
 moderationRouter.patch(
   "/reports/:id",

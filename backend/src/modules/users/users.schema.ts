@@ -26,7 +26,7 @@ export const updateMyProfileSchema = z.object({
       address: z.string().min(5).optional()
     })
     .refine((value) => value.name !== undefined || value.address !== undefined, {
-      message: "At least one field must be provided"
+      message: "Mindestens ein Feld muss angegeben werden."
     }),
   params: z.object({}),
   query: z.object({})
@@ -48,6 +48,17 @@ export const updateUserSuspensionSchema = z.object({
   }),
   params: z.object({
     id: z.string().uuid()
+  }),
+  query: z.object({})
+});
+
+export const decideSuspensionRequestSchema = z.object({
+  body: z.object({
+    approve: z.boolean(),
+    decisionNote: z.string().min(3).max(600).optional()
+  }),
+  params: z.object({
+    requestId: z.string().uuid()
   }),
   query: z.object({})
 });

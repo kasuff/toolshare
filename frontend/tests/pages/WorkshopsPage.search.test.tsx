@@ -231,7 +231,7 @@ describe("WorkshopsPage search filters", () => {
 
     expect(await screen.findByRole("dialog", { name: "Direkte Werkstatt" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Fenster schließen" }));
+    fireEvent.click(screen.getByRole("button", { name: "← Zurück" }));
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops");
   });
 });
