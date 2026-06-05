@@ -1247,7 +1247,8 @@ summary {
   accent-color: var(--color-brand);
 }
 
-.slider-row input.capacity-slider[type="range"] {
+.slider-row input.capacity-slider[type="range"],
+.search-map-control input.radius-slider[type="range"] {
   appearance: none;
   width: 100%;
   height: 8px;
@@ -1262,7 +1263,8 @@ summary {
   cursor: pointer;
 }
 
-.slider-row input.capacity-slider[type="range"]::-webkit-slider-thumb {
+.slider-row input.capacity-slider[type="range"]::-webkit-slider-thumb,
+.search-map-control input.radius-slider[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 20px;
   height: 20px;
@@ -1272,7 +1274,8 @@ summary {
   box-shadow: var(--shadow-soft);
 }
 
-.slider-row input.capacity-slider[type="range"]::-moz-range-thumb {
+.slider-row input.capacity-slider[type="range"]::-moz-range-thumb,
+.search-map-control input.radius-slider[type="range"]::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border: 3px solid #ffffff;
@@ -1281,7 +1284,8 @@ summary {
   box-shadow: var(--shadow-soft);
 }
 
-.slider-row input.capacity-slider[type="range"]::-moz-range-track {
+.slider-row input.capacity-slider[type="range"]::-moz-range-track,
+.search-map-control input.radius-slider[type="range"]::-moz-range-track {
   height: 8px;
   border-radius: 9999px;
   background: transparent;
@@ -1422,7 +1426,6 @@ summary {
 .search-map-control input[type="range"] {
   accent-color: var(--color-brand);
   padding: 0;
-  height: auto;
 }
 
 .search-map-attribution {
