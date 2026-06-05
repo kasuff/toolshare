@@ -204,7 +204,7 @@ describe("WorkshopsPage search filters", () => {
     renderPage();
 
     const blockedCard = (await screen.findByText("Blockierte Werkstatt")).closest("article")!;
-    expect(within(blockedCard).getByText("✕ Nicht verfügbar")).toHaveClass("unavailable");
+    expect(within(blockedCard).getByText("0 Slots")).toHaveClass("unavailable");
 
     fireEvent.click(screen.getByText("Nähstube").closest("article")!);
 

@@ -579,6 +579,15 @@ button.mini {
   box-shadow: 0 14px 34px -24px rgba(17, 24, 39, 0.45);
 }
 
+.search-page .surface.interactive {
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.search-page .surface.interactive:hover {
+  transform: none;
+  box-shadow: var(--shadow-soft);
+}
+
 .surface-head {
   display: grid;
   gap: var(--space-2);
@@ -770,7 +779,7 @@ button.mini {
   text-decoration: none;
   cursor: pointer;
   padding: 0;
-  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
 }
 
 .ds-workshop-card.card-link {
@@ -800,7 +809,7 @@ button.mini {
   top: 8px;
   right: 8px;
   border-radius: 8px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   background: #10b981;
   color: #ffffff;
   font-size: 14px;
@@ -1169,16 +1178,19 @@ summary {
 
 .result-summary {
   color: var(--color-text-muted);
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  min-height: 21px;
 }
 
 .filter-toolbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: var(--space-2);
+  min-height: 44px;
 }
 
 .chip {
@@ -1204,17 +1216,66 @@ summary {
 
 .slider-row {
   display: grid;
-  gap: 0.15rem;
+  gap: var(--space-2);
 }
 
 .slider-row label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.25;
 }
 
+.slider-row label strong {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: right;
+}
+
 .slider-row input[type="range"] {
   accent-color: var(--color-brand);
+}
+
+.slider-row input.capacity-slider[type="range"] {
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand) 0 var(--range-progress, 0%),
+    var(--color-border) var(--range-progress, 0%) 100%
+  );
+  cursor: pointer;
+}
+
+.slider-row input.capacity-slider[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #ffffff;
+  border-radius: 9999px;
+  background: var(--color-brand);
+  box-shadow: var(--shadow-soft);
+}
+
+.slider-row input.capacity-slider[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #ffffff;
+  border-radius: 9999px;
+  background: var(--color-brand);
+  box-shadow: var(--shadow-soft);
+}
+
+.slider-row input.capacity-slider[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: transparent;
 }
 
 .advanced-filter-panel {

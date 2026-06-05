@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
@@ -332,9 +332,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   };
 
   const ownedWorkshops = currentUser ? items.filter((item) => item.workshop.ownerId === currentUser.id) : [];
-  const publicWorkshops = currentUser
-    ? filteredItems.filter((item) => item.workshop.ownerId !== currentUser.id)
-    : filteredItems;
+  const publicWorkshops = filteredItems;
   const selectedWorkshopDraft = selectedWorkshop
     ? bookingDraftsByWorkshop[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()
     : null;
@@ -382,11 +380,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       <div className="page-header">
         <div className="stack">
           <h1>Werkstätten</h1>
-          <p className="subtitle">Klicke auf eine Werkstatt, um Details und Buchungsfenster in einem Fenster zu sehen.</p>
         </div>
       </div>
 
-      {currentUser && (
+      {false && currentUser && (
         <Surface title="Meine Werkstätten" subtitle="Eigene Räume und Verfügbarkeiten auf einen Blick.">
           {ownedWorkshops.length > 0 ? (
             <div className="workshop-dashboard">
@@ -503,10 +500,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                 </label>
                 <input
                   id="capacity-slider"
+                  className="capacity-slider"
                   type="range"
                   min={1}
-                  max={20}
+                  max={10}
                   value={maxCapacityFilter}
+                  style={{ "--range-progress": `${((maxCapacityFilter - 1) / 9) * 100}%` } as CSSProperties}
                   onChange={(e) => setMaxCapacityFilter(Number(e.target.value))}
                 />
               </div>
@@ -536,7 +535,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           const ownerName = item.workshop.ownerName ?? "Unbekannt";
           const primaryImage = item.workshop.imageUrls[0];
           const cardImage = primaryImage || DEFAULT_PLACEHOLDER_IMAGE;
-          const isWorkshopAvailable = item.slots.some((slot) => !slot.blockedByOwner);
+          const availableSlotCount = item.slots.filter((slot) => !slot.blockedByOwner).length;
           return (
             <article
               key={item.workshop.id}
@@ -552,8 +551,8 @@ export function WorkshopsPage({ token, currentUser }: Props) {
               }}
             >
               <div className="ds-workshop-card-media">
-                <span className={`ds-workshop-card-badge ${isWorkshopAvailable ? "" : "unavailable"}`.trim()}>
-                  {isWorkshopAvailable ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
+                <span className={`ds-workshop-card-badge ${availableSlotCount > 0 ? "" : "unavailable"}`.trim()}>
+                  {availableSlotCount} {availableSlotCount === 1 ? "Slot" : "Slots"}
                 </span>
                 {cardImage ? (
                   <img className="ds-workshop-card-image" src={cardImage} alt={item.workshop.name} />
