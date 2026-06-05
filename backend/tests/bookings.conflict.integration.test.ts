@@ -1,19 +1,19 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createApp } from "../src/app";
-import { prisma } from "../src/config/prisma";
 import type { Express } from "express";
+import type { PrismaClient } from "@prisma/client";
 
-const app = createApp() as Express;
+let app: Express;
+let prisma: PrismaClient;
 
-async function registerAndLogin(email: string, password: string, name: string) {
-  await request(app).post("/api/auth/register").send({
+async function registerAndLogin(appInstance: Express, email: string, password: string, name: string) {
+  await request(appInstance).post("/api/auth/register").send({
     email,
     password,
     name,
     address: "Test Street 1"
   });
-  const login = await request(app).post("/api/auth/login").send({ email, password });
+  const login = await request(appInstance).post("/api/auth/login").send({ email, password });
   return login.body.accessToken as string;
 }
 
@@ -27,14 +27,23 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
   let requesterToken: string;
   let secondRequesterToken: string;
   let toolId: string;
-  let timeslotId: string;
+  let workshopId: string;
+  let workshopToolId: string;
 
   beforeAll(async () => {
+    process.env.DATABASE_URL ??= "postgresql://toolshare:toolshare@localhost:5432/toolshare";
     process.env.JWT_SECRET ??= "test-secret";
 
-    ownerToken = await registerAndLogin(ownerEmail, password, "Owner");
-    requesterToken = await registerAndLogin(requesterEmail, password, "Requester");
+    const appModule = await import("../src/app");
+    app = appModule.createApp() as Express;
+
+    const prismaModule = await import("../src/config/prisma");
+    prisma = prismaModule.prisma;
+
+    ownerToken = await registerAndLogin(app, ownerEmail, password, "Owner");
+    requesterToken = await registerAndLogin(app, requesterEmail, password, "Requester");
     secondRequesterToken = await registerAndLogin(
+      app,
       `booking-requester-2-${seed}@example.com`,
       password,
       "Requester Two"
@@ -60,7 +69,13 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
         name: "Holzwerkstatt",
         description: "Gemeinsame Werkstatt",
         location: "Muenchen",
-        maxCapacity: 4
+        maxCapacity: 4,
+        workshopTools: [
+          {
+            name: "Akkuschrauber",
+            category: "elektro"
+          }
+        ]
       });
     expect(workshopResponse.status).toBe(201);
 
@@ -72,7 +87,14 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
         endTime: "2026-08-01T17:00:00.000Z"
       });
     expect(slotResponse.status).toBe(201);
-    timeslotId = slotResponse.body.id as string;
+    workshopId = workshopResponse.body.id as string;
+
+    const workshopTool = await prisma.workshopTool.findFirst({
+      where: { workshopId: workshopResponse.body.id as string },
+      select: { id: true }
+    });
+    expect(workshopTool).toBeTruthy();
+    workshopToolId = workshopTool!.id;
   });
 
   afterAll(async () => {
@@ -153,18 +175,28 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
     expect(nonOverlap.status).toBe(201);
   });
 
-  it("creates a workshop booking and rejects a second booking for the same slot with 409", async () => {
+  it("creates a workshop booking and rejects a second overlapping booking with 409", async () => {
     const first = await request(app)
       .post("/api/bookings/workshop")
       .set("Authorization", `Bearer ${requesterToken}`)
-      .send({ timeslotId });
+      .send({
+        workshopId,
+        startDate: "2026-08-01T09:00:00.000Z",
+        endDate: "2026-08-01T17:00:00.000Z",
+        workshopToolIds: [workshopToolId]
+      });
 
     expect(first.status).toBe(201);
 
     const conflict = await request(app)
       .post("/api/bookings/workshop")
       .set("Authorization", `Bearer ${secondRequesterToken}`)
-      .send({ timeslotId });
+      .send({
+        workshopId,
+        startDate: "2026-08-01T12:00:00.000Z",
+        endDate: "2026-08-01T15:00:00.000Z",
+        workshopToolIds: [workshopToolId]
+      });
 
     expect(conflict.status).toBe(409);
     expect(conflict.body).toMatchObject({

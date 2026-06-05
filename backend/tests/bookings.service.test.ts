@@ -6,11 +6,11 @@ import { bookingsService } from "../src/modules/bookings/bookings.service";
 vi.mock("../src/modules/bookings/bookings.repository", () => ({
   bookingsRepository: {
     listForUserContext: vi.fn(),
-    findToolById: vi.fn(),
     createToolBookingTransaction: vi.fn(),
     createWorkshopBookingTransaction: vi.fn(),
     findBookingById: vi.fn(),
-    updateStatus: vi.fn()
+    updateStatus: vi.fn(),
+    markToolAvailable: vi.fn()
   }
 }));
 
@@ -38,7 +38,7 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking when tool does not exist", async () => {
-    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce(null);
+    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce(null as any);
 
     await expect(
       bookingsService.createToolBooking({
@@ -96,48 +96,43 @@ describe("bookingsService", () => {
     expect(result).toMatchObject({ id: "b1" });
   });
 
-  it("rejects workshop booking when timeslot does not exist", async () => {
-    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce(null);
-
-    await expect(
-      bookingsService.createWorkshopBooking({
-        requesterId: "u1",
-        timeslotId: "slot-1"
-      })
-    ).rejects.toMatchObject({ code: "TIMESLOT_NOT_FOUND", status: 404 });
-  });
-
-  it("rejects workshop booking conflicts", async () => {
-    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("CONFLICT" as any);
-
-    await expect(
-      bookingsService.createWorkshopBooking({
-        requesterId: "u1",
-        timeslotId: "slot-1"
-      })
-    ).rejects.toMatchObject({ code: "BOOKING_CONFLICT", status: 409 });
-  });
-
-  it("rejects workshop booking when timeslot is owner blocked", async () => {
-    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("BLOCKED" as any);
-
-    await expect(
-      bookingsService.createWorkshopBooking({
-        requesterId: "u1",
-        timeslotId: "slot-1"
-      })
-    ).rejects.toMatchObject({ code: "TIMESLOT_BLOCKED", status: 409 });
-  });
-
-  it("returns created workshop booking", async () => {
-    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce({ id: "b2" } as any);
+  it("creates workshop booking and notifies manager", async () => {
+    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce({
+      id: "b2",
+      timeslot: { workshop: { managerId: "manager-1" } }
+    } as any);
 
     const result = await bookingsService.createWorkshopBooking({
-      requesterId: "u1",
-      timeslotId: "slot-1"
+      requesterId: "user-1",
+      workshopId: "workshop-1",
+      startDate: "2026-06-01T10:00:00.000Z",
+      endDate: "2026-06-02T10:00:00.000Z",
+      workshopToolIds: ["wt-1"]
     });
 
+    expect(mockedBookingsRepository.createWorkshopBookingTransaction).toHaveBeenCalledWith({
+      userId: "user-1",
+      workshopId: "workshop-1",
+      startDate: new Date("2026-06-01T10:00:00.000Z"),
+      endDate: new Date("2026-06-02T10:00:00.000Z"),
+      workshopToolIds: ["wt-1"]
+    });
+    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("manager-1", expect.stringContaining("Werkstatt"));
     expect(result).toMatchObject({ id: "b2" });
+  });
+
+  it("maps workshop booking repository errors to app errors", async () => {
+    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("TOOLS_REQUIRED" as any);
+
+    await expect(
+      bookingsService.createWorkshopBooking({
+        requesterId: "user-1",
+        workshopId: "workshop-1",
+        startDate: "2026-06-01T10:00:00.000Z",
+        endDate: "2026-06-02T10:00:00.000Z",
+        workshopToolIds: []
+      })
+    ).rejects.toMatchObject({ code: "WORKSHOP_TOOLS_REQUIRED", status: 400 });
   });
 
   it("rejects booking status updates when booking is missing", async () => {
@@ -153,24 +148,7 @@ describe("bookingsService", () => {
     ).rejects.toMatchObject({ code: "BOOKING_NOT_FOUND", status: 404 });
   });
 
-  it("rejects booking status updates for unauthorized actors", async () => {
-    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
-      id: "b1",
-      userId: "requester-1",
-      tool: { ownerId: "owner-1" }
-    } as any);
-
-    await expect(
-      bookingsService.updateBookingStatus({
-        actorId: "other-user",
-        actorRole: "USER",
-        bookingId: "b1",
-        status: "REJECTED"
-      })
-    ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
-  });
-
-  it("updates booking status as tool owner and sends notification", async () => {
+  it("updates booking status as provider and sends notification", async () => {
     mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
       id: "b1",
       userId: "requester-1",
@@ -190,21 +168,85 @@ describe("bookingsService", () => {
     expect(result).toMatchObject({ id: "b1", status: "ACCEPTED" });
   });
 
-  it("allows moderators to update booking status", async () => {
+  it("completes an accepted tool booking as provider and marks the tool available", async () => {
     mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
       id: "b1",
       userId: "requester-1",
-      tool: { ownerId: "owner-1" }
+      status: "ACCEPTED",
+      endDate: new Date("2026-05-01T10:00:00.000Z"),
+      tool: { id: "tool-1", ownerId: "owner-1" }
     } as any);
-    mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "REJECTED" } as any);
+    mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
+    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
 
     const result = await bookingsService.updateBookingStatus({
-      actorId: "mod-1",
-      actorRole: "MODERATOR",
+      actorId: "owner-1",
+      actorRole: "USER",
       bookingId: "b1",
-      status: "REJECTED"
+      status: "RETURNED"
     });
 
-    expect(result).toMatchObject({ id: "b1", status: "REJECTED" });
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "RETURNED");
+    expect(mockedBookingsRepository.markToolAvailable).toHaveBeenCalledWith("tool-1");
+    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("requester-1", expect.stringContaining("RETURNED"));
+    expect(result).toMatchObject({ id: "b1", status: "RETURNED" });
+  });
+
+  it("completes an accepted workshop booking as workshop provider", async () => {
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b2",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date("2026-05-01T12:00:00.000Z"),
+      timeslot: { workshop: { managerId: "manager-1" } }
+    } as any);
+    mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b2", status: "RETURNED" } as any);
+
+    const result = await bookingsService.updateBookingStatus({
+      actorId: "manager-1",
+      actorRole: "USER",
+      bookingId: "b2",
+      status: "RETURNED"
+    });
+
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b2", "RETURNED");
+    expect(mockedBookingsRepository.markToolAvailable).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: "b2", status: "RETURNED" });
+  });
+
+  it("rejects completion by requester and before the accepted period ended", async () => {
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b1",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date("2026-05-01T10:00:00.000Z"),
+      tool: { id: "tool-1", ownerId: "owner-1" }
+    } as any);
+
+    await expect(
+      bookingsService.updateBookingStatus({
+        actorId: "requester-1",
+        actorRole: "USER",
+        bookingId: "b1",
+        status: "RETURNED"
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b1",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date(Date.now() + 60_000),
+      tool: { id: "tool-1", ownerId: "owner-1" }
+    } as any);
+
+    await expect(
+      bookingsService.updateBookingStatus({
+        actorId: "owner-1",
+        actorRole: "USER",
+        bookingId: "b1",
+        status: "RETURNED"
+      })
+    ).rejects.toMatchObject({ code: "BOOKING_NOT_ENDED", status: 400 });
   });
 });

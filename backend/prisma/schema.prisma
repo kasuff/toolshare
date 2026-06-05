@@ -71,6 +71,7 @@ model User {
   pickupProposalsAuthored BookingPickupProposal[] @relation("PickupProposalAuthor")
   suspensionRequestsReceived SuspensionRequest[] @relation("SuspensionTarget")
   suspensionRequestsMade     SuspensionRequest[] @relation("SuspensionRequester")
+  timeslotProposalsAuthored BookingTimeslotProposal[] @relation("TimeslotProposalAuthor")
 }
 
 model Tool {
@@ -108,6 +109,7 @@ model WorkshopTool {
   name       String
   category   String
   workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  selectedInBookings BookingSelectedTool[]
 
   @@index([workshopId])
   @@index([category])
@@ -137,10 +139,22 @@ model Booking {
   timeslot   TimeSlot?     @relation(fields: [timeslotId], references: [id], onDelete: SetNull)
   reports    Report[]
   ratings    Rating[]
+  selectedTools BookingSelectedTool[]
   pickupProposals BookingPickupProposal[]
+  timeslotProposals BookingTimeslotProposal[]
 
   @@index([toolId, startDate, endDate])
   @@index([timeslotId])
+}
+
+model BookingSelectedTool {
+  bookingId       String
+  workshopToolId  String
+  booking         Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  workshopTool    WorkshopTool @relation(fields: [workshopToolId], references: [id], onDelete: Cascade)
+
+  @@id([bookingId, workshopToolId])
+  @@index([workshopToolId])
 }
 
 model BookingPickupProposal {
@@ -153,6 +167,22 @@ model BookingPickupProposal {
   createdAt          DateTime             @default(now())
   booking            Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   proposedBy         User                 @relation("PickupProposalAuthor", fields: [proposedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+model BookingTimeslotProposal {
+  id                 String               @id @default(uuid())
+  bookingId          String
+  proposedByUserId   String
+  proposedStartDate  DateTime
+  proposedEndDate    DateTime
+  previousStartDate  DateTime?
+  previousEndDate    DateTime?
+  status             PickupProposalStatus @default(PENDING)
+  createdAt          DateTime             @default(now())
+  booking            Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  proposedBy         User                 @relation("TimeslotProposalAuthor", fields: [proposedByUserId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
 }

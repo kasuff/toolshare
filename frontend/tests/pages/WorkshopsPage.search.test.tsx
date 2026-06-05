@@ -214,7 +214,15 @@ describe("WorkshopsPage search filters", () => {
     expect(screen.getAllByText("Nähmaschine").length).toBeGreaterThan(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Buchen" }));
-    await waitFor(() => expect(createWorkshopBooking).toHaveBeenCalledWith({ slotId: "slot-1" }, "token-123"));
+    await waitFor(() =>
+      expect(createWorkshopBooking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workshopId: "available",
+          workshopToolIds: ["needle"]
+        }),
+        "token-123"
+      )
+    );
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops");
   });
 

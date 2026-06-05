@@ -22,7 +22,10 @@ export const bookingsController = {
   createWorkshopBooking: asyncHandler(async (req: Request, res: Response) => {
     const booking = await bookingsService.createWorkshopBooking({
       requesterId: req.authUser!.userId,
-      timeslotId: req.body.timeslotId
+      workshopId: req.body.workshopId,
+      startDate: req.body.startDate,
+      endDate: req.body.endDate,
+      workshopToolIds: req.body.workshopToolIds
     });
     res.status(201).json(booking);
   }),
@@ -48,6 +51,26 @@ export const bookingsController = {
 
   respondPickupProposal: asyncHandler(async (req: Request, res: Response) => {
     const updated = await bookingsService.respondPickupProposal({
+      actorId: req.authUser!.userId,
+      bookingId: req.params.id as string,
+      proposalId: req.params.proposalId as string,
+      decision: req.body.decision as "ACCEPT" | "DECLINE"
+    });
+    res.status(200).json(updated);
+  }),
+
+  createTimeslotProposal: asyncHandler(async (req: Request, res: Response) => {
+    const created = await bookingsService.createTimeslotProposal({
+      actorId: req.authUser!.userId,
+      bookingId: req.params.id as string,
+      startDate: req.body.startDate as string,
+      endDate: req.body.endDate as string
+    });
+    res.status(201).json(created);
+  }),
+
+  respondTimeslotProposal: asyncHandler(async (req: Request, res: Response) => {
+    const updated = await bookingsService.respondTimeslotProposal({
       actorId: req.authUser!.userId,
       bookingId: req.params.id as string,
       proposalId: req.params.proposalId as string,
