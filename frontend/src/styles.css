@@ -1867,7 +1867,7 @@ summary {
 }
 
 .toast.info {
-  border-color: #93c5fd;
+  border-color: var(--color-brand);
 }
 
 .icon-button {
@@ -2609,9 +2609,11 @@ td {
 
 /* ===== Tool Detail Page ===== */
 .tool-detail-page {
-  max-width: 1000px;
+  width: min(1120px, 100%);
   margin: 0 auto;
   padding: var(--space-5) var(--space-4);
+  display: grid;
+  gap: var(--space-4);
 }
 
 .detail-topbar {
@@ -2915,10 +2917,93 @@ td {
   background: #ffffff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-5);
+  padding: 24px;
   display: grid;
-  gap: var(--space-5);
+  gap: 24px;
   box-shadow: 0 8px 24px rgba(45, 45, 45, 0.08);
+}
+
+.tool-detail-image {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  cursor: zoom-in;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.tool-detail-image:hover,
+.tool-detail-image:focus-visible {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
+  outline: none;
+}
+
+.tool-detail-image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.tool-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.tool-detail-main {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.tool-detail-header {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+}
+
+.tool-detail-header h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.tool-detail-category {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.tool-detail-main .workshop-detail-section h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.tool-location-note {
+  color: var(--color-text-muted) !important;
+}
+
+.tool-detail-booking {
+  position: sticky;
+  top: var(--space-4);
 }
 
 .playtomic-booking-panel h2,
@@ -2938,7 +3023,7 @@ td {
 
 .booking-section {
   display: grid;
-  gap: var(--space-3);
+  gap: 16px;
 }
 
 .booking-intro {
@@ -3008,6 +3093,11 @@ td {
   outline: none;
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.14);
+}
+
+.booking-input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(45%) sepia(98%) saturate(3827%) hue-rotate(359deg) brightness(101%) contrast(106%);
 }
 
 /* ===== Duration Picker ===== */
@@ -3087,7 +3177,9 @@ td {
   transition: background 180ms ease, box-shadow 180ms ease;
   text-decoration: none;
   text-align: center;
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .booking-button:hover:not(:disabled) {
@@ -3108,12 +3200,20 @@ td {
   line-height: 21px;
 }
 
+.booking-actions {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
 /* ===== Mobile Responsive ===== */
 @media (max-width: 900px) {
+  .tool-detail-layout,
   .tool-content-grid {
     grid-template-columns: 1fr;
   }
 
+  .tool-detail-booking,
   .tool-booking-column {
     position: static;
   }
@@ -3125,7 +3225,11 @@ td {
 
 @media (max-width: 640px) {
   .tool-detail-page {
-    padding: var(--space-3) var(--space-3);
+    padding: var(--space-4) 0;
+  }
+
+  .tool-detail-image {
+    height: 220px;
   }
 
   .tool-hero img {

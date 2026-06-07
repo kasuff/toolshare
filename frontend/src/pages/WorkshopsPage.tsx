@@ -911,8 +911,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
               {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
                 <aside className="playtomic-booking-panel workshop-detail-booking">
-                  <h3>Werkstatt buchen</h3>
-                  <p className="booking-intro">Wähle den gewünschten Nutzungszeitraum und die passenden Uhrzeiten.</p>
+                  <h2>Werkstatt buchen</h2>
 
                   <div className="booking-section">
                     <div className="booking-section-title">
@@ -924,6 +923,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                         <span>Datum</span>
                         <input
                           id="workshop-booking-start-date"
+                          aria-label="Abholdatum"
                           type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.startDate ?? ""}
@@ -941,6 +941,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                       <label>
                         <span>Uhrzeit</span>
                         <input
+                          aria-label="Abholzeit"
                           type="time"
                           className="booking-input"
                           value={selectedWorkshopDraft?.startTime ?? ""}
@@ -969,6 +970,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                       <label>
                         <span>Datum</span>
                         <input
+                          aria-label="Abgabedatum"
                           type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.endDate ?? ""}
@@ -987,6 +989,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                       <label>
                         <span>Uhrzeit</span>
                         <input
+                          aria-label="Abgabezeit"
                           type="time"
                           className="booking-input"
                           value={selectedWorkshopDraft?.endTime ?? ""}
@@ -1045,19 +1048,21 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    className="booking-button"
-                    onClick={() => void bookWorkshop(selectedWorkshop.workshop.id)}
-                    disabled={!selectedWorkshopHasAvailableSlots}
-                  >
-                    {token ? "Anfrage senden" : "Login"}
-                  </button>
-                  <p className="booking-hint">
-                    {selectedWorkshopHasAvailableSlots
-                      ? "Der Anbieter muss deine Anfrage noch bestätigen."
-                      : "Aktuell ist kein verfügbares Zeitfenster hinterlegt."}
-                  </p>
+                  <div className="booking-actions">
+                    <button
+                      type="button"
+                      className="booking-button"
+                      onClick={() => void bookWorkshop(selectedWorkshop.workshop.id)}
+                      disabled={!selectedWorkshopHasAvailableSlots}
+                    >
+                      {token ? "Anfrage senden" : "Jetzt einloggen"}
+                    </button>
+                    <p className="booking-hint">
+                      {selectedWorkshopHasAvailableSlots
+                        ? "Der Anbieter muss deine Anfrage noch bestätigen."
+                        : "Aktuell ist kein verfügbares Zeitfenster hinterlegt."}
+                    </p>
+                  </div>
                 </aside>
               )}
             </div>

@@ -102,7 +102,7 @@ describe("Guest protected actions", () => {
     renderWithRoutes(<WorkshopsPage />, "/workshops");
 
     fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
-    fireEvent.click(await screen.findByRole("button", { name: "Login" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Jetzt einloggen" }));
 
     expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
       "Bitte melde dich an, um eine Werkstatt zu buchen."
