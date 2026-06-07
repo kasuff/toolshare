@@ -235,7 +235,7 @@ describe("management pages", () => {
     expect(await screen.findByText(/Top/)).toBeInTheDocument();
   });
 
-  it("requires login and submits a new tool with owner data", async () => {
+  it("requires login and submits a new tool with pickup data", async () => {
     getCurrentUser.mockResolvedValueOnce({
       id: "u1",
       name: "Lea",
@@ -259,16 +259,13 @@ describe("management pages", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Deine Kontaktdaten")).toBeInTheDocument();
-    expect(screen.getByText("lea@toolshare.local")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "✓ Werkzeug einstellen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkzeug einstellen" }));
     expect(await screen.findByText("Bitte gib einen Namen für das Werkzeug ein.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText("z.B. Akku-Bohrmaschine 18V"), {
+    fireEvent.change(screen.getByPlaceholderText("z.B. Akku-Bohrmaschine"), {
       target: { value: "Akkuschrauber" }
     });
-    fireEvent.change(screen.getByPlaceholderText("z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, Ladegerät. Besonderheiten: sehr leise, eingebaute LED"), {
+    fireEvent.change(screen.getByPlaceholderText("z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, 1x Ladegerät. Besonderheiten: sehr leise, eingebaute LED"), {
       target: { value: "Sehr gut erhalten" }
     });
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
@@ -284,7 +281,7 @@ describe("management pages", () => {
       target: { files: [new File(["image"], "tool.png", { type: "image/png" })] }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "✓ Werkzeug einstellen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkzeug einstellen" }));
 
     await waitFor(() => {
       expect(createTool).toHaveBeenCalledWith(
