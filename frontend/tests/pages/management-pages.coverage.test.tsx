@@ -300,6 +300,11 @@ describe("management pages", () => {
 
   it("builds a workshop payload from the combined form", async () => {
     createWorkshop.mockResolvedValueOnce({ id: "workshop-1" });
+    validateAddress.mockResolvedValueOnce({
+      isValid: true,
+      normalizedAddress: "Musterstraße 5, 80331 München, Deutschland",
+      normalizedParts: null
+    });
 
     const { container } = render(
       <MemoryRouter initialEntries={["/workshops/new"]}>
@@ -315,11 +320,14 @@ describe("management pages", () => {
       expect(pushToast).toHaveBeenCalledWith("Bitte gib einen Namen für die Werkstatt ein.", "error");
     });
 
-    fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Maker Space" } });
+    fireEvent.change(screen.getByPlaceholderText("z.B. Garagen-Werkstatt"), { target: { value: "Maker Space" } });
     fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
       target: { value: "Eine gut ausgestattete Werkstatt." }
     });
-    fireEvent.change(screen.getByPlaceholderText("Adresse oder Gebiet"), { target: { value: "Muenchen Nord" } });
+    fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
+    fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "München" } });
     fireEvent.click(screen.getByRole("button", { name: "Personenzahl erhöhen" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
     fireEvent.change(screen.getByPlaceholderText("Werkzeugname (z.B. Bosch Akkuschrauber)"), {
@@ -346,7 +354,7 @@ describe("management pages", () => {
         expect.objectContaining({
           name: "Maker Space",
           description: "Eine gut ausgestattete Werkstatt.",
-          location: "Muenchen Nord",
+          location: "Musterstraße 5, 80331 München, Deutschland",
           maxCapacity: 3,
           extras: ["wlan"],
           equipmentItems: [{ name: "Bohrmaschine", category: "holz" }],

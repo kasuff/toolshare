@@ -6,17 +6,21 @@ import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
 import { EditWorkshopPage } from "../../src/pages/EditWorkshopPage";
 import type { User } from "../../src/types/domain";
 
-const { createWorkshop, getWorkshopById, updateWorkshop } = vi.hoisted(() => ({
+const { createWorkshop, getWorkshopById, updateWorkshop, validateAddress, suggestAddresses } = vi.hoisted(() => ({
   createWorkshop: vi.fn(),
   getWorkshopById: vi.fn(),
-  updateWorkshop: vi.fn()
+  updateWorkshop: vi.fn(),
+  validateAddress: vi.fn(),
+  suggestAddresses: vi.fn()
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
     createWorkshop,
     getWorkshopById,
-    updateWorkshop
+    updateWorkshop,
+    validateAddress,
+    suggestAddresses
   }
 }));
 
@@ -48,6 +52,11 @@ describe("Workshop management pages", () => {
 
   it("creates workshop with extras, workshop tools and slot payload", async () => {
     createWorkshop.mockResolvedValueOnce({ id: "workshop-1" });
+    validateAddress.mockResolvedValueOnce({
+      isValid: true,
+      normalizedAddress: "Musterstraße 5, 80331 München, Deutschland",
+      normalizedParts: null
+    });
 
     const { container } = render(
       <ToastProvider>
@@ -57,15 +66,16 @@ describe("Workshop management pages", () => {
       </ToastProvider>
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Name"), {
+    fireEvent.change(screen.getByPlaceholderText("z.B. Garagen-Werkstatt"), {
       target: { value: "Makerspace Nord" }
     });
     fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
       target: { value: "Eine gut ausgestattete Werkstatt im Norden." }
     });
-    fireEvent.change(screen.getByPlaceholderText("Adresse oder Gebiet"), {
-      target: { value: "Muenchen Nord" }
-    });
+    fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
+    fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "München" } });
 
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
     fireEvent.change(screen.getByPlaceholderText("Werkzeugname (z.B. Bosch Akkuschrauber)"), {
@@ -99,7 +109,7 @@ describe("Workshop management pages", () => {
     expect(payload).toMatchObject({
       name: "Makerspace Nord",
       description: "Eine gut ausgestattete Werkstatt im Norden.",
-      location: "Muenchen Nord",
+      location: "Musterstraße 5, 80331 München, Deutschland",
       maxCapacity: 2,
       extras: ["wlan"],
       equipmentItems: [{ name: "Tischkreissaege", category: "holz" }],

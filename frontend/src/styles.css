@@ -636,19 +636,28 @@ button.mini {
 
 .new-workshop-form {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .new-workshop-form textarea {
-  min-height: 144px;
+  min-height: 120px;
   resize: vertical;
 }
 
-.new-workshop-form .character-count {
-  margin: 0;
+.new-workshop-form .photo-upload > label,
+.new-workshop-form .workshop-tools-builder > label,
+.new-workshop-form .equipment-select > label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.new-workshop-form .photo-upload > .hint,
+.new-workshop-form .workshop-tools-builder > .hint,
+.new-workshop-form .equipment-select > .hint {
   color: var(--color-text-muted);
-  font-size: 0.82rem;
-  text-align: right;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .new-workshop-form .photo-grid {
@@ -663,15 +672,31 @@ button.mini {
 }
 
 .new-workshop-form .photo-upload-button {
-  border-color: var(--color-border);
+  border: 1.5px dashed #f2b284;
+  background:
+    linear-gradient(180deg, rgba(255, 244, 237, 0.72), rgba(255, 255, 255, 0.96)),
+    #fff;
+}
+
+.new-workshop-form .photo-upload-button:hover,
+.new-workshop-form .photo-upload-button:focus-visible {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  outline: none;
 }
 
 .new-workshop-form .photo-label {
   background: color-mix(in srgb, var(--color-brand) 90%, transparent);
 }
 
+.workshop-empty-photo-upload {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+}
+
 .workshop-capacity-field {
-  gap: var(--space-2);
+  gap: 0.5rem;
 }
 
 .new-workshop-form .capacity-button {
@@ -683,8 +708,19 @@ button.mini {
 .new-workshop-form .capacity-display {
   width: 72px;
   height: 44px;
-  padding: 0 var(--space-2);
+  padding: 0;
   border-radius: var(--radius-md);
+  appearance: textfield;
+  -moz-appearance: textfield;
+  text-align: center;
+  line-height: 44px;
+}
+
+.new-workshop-form .capacity-display::-webkit-inner-spin-button,
+.new-workshop-form .capacity-display::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .workshop-availability-section {
@@ -697,6 +733,14 @@ button.mini {
 .workshop-form-section-heading {
   display: grid;
   gap: var(--space-1);
+}
+
+.workshop-section-kicker {
+  color: var(--color-brand-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-transform: uppercase;
 }
 
 .workshop-form-section-heading h2 {
@@ -718,15 +762,50 @@ button.mini {
   align-items: end;
 }
 
+.workshop-slot-editor {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.workshop-slot-editor-heading,
+.workshop-slot-editor-actions,
+.workshop-slot-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.workshop-slot-editor-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.workshop-slot-editor-heading strong,
+.workshop-slot-list-heading strong {
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.workshop-slot-editor-heading span,
+.workshop-slot-list-heading span {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
 .workshop-block-toggle {
-  min-height: 60px;
+  min-height: 64px;
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background: #fff;
   cursor: pointer;
 }
 
@@ -749,7 +828,7 @@ button.mini {
 
 .workshop-add-slot {
   min-height: 44px;
-  justify-self: start;
+  flex: 0 0 auto;
 }
 
 .workshop-add-slot,
@@ -774,20 +853,24 @@ button.mini {
 }
 
 .workshop-remove-slot {
+  width: 44px;
   min-height: 44px;
+  padding: 0;
+  justify-content: center;
   flex: 0 0 auto;
 }
 
 .workshop-form-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .workshop-form-actions > button,
 .workshop-form-actions > .btn {
   min-height: 44px;
+  min-width: 170px;
 }
 
 @media (max-width: 760px) {
@@ -796,9 +879,31 @@ button.mini {
     grid-template-columns: 1fr;
   }
 
+  .new-workshop-form .workshop-tools-input-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .new-workshop-form .workshop-tools-input-row .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .new-workshop-form .photo-item,
   .new-workshop-form .photo-upload-button {
     min-height: 152px;
+  }
+
+  .workshop-slot-editor-heading,
+  .workshop-slot-editor-actions,
+  .workshop-slot-list-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workshop-add-slot {
+    align-self: stretch;
+    justify-content: center;
   }
 
   .workshop-form-actions > button,
@@ -3530,13 +3635,15 @@ td {
 
 .equipment-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-3);
 }
 
 .equipment-option {
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
   gap: var(--space-3);
   padding: var(--space-3);
   border: 2px solid var(--color-border);
@@ -3547,10 +3654,25 @@ td {
 }
 
 .equipment-option input[type="checkbox"] {
-  width: auto;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
   margin: 0;
+  padding: 0;
+  border-radius: 4px;
   cursor: pointer;
   accent-color: var(--color-brand);
+}
+
+.equipment-option input[type="checkbox"]:focus,
+.equipment-option input[type="checkbox"]:focus-visible {
+  outline: none;
+  border-color: initial;
+  box-shadow: none;
+}
+
+.equipment-option:has(input[type="checkbox"]:focus-visible) {
+  border-color: var(--color-brand);
 }
 
 .equipment-option.selected {
@@ -3562,15 +3684,24 @@ td {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
   gap: var(--space-2);
   text-align: center;
 }
 
 .equipment-icon {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 1.8rem;
 }
 
 .equipment-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-text);

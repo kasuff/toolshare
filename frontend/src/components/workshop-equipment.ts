@@ -1,5 +1,5 @@
 export const WORKSHOP_EQUIPMENT = [
-  { value: "handwerkzeug", label: "Handwerkzeug", icon: "wrench" },
+  { value: "handwerkzeug", label: "Handwerkzeug", icon: "handyman" },
   { value: "3d-drucker", label: "3D-Drucker", icon: "print" },
   { value: "starkstrom", label: "Starkstrom", icon: "flash_on" },
   { value: "wlan", label: "WLAN", icon: "wifi" },

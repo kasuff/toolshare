@@ -1,11 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Field, Surface } from "../components/ui";
+import { Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
+import { api, type AddressSuggestion } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -21,11 +21,26 @@ type SlotDraft = {
 
 type WorkshopFormField = "name" | "description" | "location" | "photos" | "slots";
 
+type AddressFormFields = {
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
+  country: string;
+};
+
 const EMPTY_SLOT: SlotDraft = {
   startIso: "",
   endIso: "",
   blockedByOwner: false
 };
+
+function toAddressPayload(fields: AddressFormFields) {
+  return `${fields.street} ${fields.houseNumber}, ${fields.postalCode} ${fields.city}, ${fields.country}`
+    .replace(/\s+,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export function NewWorkshopPage({ token }: Props) {
   const { pushToast } = useToast();
@@ -35,13 +50,42 @@ export function NewWorkshopPage({ token }: Props) {
   const [touchedFields, setTouchedFields] = useState<Partial<Record<WorkshopFormField, boolean>>>({});
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
+  const [addressSearch, setAddressSearch] = useState("");
+  const [workshopAddress, setWorkshopAddress] = useState<AddressFormFields>({
+    street: "",
+    houseNumber: "",
+    postalCode: "",
+    city: "",
+    country: "Deutschland"
+  });
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
   const [maxCapacity, setMaxCapacity] = useState(2);
   const [extras, setExtras] = useState<string[]>([]);
   const [equipmentItems, setEquipmentItems] = useState<WorkshopToolDraftItem[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [slot, setSlot] = useState<SlotDraft>(EMPTY_SLOT);
   const [slots, setSlots] = useState<SlotDraft[]>([]);
+  const location = toAddressPayload(workshopAddress);
+  const isWorkshopAddressComplete = Boolean(
+    workshopAddress.street.trim() &&
+      workshopAddress.houseNumber.trim() &&
+      workshopAddress.postalCode.trim() &&
+      workshopAddress.city.trim()
+  );
+
+  useEffect(() => {
+    if (addressSearch.trim().length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void api.suggestAddresses(addressSearch).then(setAddressSuggestions);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [addressSearch]);
 
   if (!token) {
     return (
@@ -64,7 +108,7 @@ export function NewWorkshopPage({ token }: Props) {
       description.trim().length >= 5
         ? null
         : "Bitte gib eine Beschreibung mit mindestens 5 Zeichen ein.",
-    location: location.trim() ? null : "Bitte gib eine Adresse oder ein Gebiet an.",
+    location: isWorkshopAddressComplete ? null : "Bitte gib eine vollständige Werkstattadresse an.",
     photos: photos.length > 0 ? null : "Bitte lade mindestens ein Foto hoch.",
     slots: slots.length > 0 ? null : "Bitte füge mindestens ein Zeitfenster hinzu."
   };
@@ -107,11 +151,18 @@ export function NewWorkshopPage({ token }: Props) {
 
     setIsSubmitting(true);
     try {
+      const validation = await api.validateAddress(location);
+      if (!validation.isValid) {
+        pushToast("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.", "error");
+        return;
+      }
+      const normalizedLocation = validation.normalizedAddress?.trim() || location;
+
       await api.createWorkshop(
         {
           name: name.trim(),
           description: description.trim(),
-          location: location.trim(),
+          location: normalizedLocation,
           maxCapacity,
           extras,
           equipmentItems,
@@ -123,7 +174,14 @@ export function NewWorkshopPage({ token }: Props) {
 
       setName("");
       setDescription("");
-      setLocation("");
+      setAddressSearch("");
+      setWorkshopAddress({
+        street: "",
+        houseNumber: "",
+        postalCode: "",
+        city: "",
+        country: "Deutschland"
+      });
       setMaxCapacity(2);
       setExtras([]);
       setEquipmentItems([]);
@@ -142,141 +200,256 @@ export function NewWorkshopPage({ token }: Props) {
   };
 
   return (
-    <section className="new-workshop-page">
+    <section className="new-tool-page new-workshop-page">
       <h1>Werkstatt einstellen</h1>
 
-      <Surface title="Neue Werkstatt" subtitle="Teile deinen Raum und seine Ausstattung mit der Community">
-        <form className="new-workshop-form" onSubmit={onSubmit} noValidate>
-          <p className="required-note">Pflichtfelder werden mit einem * markiert.</p>
+      <form className="new-tool-form new-workshop-form" onSubmit={onSubmit} noValidate>
+        <p className="required-note">Pflichtfelder werden mit einem * markiert!</p>
 
-          <WorkshopPhotoUpload
-            photos={photos}
-            onPhotosChange={(nextPhotos) => {
-              setPhotos(nextPhotos);
-              markFieldTouched("photos");
-            }}
-            label="Werkstattfotos *"
-            hint="Lade bis zu drei Fotos deiner Werkstatt hoch (JPG, PNG, max. 5 MB pro Foto)."
-            maxPhotos={3}
+        <WorkshopPhotoUpload
+          photos={photos}
+          onPhotosChange={(nextPhotos) => {
+            setPhotos(nextPhotos);
+            markFieldTouched("photos");
+          }}
+          label="Werkstatt Fotos *"
+          hint="Lade bis zu drei gute Fotos deiner Werkstatt hoch (JPG, PNG, WebP, max. 5 MB pro Foto)."
+          maxPhotos={3}
+        />
+        {showFieldError("photos") && <p className="field-error">{formErrors.photos}</p>}
+
+        <label className="tool-form-field">
+          <span>Name *</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onBlur={() => markFieldTouched("name")}
+            placeholder="z.B. Garagen-Werkstatt"
+            maxLength={100}
+            className={showFieldError("name") ? "input-invalid" : undefined}
+            aria-invalid={showFieldError("name")}
           />
-          {showFieldError("photos") && <p className="field-error">{formErrors.photos}</p>}
+          <small>Kurz und konkret, z.B. geräumige Garagen-Werkstatt.</small>
+          {showFieldError("name") && <p className="field-error">{formErrors.name}</p>}
+        </label>
 
-          <Field label="Name *" hint="Kurz und konkret, z. B. geräumige Garagen-Werkstatt">
+        <label className="tool-form-field">
+          <span className="field-label-row">
+            <span>Beschreibung *</span>
+            <span className="char-count">{description.length}/1000 Zeichen</span>
+          </span>
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            onBlur={() => markFieldTouched("description")}
+            placeholder="z.B. helle Werkstatt mit großer Arbeitsfläche und umfangreicher Holzbearbeitungsausstattung"
+            maxLength={1000}
+            minLength={5}
+            rows={5}
+            className={showFieldError("description") ? "input-invalid" : undefined}
+            aria-invalid={showFieldError("description")}
+          />
+          <small>Beschreibe Zustand, Nutzungsmöglichkeiten und Besonderheiten deiner Werkstatt.</small>
+          {showFieldError("description") && <p className="field-error">{formErrors.description}</p>}
+        </label>
+
+        <WorkshopToolsInput
+          items={equipmentItems}
+          onChange={setEquipmentItems}
+          label="Ausstattung"
+          hint="Füge die Werkzeuge hinzu, die in deiner Werkstatt vorhanden sind."
+        />
+
+        <WorkshopEquipmentSelect
+          selected={extras}
+          onChange={setExtras}
+          label="Extras"
+          hint="Wähle optionale Zusatzmerkmale wie WLAN, Starkstrom oder einen Parkplatz."
+        />
+
+        <div className="tool-form-field new-tool-address-section">
+          <span>Adresse *</span>
+          <small>Gib die vollständige Adresse an, an der sich die Werkstatt befindet.</small>
+
+          <div className="address-autocomplete">
             <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              onBlur={() => markFieldTouched("name")}
-              placeholder="Name"
-              maxLength={100}
-              className={showFieldError("name") ? "input-invalid" : undefined}
-              aria-invalid={showFieldError("name")}
-            />
-            {showFieldError("name") && <p className="field-error">{formErrors.name}</p>}
-          </Field>
-
-          <Field
-            label="Beschreibung *"
-            hint="Beschreibe Zustand, Nutzungsmöglichkeiten und Besonderheiten deiner Werkstatt."
-          >
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              onBlur={() => markFieldTouched("description")}
-              placeholder="z. B. helle Werkstatt mit großer Arbeitsfläche und umfangreicher Holzbearbeitungsausstattung"
-              maxLength={1000}
-              minLength={5}
-              rows={5}
-              className={showFieldError("description") ? "input-invalid" : undefined}
-              aria-invalid={showFieldError("description")}
-            />
-            {showFieldError("description") && <p className="field-error">{formErrors.description}</p>}
-            <p className="character-count">{description.length}/1000 Zeichen</p>
-          </Field>
-
-          <WorkshopToolsInput
-            items={equipmentItems}
-            onChange={setEquipmentItems}
-            label="Ausstattung"
-            hint="Füge die Werkzeuge hinzu, die in deiner Werkstatt vorhanden sind."
-          />
-
-          <WorkshopEquipmentSelect
-            selected={extras}
-            onChange={setExtras}
-            label="Extras"
-            hint="Wähle optionale Zusatzmerkmale wie WLAN, Starkstrom oder einen Parkplatz."
-          />
-
-          <Field label="Adresse *" hint="Gib die Adresse oder das Gebiet an, in dem sich die Werkstatt befindet.">
-            <input
-              type="text"
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              onBlur={() => markFieldTouched("location")}
-              placeholder="Adresse oder Gebiet"
-              maxLength={200}
+              value={addressSearch}
+              onChange={(event) => setAddressSearch(event.target.value)}
+              onFocus={() => setIsAddressSearchFocused(true)}
+              onBlur={() => {
+                markFieldTouched("location");
+                window.setTimeout(() => setIsAddressSearchFocused(false), 120);
+              }}
+              placeholder="Adresse suchen (optional für Autofill)"
+              autoComplete="street-address"
               className={showFieldError("location") ? "input-invalid" : undefined}
               aria-invalid={showFieldError("location")}
             />
-            {showFieldError("location") && <p className="field-error">{formErrors.location}</p>}
-          </Field>
+            {isAddressSearchFocused && addressSearch.trim().length >= 3 && (
+              <div className="address-dropdown" role="listbox" aria-label="Adressvorschläge">
+                <p className="address-dropdown-head">Vorschläge - klicken zum Übernehmen</p>
+                {addressSuggestions.length > 0 ? (
+                  <ul className="address-suggestion-list">
+                    {addressSuggestions.map((suggestion) => (
+                      <li key={suggestion.label}>
+                        <button
+                          type="button"
+                          className="address-suggestion-item"
+                          onMouseDown={() => {
+                            setWorkshopAddress({
+                              street: suggestion.street,
+                              houseNumber: suggestion.houseNumber,
+                              postalCode: suggestion.postalCode,
+                              city: suggestion.city,
+                              country: suggestion.country || "Deutschland"
+                            });
+                            setAddressSearch(suggestion.label);
+                          }}
+                        >
+                          <span className="address-suggestion-title">{suggestion.label}</span>
+                          <span className="address-suggestion-meta">
+                            {suggestion.postalCode} {suggestion.city}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="address-suggestion-empty">Keine Vorschläge gefunden.</p>
+                )}
+              </div>
+            )}
+          </div>
+          <small>Mindestens 3 Zeichen eingeben, um Adressvorschläge zu sehen.</small>
 
-          <div className="field workshop-capacity-field">
-            <label htmlFor="capacity-input">
-              <strong>Maximale Personenzahl *</strong>
-            </label>
-            <p className="hint">Wie viele Personen können gleichzeitig komfortabel in der Werkstatt arbeiten?</p>
-            <div className="capacity-input">
-              <button
-                type="button"
-                onClick={() => setMaxCapacity((current) => Math.max(1, current - 1))}
-                className="capacity-button"
-                aria-label="Personenzahl verringern"
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">remove</span>
-              </button>
+          <div className="address-grid new-tool-address-grid">
+            <label className="address-field address-field-street form-label">
+              <span>Straße *</span>
               <input
-                id="capacity-input"
-                type="number"
-                min={1}
-                value={maxCapacity}
-                onChange={(event) => setMaxCapacity(Math.max(1, Number(event.target.value) || 1))}
-                className="capacity-display"
-                aria-label="Maximale Personenzahl"
+                value={workshopAddress.street}
+                onChange={(event) => setWorkshopAddress((current) => ({ ...current, street: event.target.value }))}
+                onBlur={() => markFieldTouched("location")}
+                placeholder="Straße"
+                autoComplete="address-line1"
               />
-              <button
-                type="button"
-                onClick={() => setMaxCapacity((current) => current + 1)}
-                className="capacity-button"
-                aria-label="Personenzahl erhöhen"
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">add</span>
-              </button>
-            </div>
+            </label>
+            <label className="address-field form-label">
+              <span>Hausnummer *</span>
+              <input
+                value={workshopAddress.houseNumber}
+                onChange={(event) => setWorkshopAddress((current) => ({ ...current, houseNumber: event.target.value }))}
+                onBlur={() => markFieldTouched("location")}
+                placeholder="Hausnummer"
+                autoComplete="address-line2"
+              />
+            </label>
+            <label className="address-field form-label">
+              <span>PLZ *</span>
+              <input
+                value={workshopAddress.postalCode}
+                onChange={(event) => setWorkshopAddress((current) => ({ ...current, postalCode: event.target.value }))}
+                onBlur={() => markFieldTouched("location")}
+                placeholder="PLZ"
+                autoComplete="postal-code"
+              />
+            </label>
+            <label className="address-field address-field-city form-label">
+              <span>Ort *</span>
+              <input
+                value={workshopAddress.city}
+                onChange={(event) => setWorkshopAddress((current) => ({ ...current, city: event.target.value }))}
+                onBlur={() => markFieldTouched("location")}
+                placeholder="Ort"
+                autoComplete="address-level2"
+              />
+            </label>
+            <label className="address-field address-field-country form-label">
+              <span>Land</span>
+              <input
+                value={workshopAddress.country}
+                onChange={(event) => setWorkshopAddress((current) => ({ ...current, country: event.target.value }))}
+                onBlur={() => markFieldTouched("location")}
+                placeholder="Land"
+                autoComplete="country-name"
+              />
+            </label>
+          </div>
+          {location.length > 0 && (
+            <p className="address-preview" aria-live="polite">
+              {location}
+            </p>
+          )}
+          {showFieldError("location") && <p className="field-error">{formErrors.location}</p>}
+        </div>
+
+        <div className="tool-form-field workshop-capacity-field">
+          <span>Maximale Personenzahl *</span>
+          <div className="capacity-input">
+            <button
+              type="button"
+              onClick={() => setMaxCapacity((current) => Math.max(1, current - 1))}
+              className="capacity-button"
+              aria-label="Personenzahl verringern"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">remove</span>
+            </button>
+            <input
+              id="capacity-input"
+              type="number"
+              min={1}
+              value={maxCapacity}
+              onChange={(event) => setMaxCapacity(Math.max(1, Number(event.target.value) || 1))}
+              className="capacity-display"
+              aria-label="Maximale Personenzahl"
+            />
+            <button
+              type="button"
+              onClick={() => setMaxCapacity((current) => current + 1)}
+              className="capacity-button"
+              aria-label="Personenzahl erhöhen"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">add</span>
+            </button>
+          </div>
+          <small>Wie viele Personen können gleichzeitig komfortabel in der Werkstatt arbeiten?</small>
+        </div>
+
+        <section className="workshop-availability-section" aria-labelledby="workshop-availability-title">
+          <div className="workshop-form-section-heading">
+            <span className="workshop-section-kicker">Buchungsplanung</span>
+            <h2 id="workshop-availability-title">Verfügbare Zeitfenster</h2>
+            <p>Lege fest, wann die Werkstatt buchbar ist. Blockierte Zeiträume sind für Nutzer nicht auswählbar.</p>
           </div>
 
-          <section className="workshop-availability-section" aria-labelledby="workshop-availability-title">
-            <div className="workshop-form-section-heading">
-              <h2 id="workshop-availability-title">Verfügbarkeit und Zeitfenster</h2>
-              <p>Lege mindestens einen buchbaren Zeitraum fest oder markiere einen Zeitraum als blockiert.</p>
+          <div className="workshop-slot-editor">
+            <div className="workshop-slot-editor-heading">
+              <div>
+                <strong>Neues Zeitfenster</strong>
+                <span>Start und Ende des Zeitraums festlegen</span>
+              </div>
             </div>
 
             <div className="workshop-slot-builder">
-              <Field label="Startzeit">
+              <label className="tool-form-field">
+                <span>Startzeit</span>
                 <input
                   type="datetime-local"
                   value={slot.startIso}
                   onChange={(event) => setSlot((current) => ({ ...current, startIso: event.target.value }))}
                 />
-              </Field>
-              <Field label="Endzeit">
+              </label>
+              <label className="tool-form-field">
+                <span>Endzeit</span>
                 <input
                   type="datetime-local"
                   value={slot.endIso}
                   onChange={(event) => setSlot((current) => ({ ...current, endIso: event.target.value }))}
                 />
-              </Field>
+              </label>
+            </div>
+
+            <div className="workshop-slot-editor-actions">
               <label className="workshop-block-toggle">
                 <input
                   type="checkbox"
@@ -290,55 +463,58 @@ export function NewWorkshopPage({ token }: Props) {
                   <small>Für Wartung oder private Nutzung sperren</small>
                 </span>
               </label>
-              <button type="button" className="btn secondary workshop-add-slot" onClick={addSlot}>
+              <button type="button" className="btn btn-outline workshop-add-slot" onClick={addSlot}>
                 <span className="material-symbols-outlined" aria-hidden="true">add</span>
                 Zeitfenster hinzufügen
               </button>
             </div>
-
-            <div className={`time-slots-list ${showFieldError("slots") ? "input-invalid" : ""}`}>
-              {slots.length > 0 ? (
-                <ul className="meta-list workshop-created-slots">
-                  {slots.map((currentSlot, index) => (
-                    <li key={`${currentSlot.startIso}-${currentSlot.endIso}-${index}`} className="slot-item">
-                      <div className="workshop-slot-copy">
-                        <span className="material-symbols-outlined" aria-hidden="true">schedule</span>
-                        <span>
-                          <strong>{new Date(currentSlot.startIso).toLocaleString("de-DE")}</strong>
-                          {" bis "}
-                          <strong>{new Date(currentSlot.endIso).toLocaleString("de-DE")}</strong>
-                          {currentSlot.blockedByOwner && <span className="slot-badge">Blockiert</span>}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeSlot(index)}
-                        className="btn ghost danger workshop-remove-slot"
-                        aria-label={`Zeitfenster ${index + 1} entfernen`}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">delete</span>
-                        Entfernen
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="workshop-empty-slots">Noch kein Zeitfenster hinzugefügt.</p>
-              )}
-            </div>
-            {showFieldError("slots") && <p className="field-error">{formErrors.slots}</p>}
-          </section>
-
-          <div className="workshop-form-actions">
-            <button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Wird eingestellt..." : "Werkstatt einstellen"}
-            </button>
-            <Link to="/workshops" className="btn secondary">
-              Abbrechen
-            </Link>
           </div>
-        </form>
-      </Surface>
+
+          <div className="workshop-slot-list-heading">
+            <strong>Geplante Zeitfenster</strong>
+            <span>{slots.length === 0 ? "Noch keine Einträge" : `${slots.length} Einträge`}</span>
+          </div>
+          <div className={`time-slots-list ${showFieldError("slots") ? "input-invalid" : ""}`}>
+            {slots.length > 0 ? (
+              <ul className="meta-list workshop-created-slots">
+                {slots.map((currentSlot, index) => (
+                  <li key={`${currentSlot.startIso}-${currentSlot.endIso}-${index}`} className="slot-item">
+                    <div className="workshop-slot-copy">
+                      <span className="material-symbols-outlined" aria-hidden="true">schedule</span>
+                      <span>
+                        <strong>{new Date(currentSlot.startIso).toLocaleString("de-DE")}</strong>
+                        {" bis "}
+                        <strong>{new Date(currentSlot.endIso).toLocaleString("de-DE")}</strong>
+                        {currentSlot.blockedByOwner && <span className="slot-badge">Blockiert</span>}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSlot(index)}
+                      className="btn ghost danger workshop-remove-slot"
+                      aria-label={`Zeitfenster ${index + 1} entfernen`}
+                    >
+                      <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="workshop-empty-slots">Noch kein Zeitfenster hinzugefügt.</p>
+            )}
+          </div>
+          {showFieldError("slots") && <p className="field-error">{formErrors.slots}</p>}
+        </section>
+
+        <div className="new-tool-actions workshop-form-actions">
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Wird eingestellt..." : "Werkstatt einstellen"}
+          </button>
+          <Link to="/workshops" className="btn btn-outline">
+            Abbrechen
+          </Link>
+        </div>
+      </form>
     </section>
   );
 }
