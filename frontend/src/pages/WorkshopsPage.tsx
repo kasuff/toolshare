@@ -333,6 +333,14 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     });
   };
 
+  const openWorkshopImage = (index: number) => {
+    if (selectedWorkshopImages[index] === DEFAULT_PLACEHOLDER_IMAGE) {
+      pushToast("Keine Bilder vorhanden.", "info");
+      return;
+    }
+    setActiveImageIndex(index);
+  };
+
   const selectWorkshopCalendarDate = (dateKey: string) => {
     if (!selectedWorkshop) return;
     const workshopId = selectedWorkshop.workshop.id;
@@ -740,8 +748,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                 <button
                   type="button"
                   className="workshop-detail-image-main"
-                  onClick={() => setActiveImageIndex(0)}
-                  aria-label={`${selectedWorkshop.workshop.name} vergrößern`}
+                  onClick={() => openWorkshopImage(0)}
+                  aria-label={
+                    selectedWorkshopImages[0] === DEFAULT_PLACEHOLDER_IMAGE
+                      ? "Keine Bilder vorhanden"
+                      : `${selectedWorkshop.workshop.name} vergrößern`
+                  }
                 >
                   <img src={selectedWorkshopImages[0]} alt={selectedWorkshop.workshop.name} />
                 </button>
@@ -752,8 +764,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                         type="button"
                         key={`${imageUrl}-${index}`}
                         className="workshop-detail-image-thumb"
-                        onClick={() => setActiveImageIndex(index + 1)}
-                        aria-label={`Bild ${index + 2} von ${selectedWorkshop.workshop.name} vergrößern`}
+                        onClick={() => openWorkshopImage(index + 1)}
+                        aria-label={
+                          imageUrl === DEFAULT_PLACEHOLDER_IMAGE
+                            ? "Keine Bilder vorhanden"
+                            : `Bild ${index + 2} von ${selectedWorkshop.workshop.name} vergrößern`
+                        }
                       >
                         <img src={imageUrl} alt={`${selectedWorkshop.workshop.name} ${index + 2}`} />
                       </button>

@@ -3,6 +3,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { WorkshopsPage } from "../../src/pages/WorkshopsPage";
+import { ToastViewport } from "../../src/components/ui";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 import type { Tool, Workshop, WorkshopSlot } from "../../src/types/domain";
 
 const { createWorkshopBooking, getWorkshops } = vi.hoisted(() => ({
@@ -62,6 +64,7 @@ function renderPage(initialPath = "/workshops") {
           />
         </Routes>
       </MemoryRouter>
+      <ToastViewport />
     </ToastProvider>
   );
 }
@@ -250,5 +253,26 @@ describe("WorkshopsPage search filters", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Zurück" }));
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops");
+  });
+
+  it("shows a notice instead of opening the default workshop image", async () => {
+    getWorkshops.mockResolvedValueOnce([
+      {
+        workshop: workshop({
+          id: "without-image",
+          name: "Werkstatt ohne Bilder",
+          imageUrls: [DEFAULT_PLACEHOLDER_IMAGE]
+        }),
+        slots: [slot({ workshopId: "without-image" })],
+        tools: []
+      }
+    ]);
+
+    renderPage("/workshops/without-image");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Keine Bilder vorhanden" }));
+
+    expect(await screen.findByText("Keine Bilder vorhanden.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /Bilder von/i })).not.toBeInTheDocument();
   });
 });
