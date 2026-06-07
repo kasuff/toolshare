@@ -189,7 +189,8 @@ describe("WorkshopsPage search filters", () => {
           name: "Nähstube",
           description: "Ausstattung: sewing, light",
           extras: ["sewing"],
-          ownerName: "Nina Nadel"
+          ownerName: "Nina Nadel",
+          imageUrls: ["https://example.com/workshop-1.jpg", "https://example.com/workshop-2.jpg"]
         }),
         slots: [slot({ workshopId: "available" })],
         tools: [tool({ id: "needle", name: "Nähmaschine", selectable: true })]
@@ -208,12 +209,20 @@ describe("WorkshopsPage search filters", () => {
 
     fireEvent.click(screen.getByText("Nähstube").closest("article")!);
 
-    expect(await screen.findByRole("dialog", { name: "Nähstube" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Nähstube" })).toBeInTheDocument();
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops/available");
     expect(screen.getByText("Leopoldstraße 120, München")).toBeInTheDocument();
     expect(screen.getAllByText("Nähmaschine").length).toBeGreaterThan(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Buchen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nähstube vergrößern" }));
+    const imageViewer = screen.getByRole("dialog", { name: "Bilder von Nähstube" });
+    expect(within(imageViewer).getByRole("img")).toHaveAttribute("src", "https://example.com/workshop-1.jpg");
+    fireEvent.click(within(imageViewer).getByRole("button", { name: "Nächstes Bild" }));
+    expect(within(imageViewer).getByRole("img")).toHaveAttribute("src", "https://example.com/workshop-2.jpg");
+    fireEvent.click(within(imageViewer).getByRole("button", { name: "Bildansicht schließen" }));
+    expect(screen.queryByRole("dialog", { name: "Bilder von Nähstube" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Anfrage senden" }));
     await waitFor(() =>
       expect(createWorkshopBooking).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -237,9 +246,9 @@ describe("WorkshopsPage search filters", () => {
 
     renderPage("/workshops/direct");
 
-    expect(await screen.findByRole("dialog", { name: "Direkte Werkstatt" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Direkte Werkstatt" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "← Zurück" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zurück" }));
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops");
   });
 });

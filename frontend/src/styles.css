@@ -2630,15 +2630,24 @@ td {
 }
 
 .back-button {
+  min-width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.95rem;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
   font-weight: 500;
-  padding: var(--space-2) 0;
+  padding: 0 var(--space-3);
   margin-bottom: 0;
-  transition: color 0.2s ease;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 
 .tool-detail-page > .detail-topbar .back-button,
@@ -2647,7 +2656,27 @@ td {
 }
 
 .back-button:hover {
-  color: var(--color-brand);
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+}
+
+.back-button:active {
+  border-color: rgba(255, 102, 0, 0.35);
+  background: #ffe8d8;
+}
+
+.back-button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+  box-shadow: none;
+}
+
+.back-button-icon {
+  font-size: 20px;
+  line-height: 1;
+  font-variation-settings: "wght" 500;
 }
 
 .detail-report-trigger {
@@ -2771,7 +2800,12 @@ td {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  margin-bottom: 0;
+}
+
+.workshop-modal-toolbar .detail-topbar {
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .tool-hero {
@@ -2878,20 +2912,22 @@ td {
 }
 
 .playtomic-booking-panel {
-  background: linear-gradient(135deg, #f5fbf8 0%, #eaf7f1 100%);
-  border: 2px solid var(--color-brand);
+  background: #ffffff;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
   display: grid;
-  gap: var(--space-4);
-  box-shadow: 0 12px 28px rgba(31, 138, 91, 0.08);
+  gap: var(--space-5);
+  box-shadow: 0 8px 24px rgba(45, 45, 45, 0.08);
 }
 
-.playtomic-booking-panel h2 {
+.playtomic-booking-panel h2,
+.playtomic-booking-panel h3 {
   margin: 0;
-  font-size: 1.5rem;
-  color: var(--color-brand-strong);
-  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .playtomic-booking-panel.unavailable {
@@ -2902,22 +2938,66 @@ td {
 
 .booking-section {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-.booking-label {
-  font-size: 0.9rem;
+.booking-intro {
+  margin: calc(var(--space-3) * -1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.booking-section-title {
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.booking-section-title > span {
+  width: 4px;
+  height: 26px;
+  border-radius: 9999px;
+  background: var(--color-brand);
+}
+
+.booking-section-title strong {
+  font-size: 16px;
+  line-height: 26px;
   font-weight: 600;
+}
+
+.booking-fields-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: var(--space-3);
+}
+
+.booking-fields-row label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.booking-fields-row label > span {
   color: var(--color-text);
-  display: block;
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.booking-divider {
+  height: 1px;
+  background: var(--color-border);
 }
 
 .booking-input {
   width: 100%;
-  padding: var(--space-3) var(--space-2);
-  border: 1px solid #d4ebe2;
-  border-radius: var(--radius-sm);
-  font-size: 0.95rem;
+  height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
   font-family: inherit;
   background: white;
   color: var(--color-text);
@@ -2927,7 +3007,7 @@ td {
 .booking-input:focus {
   outline: none;
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 3px rgba(31, 138, 91, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.14);
 }
 
 /* ===== Duration Picker ===== */
@@ -2936,18 +3016,18 @@ td {
   align-items: center;
   justify-content: space-between;
   background: white;
-  border: 1px solid #d4ebe2;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: var(--space-2);
   gap: var(--space-2);
 }
 
 .duration-btn {
   background: transparent;
-  border: 1px solid #d4ebe2;
-  border-radius: var(--radius-sm);
-  width: 40px;
-  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  width: 44px;
+  height: 44px;
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--color-brand);
@@ -2994,26 +3074,25 @@ td {
 }
 
 .booking-button {
+  width: 100%;
+  height: 44px;
   background: var(--color-brand);
   color: white;
   border: none;
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  font-size: 1rem;
-  font-weight: 700;
+  padding: 0 var(--space-4);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 180ms ease, box-shadow 180ms ease;
   text-decoration: none;
   text-align: center;
   display: block;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
 }
 
 .booking-button:hover:not(:disabled) {
   background: var(--color-brand-strong);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(31, 138, 91, 0.25);
+  box-shadow: 0 8px 16px rgba(255, 102, 0, 0.22);
 }
 
 .booking-button:disabled {
@@ -3022,11 +3101,11 @@ td {
 }
 
 .booking-hint {
-  font-size: 0.85rem;
+  font-size: 14px;
   color: var(--color-text-muted);
   margin: 0;
-  text-align: center;
-  line-height: 1.5;
+  text-align: left;
+  line-height: 21px;
 }
 
 /* ===== Mobile Responsive ===== */
@@ -3519,27 +3598,435 @@ button.danger:hover {
   min-height: 100%;
 }
 
-.workshop-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(17, 24, 39, 0.45);
-  display: grid;
-  place-items: center;
-  padding: var(--space-4);
-  z-index: 80;
+.search-page.has-workshop-detail > .offer-strip,
+.search-page.has-workshop-detail > .page-header,
+.search-page.has-workshop-detail > .surface,
+.search-page.has-workshop-detail > .cards {
+  display: none;
 }
 
-.workshop-modal {
-  width: min(760px, 100%);
-  max-height: min(88vh, 920px);
-  overflow: auto;
-  background: #fff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-soft);
+.search-page.has-workshop-detail {
+  display: block;
+}
+
+.workshop-detail-page {
+  width: 100%;
+}
+
+.workshop-detail-page-content {
+  width: min(1120px, 100%);
+  margin: 0 auto;
   display: grid;
   gap: var(--space-4);
-  padding: var(--space-5);
+  padding: var(--space-5) var(--space-4);
+}
+
+.workshop-detail-gallery {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.workshop-detail-gallery-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.15fr) minmax(180px, 0.8fr);
+  gap: var(--space-3);
+}
+
+.workshop-detail-gallery-grid.single {
+  grid-template-columns: 1fr;
+}
+
+.workshop-detail-image-main,
+.workshop-detail-image-thumb {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  cursor: zoom-in;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.workshop-detail-image-main:hover,
+.workshop-detail-image-main:focus-visible,
+.workshop-detail-image-thumb:hover,
+.workshop-detail-image-thumb:focus-visible {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
+  outline: none;
+}
+
+.workshop-detail-gallery img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.workshop-detail-image-main {
+  height: 280px;
+}
+
+.workshop-detail-image-stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.workshop-detail-image-thumb {
+  height: 134px;
+}
+
+.workshop-image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: clamp(56px, 8vw, 96px);
+  background: rgba(17, 24, 39, 0.9);
+}
+
+.workshop-image-viewer-content {
+  position: relative;
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.workshop-image-viewer-content img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(1200px, 100%);
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.workshop-image-viewer-close,
+.workshop-image-viewer-nav {
+  position: fixed;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  cursor: pointer;
+}
+
+.workshop-image-viewer-close:hover,
+.workshop-image-viewer-close:focus-visible,
+.workshop-image-viewer-nav:hover,
+.workshop-image-viewer-nav:focus-visible {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  outline: none;
+}
+
+.workshop-image-viewer-close {
+  top: var(--space-4);
+  right: var(--space-4);
+}
+
+.workshop-image-viewer-nav {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.workshop-image-viewer-nav.previous {
+  left: var(--space-4);
+}
+
+.workshop-image-viewer-nav.next {
+  right: var(--space-4);
+}
+
+.workshop-image-viewer-counter {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(17, 24, 39, 0.78);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.workshop-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.workshop-detail-main,
+.workshop-detail-header,
+.workshop-detail-section {
+  display: grid;
+}
+
+.workshop-detail-main {
+  gap: var(--space-4);
+}
+
+.workshop-detail-header {
+  gap: var(--space-2);
+}
+
+.workshop-detail-header h2 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.workshop-detail-section {
+  gap: var(--space-2);
+}
+
+.workshop-detail-section h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.workshop-detail-section p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.workshop-detail-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.workshop-detail-list li span {
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workshop-detail-list .is-muted {
+  color: var(--color-text-muted);
+}
+
+.workshop-detail-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.workshop-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workshop-detail-chip .material-symbols-outlined {
+  color: var(--color-brand);
+  font-size: 20px;
+}
+
+.workshop-detail-provider {
+  width: min(360px, 100%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.workshop-detail-provider > div {
+  display: grid;
+  gap: 2px;
+}
+
+.workshop-detail-provider strong {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.workshop-detail-provider span {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.workshop-calendar-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.workshop-calendar-navigation {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.workshop-calendar-navigation button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text);
+}
+
+.workshop-calendar-navigation button:hover:not(:disabled),
+.workshop-calendar-navigation button:focus-visible {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+}
+
+.workshop-calendar-navigation button:disabled {
+  opacity: 0.4;
+}
+
+.workshop-calendar-navigation .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.workshop-calendar-instruction {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.workshop-calendar-months {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.workshop-calendar-month {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.workshop-calendar-month h4 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 21px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.workshop-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.workshop-calendar-weekday {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.workshop-calendar-day {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workshop-calendar-day.available:hover,
+.workshop-calendar-day.range-start,
+.workshop-calendar-day.range-end {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.workshop-calendar-day.in-range:not(.range-start):not(.range-end) {
+  border-color: #ffd2b3;
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+}
+
+.workshop-calendar-day.unavailable {
+  background: #f3f4f6;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.workshop-calendar-day.empty {
+  height: 28px;
+  background: transparent;
+}
+
+.workshop-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.workshop-calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.workshop-calendar-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+}
+
+.workshop-calendar-legend i.available {
+  background: var(--color-brand);
+}
+
+.workshop-calendar-legend i.unavailable {
+  background: #9ca3af;
+}
+
+.workshop-detail-booking {
+  position: sticky;
+  top: var(--space-4);
 }
 
 .workshop-modal-header {
@@ -3651,6 +4138,72 @@ button.danger:hover {
   background: var(--color-surface-soft);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
+}
+
+@media (max-width: 980px) {
+  .workshop-detail-layout,
+  .workshop-detail-gallery-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workshop-detail-image-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+
+  .workshop-detail-booking {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .workshop-calendar-months {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-fields-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .workshop-detail-page-content {
+    padding: var(--space-4) 0;
+  }
+
+  .workshop-detail-header h2 {
+    font-size: 24px;
+  }
+
+  .workshop-detail-image-main {
+    height: 220px;
+    min-height: 0;
+  }
+
+  .workshop-detail-image-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .workshop-detail-image-thumb {
+    height: 160px;
+  }
+
+  .workshop-image-viewer {
+    padding: 64px var(--space-3);
+  }
+
+  .workshop-image-viewer-nav {
+    width: 40px;
+    height: 40px;
+  }
+
+  .workshop-image-viewer-nav.previous {
+    left: var(--space-2);
+  }
+
+  .workshop-image-viewer-nav.next {
+    right: var(--space-2);
+  }
 }
 
 /* ===== Page Header ===== */

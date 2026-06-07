@@ -159,7 +159,7 @@ describe("Guest protected actions", () => {
     fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
 
     expect((await screen.findAllByText("Bandsäge")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Schleifer")).toBeInTheDocument();
-    expect(screen.getByText("Ausgeliehen")).toBeInTheDocument();
+    expect(screen.getAllByText("Schleifer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ausgeliehen").length).toBeGreaterThan(0);
   });
 });

@@ -73,9 +73,9 @@ describe("WorkshopsPage coverage", () => {
 
     expect(await screen.findByText("Maker Space")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Maker Space").closest("article")!);
-    expect(await screen.findByRole("dialog", { name: "Maker Space" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Maker Space" })).toBeInTheDocument();
     expect(screen.getByText("Eigene Werkstatt")).toBeInTheDocument();
-    expect(screen.getAllByText("Bohrmaschine").length).toBeGreaterThan(1);
+    expect(screen.getByText("Bohrmaschine")).toBeInTheDocument();
 
     getWorkshops.mockResolvedValueOnce([
       {
@@ -110,10 +110,16 @@ describe("WorkshopsPage coverage", () => {
 
     expect(await screen.findByText("Holzwerkstatt")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Holzwerkstatt").closest("article")!);
-    fireEvent.click(await screen.findByRole("button", { name: "Buchen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Anfrage senden" }));
 
     await waitFor(() => {
-      expect(createWorkshopBooking).toHaveBeenCalledWith({ slotId: "s2" }, "token-123");
+      expect(createWorkshopBooking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workshopId: "w2",
+          workshopToolIds: []
+        }),
+        "token-123"
+      );
     });
   });
 });
