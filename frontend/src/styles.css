@@ -623,6 +623,196 @@ button.mini {
   box-shadow: var(--shadow-soft);
 }
 
+.new-workshop-page {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.new-workshop-page h1 {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.new-workshop-form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.new-workshop-form textarea {
+  min-height: 144px;
+  resize: vertical;
+}
+
+.new-workshop-form .character-count {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.new-workshop-form .photo-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.new-workshop-form .photo-item,
+.new-workshop-form .photo-upload-button {
+  min-height: 176px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+}
+
+.new-workshop-form .photo-upload-button {
+  border-color: var(--color-border);
+}
+
+.new-workshop-form .photo-label {
+  background: color-mix(in srgb, var(--color-brand) 90%, transparent);
+}
+
+.workshop-capacity-field {
+  gap: var(--space-2);
+}
+
+.new-workshop-form .capacity-button {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+}
+
+.new-workshop-form .capacity-display {
+  width: 72px;
+  height: 44px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.workshop-availability-section {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.workshop-form-section-heading {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.workshop-form-section-heading h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.workshop-form-section-heading p,
+.workshop-empty-slots {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.workshop-slot-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.workshop-block-toggle {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.workshop-block-toggle input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--color-brand);
+}
+
+.workshop-block-toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.workshop-block-toggle small {
+  color: var(--color-text-muted);
+}
+
+.workshop-add-slot {
+  min-height: 44px;
+  justify-self: start;
+}
+
+.workshop-add-slot,
+.workshop-remove-slot,
+.workshop-slot-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.workshop-created-slots {
+  margin: 0;
+  padding: 0;
+}
+
+.workshop-slot-copy {
+  min-width: 0;
+}
+
+.workshop-slot-copy > span:last-child {
+  min-width: 0;
+}
+
+.workshop-remove-slot {
+  min-height: 44px;
+  flex: 0 0 auto;
+}
+
+.workshop-form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.workshop-form-actions > button,
+.workshop-form-actions > .btn {
+  min-height: 44px;
+}
+
+@media (max-width: 760px) {
+  .new-workshop-form .photo-grid,
+  .workshop-slot-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .new-workshop-form .photo-item,
+  .new-workshop-form .photo-upload-button {
+    min-height: 152px;
+  }
+
+  .workshop-form-actions > button,
+  .workshop-form-actions > .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .slot-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .required-note {
   color: var(--color-danger);
   font-size: 0.9rem;

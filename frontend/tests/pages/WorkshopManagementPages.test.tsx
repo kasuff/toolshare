@@ -60,6 +60,9 @@ describe("Workshop management pages", () => {
     fireEvent.change(screen.getByPlaceholderText("Name"), {
       target: { value: "Makerspace Nord" }
     });
+    fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
+      target: { value: "Eine gut ausgestattete Werkstatt im Norden." }
+    });
     fireEvent.change(screen.getByPlaceholderText("Adresse oder Gebiet"), {
       target: { value: "Muenchen Nord" }
     });
@@ -80,8 +83,6 @@ describe("Workshop management pages", () => {
     });
     await screen.findByText("1 von 3 Fotos");
 
-    fireEvent.click(screen.getByRole("button", { name: "Schritt 1 von 3" }));
-
     fireEvent.change(screen.getByLabelText("Startzeit"), {
       target: { value: "2026-07-01T09:00" }
     });
@@ -89,7 +90,7 @@ describe("Workshop management pages", () => {
       target: { value: "2026-07-01T12:00" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Werkstatt veröffentlichen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => expect(createWorkshop).toHaveBeenCalledTimes(1));
 
@@ -97,6 +98,7 @@ describe("Workshop management pages", () => {
     expect(token).toBe("token-123");
     expect(payload).toMatchObject({
       name: "Makerspace Nord",
+      description: "Eine gut ausgestattete Werkstatt im Norden.",
       location: "Muenchen Nord",
       maxCapacity: 2,
       extras: ["wlan"],

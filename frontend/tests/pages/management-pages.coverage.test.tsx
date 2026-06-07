@@ -301,7 +301,7 @@ describe("management pages", () => {
     expect(await screen.findByText("Tools Home")).toBeInTheDocument();
   });
 
-  it("builds a workshop payload from the step flow", async () => {
+  it("builds a workshop payload from the combined form", async () => {
     createWorkshop.mockResolvedValueOnce({ id: "workshop-1" });
 
     const { container } = render(
@@ -313,12 +313,15 @@ describe("management pages", () => {
       </MemoryRouter>
     );
 
-    fireEvent.submit(screen.getByRole("button", { name: "Schritt 1 von 3" }).closest("form")!);
+    fireEvent.submit(screen.getByRole("button", { name: "Werkstatt einstellen" }).closest("form")!);
     await waitFor(() => {
-      expect(pushToast).toHaveBeenCalledWith("Bitte geben Sie einen Werkstatt-Namen ein.", "error");
+      expect(pushToast).toHaveBeenCalledWith("Bitte gib einen Namen für die Werkstatt ein.", "error");
     });
 
     fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Maker Space" } });
+    fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
+      target: { value: "Eine gut ausgestattete Werkstatt." }
+    });
     fireEvent.change(screen.getByPlaceholderText("Adresse oder Gebiet"), { target: { value: "Muenchen Nord" } });
     fireEvent.click(screen.getByRole("button", { name: "Personenzahl erhöhen" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
@@ -333,21 +336,19 @@ describe("management pages", () => {
       target: { files: [new File(["photo"], "workshop.png", { type: "image/png" })] }
     });
 
-    fireEvent.submit(screen.getByRole("button", { name: "Schritt 1 von 3" }).closest("form")!);
-    expect(await screen.findByText("Verfügbarkeit & Zeitfenster")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Werkstatt veröffentlichen" }));
-    expect(pushToast).toHaveBeenCalledWith("Bitte fügen Sie mindestens einen Zeitfenster hinzu.", "error");
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
+    expect(pushToast).toHaveBeenCalledWith("Bitte füge mindestens ein Zeitfenster hinzu.", "error");
 
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "2026-07-01T09:00" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "2026-07-01T12:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Werkstatt veröffentlichen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => {
       expect(createWorkshop).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "Maker Space",
+          description: "Eine gut ausgestattete Werkstatt.",
           location: "Muenchen Nord",
           maxCapacity: 3,
           extras: ["wlan"],
