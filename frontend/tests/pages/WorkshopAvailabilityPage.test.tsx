@@ -92,7 +92,7 @@ describe("WorkshopAvailabilityPage", () => {
 
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "2026-06-01T10:00" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "2026-06-01T12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitfenster anlegen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
 
     await waitFor(() => expect(createWorkshopTimeslot).toHaveBeenCalledWith(
       "w1",
@@ -103,7 +103,7 @@ describe("WorkshopAvailabilityPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
     fireEvent.change(screen.getAllByLabelText("Startzeit")[1], { target: { value: "2026-05-08T09:00" } });
     fireEvent.change(screen.getAllByLabelText("Endzeit")[1], { target: { value: "2026-05-08T11:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Änderungen speichern" })[1]);
 
     await waitFor(() => expect(updateWorkshopTimeslot).toHaveBeenCalled());
 

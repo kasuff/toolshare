@@ -347,7 +347,15 @@ describe("api coverage", () => {
       providerName: undefined
     });
 
-    const workshopBooking = await api.createWorkshopBooking({ slotId: "s1" }, "token-123");
+    const workshopBooking = await api.createWorkshopBooking(
+      {
+        workshopId: "w1",
+        startIso: "2026-05-07T08:00:00.000Z",
+        endIso: "2026-05-07T10:00:00.000Z",
+        workshopToolIds: ["wt1"]
+      },
+      "token-123"
+    );
     expect(workshopBooking).toMatchObject({
       type: "WORKSHOP",
       providerId: "u2",

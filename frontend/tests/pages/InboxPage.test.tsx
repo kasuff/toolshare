@@ -252,7 +252,7 @@ describe("InboxPage", () => {
 
     await screen.findByRole("heading", { name: "Nachrichten" });
     fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
-    fireEvent.change(screen.getByLabelText("Alternatives Abholdatum"), {
+    fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum"), {
       target: { value: "2026-05-06" },
     });
     fireEvent.change(screen.getByLabelText("Alternative Abholzeit"), {
@@ -322,7 +322,7 @@ describe("InboxPage", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Alternativvorschlag senden" }));
-    fireEvent.change(screen.getByLabelText("Alternativdatum für Werkstattvorschlag"), {
+    fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag"), {
       target: { value: "2026-05-08" }
     });
     fireEvent.change(screen.getByLabelText("Alternativuhrzeit für Werkstattvorschlag"), {
