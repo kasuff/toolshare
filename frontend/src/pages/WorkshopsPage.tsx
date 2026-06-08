@@ -56,26 +56,8 @@ function combineLocalDateTimeToIso(date: string, time: string): string | null {
   return combined.toISOString();
 }
 
-function formatWorkshopDate(value: string) {
-  return new Intl.DateTimeFormat("de-DE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    hour12: false
-  }).format(new Date(value));
-}
-
 const extrasByValue = new Map(WORKSHOP_EQUIPMENT.map((equipment) => [equipment.value, equipment] as const));
 const toolCategoryByValue = new Map(TOOL_CATEGORIES.map((category) => [category.value, category] as const));
-const toolCategoryIcons: Record<string, string> = {
-  elektro: "bolt",
-  garten: "yard",
-  holz: "carpenter",
-  bau: "construction",
-  sanitaer: "plumbing",
-  malen: "format_paint",
-  kfz: "directions_car",
-  sonstiges: "handyman"
-};
 
 function getWorkshopExtras(workshop: Workshop) {
   if (workshop.extras.length > 0) {

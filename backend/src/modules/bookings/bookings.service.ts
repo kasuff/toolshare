@@ -136,7 +136,6 @@ export const bookingsService = {
     }
 
     const providerId = getProviderId(booking);
-    const isRequester = booking.userId === input.actorId;
     const isProvider = providerId !== null && providerId === input.actorId;
     const isModeratorOrManager = input.actorRole === "MODERATOR" || input.actorRole === "MANAGER";
 

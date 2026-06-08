@@ -1131,10 +1131,6 @@ function formatDateTime(value?: string) {
   });
 }
 
-function formatSlotRange(startIso?: string, endIso?: string) {
-  return `${formatDateTime(startIso)} – ${formatDateTime(endIso)}`;
-}
-
 function getPendingPickupProposal(booking: Booking): PickupProposal | null {
   const pending = (booking.pickupProposals ?? []).filter((p) => p.status === "PENDING");
   return pending.length > 0 ? pending[pending.length - 1] : null;
