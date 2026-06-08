@@ -1,11 +1,17 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  AddressInput,
+  EMPTY_ADDRESS,
+  isAddressComplete,
+  toAddressPayload
+} from "../components/AddressInput";
 import { Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { useToast } from "../hooks/useToast";
-import { api, type AddressSuggestion } from "../services/api";
+import { api } from "../services/api";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -21,26 +27,11 @@ type SlotDraft = {
 
 type WorkshopFormField = "name" | "description" | "location" | "photos" | "slots";
 
-type AddressFormFields = {
-  street: string;
-  houseNumber: string;
-  postalCode: string;
-  city: string;
-  country: string;
-};
-
 const EMPTY_SLOT: SlotDraft = {
   startIso: "",
   endIso: "",
   blockedByOwner: false
 };
-
-function toAddressPayload(fields: AddressFormFields) {
-  return `${fields.street} ${fields.houseNumber}, ${fields.postalCode} ${fields.city}, ${fields.country}`
-    .replace(/\s+,/g, ",")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
 
 export function NewWorkshopPage({ token }: Props) {
   const { pushToast } = useToast();
@@ -50,16 +41,7 @@ export function NewWorkshopPage({ token }: Props) {
   const [touchedFields, setTouchedFields] = useState<Partial<Record<WorkshopFormField, boolean>>>({});
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [addressSearch, setAddressSearch] = useState("");
-  const [workshopAddress, setWorkshopAddress] = useState<AddressFormFields>({
-    street: "",
-    houseNumber: "",
-    postalCode: "",
-    city: "",
-    country: "Deutschland"
-  });
-  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
-  const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
+  const [workshopAddress, setWorkshopAddress] = useState({ ...EMPTY_ADDRESS });
   const [maxCapacity, setMaxCapacity] = useState(2);
   const [extras, setExtras] = useState<string[]>([]);
   const [equipmentItems, setEquipmentItems] = useState<WorkshopToolDraftItem[]>([]);
@@ -67,25 +49,7 @@ export function NewWorkshopPage({ token }: Props) {
   const [slot, setSlot] = useState<SlotDraft>(EMPTY_SLOT);
   const [slots, setSlots] = useState<SlotDraft[]>([]);
   const location = toAddressPayload(workshopAddress);
-  const isWorkshopAddressComplete = Boolean(
-    workshopAddress.street.trim() &&
-      workshopAddress.houseNumber.trim() &&
-      workshopAddress.postalCode.trim() &&
-      workshopAddress.city.trim()
-  );
-
-  useEffect(() => {
-    if (addressSearch.trim().length < 3) {
-      setAddressSuggestions([]);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      void api.suggestAddresses(addressSearch).then(setAddressSuggestions);
-    }, 250);
-
-    return () => window.clearTimeout(timer);
-  }, [addressSearch]);
+  const isWorkshopAddressComplete = isAddressComplete(workshopAddress);
 
   if (!token) {
     return (
@@ -174,14 +138,7 @@ export function NewWorkshopPage({ token }: Props) {
 
       setName("");
       setDescription("");
-      setAddressSearch("");
-      setWorkshopAddress({
-        street: "",
-        houseNumber: "",
-        postalCode: "",
-        city: "",
-        country: "Deutschland"
-      });
+      setWorkshopAddress({ ...EMPTY_ADDRESS });
       setMaxCapacity(2);
       setExtras([]);
       setEquipmentItems([]);
@@ -272,114 +229,13 @@ export function NewWorkshopPage({ token }: Props) {
           <span>Adresse *</span>
           <small>Gib die vollständige Adresse an, an der sich die Werkstatt befindet.</small>
 
-          <div className="address-autocomplete">
-            <input
-              value={addressSearch}
-              onChange={(event) => setAddressSearch(event.target.value)}
-              onFocus={() => setIsAddressSearchFocused(true)}
-              onBlur={() => {
-                markFieldTouched("location");
-                window.setTimeout(() => setIsAddressSearchFocused(false), 120);
-              }}
-              placeholder="Adresse suchen (optional für Autofill)"
-              autoComplete="street-address"
-              className={showFieldError("location") ? "input-invalid" : undefined}
-              aria-invalid={showFieldError("location")}
-            />
-            {isAddressSearchFocused && addressSearch.trim().length >= 3 && (
-              <div className="address-dropdown" role="listbox" aria-label="Adressvorschläge">
-                <p className="address-dropdown-head">Vorschläge - klicken zum Übernehmen</p>
-                {addressSuggestions.length > 0 ? (
-                  <ul className="address-suggestion-list">
-                    {addressSuggestions.map((suggestion) => (
-                      <li key={suggestion.label}>
-                        <button
-                          type="button"
-                          className="address-suggestion-item"
-                          onMouseDown={() => {
-                            setWorkshopAddress({
-                              street: suggestion.street,
-                              houseNumber: suggestion.houseNumber,
-                              postalCode: suggestion.postalCode,
-                              city: suggestion.city,
-                              country: suggestion.country || "Deutschland"
-                            });
-                            setAddressSearch(suggestion.label);
-                          }}
-                        >
-                          <span className="address-suggestion-title">{suggestion.label}</span>
-                          <span className="address-suggestion-meta">
-                            {suggestion.postalCode} {suggestion.city}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="address-suggestion-empty">Keine Vorschläge gefunden.</p>
-                )}
-              </div>
-            )}
-          </div>
-          <small>Mindestens 3 Zeichen eingeben, um Adressvorschläge zu sehen.</small>
-
-          <div className="address-grid new-tool-address-grid">
-            <label className="address-field address-field-street form-label">
-              <span>Straße *</span>
-              <input
-                value={workshopAddress.street}
-                onChange={(event) => setWorkshopAddress((current) => ({ ...current, street: event.target.value }))}
-                onBlur={() => markFieldTouched("location")}
-                placeholder="Straße"
-                autoComplete="address-line1"
-              />
-            </label>
-            <label className="address-field form-label">
-              <span>Hausnummer *</span>
-              <input
-                value={workshopAddress.houseNumber}
-                onChange={(event) => setWorkshopAddress((current) => ({ ...current, houseNumber: event.target.value }))}
-                onBlur={() => markFieldTouched("location")}
-                placeholder="Hausnummer"
-                autoComplete="address-line2"
-              />
-            </label>
-            <label className="address-field form-label">
-              <span>PLZ *</span>
-              <input
-                value={workshopAddress.postalCode}
-                onChange={(event) => setWorkshopAddress((current) => ({ ...current, postalCode: event.target.value }))}
-                onBlur={() => markFieldTouched("location")}
-                placeholder="PLZ"
-                autoComplete="postal-code"
-              />
-            </label>
-            <label className="address-field address-field-city form-label">
-              <span>Ort *</span>
-              <input
-                value={workshopAddress.city}
-                onChange={(event) => setWorkshopAddress((current) => ({ ...current, city: event.target.value }))}
-                onBlur={() => markFieldTouched("location")}
-                placeholder="Ort"
-                autoComplete="address-level2"
-              />
-            </label>
-            <label className="address-field address-field-country form-label">
-              <span>Land</span>
-              <input
-                value={workshopAddress.country}
-                onChange={(event) => setWorkshopAddress((current) => ({ ...current, country: event.target.value }))}
-                onBlur={() => markFieldTouched("location")}
-                placeholder="Land"
-                autoComplete="country-name"
-              />
-            </label>
-          </div>
-          {location.length > 0 && (
-            <p className="address-preview" aria-live="polite">
-              {location}
-            </p>
-          )}
+          <AddressInput
+            value={workshopAddress}
+            onChange={setWorkshopAddress}
+            required
+            hasError={showFieldError("location")}
+            onBlur={() => markFieldTouched("location")}
+          />
           {showFieldError("location") && <p className="field-error">{formErrors.location}</p>}
         </div>
 

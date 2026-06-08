@@ -76,10 +76,10 @@ describe("ProfileSettingsPage", () => {
       </ToastProvider>
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
+    fireEvent.change(screen.getByPlaceholderText("Adresse suchen"), {
       target: { value: "Muster" }
     });
-    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
+    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen"));
 
     expect(await screen.findByRole("listbox", { name: "Adressvorschläge" })).toBeInTheDocument();
     await waitFor(() => expect(suggestAddresses).toHaveBeenCalled());

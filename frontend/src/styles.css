@@ -1042,11 +1042,6 @@ button.mini {
   margin-top: var(--space-1);
 }
 
-.new-tool-address-section .address-preview {
-  border-color: rgba(255, 102, 0, 0.2);
-  background: var(--color-brand-soft);
-}
-
 .new-tool-form .button-group {
   display: none;
 }
@@ -1063,6 +1058,14 @@ button.mini {
 }
 
 @media (max-width: 520px) {
+  .address-grid-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .address-grid-compact .address-field {
+    grid-column: 1;
+  }
+
   .new-tool-address-grid {
     grid-template-columns: 1fr;
   }
@@ -1428,6 +1431,51 @@ button.mini {
   position: relative;
 }
 
+.address-input {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.address-mode-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.address-mode-toggle {
+  display: inline;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-brand-strong);
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.address-mode-toggle:hover {
+  background: transparent;
+  color: var(--color-brand);
+}
+
+.address-mode-toggle:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.address-input-compact .address-mode-hint {
+  padding-left: var(--space-2);
+  font-weight: 400;
+}
+
+.address-input-compact .address-mode-toggle {
+  font-weight: 400;
+}
+
 .address-dropdown {
   position: absolute;
   z-index: 25;
@@ -1484,7 +1532,8 @@ button.mini {
 }
 
 .address-suggestion-item:hover {
-  background: #f3faf6;
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
 }
 
 .address-suggestion-empty {
@@ -1498,6 +1547,30 @@ button.mini {
   display: grid;
   gap: var(--space-2);
   grid-template-columns: minmax(0, 1.9fr) minmax(7.2rem, 0.75fr) minmax(6rem, 0.65fr) minmax(0, 1.3fr);
+}
+
+.address-grid-compact {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.address-grid-compact .address-field-street {
+  grid-column: span 8;
+}
+
+.address-grid-compact .address-field-house-number {
+  grid-column: span 4;
+}
+
+.address-grid-compact .address-field-postal-code {
+  grid-column: span 3;
+}
+
+.address-grid-compact .address-field-city {
+  grid-column: span 4;
+}
+
+.address-grid-compact .address-field-country {
+  grid-column: span 5;
 }
 
 .address-field {
@@ -1523,18 +1596,6 @@ button.mini {
 
 .address-field-country {
   grid-column: 1 / -1;
-}
-
-.address-preview {
-  margin: 0;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-soft);
-  color: var(--color-text);
-  font-size: 0.9rem;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
 }
 
 .empty-state {
@@ -2419,7 +2480,7 @@ td {
     width: 100%;
   }
 
-  .address-grid {
+  .address-grid:not(.address-grid-compact) {
     grid-template-columns: 1fr;
   }
 }

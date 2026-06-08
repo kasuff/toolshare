@@ -155,8 +155,9 @@ describe("App", () => {
     fireEvent.change(screen.getByPlaceholderText("Passwort (mind. 8 Zeichen)"), { target: { value: "password123" } });
     fireEvent.change(screen.getByPlaceholderText("Passwort wiederholen"), { target: { value: "different123" } });
     fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Nina" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
-    fireEvent.change(screen.getByPlaceholderText("Hausnr"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
     fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "Muenchen" } });
     fireEvent.change(screen.getByPlaceholderText("Land"), { target: { value: "Deutschland" } });
@@ -181,8 +182,9 @@ describe("App", () => {
     fireEvent.change(screen.getByPlaceholderText("Passwort (mind. 8 Zeichen)"), { target: { value: "password123" } });
     fireEvent.change(screen.getByPlaceholderText("Passwort wiederholen"), { target: { value: "password123" } });
     fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Nina" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
-    fireEvent.change(screen.getByPlaceholderText("Hausnr"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
     fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "Muenchen" } });
     fireEvent.change(screen.getByPlaceholderText("Land"), { target: { value: "Deutschland" } });

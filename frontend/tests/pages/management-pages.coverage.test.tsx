@@ -270,6 +270,7 @@ describe("management pages", () => {
     });
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
 
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
     fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
@@ -324,6 +325,7 @@ describe("management pages", () => {
     fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
       target: { value: "Eine gut ausgestattete Werkstatt." }
     });
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
     fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });

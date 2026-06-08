@@ -72,6 +72,7 @@ describe("Workshop management pages", () => {
     fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
       target: { value: "Eine gut ausgestattete Werkstatt im Norden." }
     });
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
     fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
@@ -125,7 +126,7 @@ describe("Workshop management pages", () => {
         ownerId: "owner-1",
         name: "Alte Werkstatt",
         description: "Werkstatt",
-        location: "Muenchen Ost",
+        location: "Musterstraße 5, 80331 München, Deutschland",
         maxCapacity: 5,
         extras: ["starkstrom"],
         equipmentItems: [{ id: "tool-1", name: "Akkuschrauber", category: "elektro" }],
@@ -136,6 +137,11 @@ describe("Workshop management pages", () => {
     });
     updateWorkshop.mockResolvedValueOnce({
       id: "workshop-1"
+    });
+    validateAddress.mockResolvedValue({
+      isValid: true,
+      normalizedAddress: "Musterstraße 5, 80331 München, Deutschland",
+      normalizedParts: null
     });
 
     render(
@@ -163,7 +169,7 @@ describe("Workshop management pages", () => {
       "workshop-1",
       expect.objectContaining({
         name: "Neue Werkstatt",
-        location: "Muenchen Ost",
+        location: "Musterstraße 5, 80331 München, Deutschland",
         maxCapacity: 5,
         extras: ["starkstrom"],
         equipmentItems: [{ name: "Akkuschrauber", category: "elektro" }],

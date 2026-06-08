@@ -1,10 +1,16 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  AddressInput,
+  EMPTY_ADDRESS,
+  isAddressComplete,
+  toAddressPayload
+} from "../components/AddressInput";
 import { Surface } from "../components/ui";
 import { ImageUpload } from "../components/ImageUpload";
 import { CategorySelect } from "../components/CategorySelect";
 import { useToast } from "../hooks/useToast";
-import { api, type AddressSuggestion } from "../services/api";
+import { api } from "../services/api";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
 import type { User } from "../types/domain";
 
@@ -14,25 +20,6 @@ type Props = {
 };
 
 type ToolFormField = "name" | "description" | "category" | "pickupLocation";
-
-type AddressFormFields = {
-  street: string;
-  houseNumber: string;
-  postalCode: string;
-  city: string;
-  country: string;
-};
-
-function toAddressPayload(fields: AddressFormFields) {
-  return `${fields.street} ${fields.houseNumber}, ${fields.postalCode} ${fields.city}, ${fields.country}`
-    .replace(/\s+,/g, ",")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
-function toAddressPreview(fields: AddressFormFields) {
-  return toAddressPayload(fields);
-}
 
 export function NewToolPage({ token }: Props) {
   const { pushToast } = useToast();
@@ -44,24 +31,9 @@ export function NewToolPage({ token }: Props) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<Partial<Record<ToolFormField, boolean>>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [addressSearch, setAddressSearch] = useState("");
-  const [pickupAddress, setPickupAddress] = useState<AddressFormFields>({
-    street: "",
-    houseNumber: "",
-    postalCode: "",
-    city: "",
-    country: "Deutschland"
-  });
-  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
-  const [isAddressSearchFocused, setIsAddressSearchFocused] = useState(false);
+  const [pickupAddress, setPickupAddress] = useState({ ...EMPTY_ADDRESS });
   const [pickupLocationNote, setPickupLocationNote] = useState("");
-  const pickupLocationPreview = toAddressPreview(pickupAddress);
-  const isPickupAddressComplete = Boolean(
-    pickupAddress.street.trim() &&
-      pickupAddress.houseNumber.trim() &&
-      pickupAddress.postalCode.trim() &&
-      pickupAddress.city.trim()
-  );
+  const isPickupAddressComplete = isAddressComplete(pickupAddress);
   const formErrors = {
     name: name.trim() ? null : "Bitte gib einen Namen für das Werkzeug ein.",
     description:
@@ -78,23 +50,6 @@ export function NewToolPage({ token }: Props) {
   const markFieldTouched = (field: ToolFormField) => {
     setTouchedFields((prev) => ({ ...prev, [field]: true }));
   };
-
-  useEffect(() => {
-    if (addressSearch.trim().length < 3) {
-      setAddressSuggestions([]);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      void api.suggestAddresses(addressSearch).then((suggestions) => {
-        setAddressSuggestions(suggestions);
-      });
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [addressSearch]);
 
   if (!token) {
     return (
@@ -146,14 +101,7 @@ export function NewToolPage({ token }: Props) {
       setDescription("");
       setCategory("");
       setUploadedImage(null);
-      setAddressSearch("");
-      setPickupAddress({
-        street: "",
-        houseNumber: "",
-        postalCode: "",
-        city: "",
-        country: "Deutschland"
-      });
+      setPickupAddress({ ...EMPTY_ADDRESS });
       setPickupLocationNote("");
       setTouchedFields({});
       setSubmitAttempted(false);
@@ -235,115 +183,14 @@ export function NewToolPage({ token }: Props) {
           <span>Abholort *</span>
           <small>Gib die vollständige Adresse an, an der das Werkzeug abgeholt werden kann.</small>
 
-          <div className="address-autocomplete">
-            <input
-              value={addressSearch}
-              onChange={(event) => setAddressSearch(event.target.value)}
-              onFocus={() => setIsAddressSearchFocused(true)}
-              onBlur={() => {
-                markFieldTouched("pickupLocation");
-                window.setTimeout(() => setIsAddressSearchFocused(false), 120);
-              }}
-              placeholder="Adresse suchen (optional für Autofill)"
-              autoComplete="street-address"
-              className={showFieldError("pickupLocation") ? "input-invalid" : undefined}
-              aria-invalid={showFieldError("pickupLocation")}
-            />
-            {isAddressSearchFocused && addressSearch.trim().length >= 3 && (
-              <div className="address-dropdown" role="listbox" aria-label="Adressvorschläge">
-                <p className="address-dropdown-head">Vorschläge - klicken zum Übernehmen</p>
-                {addressSuggestions.length > 0 ? (
-                  <ul className="address-suggestion-list">
-                    {addressSuggestions.map((suggestion) => (
-                      <li key={suggestion.label}>
-                        <button
-                          type="button"
-                          className="address-suggestion-item"
-                          onMouseDown={() => {
-                            setPickupAddress({
-                              street: suggestion.street,
-                              houseNumber: suggestion.houseNumber,
-                              postalCode: suggestion.postalCode,
-                              city: suggestion.city,
-                              country: suggestion.country || "Deutschland"
-                            });
-                            setAddressSearch(suggestion.label);
-                          }}
-                        >
-                          <span className="address-suggestion-title">{suggestion.label}</span>
-                          <span className="address-suggestion-meta">
-                            {suggestion.postalCode} {suggestion.city}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="address-suggestion-empty">Keine Vorschläge gefunden.</p>
-                )}
-              </div>
-            )}
-          </div>
-          <small>Mindestens 3 Zeichen eingeben, um Adressvorschläge zu sehen.</small>
+          <AddressInput
+            value={pickupAddress}
+            onChange={setPickupAddress}
+            required
+            hasError={showFieldError("pickupLocation")}
+            onBlur={() => markFieldTouched("pickupLocation")}
+          />
 
-          <div className="address-grid new-tool-address-grid">
-            <label className="address-field address-field-street form-label">
-              <span>Straße *</span>
-              <input
-                value={pickupAddress.street}
-                onChange={(event) => setPickupAddress((prev) => ({ ...prev, street: event.target.value }))}
-                onBlur={() => markFieldTouched("pickupLocation")}
-                placeholder="Straße"
-                autoComplete="address-line1"
-              />
-            </label>
-            <label className="address-field form-label">
-              <span>Hausnummer *</span>
-              <input
-                value={pickupAddress.houseNumber}
-                onChange={(event) => setPickupAddress((prev) => ({ ...prev, houseNumber: event.target.value }))}
-                onBlur={() => markFieldTouched("pickupLocation")}
-                placeholder="Hausnummer"
-                autoComplete="address-line2"
-              />
-            </label>
-            <label className="address-field form-label">
-              <span>PLZ *</span>
-              <input
-                value={pickupAddress.postalCode}
-                onChange={(event) => setPickupAddress((prev) => ({ ...prev, postalCode: event.target.value }))}
-                onBlur={() => markFieldTouched("pickupLocation")}
-                placeholder="PLZ"
-                autoComplete="postal-code"
-              />
-            </label>
-            <label className="address-field address-field-city form-label">
-              <span>Ort *</span>
-              <input
-                value={pickupAddress.city}
-                onChange={(event) => setPickupAddress((prev) => ({ ...prev, city: event.target.value }))}
-                onBlur={() => markFieldTouched("pickupLocation")}
-                placeholder="Ort"
-                autoComplete="address-level2"
-              />
-            </label>
-            <label className="address-field address-field-country form-label">
-              <span>Land</span>
-              <input
-                value={pickupAddress.country}
-                onChange={(event) => setPickupAddress((prev) => ({ ...prev, country: event.target.value }))}
-                onBlur={() => markFieldTouched("pickupLocation")}
-                placeholder="Land"
-                autoComplete="country-name"
-              />
-            </label>
-          </div>
-
-          {pickupLocationPreview.length > 0 && (
-            <p className="address-preview" aria-live="polite">
-              {pickupLocationPreview}
-            </p>
-          )}
           {showFieldError("pickupLocation") && <p className="field-error">{formErrors.pickupLocation}</p>}
         </div>
 
