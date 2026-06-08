@@ -93,17 +93,21 @@ export function ToolsPage({ token, currentUser }: Props) {
 
   return (
     <section className="stack search-page">
-      <div className="offer-strip">
-        <div>
-          <h2>Easy verleihen. Schnell Nachbarn helfen.</h2>
-          <p>Jetzt ganz einfach privat Werkzeuge einstellen.</p>
-        </div>
-        {token && (
+      {!token && (
+        <GuestBanner text="Du kannst als Gast stöbern. Für Ausleihanfragen melde dich bitte an." />
+      )}
+
+      {token && (
+        <div className="offer-strip">
+          <div>
+            <h2>Easy verleihen. Schnell Nachbarn helfen.</h2>
+            <p>Jetzt ganz einfach privat Werkzeuge einstellen.</p>
+          </div>
           <Link to="/tools/new" className="btn offer-tool">
             Werkzeug anbieten
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
       <h1>Werkzeuge</h1>
 
@@ -156,10 +160,6 @@ export function ToolsPage({ token, currentUser }: Props) {
           </div>
         </details>
       </Surface>
-      {!token && (
-        <GuestBanner text="Du kannst als Gast stöbern. Für Ausleihanfragen bitte einloggen." />
-      )}
-
       <div className={`cards ${!isLoading && hasLoaded && filteredTools.length === 0 ? "cards-empty" : ""}`}>
         {isLoading && <SkeletonCards />}
         {!isLoading && hasLoaded && filteredTools.length === 0 && (

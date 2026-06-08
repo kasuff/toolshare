@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
-import { EmptyState, Field, SkeletonCards, Surface } from "../components/ui";
+import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
 import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories";
 import { useToast } from "../hooks/useToast";
@@ -498,17 +498,21 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     <section className={`stack search-page ${selectedWorkshop ? "has-workshop-detail" : ""}`.trim()}>
       {!selectedWorkshop && (
         <>
-      <div className="offer-strip">
-        <div>
-          <h2>Easy verleihen. Schnell Nachbarn helfen.</h2>
-          <p>Jetzt ganz einfach private Werkstätten einstellen.</p>
-        </div>
-        {token && (
+      {!token && (
+        <GuestBanner text="Du kannst als Gast stöbern. Für Buchungsanfragen melde dich bitte an." />
+      )}
+
+      {token && (
+        <div className="offer-strip">
+          <div>
+            <h2>Easy verleihen. Schnell Nachbarn helfen.</h2>
+            <p>Jetzt ganz einfach private Werkstätten einstellen.</p>
+          </div>
           <button className="btn offer-tool" onClick={() => navigate("/workshops/new")}>
             Werkstatt anbieten
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="page-header">
         <div className="stack">

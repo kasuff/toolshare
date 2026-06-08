@@ -113,6 +113,26 @@ function tool(overrides: Partial<Tool & { selectable: boolean }>): Tool & { sele
 }
 
 describe("WorkshopsPage search filters", () => {
+  it("shows the guest login notice at the top of the workshop search page", async () => {
+    getWorkshops.mockResolvedValueOnce([]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/workshops"]}>
+          <Routes>
+            <Route path="/workshops" element={<WorkshopsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const guestBanner = screen.getByRole("complementary");
+    expect(screen.getByRole("heading", { name: "Bitte anmelden" })).toBeInTheDocument();
+    expect(screen.queryByText("Easy verleihen. Schnell Nachbarn helfen.")).not.toBeInTheDocument();
+    expect(guestBanner.closest(".search-page")?.firstElementChild).toBe(guestBanner);
+    await waitFor(() => expect(getWorkshops).toHaveBeenCalled());
+  });
+
   it("filters approved workshops by radius and keeps the map slider capped at 5 km", async () => {
     getWorkshops.mockResolvedValueOnce([
       {

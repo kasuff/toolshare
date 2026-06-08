@@ -74,12 +74,18 @@ export function GuestBanner({
   cta?: string;
 }) {
   return (
-    <div className="guest-banner">
-      <p>{text}</p>
+    <aside className="guest-banner" aria-labelledby="guest-banner-title">
+      <span className="guest-banner-icon material-symbols-outlined" aria-hidden="true">
+        login
+      </span>
+      <div className="guest-banner-copy">
+        <h2 id="guest-banner-title">Bitte anmelden</h2>
+        <p>{text}</p>
+      </div>
       <Link to="/auth" className="btn">
         {cta}
       </Link>
-    </div>
+    </aside>
   );
 }
 
