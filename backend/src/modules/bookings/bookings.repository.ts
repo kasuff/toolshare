@@ -26,7 +26,7 @@ export const bookingsRepository = {
           }
         }
       },
-      orderBy: { startDate: "desc" }
+      orderBy: { createdAt: "desc" }
     });
   },
 
@@ -90,7 +90,9 @@ export const bookingsRepository = {
       bookingId: string;
       proposedByUserId: string;
       proposedPickupTime: Date;
+      proposedReturnTime: Date;
       previousPickupTime: Date | null;
+      previousReturnTime: Date | null;
     }
   ) {
     return tx.bookingPickupProposal.create({
@@ -98,7 +100,9 @@ export const bookingsRepository = {
         bookingId: input.bookingId,
         proposedByUserId: input.proposedByUserId,
         proposedPickupTime: input.proposedPickupTime,
+        proposedReturnTime: input.proposedReturnTime,
         previousPickupTime: input.previousPickupTime,
+        previousReturnTime: input.previousReturnTime,
         status: "PENDING"
       },
       include: { proposedBy: { select: { id: true, name: true } } }

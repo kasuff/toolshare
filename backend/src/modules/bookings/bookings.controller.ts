@@ -44,7 +44,8 @@ export const bookingsController = {
     const created = await bookingsService.createPickupProposal({
       actorId: req.authUser!.userId,
       bookingId: req.params.id as string,
-      pickupTime: req.body.pickupTime as string
+      pickupTime: req.body.pickupTime as string,
+      returnTime: req.body.returnTime as string
     });
     res.status(201).json(created);
   }),

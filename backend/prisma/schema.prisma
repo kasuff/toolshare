@@ -131,9 +131,10 @@ model Booking {
   toolId     String?
   timeslotId String?
   status     BookingStatus @default(PENDING)
-  startDate  DateTime
-  endDate    DateTime
-  pickupTime DateTime?
+    startDate  DateTime
+    endDate    DateTime
+    pickupTime DateTime?
+    createdAt  DateTime      @default(now())
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   tool       Tool?         @relation(fields: [toolId], references: [id], onDelete: SetNull)
   timeslot   TimeSlot?     @relation(fields: [timeslotId], references: [id], onDelete: SetNull)
@@ -160,9 +161,11 @@ model BookingSelectedTool {
 model BookingPickupProposal {
   id                 String               @id @default(uuid())
   bookingId          String
-  proposedByUserId   String
-  proposedPickupTime DateTime
-  previousPickupTime DateTime?
+    proposedByUserId   String
+    proposedPickupTime DateTime
+    proposedReturnTime DateTime?
+    previousPickupTime DateTime?
+    previousReturnTime DateTime?
   status             PickupProposalStatus @default(PENDING)
   createdAt          DateTime             @default(now())
   booking            Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)

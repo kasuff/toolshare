@@ -174,7 +174,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
         throw new Error("Der gewählte Zeitraum ist ungültig. Bitte eine spätere Abgabe wählen.");
       }
 
-      await api.createToolRequest(
+      const createdBooking = await api.createToolRequest(
         {
           toolId: tool.id,
           startIso,
@@ -184,7 +184,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
         token
       );
       pushToast("Ausleihanfrage erstellt.", "success");
-      navigate("/inbox");
+      navigate("/inbox", { state: { bookingId: createdBooking.id } });
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Anfrage konnte nicht erstellt werden.", "error");
     } finally {

@@ -59,7 +59,7 @@ export const bookingsService = {
       );
     }
 
-    await notificationsRepository.create(result.tool.ownerId, "Neue Ausleihanfrage fuer dein Werkzeug.");
+    await notificationsRepository.create(result.tool.ownerId, "Neue Ausleihanfrage für dein Werkzeug.");
     return result.booking;
   },
 
@@ -119,7 +119,7 @@ export const bookingsService = {
     }
     const providerId = result.timeslot?.workshop?.managerId ?? null;
     if (providerId && providerId !== input.requesterId) {
-      await notificationsRepository.create(providerId, "Neue Buchungsanfrage fuer deine Werkstatt.");
+      await notificationsRepository.create(providerId, "Neue Buchungsanfrage für deine Werkstatt.");
     }
     return result;
   },
@@ -171,7 +171,12 @@ export const bookingsService = {
     return updated;
   },
 
-  async createPickupProposal(input: { actorId: string; bookingId: string; pickupTime: string }) {
+  async createPickupProposal(input: {
+    actorId: string;
+    bookingId: string;
+    pickupTime: string;
+    returnTime: string;
+  }) {
     const booking = await bookingsRepository.findBookingForPickupProposal(input.bookingId);
     if (!booking) {
       throw new AppError("BOOKING_NOT_FOUND", "Booking not found", 404);
@@ -198,22 +203,35 @@ export const bookingsService = {
       throw new AppError("FORBIDDEN", "Not a participant", 403);
     }
 
-    let pickup = new Date(input.pickupTime);
-    if (Number.isNaN(pickup.getTime())) {
-      throw new AppError("INVALID_PICKUP", "Invalid pickup time", 400);
+    const pickup = new Date(input.pickupTime);
+    const returnTime = new Date(input.returnTime);
+    if (
+      Number.isNaN(pickup.getTime()) ||
+      Number.isNaN(returnTime.getTime()) ||
+      pickup >= returnTime
+    ) {
+      throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
 
-    const startMs = booking.startDate.getTime();
-    const endMs = booking.endDate.getTime();
-    let pickupMs = pickup.getTime();
-    // Typische Ursache für 400: lokales Datum/Uhrzeit liegt vor dem Buchungsbeginn (UTC) oder knapp außerhalb — in den Zeitraum clampen.
-    if (pickupMs < startMs || pickupMs > endMs) {
-      pickupMs = Math.min(Math.max(pickupMs, startMs), endMs);
-      pickup = new Date(pickupMs);
+    if (booking.toolId) {
+      const conflict = await prisma.booking.findFirst({
+        where: {
+          id: { not: booking.id },
+          toolId: booking.toolId,
+          status: { in: BLOCKING_BOOKING_STATUSES },
+          startDate: { lt: returnTime },
+          endDate: { gt: pickup }
+        }
+      });
+      if (conflict) {
+        throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
+      }
     }
 
     const proposalsAsc = booking.pickupProposals;
     const previousPickupTime = computePreviousPickupForNewProposal(booking, proposalsAsc);
+    const latestPending = proposalsAsc.filter((proposal) => proposal.status === "PENDING").at(-1);
+    const previousReturnTime = latestPending?.proposedReturnTime ?? booking.endDate;
 
     const created = await prisma.$transaction(async (tx) => {
       await bookingsRepository.declinePendingPickupProposals(tx, booking.id);
@@ -221,7 +239,9 @@ export const bookingsService = {
         bookingId: booking.id,
         proposedByUserId: input.actorId,
         proposedPickupTime: pickup,
-        previousPickupTime
+        proposedReturnTime: returnTime,
+        previousPickupTime,
+        previousReturnTime
       });
     });
 
@@ -286,6 +306,22 @@ export const bookingsService = {
       });
     }
 
+    const proposedReturnTime = proposalRow.proposedReturnTime ?? booking.endDate;
+    if (booking.tool?.id) {
+      const conflict = await prisma.booking.findFirst({
+        where: {
+          id: { not: booking.id },
+          toolId: booking.tool.id,
+          status: { in: BLOCKING_BOOKING_STATUSES },
+          startDate: { lt: proposedReturnTime },
+          endDate: { gt: proposalRow.proposedPickupTime }
+        }
+      });
+      if (conflict) {
+        throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
+      }
+    }
+
     await prisma.$transaction([
       prisma.bookingPickupProposal.updateMany({
         where: {
@@ -303,7 +339,9 @@ export const bookingsService = {
         where: { id: input.bookingId },
         data: {
           status: "ACCEPTED",
-          pickupTime: proposalRow.proposedPickupTime
+          pickupTime: proposalRow.proposedPickupTime,
+          startDate: proposalRow.proposedPickupTime,
+          endDate: proposedReturnTime
         }
       })
     ]);
@@ -383,7 +421,7 @@ export const bookingsService = {
     });
 
     const recipientId = isRequester ? providerId : booking.userId;
-    await notificationsRepository.create(recipientId, "Neuer Alternativvorschlag fuer die Werkstattbuchung.");
+    await notificationsRepository.create(recipientId, "Neuer Alternativvorschlag für die Werkstattbuchung.");
 
     return created;
   },
@@ -539,11 +577,6 @@ async function ensureWorkshopProposalCanUseRange(
   });
   if (existingBooking) {
     throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
-  }
-
-  const selectedWorkshopToolIds = Array.from(new Set(selectedTools.map((tool) => tool.workshopToolId)));
-  if (selectedWorkshopToolIds.length === 0) {
-    throw new AppError("WORKSHOP_TOOLS_REQUIRED", "At least one required tool must be selected", 400);
   }
 
   const allBelongToWorkshop = selectedTools.every(

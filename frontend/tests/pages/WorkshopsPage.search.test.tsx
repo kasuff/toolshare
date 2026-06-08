@@ -204,7 +204,7 @@ describe("WorkshopsPage search filters", () => {
   });
 
   it("opens details, marks unavailable workshops with the design-system badge and starts bookings", async () => {
-    createWorkshopBooking.mockResolvedValueOnce({});
+    createWorkshopBooking.mockResolvedValueOnce({ id: "booking-new" });
     getWorkshops.mockResolvedValueOnce([
       {
         workshop: workshop({
@@ -255,7 +255,7 @@ describe("WorkshopsPage search filters", () => {
         "token-123"
       )
     );
-    expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops");
+    expect(screen.getByTestId("location-path")).toHaveTextContent("/inbox");
   });
 
   it("opens workshop details directly from the documented detail route", async () => {

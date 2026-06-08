@@ -47,7 +47,8 @@ export const updateBookingStatusSchema = z.object({
 
 export const createPickupProposalSchema = z.object({
   body: z.object({
-    pickupTime: flexibleIsoDateTime
+    pickupTime: flexibleIsoDateTime,
+    returnTime: flexibleIsoDateTime
   }),
   params: z.object({
     id: z.string().uuid()

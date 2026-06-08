@@ -92,7 +92,7 @@ describe("bookingsRepository", () => {
           include: { proposedBy: { select: { id: true, name: true } } }
         }
       },
-      orderBy: { startDate: "desc" }
+      orderBy: { createdAt: "desc" }
     });
     expect(result).toEqual([{ id: "b1" }]);
   });

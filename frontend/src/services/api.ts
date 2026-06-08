@@ -151,7 +151,9 @@ type BackendPickupProposal = {
   bookingId: string;
   proposedByUserId: string;
   proposedPickupTime: string;
+  proposedReturnTime: string | null;
   previousPickupTime: string | null;
+  previousReturnTime: string | null;
   status: BackendPickupProposalStatus;
   createdAt: string;
 };
@@ -176,6 +178,7 @@ type BackendBooking = {
   startDate: string;
   endDate: string;
   pickupTime?: string | null;
+  createdAt?: string;
   status: BackendBookingStatus;
   user?: BackendUser | null;
   tool?: (BackendTool & { owner?: BackendUser | null }) | null;
@@ -373,7 +376,9 @@ function mapPickupProposal(p: BackendPickupProposal): PickupProposal {
     id: p.id,
     proposedById: p.proposedByUserId,
     proposedPickupIso: p.proposedPickupTime,
+    proposedReturnIso: p.proposedReturnTime ?? undefined,
     previousPickupIso: p.previousPickupTime ?? undefined,
+    previousReturnIso: p.previousReturnTime ?? undefined,
     status: p.status,
     createdIso: p.createdAt
   };
@@ -427,7 +432,7 @@ function mapBooking(booking: BackendBooking): Booking {
     endIso: booking.endDate,
     pickupTimeIso: booking.pickupTime ?? undefined,
     status: bookingStatusMap[booking.status],
-    createdIso: booking.startDate,
+    createdIso: booking.createdAt ?? booking.startDate,
     requesterName,
     providerName,
     toolName,
@@ -836,16 +841,24 @@ export const api = {
     );
   },
 
-  async createPickupProposal(bookingId: string, pickupTimeIso: string, token: string) {
-    const d = new Date(pickupTimeIso);
-    if (Number.isNaN(d.getTime())) {
-      throw new Error("Ungültige Abholzeit.");
+  async createPickupProposal(bookingId: string, pickupTimeIso: string, returnTimeIso: string, token: string) {
+    const pickup = new Date(pickupTimeIso);
+    const returnTime = new Date(returnTimeIso);
+    if (
+      Number.isNaN(pickup.getTime()) ||
+      Number.isNaN(returnTime.getTime()) ||
+      pickup >= returnTime
+    ) {
+      throw new Error("Ungültiger Abhol- oder Rückgabezeitpunkt.");
     }
     await request(
       `/bookings/${bookingId}/pickup-proposals`,
       {
         method: "POST",
-        body: JSON.stringify({ pickupTime: d.toISOString() })
+        body: JSON.stringify({
+          pickupTime: pickup.toISOString(),
+          returnTime: returnTime.toISOString()
+        })
       },
       token
     );

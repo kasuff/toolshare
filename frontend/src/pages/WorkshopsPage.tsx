@@ -397,7 +397,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     }
 
     try {
-      await api.createWorkshopBooking({ workshopId, startIso, endIso, workshopToolIds: selectedToolIds }, token);
+      const createdBooking = await api.createWorkshopBooking(
+        { workshopId, startIso, endIso, workshopToolIds: selectedToolIds },
+        token
+      );
       pushToast("Werkstattbuchung erstellt.", "success");
       setSelectedToolIdsByWorkshop((prev) => ({
         ...prev,
@@ -407,9 +410,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
         ...prev,
         [workshopId]: getDefaultBookingDraft()
       }));
-      if (selectedWorkshop?.workshop.id === workshopId) {
-        closeWorkshop();
-      }
+      navigate("/inbox", { state: { bookingId: createdBooking.id } });
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Buchung fehlgeschlagen.", "error");
     }

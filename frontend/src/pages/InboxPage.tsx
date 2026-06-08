@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { KebabMenu } from "../components/KebabMenu";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
@@ -34,7 +34,12 @@ const bookingStatusLabel: Record<BookingStatus, string> = {
   ABGESCHLOSSEN: "Abgeschlossen",
 };
 
-type DraftPickupParts = { date: string; time: string };
+type DraftToolRangeParts = {
+  pickupDate: string;
+  pickupTime: string;
+  returnDate: string;
+  returnTime: string;
+};
 type DraftWorkshopRangeParts = {
   startDate: string;
   startTime: string;
@@ -48,10 +53,11 @@ type BookingRow = Booking & {
 };
 
 export function InboxPage({ currentUser, token }: Props) {
+  const location = useLocation();
   const { pushToast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
-  const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftPickupParts>>({});
+  const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftToolRangeParts>>({});
   const [draftWorkshopRangeByBooking, setDraftWorkshopRangeByBooking] = useState<
     Record<string, DraftWorkshopRangeParts>
   >({});
@@ -118,15 +124,8 @@ export function InboxPage({ currentUser, token }: Props) {
   );
 
   const sortedRows = useMemo(() => {
-    if (!currentUser?.id) return [...bookingRows];
-    const uid = currentUser.id;
-    return [...bookingRows].sort((a, b) => {
-      const unreadA = threadHasUnread(a, uid, readMessageIds);
-      const unreadB = threadHasUnread(b, uid, readMessageIds);
-      if (unreadA !== unreadB) return unreadA ? -1 : 1;
-      return getBookingCreatedMs(b) - getBookingCreatedMs(a);
-    });
-  }, [bookingRows, currentUser?.id, readMessageIds]);
+    return [...bookingRows].sort((a, b) => getLastActivityMs(b) - getLastActivityMs(a));
+  }, [bookingRows]);
 
   useEffect(() => {
     if (sortedRows.length === 0) {
@@ -134,9 +133,16 @@ export function InboxPage({ currentUser, token }: Props) {
       return;
     }
     if (!selectedBookingId || !sortedRows.some((booking) => booking.id === selectedBookingId)) {
-      setSelectedBookingId(sortedRows[0].id);
+      const requestedBookingId =
+        typeof (location.state as { bookingId?: unknown } | null)?.bookingId === "string"
+          ? (location.state as { bookingId: string }).bookingId
+          : null;
+      const requestedBooking = requestedBookingId
+        ? sortedRows.find((booking) => booking.id === requestedBookingId)
+        : null;
+      setSelectedBookingId(requestedBooking?.id ?? sortedRows[0].id);
     }
-  }, [sortedRows, selectedBookingId]);
+  }, [location.state, sortedRows, selectedBookingId]);
 
   useEffect(() => {
     setShowUserReportForm(false);
@@ -160,10 +166,9 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!row) return;
     if (draftSeededForThreadRef.current.has(selectedBookingId)) return;
     draftSeededForThreadRef.current.add(selectedBookingId);
-    const baseIso = getEffectivePickupIso(row) ?? row.pickupTimeIso ?? "";
     setDraftPickupByBooking((prev) => ({
       ...prev,
-      [selectedBookingId]: splitIsoToLocalParts(baseIso),
+      [selectedBookingId]: toToolRangeDraft(row),
     }));
     if (row.type === "WORKSHOP") {
       setDraftWorkshopRangeByBooking((prev) => ({
@@ -234,26 +239,27 @@ export function InboxPage({ currentUser, token }: Props) {
       pushToast("Alternativvorschlag ist nur bei Ausleihanfragen mit Abholzeit möglich.", "error");
       return;
     }
-    const parts = draftPickupByBooking[booking.id];
-    const iso = combineLocalDateTimeToIso(parts?.date ?? "", parts?.time ?? "");
-    if (!iso) {
-      pushToast("Bitte Datum und Uhrzeit für den Alternativvorschlag wählen.", "error");
+    const draft = draftPickupByBooking[booking.id];
+    const pickupIso = combineLocalDateTimeToIso(draft?.pickupDate ?? "", draft?.pickupTime ?? "");
+    const returnIso = combineLocalDateTimeToIso(draft?.returnDate ?? "", draft?.returnTime ?? "");
+    if (!pickupIso || !returnIso) {
+      pushToast("Bitte Abholung und Rückgabe jeweils mit Datum und Uhrzeit wählen.", "error");
       return;
     }
-    const payloadIso = clampPickupIsoToBooking(iso, booking);
-    if (payloadIso !== iso) {
-      pushToast("Abholzeit wurde auf den Buchungszeitraum begrenzt.", "info");
+    if (new Date(returnIso).getTime() <= new Date(pickupIso).getTime()) {
+      pushToast("Die Rückgabe muss nach der Abholung liegen.", "error");
+      return;
     }
     const pendingIncoming = getPendingPickupProposal(booking);
     if (pendingIncoming && pendingIncoming.proposedById !== currentUser.id) {
       markIncomingRead(proposalMessageKey(booking.id, pendingIncoming.id));
     }
     try {
-      await api.createPickupProposal(booking.id, payloadIso, token);
+      await api.createPickupProposal(booking.id, pickupIso, returnIso, token);
       await loadData();
       setDraftPickupByBooking((prev) => ({
         ...prev,
-        [booking.id]: { date: "", time: "" },
+        [booking.id]: toToolRangeDraft(booking),
       }));
       setCounterFormBookingId(null);
       pushToast("Alternativvorschlag gesendet.", "success");
@@ -437,7 +443,14 @@ export function InboxPage({ currentUser, token }: Props) {
                   aria-current={active ? "true" : undefined}
                   onClick={() => setSelectedBookingId(booking.id)}
                 >
-                  <UserAvatar name={cp.name} imageUrl={null} size="md" />
+                  <span className="messenger-thread-avatar-wrap">
+                    <UserAvatar name={cp.name} imageUrl={null} size="md" />
+                    {threadUnread && (
+                      <span className="messenger-thread-unread-badge" aria-label="1 neue Nachricht">
+                        1
+                      </span>
+                    )}
+                  </span>
                   <span className="messenger-thread-body">
                     <span className="messenger-thread-top">
                       <span className="messenger-thread-sub">{cp.name}</span>
@@ -548,7 +561,7 @@ export function InboxPage({ currentUser, token }: Props) {
                         firstLabel="Abholung"
                         firstValue={formatDateTime(proposal.proposedPickupIso)}
                         secondLabel="Rückgabe"
-                        secondValue={formatDateTime(selectedBooking.endIso)}
+                        secondValue={formatDateTime(proposal.proposedReturnIso ?? selectedBooking.endIso)}
                         unread={incoming && proposal.status === "PENDING" && !readMessageIds.has(key)}
                         onClick={incoming ? () => markIncomingRead(key) : undefined}
                       />
@@ -626,36 +639,70 @@ export function InboxPage({ currentUser, token }: Props) {
                       icon="help"
                     >
                       {selectedBooking.type === "TOOL" ? (
-                        <div className="request-card-form-grid">
+                        <div className="request-card-form-grid request-card-form-grid--workshop">
                           <label>
-                            <span>Datum</span>
+                            <span>Abholdatum</span>
                             <input
-                              aria-label="Alternativdatum für Gegenvorschlag"
+                              aria-label="Alternatives Abholdatum"
                               type="date"
-                              value={counterDraft?.date ?? ""}
+                              value={counterDraft?.pickupDate ?? ""}
                               onChange={(event) =>
                                 setDraftPickupByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
-                                    ...(prev[selectedBooking.id] ?? { date: "", time: "" }),
-                                    date: event.target.value
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    pickupDate: event.target.value
                                   }
                                 }))
                               }
                             />
                           </label>
                           <label>
-                            <span>Uhrzeit</span>
+                            <span>Abholzeit</span>
                             <input
-                              aria-label="Alternativuhrzeit für Gegenvorschlag"
+                              aria-label="Alternative Abholzeit"
                               type="time"
-                              value={counterDraft?.time ?? ""}
+                              value={counterDraft?.pickupTime ?? ""}
                               onChange={(event) =>
                                 setDraftPickupByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
-                                    ...(prev[selectedBooking.id] ?? { date: "", time: "" }),
-                                    time: event.target.value
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    pickupTime: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Rückgabedatum</span>
+                            <input
+                              aria-label="Alternatives Rückgabedatum"
+                              type="date"
+                              value={counterDraft?.returnDate ?? ""}
+                              onChange={(event) =>
+                                setDraftPickupByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    returnDate: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Rückgabezeit</span>
+                            <input
+                              aria-label="Alternative Rückgabezeit"
+                              type="time"
+                              value={counterDraft?.returnTime ?? ""}
+                              onChange={(event) =>
+                                setDraftPickupByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    returnTime: event.target.value
                                   }
                                 }))
                               }
@@ -1002,10 +1049,8 @@ function getThreadPreview(row: BookingRow, currentUserId: string): string {
 }
 
 function getLastActivityMs(booking: BookingRow): number {
-  let t = 0;
-  for (const c of [booking.pickupTimeIso, booking.startIso, booking.createdIso]) {
-    if (c) t = Math.max(t, new Date(c).getTime());
-  }
+  const createdMs = booking.createdIso ? new Date(booking.createdIso).getTime() : 0;
+  let t = Number.isNaN(createdMs) ? 0 : createdMs;
   for (const p of booking.pickupProposals) {
     t = Math.max(t, new Date(p.createdIso).getTime());
   }
@@ -1013,12 +1058,6 @@ function getLastActivityMs(booking: BookingRow): number {
     t = Math.max(t, new Date(p.createdIso).getTime());
   }
   return t;
-}
-
-function getBookingCreatedMs(booking: BookingRow): number {
-  if (!booking.createdIso) return 0;
-  const ms = new Date(booking.createdIso).getTime();
-  return Number.isNaN(ms) ? 0 : ms;
 }
 
 function formatShortClockOrDate(ms: number) {
@@ -1062,13 +1101,7 @@ function getPendingTimeslotProposal(booking: Booking): TimeslotProposal | null {
   return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
-function getEffectivePickupIso(booking: Booking): string | undefined {
-  const proposals = booking.pickupProposals ?? [];
-  if (proposals.length === 0) return booking.pickupTimeIso;
-  return proposals[proposals.length - 1].proposedPickupIso;
-}
-
-function splitIsoToLocalParts(iso: string): DraftPickupParts {
+function splitIsoToLocalParts(iso: string): { date: string; time: string } {
   if (!iso.trim()) return { date: "", time: "" };
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return { date: "", time: "" };
@@ -1076,6 +1109,20 @@ function splitIsoToLocalParts(iso: string): DraftPickupParts {
   return {
     date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
     time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
+function toToolRangeDraft(booking: Booking): DraftToolRangeParts {
+  const latest = booking.pickupProposals?.length
+    ? booking.pickupProposals[booking.pickupProposals.length - 1]
+    : null;
+  const pickup = splitIsoToLocalParts(latest?.proposedPickupIso ?? booking.pickupTimeIso ?? booking.startIso ?? "");
+  const returnTime = splitIsoToLocalParts(latest?.proposedReturnIso ?? booking.endIso ?? "");
+  return {
+    pickupDate: pickup.date,
+    pickupTime: pickup.time,
+    returnDate: returnTime.date,
+    returnTime: returnTime.time
   };
 }
 
@@ -1120,13 +1167,4 @@ function toWorkshopDraft(booking: Booking): DraftWorkshopRangeParts {
     endDate: endParts.date || startParts.date,
     endTime: endParts.time || "12:00"
   };
-}
-
-function clampPickupIsoToBooking(iso: string, booking: Booking): string {
-  const p = new Date(iso).getTime();
-  const s = booking.startIso ? new Date(booking.startIso).getTime() : NaN;
-  const e = booking.endIso ? new Date(booking.endIso).getTime() : NaN;
-  if (Number.isNaN(p) || Number.isNaN(s) || Number.isNaN(e)) return iso;
-  const clamped = Math.min(Math.max(p, s), e);
-  return new Date(clamped).toISOString();
 }

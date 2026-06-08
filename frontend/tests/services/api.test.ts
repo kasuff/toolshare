@@ -231,6 +231,32 @@ describe("api service", () => {
     });
   });
 
+  it("sends pickup and return times for tool counter proposals", async () => {
+    fetchMock.mockResolvedValueOnce(responseJson({ id: "proposal-1" }, { status: 201 }));
+
+    await api.createPickupProposal(
+      "b1",
+      "2026-05-06T12:00:00.000Z",
+      "2026-05-07T14:00:00.000Z",
+      "token-123"
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:4000/api/bookings/b1/pickup-proposals",
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer token-123"
+        },
+        method: "POST",
+        body: JSON.stringify({
+          pickupTime: "2026-05-06T12:00:00.000Z",
+          returnTime: "2026-05-07T14:00:00.000Z"
+        })
+      }
+    );
+  });
+
   it("surfaces backend validation messages", async () => {
     fetchMock.mockResolvedValueOnce(responseJson(
       {

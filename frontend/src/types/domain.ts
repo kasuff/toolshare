@@ -10,7 +10,9 @@ export interface PickupProposal {
   id: string;
   proposedById: string;
   proposedPickupIso: string;
+  proposedReturnIso?: string;
   previousPickupIso?: string;
+  previousReturnIso?: string;
   status: PickupProposalStatus;
   createdIso: string;
 }

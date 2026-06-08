@@ -9,13 +9,13 @@ export const notificationsService = {
 
   async createWarning(userId: string, reason: string) {
     const safeReason = reason.trim();
-    const message = `ERMAHNUNG: ${safeReason}\nHinweis: Bei weiteren Verstoessen kann dein Konto gesperrt werden.`;
+    const message = `ERMAHNUNG: ${safeReason}\nHinweis: Bei weiteren Verstößen kann dein Konto gesperrt werden.`;
     return notificationsRepository.create(userId, message);
   },
 
   async notifyManagersSuspensionRequest(requestId: string, userName: string, reason: string) {
     const managers = await suspensionRepository.listManagerIds();
-    const message = `SPERRUNG_ANFRAGE: Fuer "${userName}" wurde eine Kontosperrung angefragt.\nGrund: ${reason.trim()}\nAnfrage-ID: ${requestId}`;
+    const message = `SPERRUNG_ANFRAGE: Für "${userName}" wurde eine Kontosperrung angefragt.\nGrund: ${reason.trim()}\nAnfrage-ID: ${requestId}`;
     await Promise.all(managers.map((manager) => notificationsRepository.create(manager.id, message)));
   },
 
