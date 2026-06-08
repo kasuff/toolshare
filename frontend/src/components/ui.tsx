@@ -126,10 +126,13 @@ export function ToastViewport() {
   return (
     <aside className="toast-viewport" aria-live="polite" aria-atomic="false">
       {toasts.map((toast) => (
-        <article key={toast.id} className={`toast ${toast.tone}`}>
+        <article key={toast.id} className={`toast ${toast.tone}`} role={toast.tone === "error" ? "alert" : "status"}>
+          <span className="toast-icon material-symbols-outlined" aria-hidden="true">
+            {toast.tone === "success" ? "check_circle" : toast.tone === "error" ? "error" : "info"}
+          </span>
           <p>{toast.text}</p>
           <button className="icon-button" onClick={() => removeToast(toast.id)} aria-label="Meldung schließen">
-            x
+            <span className="material-symbols-outlined" aria-hidden="true">close</span>
           </button>
         </article>
       ))}

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
 type ToastTone = "success" | "error" | "info";
 
@@ -18,15 +18,27 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const activeToastKeys = useRef(new Set<string>());
+  const toastKeysById = useRef(new Map<string, string>());
 
   const removeToast = useCallback((id: string) => {
+    const key = toastKeysById.current.get(id);
+    if (key) {
+      activeToastKeys.current.delete(key);
+      toastKeysById.current.delete(id);
+    }
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
   const pushToast = useCallback(
     (text: string, tone: ToastTone = "info") => {
+      const key = text.trim();
+      if (!key || activeToastKeys.current.has(key)) return;
+
       const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const message = { id, tone, text };
+      activeToastKeys.current.add(key);
+      toastKeysById.current.set(id, key);
       setToasts((prev) => [...prev, message]);
       window.setTimeout(() => removeToast(id), 3500);
     },

@@ -1,7 +1,8 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AddressInput, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./components/AddressInput";
 import { Layout } from "./components/Layout";
+import { GlobalProgressBar } from "./components/GlobalProgressBar";
 import { ToastViewport } from "./components/ui";
 import { useSession } from "./hooks/useSession";
 import { ToastProvider, useToast } from "./hooks/useToast";
@@ -18,6 +19,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { ModerationPage } from "./pages/ModerationPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { api } from "./services/api";
+import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./services/sessionEvents";
 
 function AuthScreen({
   onLogin,
@@ -261,6 +263,7 @@ function AuthScreen({
 export default function App() {
   return (
     <ToastProvider>
+      <GlobalProgressBar />
       <AppWithProviders />
       <ToastViewport />
     </ToastProvider>
@@ -268,6 +271,7 @@ export default function App() {
 }
 
 function AppWithProviders() {
+  const { pushToast } = useToast();
   const {
     token,
     users,
@@ -280,7 +284,21 @@ function AppWithProviders() {
     updateProfile
   } = useSession();
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      pushToast(SESSION_EXPIRED_MESSAGE, "error");
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [pushToast]);
+
   if (isLoading) return <p>Lade Session...</p>;
+
+  const handleLogout = () => {
+    logout();
+    pushToast("Erfolgreich ausgeloggt.", "success");
+  };
 
   return (
     <Routes>
@@ -292,7 +310,7 @@ function AppWithProviders() {
             currentUser={currentUser ?? undefined}
             token={token}
             onSwitchUser={() => undefined}
-            onLogout={logout}
+            onLogout={handleLogout}
           />
         }
       >

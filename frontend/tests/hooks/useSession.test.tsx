@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSession } from "../../src/hooks/useSession";
+import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../../src/services/sessionEvents";
 
 const { login, register, getCurrentUser, updateMyProfile } = vi.hoisted(() => ({
   login: vi.fn(),
@@ -50,6 +51,29 @@ describe("useSession", () => {
 
     expect(localStorage.getItem("toolshare_access_token")).toBeNull();
     expect(result.current.currentUser).toBeNull();
+  });
+
+  it("clears an expired session immediately", async () => {
+    localStorage.setItem("toolshare_access_token", "expired-token");
+    getCurrentUser.mockResolvedValueOnce({
+      id: "u1",
+      name: "Lea",
+      email: "lea@toolshare.local",
+      role: "NUTZER",
+      isSuspended: false
+    });
+
+    const { result } = renderHook(() => useSession());
+    await waitFor(() => expect(result.current.currentUser?.name).toBe("Lea"));
+
+    act(() => {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    });
+
+    expect(localStorage.getItem("toolshare_access_token")).toBeNull();
+    expect(result.current.token).toBeNull();
+    expect(result.current.currentUser).toBeNull();
+    expect(result.current.error).toBe(SESSION_EXPIRED_MESSAGE);
   });
 
   it("persists tokens on login and register", async () => {

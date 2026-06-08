@@ -10,6 +10,8 @@ import type {
   WorkshopSlot
 } from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
+import { beginRequestActivity } from "./requestActivity";
+import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "./sessionEvents";
 
 interface FrontendImportMetaEnv {
   readonly VITE_API_URL?: string;
@@ -253,61 +255,71 @@ function translateValidationMessage(raw: string): string {
 }
 
 async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
-  let response: Response;
+  const finishActivity = beginRequestActivity();
   try {
-    response = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init?.headers ?? {})
-      }
-    });
-  } catch {
-    throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
-  }
-
-  if (!response.ok) {
-    let message = `Anfrage fehlgeschlagen (Fehler ${response.status}).`;
+    let response: Response;
     try {
-      const payload = (await response.json()) as {
-        message?: string;
-        error?: {
+      response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(init?.headers ?? {})
+        }
+      });
+    } catch {
+      throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
+    }
+
+    if (response.status === 401 && token) {
+      notifySessionExpired();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
+
+    if (!response.ok) {
+      let message = `Anfrage fehlgeschlagen (Fehler ${response.status}).`;
+      try {
+        const payload = (await response.json()) as {
           message?: string;
-          code?: string;
-          details?: {
-            fieldErrors?: Record<string, string[] | undefined>;
-            formErrors?: string[];
+          error?: {
+            message?: string;
+            code?: string;
+            details?: {
+              fieldErrors?: Record<string, string[] | undefined>;
+              formErrors?: string[];
+            };
           };
         };
-      };
-      if (payload.error?.message) {
-        message = payload.error.message;
-      } else if (payload.message) {
-        message = payload.message;
+        if (payload.error?.message) {
+          message = payload.error.message;
+        } else if (payload.message) {
+          message = payload.message;
+        }
+        if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
+          message = "Diese E-Mail ist bereits registriert.";
+        }
+        const fieldErrorEntries = payload.error?.details?.fieldErrors
+          ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
+          : [];
+        if (fieldErrorEntries.length > 0) {
+          const [field, errors] = fieldErrorEntries[0];
+          const rawError = errors?.[0] ?? "Ungültige Eingabe.";
+          const translated = translateValidationMessage(rawError);
+          message = field === "body" ? translated : `${field}: ${translated}`;
+        } else if (payload.error?.details?.formErrors?.length) {
+          message = translateValidationMessage(payload.error.details.formErrors[0]);
+        }
+      } catch {
+        // keep fallback message
       }
-      if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
-        message = "Diese E-Mail ist bereits registriert.";
-      }
-      const fieldErrorEntries = payload.error?.details?.fieldErrors
-        ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
-        : [];
-      if (fieldErrorEntries.length > 0) {
-        const [field, errors] = fieldErrorEntries[0];
-        const rawError = errors?.[0] ?? "Ungültige Eingabe.";
-        const translated = translateValidationMessage(rawError);
-        message = field === "body" ? translated : `${field}: ${translated}`;
-      } else if (payload.error?.details?.formErrors?.length) {
-        message = translateValidationMessage(payload.error.details.formErrors[0]);
-      }
-    } catch {
-      // keep fallback message
+      throw new Error(message);
     }
-    throw new Error(message);
-  }
 
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  } finally {
+    finishActivity();
+  }
 }
 
 function mapTool(tool: BackendTool): Tool {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { api } from "../../src/services/api";
+import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../../src/services/sessionEvents";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 
 const fetchMock = vi.fn();
@@ -19,6 +20,17 @@ beforeEach(() => {
 });
 
 describe("api service", () => {
+  it("notifies the app and returns a consistent error for expired authenticated requests", async () => {
+    const handleSessionExpired = vi.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    fetchMock.mockResolvedValueOnce(responseJson({ error: { message: "Invalid or expired token" } }, { status: 401 }));
+
+    await expect(api.getCurrentUser("expired-token")).rejects.toThrow(SESSION_EXPIRED_MESSAGE);
+
+    expect(handleSessionExpired).toHaveBeenCalledTimes(1);
+    window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  });
+
   it("maps backend users and sends authorization headers", async () => {
     fetchMock.mockResolvedValueOnce(
       responseJson({ id: "u1", email: "lea@toolshare.local", name: "Lea", role: "MANAGER", isSuspended: false })
