@@ -47,10 +47,10 @@ describe("Layout", () => {
     );
 
     fireEvent.click(screen.getByLabelText("Profil-Menü öffnen"));
-    expect(screen.getByText("Settings")).toBeVisible();
+    expect(screen.getByText("Einstellungen")).toBeVisible();
 
     fireEvent.mouseDown(document.body);
-    expect(screen.getByText("Settings")).not.toBeVisible();
+    expect(screen.getByText("Einstellungen")).not.toBeVisible();
 
     expect(screen.getByRole("button", { name: "Ausloggen" })).toBeInTheDocument();
 

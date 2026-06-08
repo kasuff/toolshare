@@ -89,24 +89,25 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
   };
 
   return (
-    <section className="stack">
-      <h1>Profil-Settings</h1>
-      <Surface title="Konto" subtitle="Übersicht deiner Kontodaten">
-        <ul className="meta-list">
-          <li>
-            <strong>E-Mail:</strong> {currentUser.email}
-          </li>
-          <li>
-            <strong>Rolle:</strong> {currentUser.role}
-          </li>
-          <li>
-            <strong>Status:</strong> {currentUser.isSuspended ? "Gesperrt" : "Aktiv"}
-          </li>
-        </ul>
+    <section className="profile-settings-page">
+      <h1>Einstellungen</h1>
+
+      <Surface title="Kontodaten" className="profile-settings-card profile-account-card">
+        <div className="profile-account-data">
+          <span>E-Mail</span>
+          <a href={`mailto:${currentUser.email}`}>{currentUser.email}</a>
+        </div>
+        <button
+          type="button"
+          className="btn profile-password-button"
+          onClick={() => pushToast("Die Passwortänderung ist derzeit noch nicht verfügbar.", "info")}
+        >
+          Passwort ändern
+        </button>
       </Surface>
 
-      <Surface title="Persönliche Daten" subtitle="Passe Name und Adresse an">
-        <form className="stack" onSubmit={onSubmit}>
+      <Surface title="Persönliche Daten" className="profile-settings-card">
+        <form className="profile-settings-form" onSubmit={onSubmit}>
           <Field label="Name">
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Dein Name" autoComplete="name" />
           </Field>
@@ -118,14 +119,11 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
               required
             />
           </Field>
-          <div className="row">
-            <button type="submit" disabled={isSaving}>
-              {isSaving ? "Speichere..." : "Änderungen speichern"}
-            </button>
-          </div>
+          <button type="submit" className="btn profile-save-button" disabled={isSaving}>
+            {isSaving ? "Speichere..." : "Änderungen speichern"}
+          </button>
         </form>
       </Surface>
-
     </section>
   );
 }

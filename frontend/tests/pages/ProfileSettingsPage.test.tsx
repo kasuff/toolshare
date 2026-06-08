@@ -76,6 +76,11 @@ describe("ProfileSettingsPage", () => {
       </ToastProvider>
     );
 
+    expect(screen.getByRole("heading", { name: "Einstellungen" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Kontodaten" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "lea@example.com" })).toHaveAttribute("href", "mailto:lea@example.com");
+    expect(screen.getByRole("button", { name: "Passwort ändern" })).toBeInTheDocument();
+
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen"), {
       target: { value: "Muster" }
     });
