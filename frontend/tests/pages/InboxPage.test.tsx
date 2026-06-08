@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
-import { inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
+import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
 
 const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
@@ -140,6 +140,44 @@ describe("InboxPage", () => {
 
     const threadList = await screen.findByLabelText("Konversationen");
     expect(within(threadList).getByLabelText("1 neue Nachricht")).toHaveTextContent("1");
+  });
+
+  it("removes the thread unread badge when the conversation is opened", async () => {
+    localStorage.setItem(inboxReadSeedKey(currentUser.id), "1");
+    const firstBooking = { ...baseOpenBooking, id: "b1", toolName: "Erster Chat", pickupProposals: [] };
+    const secondBooking = {
+      ...baseOpenBooking,
+      id: "b2",
+      toolId: "tool-2",
+      toolName: "Zweiter Chat",
+      createdIso: "2026-05-06T08:00:00.000Z",
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    const onReadChanged = vi.fn();
+    window.addEventListener(INBOX_READ_CHANGED_EVENT, onReadChanged);
+    getBookingsForUser.mockResolvedValueOnce([firstBooking, secondBooking]);
+
+    try {
+      render(
+        <ToastProvider>
+          <MemoryRouter>
+            <InboxPage currentUser={currentUser} token="token-123" />
+          </MemoryRouter>
+        </ToastProvider>
+      );
+
+      const threadList = await screen.findByLabelText("Konversationen");
+      const firstThread = within(threadList).getByRole("button", { name: /Erster Chat/ });
+      expect(within(firstThread).getByLabelText("1 neue Nachricht")).toBeInTheDocument();
+
+      fireEvent.click(firstThread);
+
+      expect(within(firstThread).queryByLabelText("1 neue Nachricht")).not.toBeInTheDocument();
+      expect(onReadChanged).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(INBOX_READ_CHANGED_EVENT, onReadChanged);
+    }
   });
 
   it("marks incoming request bubble unread until clicked", async () => {

@@ -222,6 +222,27 @@ export function InboxPage({ currentUser, token }: Props) {
     });
   };
 
+  const markThreadRead = (booking: BookingRow) => {
+    if (!currentUser?.id) return;
+    const incomingKeys = collectIncomingMessageKeys(booking, currentUser.id);
+    if (incomingKeys.length === 0) return;
+
+    setReadMessageIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const key of incomingKeys) {
+        if (!next.has(key)) {
+          next.add(key);
+          changed = true;
+        }
+      }
+      if (!changed) return prev;
+      saveReadMessageIds(currentUser.id, next);
+      window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
+      return next;
+    });
+  };
+
   const decide = async (bookingId: string, accept: boolean) => {
     if (!token) return;
     try {
@@ -441,7 +462,10 @@ export function InboxPage({ currentUser, token }: Props) {
                   type="button"
                   className={`messenger-thread-item ${active ? "active" : ""}${threadUnread ? " messenger-thread-item--unread" : ""}`}
                   aria-current={active ? "true" : undefined}
-                  onClick={() => setSelectedBookingId(booking.id)}
+                  onClick={() => {
+                    setSelectedBookingId(booking.id);
+                    markThreadRead(booking);
+                  }}
                 >
                   <span className="messenger-thread-avatar-wrap">
                     <UserAvatar name={cp.name} imageUrl={null} size="md" />
@@ -1008,6 +1032,24 @@ function threadHasUnread(booking: BookingRow, currentUserId: string, readIds: Se
   return bookingHasUnreadForUser(booking, currentUserId, readIds);
 }
 
+function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string): string[] {
+  const keys: string[] = [];
+  if (booking.requesterId !== currentUserId) {
+    keys.push(requestMessageKey(booking.id));
+  }
+  for (const proposal of booking.pickupProposals) {
+    if (proposal.status === "PENDING" && proposal.proposedById !== currentUserId) {
+      keys.push(proposalMessageKey(booking.id, proposal.id));
+    }
+  }
+  for (const proposal of booking.timeslotProposals) {
+    if (proposal.status === "PENDING" && proposal.proposedById !== currentUserId) {
+      keys.push(proposalMessageKey(booking.id, proposal.id));
+    }
+  }
+  return keys;
+}
+
 function counterparty(booking: Booking, currentUserId: string): { name: string } {
   if (booking.providerId === currentUserId) {
     return { name: booking.requesterName ?? "Anfragender" };
@@ -1052,10 +1094,12 @@ function getLastActivityMs(booking: BookingRow): number {
   const createdMs = booking.createdIso ? new Date(booking.createdIso).getTime() : 0;
   let t = Number.isNaN(createdMs) ? 0 : createdMs;
   for (const p of booking.pickupProposals) {
-    t = Math.max(t, new Date(p.createdIso).getTime());
+    const ms = new Date(p.createdIso).getTime();
+    if (!Number.isNaN(ms)) t = Math.max(t, ms);
   }
   for (const p of booking.timeslotProposals) {
-    t = Math.max(t, new Date(p.createdIso).getTime());
+    const ms = new Date(p.createdIso).getTime();
+    if (!Number.isNaN(ms)) t = Math.max(t, ms);
   }
   return t;
 }

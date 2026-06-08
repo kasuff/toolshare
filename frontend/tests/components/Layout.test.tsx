@@ -1,8 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Layout } from "../../src/components/Layout";
 import type { User } from "../../src/types/domain";
+import {
+  INBOX_READ_CHANGED_EVENT,
+  requestMessageKey,
+  saveReadMessageIds
+} from "../../src/utils/inboxMessageRead";
 
 const { getBookingsForUser } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn()
@@ -20,6 +25,11 @@ const users: User[] = [
 ];
 
 describe("Layout", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+  });
+
   it("shows bell, nav actions and closes profile menu on outside click", async () => {
     const onSwitchUser = vi.fn();
     const onLogout = vi.fn();
@@ -56,5 +66,68 @@ describe("Layout", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Ausloggen" }));
     expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it("updates the bell unread count when an inbox thread is marked read", async () => {
+    const onSwitchUser = vi.fn();
+    const onLogout = vi.fn();
+    const bookings = [
+      {
+        id: "b1",
+        type: "TOOL" as const,
+        requesterId: "requester-1",
+        providerId: "u1",
+        requesterName: "Max",
+        providerName: "Lea",
+        toolName: "Bohrer",
+        startIso: "2026-05-06T10:00:00.000Z",
+        endIso: "2026-05-07T10:00:00.000Z",
+        status: "OFFEN" as const,
+        createdIso: "2026-05-05T08:00:00.000Z",
+        pickupProposals: [],
+        timeslotProposals: []
+      },
+      {
+        id: "b2",
+        type: "TOOL" as const,
+        requesterId: "requester-2",
+        providerId: "u1",
+        requesterName: "Anna",
+        providerName: "Lea",
+        toolName: "Säge",
+        startIso: "2026-05-08T10:00:00.000Z",
+        endIso: "2026-05-09T10:00:00.000Z",
+        status: "OFFEN" as const,
+        createdIso: "2026-05-08T08:00:00.000Z",
+        pickupProposals: [],
+        timeslotProposals: []
+      }
+    ];
+    getBookingsForUser.mockResolvedValue(bookings);
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route
+            element={
+              <Layout users={users} currentUser={users[0]} token="tok-1" onSwitchUser={onSwitchUser} onLogout={onLogout} />
+            }
+          >
+            <Route index element={<div>Home</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Nachrichten und Benachrichtigungen, 2 ungelesene Konversationen" })
+    ).toBeInTheDocument();
+
+    saveReadMessageIds(users[0].id, new Set([requestMessageKey("b1")]));
+    window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
+
+    expect(
+      await screen.findByRole("link", { name: "Nachrichten und Benachrichtigungen, 1 ungelesene Konversationen" })
+    ).toBeInTheDocument();
   });
 });
