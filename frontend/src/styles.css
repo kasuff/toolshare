@@ -817,7 +817,19 @@ button.mini {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-3);
-  align-items: end;
+  align-items: start;
+}
+
+.workshop-slot-date-group {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.workshop-slot-date-group > strong {
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 600;
 }
 
 .workshop-slot-editor {

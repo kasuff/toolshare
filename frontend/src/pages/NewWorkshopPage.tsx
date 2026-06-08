@@ -25,11 +25,21 @@ type SlotDraft = {
   blockedByOwner: boolean;
 };
 
+type SlotEditorDraft = {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  blockedByOwner: boolean;
+};
+
 type WorkshopFormField = "name" | "description" | "location" | "photos" | "slots";
 
-const EMPTY_SLOT: SlotDraft = {
-  startIso: "",
-  endIso: "",
+const EMPTY_SLOT: SlotEditorDraft = {
+  startDate: "",
+  startTime: "",
+  endDate: "",
+  endTime: "",
   blockedByOwner: false
 };
 
@@ -46,7 +56,7 @@ export function NewWorkshopPage({ token }: Props) {
   const [extras, setExtras] = useState<string[]>([]);
   const [equipmentItems, setEquipmentItems] = useState<WorkshopToolDraftItem[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
-  const [slot, setSlot] = useState<SlotDraft>(EMPTY_SLOT);
+  const [slot, setSlot] = useState<SlotEditorDraft>(EMPTY_SLOT);
   const [slots, setSlots] = useState<SlotDraft[]>([]);
   const location = toAddressPayload(workshopAddress);
   const isWorkshopAddressComplete = isAddressComplete(workshopAddress);
@@ -85,16 +95,18 @@ export function NewWorkshopPage({ token }: Props) {
   };
 
   const addSlot = () => {
-    if (!slot.startIso || !slot.endIso) {
+    if (!slot.startDate || !slot.startTime || !slot.endDate || !slot.endTime) {
       pushToast("Bitte gib Start und Ende für das Zeitfenster an.", "error");
       return;
     }
-    if (new Date(slot.startIso) >= new Date(slot.endIso)) {
+    const startIso = `${slot.startDate}T${slot.startTime}`;
+    const endIso = `${slot.endDate}T${slot.endTime}`;
+    if (new Date(startIso) >= new Date(endIso)) {
       pushToast("Die Endzeit muss nach der Startzeit liegen.", "error");
       return;
     }
 
-    setSlots((current) => [...current, slot]);
+    setSlots((current) => [...current, { startIso, endIso, blockedByOwner: slot.blockedByOwner }]);
     setSlot(EMPTY_SLOT);
     setTouchedFields((current) => ({ ...current, slots: true }));
   };
@@ -287,22 +299,57 @@ export function NewWorkshopPage({ token }: Props) {
             </div>
 
             <div className="workshop-slot-builder">
-              <label className="tool-form-field">
-                <span>Startzeit</span>
-                <input
-                  type="datetime-local"
-                  value={slot.startIso}
-                  onChange={(event) => setSlot((current) => ({ ...current, startIso: event.target.value }))}
-                />
-              </label>
-              <label className="tool-form-field">
-                <span>Endzeit</span>
-                <input
-                  type="datetime-local"
-                  value={slot.endIso}
-                  onChange={(event) => setSlot((current) => ({ ...current, endIso: event.target.value }))}
-                />
-              </label>
+              <div className="workshop-slot-date-group">
+                <strong>Startdaten</strong>
+                <div className="booking-fields-row">
+                  <label>
+                    <span>Datum</span>
+                    <input
+                      aria-label="Startdatum"
+                      type="date"
+                      className="booking-input"
+                      value={slot.startDate}
+                      onChange={(event) => setSlot((current) => ({ ...current, startDate: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    <span>Uhrzeit</span>
+                    <input
+                      aria-label="Startzeit"
+                      type="time"
+                      className="booking-input"
+                      value={slot.startTime}
+                      onChange={(event) => setSlot((current) => ({ ...current, startTime: event.target.value }))}
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="workshop-slot-date-group">
+                <strong>Enddaten</strong>
+                <div className="booking-fields-row">
+                  <label>
+                    <span>Datum</span>
+                    <input
+                      aria-label="Enddatum"
+                      type="date"
+                      className="booking-input"
+                      value={slot.endDate}
+                      min={slot.startDate}
+                      onChange={(event) => setSlot((current) => ({ ...current, endDate: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    <span>Uhrzeit</span>
+                    <input
+                      aria-label="Endzeit"
+                      type="time"
+                      className="booking-input"
+                      value={slot.endTime}
+                      onChange={(event) => setSlot((current) => ({ ...current, endTime: event.target.value }))}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div className="workshop-slot-editor-actions">

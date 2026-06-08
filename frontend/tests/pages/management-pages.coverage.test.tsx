@@ -346,8 +346,10 @@ describe("management pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
     expect(pushToast).toHaveBeenCalledWith("Bitte füge mindestens ein Zeitfenster hinzu.", "error");
 
-    fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "2026-07-01T09:00" } });
-    fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "2026-07-01T12:00" } });
+    fireEvent.change(screen.getByLabelText("Startdatum"), { target: { value: "2026-07-01" } });
+    fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "09:00" } });
+    fireEvent.change(screen.getByLabelText("Enddatum"), { target: { value: "2026-07-01" } });
+    fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "12:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
