@@ -314,6 +314,10 @@ button:disabled {
   color: inherit;
 }
 
+.notification-bell-wrap:focus-visible {
+  outline: none;
+}
+
 .notification-bell {
   width: 2.25rem;
   height: 2.25rem;
@@ -324,7 +328,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 
 .notification-bell svg {
@@ -335,8 +339,9 @@ button:disabled {
 
 .notification-bell-wrap:hover .notification-bell,
 .notification-bell-wrap:focus-visible .notification-bell {
-  border-color: #9bcfb3;
-  box-shadow: 0 0 0 3px #eaf7f1;
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
 }
 
 .notification-bell-badge {
@@ -362,11 +367,20 @@ button:disabled {
 
 .profile-menu {
   position: relative;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .profile-menu summary {
+  display: flex;
   list-style: none;
   cursor: pointer;
+}
+
+.profile-menu summary:focus-visible {
+  outline: none;
 }
 
 .profile-menu summary::-webkit-details-marker {
@@ -383,7 +397,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 
 .profile-avatar svg {
@@ -393,9 +407,11 @@ button:disabled {
 }
 
 .profile-menu[open] .profile-avatar,
-.profile-menu summary:hover .profile-avatar {
-  border-color: #9bcfb3;
-  box-shadow: 0 0 0 3px #eaf7f1;
+.profile-menu summary:hover .profile-avatar,
+.profile-menu summary:focus-visible .profile-avatar {
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
 }
 
 .profile-menu-panel {
