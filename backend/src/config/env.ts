@@ -47,7 +47,7 @@ export const env = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "7d",
   managerEmailAllowlist: parseEmailAllowlist(process.env.MANAGER_EMAIL_ALLOWLIST),
   corsOrigin: parseCorsOrigins(process.env.CORS_ORIGIN),
-  rateLimitWindowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
-  rateLimitMax: parsePositiveInt(process.env.RATE_LIMIT_MAX, 300),
-  rateLimitAuthMax: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, 20)
+  rateLimitWindowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 10 * 60 * 1000),
+  rateLimitMax: parsePositiveInt(process.env.RATE_LIMIT_MAX, 600),
+  rateLimitAuthMax: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, 100)
 };
