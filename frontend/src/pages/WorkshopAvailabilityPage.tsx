@@ -322,7 +322,7 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
             </div>
             <div className="row">
               <button type="button" className="btn secondary" onClick={() => void addSlot()}>
-                Zeitfenster anlegen
+                Änderungen speichern
               </button>
             </div>
           </Surface>
@@ -363,7 +363,7 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
                             </div>
                             <div className="row slot-edit-actions">
                               <button type="button" onClick={() => void saveEditedSlot()}>
-                                Speichern
+                                Änderungen speichern
                               </button>
                               <button type="button" className="btn secondary" onClick={cancelEditing}>
                                 Abbrechen

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { coordinatesForLocation, distanceInKm, type Coordinates } from "../utils/searchFilters";
 
 type SearchMapPoint = {
@@ -110,10 +111,12 @@ export function SearchRadiusMap({ centerAddress, points, radiusKm, onRadiusChang
         </label>
         <input
           id={sliderId}
+          className="radius-slider"
           type="range"
           min={1}
           max={5}
           value={radiusKm}
+          style={{ "--range-progress": `${((radiusKm - 1) / 4) * 100}%` } as CSSProperties}
           onChange={(event) => onRadiusChange(Number(event.target.value))}
         />
       </div>

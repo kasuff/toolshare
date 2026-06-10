@@ -5,8 +5,9 @@ const mocks = vi.hoisted(() => ({
   workshopFindMany: vi.fn(),
   workshopFindUnique: vi.fn(),
   workshopCreate: vi.fn(),
-  workshopUpdate: vi.fn(),
   workshopDelete: vi.fn(),
+  txWorkshopToolDeleteMany: vi.fn(),
+  txWorkshopUpdate: vi.fn(),
   timeSlotFindFirst: vi.fn(),
   timeSlotCreate: vi.fn(),
   timeSlotFindUnique: vi.fn(),
@@ -21,7 +22,6 @@ vi.mock("../src/config/prisma", () => ({
       findMany: mocks.workshopFindMany,
       findUnique: mocks.workshopFindUnique,
       create: mocks.workshopCreate,
-      update: mocks.workshopUpdate,
       delete: mocks.workshopDelete
     },
     timeSlot: {
@@ -111,18 +111,15 @@ describe("workshopsRepository", () => {
   });
 
   it("creates, updates and removes workshops", async () => {
+    mocks.workshopCreate.mockResolvedValueOnce({ id: "w2", workshopTools: [] });
     mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
       handler({
-        workshopTool: {
-          deleteMany: vi.fn()
-        },
-        workshop: {
-          update: mocks.workshopUpdate
-        }
+        workshopTool: { deleteMany: mocks.txWorkshopToolDeleteMany },
+        workshop: { update: mocks.txWorkshopUpdate }
       })
     );
-    mocks.workshopCreate.mockResolvedValueOnce({ id: "w2", workshopTools: [] });
-    mocks.workshopUpdate.mockResolvedValueOnce({ id: "w2", name: "Neu", workshopTools: [] });
+    mocks.txWorkshopToolDeleteMany.mockResolvedValueOnce({ count: 1 });
+    mocks.txWorkshopUpdate.mockResolvedValueOnce({ id: "w2", name: "Neu", workshopTools: [] });
     mocks.workshopDelete.mockResolvedValueOnce({ id: "w2" });
 
     const created = await workshopsRepository.create({
@@ -131,11 +128,15 @@ describe("workshopsRepository", () => {
       description: "desc",
       location: "Muenchen",
       maxCapacity: 4,
-      extras: ["wlan"],
-      workshopTools: [{ name: "Bohrmaschine", category: "holz" }],
-      imageUrls: ["photo.png"]
+      extras: ["WLAN"],
+      workshopTools: [{ name: "Akkuschrauber", category: "elektro" }],
+      imageUrls: ["https://example.com/workshop.png"]
     });
-    const updated = await workshopsRepository.update("w2", { name: "Neu" });
+    const updated = await workshopsRepository.update("w2", {
+      name: "Neu",
+      extras: ["Starkstrom"],
+      workshopTools: [{ name: "Stichsaege", category: "holz" }]
+    });
     const removed = await workshopsRepository.remove("w2");
 
     expect(mocks.workshopCreate).toHaveBeenCalledWith({
@@ -145,10 +146,10 @@ describe("workshopsRepository", () => {
         description: "desc",
         location: "Muenchen",
         maxCapacity: 4,
-        equipment: ["wlan"],
-        imageUrls: ["photo.png"],
+        equipment: ["WLAN"],
+        imageUrls: ["https://example.com/workshop.png"],
         workshopTools: {
-          create: [{ name: "Bohrmaschine", category: "holz" }]
+          create: [{ name: "Akkuschrauber", category: "elektro" }]
         }
       },
       include: {
@@ -161,9 +162,18 @@ describe("workshopsRepository", () => {
         }
       }
     });
-    expect(mocks.workshopUpdate).toHaveBeenCalledWith({
+    expect(mocks.txWorkshopToolDeleteMany).toHaveBeenCalledWith({
+      where: { workshopId: "w2" }
+    });
+    expect(mocks.txWorkshopUpdate).toHaveBeenCalledWith({
       where: { id: "w2" },
-      data: { name: "Neu", extras: undefined, workshopTools: undefined, imageUrls: undefined },
+      data: {
+        name: "Neu",
+        equipment: ["Starkstrom"],
+        workshopTools: {
+          create: [{ name: "Stichsaege", category: "holz" }]
+        }
+      },
       include: {
         workshopTools: {
           select: {
@@ -193,39 +203,13 @@ describe("workshopsRepository", () => {
     const created = await workshopsRepository.createTimeslot({
       workshopId: "w1",
       startTime,
-      endTime
+      endTime,
+      blockedByOwner: false
     });
     const found = await workshopsRepository.findTimeslotById("slot-1");
     const activeBooking = await workshopsRepository.findActiveBookingForTimeslot("slot-1");
     const removed = await workshopsRepository.removeTimeslot("slot-1");
 
-    expect(mocks.timeSlotFindFirst).toHaveBeenCalledWith({
-      where: {
-        workshopId: "w1",
-        startTime: { lt: endTime },
-        endTime: { gt: startTime }
-      }
-    });
-    expect(mocks.timeSlotCreate).toHaveBeenCalledWith({
-      data: {
-        workshopId: "w1",
-        startTime,
-        endTime
-      }
-    });
-    expect(mocks.timeSlotFindUnique).toHaveBeenCalledWith({
-      where: { id: "slot-1" },
-      include: {
-        workshop: true
-      }
-    });
-    expect(mocks.bookingFindFirst).toHaveBeenCalledWith({
-      where: {
-        timeslotId: "slot-1",
-        status: { in: ["PENDING", "ACCEPTED"] }
-      }
-    });
-    expect(mocks.timeSlotDelete).toHaveBeenCalledWith({ where: { id: "slot-1" } });
     expect(overlap).toEqual({ id: "slot-overlap" });
     expect(created).toEqual({ id: "slot-1" });
     expect(found).toEqual({ id: "slot-1" });

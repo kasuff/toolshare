@@ -145,7 +145,7 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
                 <div className="profile-menu-panel">
                   <p className="profile-menu-meta">{currentUser.name}</p>
                   <Link to="/profile" className="profile-menu-item">
-                    Settings
+                    Einstellungen
                   </Link>
                   <button type="button" className="profile-menu-item profile-menu-logout" onClick={onLogout}>
                     Ausloggen

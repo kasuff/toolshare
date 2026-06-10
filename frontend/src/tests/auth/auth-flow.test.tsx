@@ -81,8 +81,8 @@ describe("Authentication user journey", () => {
     renderApp("/auth");
 
     fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
-    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
-    fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
+    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen"));
+    fireEvent.change(screen.getByPlaceholderText("Adresse suchen"), {
       target: { value: "Muster" }
     });
 
@@ -90,10 +90,13 @@ describe("Authentication user journey", () => {
 
     fireEvent.mouseDown(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
 
+    expect(screen.queryByPlaceholderText("Straße")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     expect(await screen.findByDisplayValue("Musterstrasse")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10")).toBeInTheDocument();
     expect(screen.getByDisplayValue("80802")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Muenchen")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Automatische Adresssuche verwenden" }));
     expect(screen.getByDisplayValue("Musterstrasse 10, 80802 Muenchen, Deutschland")).toBeInTheDocument();
   });
 
@@ -102,13 +105,14 @@ describe("Authentication user journey", () => {
 
     renderApp("/auth");
     fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
-    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"));
-    fireEvent.change(screen.getByPlaceholderText("Adresse suchen (optional für Autofill)"), {
+    fireEvent.focus(screen.getByPlaceholderText("Adresse suchen"));
+    fireEvent.change(screen.getByPlaceholderText("Adresse suchen"), {
       target: { value: "zzz" }
     });
 
     expect(await screen.findByText("Keine Vorschläge gefunden.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     expect(screen.getByPlaceholderText("Straße")).toHaveValue("");
-    expect(screen.getByPlaceholderText("Hausnr")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Hausnummer")).toHaveValue("");
   });
 });

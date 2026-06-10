@@ -347,7 +347,15 @@ describe("api coverage", () => {
       providerName: undefined
     });
 
-    const workshopBooking = await api.createWorkshopBooking({ slotId: "s1" }, "token-123");
+    const workshopBooking = await api.createWorkshopBooking(
+      {
+        workshopId: "w1",
+        startIso: "2026-05-07T08:00:00.000Z",
+        endIso: "2026-05-07T10:00:00.000Z",
+        workshopToolIds: ["wt1"]
+      },
+      "token-123"
+    );
     expect(workshopBooking).toMatchObject({
       type: "WORKSHOP",
       providerId: "u2",
@@ -358,7 +366,12 @@ describe("api coverage", () => {
     expect(bookings[0]).toMatchObject({ id: "b3", status: "ABGESCHLOSSEN", type: "TOOL" });
 
     await api.decideBooking("b1", "BESTAETIGT", "token-123");
-    await api.createPickupProposal("b1", "2026-05-06T13:00:00.000Z", "token-123");
+    await api.createPickupProposal(
+      "b1",
+      "2026-05-06T13:00:00.000Z",
+      "2026-05-07T13:00:00.000Z",
+      "token-123"
+    );
     await api.respondPickupProposal("b1", "p1", "DECLINE", "token-123");
 
     const notifications = await api.getNotifications("token-123");
@@ -475,6 +488,8 @@ describe("api coverage", () => {
     fetchMock.mockRejectedValueOnce(new Error("offline"));
     await expect(api.getMetrics("token-123")).rejects.toThrow("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
 
-    await expect(api.createPickupProposal("b1", "not-a-date", "token-123")).rejects.toThrow("Ungültige Abholzeit.");
+    await expect(
+      api.createPickupProposal("b1", "not-a-date", "2026-05-07T13:00:00.000Z", "token-123")
+    ).rejects.toThrow("Ungültiger Abhol- oder Rückgabezeitpunkt.");
   });
 });

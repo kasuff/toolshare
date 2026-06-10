@@ -3,6 +3,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { WorkshopsPage } from "../../src/pages/WorkshopsPage";
+import { ToastViewport } from "../../src/components/ui";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 import type { Tool, Workshop, WorkshopSlot } from "../../src/types/domain";
 
 const { createWorkshopBooking, getWorkshops } = vi.hoisted(() => ({
@@ -62,6 +64,7 @@ function renderPage(initialPath = "/workshops") {
           />
         </Routes>
       </MemoryRouter>
+      <ToastViewport />
     </ToastProvider>
   );
 }
@@ -110,6 +113,26 @@ function tool(overrides: Partial<Tool & { selectable: boolean }>): Tool & { sele
 }
 
 describe("WorkshopsPage search filters", () => {
+  it("shows the guest login notice at the top of the workshop search page", async () => {
+    getWorkshops.mockResolvedValueOnce([]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/workshops"]}>
+          <Routes>
+            <Route path="/workshops" element={<WorkshopsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const guestBanner = screen.getByRole("complementary");
+    expect(screen.getByRole("heading", { name: "Bitte anmelden" })).toBeInTheDocument();
+    expect(screen.queryByText("Easy verleihen. Schnell Nachbarn helfen.")).not.toBeInTheDocument();
+    expect(guestBanner.closest(".search-page")?.firstElementChild).toBe(guestBanner);
+    await waitFor(() => expect(getWorkshops).toHaveBeenCalled());
+  });
+
   it("filters approved workshops by radius and keeps the map slider capped at 5 km", async () => {
     getWorkshops.mockResolvedValueOnce([
       {
@@ -181,7 +204,7 @@ describe("WorkshopsPage search filters", () => {
   });
 
   it("opens details, marks unavailable workshops with the design-system badge and starts bookings", async () => {
-    createWorkshopBooking.mockResolvedValueOnce({});
+    createWorkshopBooking.mockResolvedValueOnce({ id: "booking-new" });
     getWorkshops.mockResolvedValueOnce([
       {
         workshop: workshop({
@@ -189,7 +212,8 @@ describe("WorkshopsPage search filters", () => {
           name: "Nähstube",
           description: "Ausstattung: sewing, light",
           extras: ["sewing"],
-          ownerName: "Nina Nadel"
+          ownerName: "Nina Nadel",
+          imageUrls: ["https://example.com/workshop-1.jpg", "https://example.com/workshop-2.jpg"]
         }),
         slots: [slot({ workshopId: "available" })],
         tools: [tool({ id: "needle", name: "Nähmaschine", selectable: true })]
@@ -204,18 +228,34 @@ describe("WorkshopsPage search filters", () => {
     renderPage();
 
     const blockedCard = (await screen.findByText("Blockierte Werkstatt")).closest("article")!;
-    expect(within(blockedCard).getByText("✕ Nicht verfügbar")).toHaveClass("unavailable");
+    expect(within(blockedCard).getByText("0 Slots")).toHaveClass("unavailable");
 
     fireEvent.click(screen.getByText("Nähstube").closest("article")!);
 
-    expect(await screen.findByRole("dialog", { name: "Nähstube" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Nähstube" })).toBeInTheDocument();
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops/available");
     expect(screen.getByText("Leopoldstraße 120, München")).toBeInTheDocument();
     expect(screen.getAllByText("Nähmaschine").length).toBeGreaterThan(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Buchen" }));
-    await waitFor(() => expect(createWorkshopBooking).toHaveBeenCalledWith({ slotId: "slot-1" }, "token-123"));
-    expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops");
+    fireEvent.click(screen.getByRole("button", { name: "Nähstube vergrößern" }));
+    const imageViewer = screen.getByRole("dialog", { name: "Bilder von Nähstube" });
+    expect(within(imageViewer).getByRole("img")).toHaveAttribute("src", "https://example.com/workshop-1.jpg");
+    fireEvent.click(within(imageViewer).getByRole("button", { name: "Nächstes Bild" }));
+    expect(within(imageViewer).getByRole("img")).toHaveAttribute("src", "https://example.com/workshop-2.jpg");
+    fireEvent.click(within(imageViewer).getByRole("button", { name: "Bildansicht schließen" }));
+    expect(screen.queryByRole("dialog", { name: "Bilder von Nähstube" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Anfrage senden" }));
+    await waitFor(() =>
+      expect(createWorkshopBooking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workshopId: "available",
+          workshopToolIds: ["needle"]
+        }),
+        "token-123"
+      )
+    );
+    expect(screen.getByTestId("location-path")).toHaveTextContent("/inbox");
   });
 
   it("opens workshop details directly from the documented detail route", async () => {
@@ -229,9 +269,30 @@ describe("WorkshopsPage search filters", () => {
 
     renderPage("/workshops/direct");
 
-    expect(await screen.findByRole("dialog", { name: "Direkte Werkstatt" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Direkte Werkstatt" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "← Zurück" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zurück" }));
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops");
+  });
+
+  it("shows a notice instead of opening the default workshop image", async () => {
+    getWorkshops.mockResolvedValueOnce([
+      {
+        workshop: workshop({
+          id: "without-image",
+          name: "Werkstatt ohne Bilder",
+          imageUrls: [DEFAULT_PLACEHOLDER_IMAGE]
+        }),
+        slots: [slot({ workshopId: "without-image" })],
+        tools: []
+      }
+    ]);
+
+    renderPage("/workshops/without-image");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Keine Bilder vorhanden" }));
+
+    expect(await screen.findByText("Keine Bilder vorhanden.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /Bilder von/i })).not.toBeInTheDocument();
   });
 });

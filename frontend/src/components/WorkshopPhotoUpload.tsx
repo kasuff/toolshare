@@ -62,6 +62,28 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
       </label>
       {hint && <p className="hint">{hint}</p>}
 
+      {photos.length === 0 ? (
+        <button
+          type="button"
+          onClick={openFileDialog}
+          className="image-preview-container workshop-empty-photo-upload"
+        >
+          <div className="image-placeholder">
+            <span className="upload-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 15V5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M8.5 8.5 12 5l3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M5 14.5v2.25A2.25 2.25 0 0 0 7.25 19h9.5A2.25 2.25 0 0 0 19 16.75V14.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span className="upload-copy">
+              <span className="upload-title">Bilddateien hochladen</span>
+              <span className="upload-description">Ziehe deine Werkstattfotos hierher oder klicke zum Auswählen.</span>
+            </span>
+            <span className="upload-meta">JPG, PNG, WebP · max. 5 MB</span>
+          </div>
+        </button>
+      ) : (
       <div className="photo-grid">
         {photos.map((photo, index) => (
           <div key={index} className="photo-item">
@@ -79,14 +101,29 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
         ))}
 
         {photos.length < maxPhotos && (
-          <button type="button" onClick={openFileDialog} className="photo-upload-button">
+          <button
+            type="button"
+            onClick={openFileDialog}
+            className="photo-upload-button"
+          >
             <div className="photo-placeholder">
-              <span className="material-symbols-outlined placeholder-icon">add_a_photo</span>
-              <span className="placeholder-text">Foto hinzufügen</span>
+              <span className="upload-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 15V5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <path d="M8.5 8.5 12 5l3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M5 14.5v2.25A2.25 2.25 0 0 0 7.25 19h9.5A2.25 2.25 0 0 0 19 16.75V14.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span className="upload-copy">
+                <span className="upload-title">Werkstattfotos hochladen</span>
+                <span className="upload-description">Wähle bis zu {maxPhotos} Bilder deiner Werkstatt aus.</span>
+              </span>
+              <span className="upload-meta">JPG, PNG, WebP · max. 5 MB</span>
             </div>
           </button>
         )}
       </div>
+      )}
 
       {error && <p className="field-error">{error}</p>}
       <p className="meta-text">{photos.length} von {maxPhotos} Fotos</p>

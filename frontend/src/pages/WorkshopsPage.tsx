@@ -1,9 +1,9 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
-import { EmptyState, Field, SkeletonCards, Surface } from "../components/ui";
+import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
 import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories";
 import { useToast } from "../hooks/useToast";
@@ -22,26 +22,42 @@ type WorkshopListItem = {
   tools: Array<Tool & { selectable: boolean }>;
 };
 
-function formatWorkshopDate(value: string) {
-  return new Intl.DateTimeFormat("de-DE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    hour12: false
-  }).format(new Date(value));
+type BookingDraft = {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+};
+
+function getDefaultBookingDraft(): BookingDraft {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dayAfterTomorrow = new Date(tomorrow);
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+  const pad = (value: number) => `${value}`.padStart(2, "0");
+  const formatDate = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return {
+    startDate: formatDate(tomorrow),
+    startTime: "10:00",
+    endDate: formatDate(dayAfterTomorrow),
+    endTime: "10:00"
+  };
+}
+
+function combineLocalDateTimeToIso(date: string, time: string): string | null {
+  const dStr = date.trim();
+  const tStr = time.trim();
+  if (!dStr || !tStr) return null;
+  const [year, month, day] = dStr.split("-").map(Number);
+  const [hour, minute] = tStr.split(":").map(Number);
+  if (!year || !month || !day || Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  const combined = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (Number.isNaN(combined.getTime())) return null;
+  return combined.toISOString();
 }
 
 const extrasByValue = new Map(WORKSHOP_EQUIPMENT.map((equipment) => [equipment.value, equipment] as const));
 const toolCategoryByValue = new Map(TOOL_CATEGORIES.map((category) => [category.value, category] as const));
-const toolCategoryIcons: Record<string, string> = {
-  elektro: "bolt",
-  garten: "yard",
-  holz: "carpenter",
-  bau: "construction",
-  sanitaer: "plumbing",
-  malen: "format_paint",
-  kfz: "directions_car",
-  sonstiges: "handyman"
-};
 
 function getWorkshopExtras(workshop: Workshop) {
   if (workshop.extras.length > 0) {
@@ -79,6 +95,58 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function slotOverlapsDay(slot: WorkshopSlot, day: Date) {
+  if (slot.blockedByOwner) return false;
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
+  const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0);
+  return new Date(slot.startIso) < dayEnd && new Date(slot.endIso) > dayStart;
+}
+
+function getWorkshopCalendarDays(monthDate: Date, slots: WorkshopSlot[]) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days: Array<{ key: string; day: number | null; dateKey?: string; available?: boolean }> = [];
+
+  for (let index = 0; index < leadingEmptyDays; index += 1) {
+    days.push({ key: `empty-${index}`, day: null });
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month, day);
+    days.push({
+      key: toLocalDateKey(date),
+      day,
+      dateKey: toLocalDateKey(date),
+      available: slots.some((slot) => slotOverlapsDay(slot, date))
+    });
+  }
+
+  return days;
+}
+
+function isDateRangeAvailable(startDate: string, endDate: string, slots: WorkshopSlot[]) {
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return false;
+
+  const current = new Date(start);
+  while (current <= end) {
+    if (!slots.some((slot) => slotOverlapsDay(slot, current))) return false;
+    current.setDate(current.getDate() + 1);
+  }
+  return true;
+}
+
 export function WorkshopsPage({ token, currentUser }: Props) {
   const { pushToast } = useToast();
   const navigate = useNavigate();
@@ -99,6 +167,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [isReporting, setIsReporting] = useState(false);
+  const [selectedToolIdsByWorkshop, setSelectedToolIdsByWorkshop] = useState<Record<string, string[]>>({});
+  const [bookingDraftsByWorkshop, setBookingDraftsByWorkshop] = useState<Record<string, BookingDraft>>({});
+  const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
+  const [isSelectingRangeEnd, setIsSelectingRangeEnd] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -195,6 +268,24 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   };
 
   const openWorkshop = (workshop: WorkshopListItem) => {
+    setCalendarMonthOffset(0);
+    setIsSelectingRangeEnd(false);
+    setBookingDraftsByWorkshop((prev) =>
+      prev[workshop.workshop.id]
+        ? prev
+        : {
+            ...prev,
+            [workshop.workshop.id]: getDefaultBookingDraft()
+          }
+    );
+    setSelectedToolIdsByWorkshop((prev) =>
+      prev[workshop.workshop.id]
+        ? prev
+        : {
+            ...prev,
+            [workshop.workshop.id]: workshop.tools.filter((tool) => tool.selectable).map((tool) => tool.id)
+          }
+    );
     navigate(`/workshops/${workshop.workshop.id}`);
   };
 
@@ -206,21 +297,102 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
   const closeWorkshop = () => {
     closeReportForm();
+    setActiveImageIndex(null);
     navigate("/workshops");
   };
 
-  const bookWorkshop = async (workshopId: string, slotId: string) => {
+  const showPreviousImage = () => {
+    setActiveImageIndex((current) => {
+      if (current === null) return null;
+      return (current - 1 + selectedWorkshopImages.length) % selectedWorkshopImages.length;
+    });
+  };
+
+  const showNextImage = () => {
+    setActiveImageIndex((current) => {
+      if (current === null) return null;
+      return (current + 1) % selectedWorkshopImages.length;
+    });
+  };
+
+  const openWorkshopImage = (index: number) => {
+    if (selectedWorkshopImages[index] === DEFAULT_PLACEHOLDER_IMAGE) {
+      pushToast("Keine Bilder vorhanden.", "info");
+      return;
+    }
+    setActiveImageIndex(index);
+  };
+
+  const selectWorkshopCalendarDate = (dateKey: string) => {
+    if (!selectedWorkshop) return;
+    const workshopId = selectedWorkshop.workshop.id;
+    const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
+
+    if (!isSelectingRangeEnd || dateKey < draft.startDate) {
+      setBookingDraftsByWorkshop((prev) => ({
+        ...prev,
+        [workshopId]: {
+          ...(prev[workshopId] ?? getDefaultBookingDraft()),
+          startDate: dateKey,
+          endDate: dateKey
+        }
+      }));
+      setIsSelectingRangeEnd(true);
+      return;
+    }
+
+    if (!isDateRangeAvailable(draft.startDate, dateKey, selectedWorkshop.slots)) {
+      pushToast("Der gewählte Zeitraum enthält nicht verfügbare Tage.", "error");
+      return;
+    }
+
+    setBookingDraftsByWorkshop((prev) => ({
+      ...prev,
+      [workshopId]: {
+        ...(prev[workshopId] ?? getDefaultBookingDraft()),
+        endDate: dateKey
+      }
+    }));
+    setIsSelectingRangeEnd(false);
+  };
+
+  const bookWorkshop = async (workshopId: string) => {
     if (!token) {
       pushToast("Zum Buchen bitte anmelden.", "info");
       navigate("/auth", { state: { redirectHint: "Bitte melde dich an, um eine Werkstatt zu buchen." } });
       return;
     }
+
+    const selectedToolIds = selectedToolIdsByWorkshop[workshopId] ?? [];
+    const workshopItem = items.find((item) => item.workshop.id === workshopId);
+    if (workshopItem && workshopItem.tools.length > 0 && selectedToolIds.length === 0) {
+      pushToast("Bitte mindestens ein Werkzeug aus der Ausstattung auswählen.", "error");
+      return;
+    }
+
+    const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
+    const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
+    const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
+    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) {
+      pushToast("Bitte einen gültigen Zeitraum mit Start- und Endzeit angeben.", "error");
+      return;
+    }
+
     try {
-      await api.createWorkshopBooking({ slotId }, token);
+      const createdBooking = await api.createWorkshopBooking(
+        { workshopId, startIso, endIso, workshopToolIds: selectedToolIds },
+        token
+      );
       pushToast("Werkstattbuchung erstellt.", "success");
-      if (selectedWorkshop?.workshop.id === workshopId) {
-        closeWorkshop();
-      }
+      setSelectedToolIdsByWorkshop((prev) => ({
+        ...prev,
+        [workshopId]: []
+      }));
+      setBookingDraftsByWorkshop((prev) => ({
+        ...prev,
+        [workshopId]: getDefaultBookingDraft()
+      }));
+      navigate("/inbox", { state: { bookingId: createdBooking.id } });
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Buchung fehlgeschlagen.", "error");
     }
@@ -260,9 +432,36 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   };
 
   const ownedWorkshops = currentUser ? items.filter((item) => item.workshop.ownerId === currentUser.id) : [];
-  const publicWorkshops = currentUser
-    ? filteredItems.filter((item) => item.workshop.ownerId !== currentUser.id)
-    : filteredItems;
+  const publicWorkshops = filteredItems;
+  const selectedWorkshopDraft = selectedWorkshop
+    ? bookingDraftsByWorkshop[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()
+    : null;
+  const selectedWorkshopHasAvailableSlots = selectedWorkshop
+    ? selectedWorkshop.slots.some((slot) => !slot.blockedByOwner)
+    : false;
+  const selectedWorkshopImages = selectedWorkshop
+    ? selectedWorkshop.workshop.imageUrls.length > 0
+      ? selectedWorkshop.workshop.imageUrls
+      : [DEFAULT_PLACEHOLDER_IMAGE]
+    : [];
+  const selectedWorkshopExtras = selectedWorkshop ? getWorkshopExtras(selectedWorkshop.workshop) : [];
+  const currentCalendarMonth = new Date();
+  currentCalendarMonth.setDate(1);
+  currentCalendarMonth.setMonth(currentCalendarMonth.getMonth() + calendarMonthOffset);
+  const selectedWorkshopCalendarMonths = selectedWorkshop
+    ? [0, 1].map((monthIndex) => {
+        const monthDate = new Date(currentCalendarMonth);
+        monthDate.setMonth(monthDate.getMonth() + monthIndex);
+        return {
+          key: `${monthDate.getFullYear()}-${monthDate.getMonth()}`,
+          label: new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(monthDate),
+          days: getWorkshopCalendarDays(monthDate, selectedWorkshop.slots)
+        };
+      })
+    : [];
+  const selectedWorkshopOwnerOfferCount = selectedWorkshop
+    ? items.filter((item) => item.workshop.ownerId === selectedWorkshop.workshop.ownerId).length
+    : 0;
 
   const ownedStats = currentUser
     ? [
@@ -279,27 +478,32 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     : [];
 
   return (
-    <section className="stack search-page">
-      <div className="offer-strip">
-        <div>
-          <h2>Easy verleihen. Schnell Nachbarn helfen.</h2>
-          <p>Jetzt ganz einfach private Werkstätten einstellen.</p>
-        </div>
-        {token && (
+    <section className={`stack search-page ${selectedWorkshop ? "has-workshop-detail" : ""}`.trim()}>
+      {!selectedWorkshop && (
+        <>
+      {!token && (
+        <GuestBanner text="Du kannst als Gast stöbern. Für Buchungsanfragen melde dich bitte an." />
+      )}
+
+      {token && (
+        <div className="offer-strip">
+          <div>
+            <h2>Easy verleihen. Schnell Nachbarn helfen.</h2>
+            <p>Jetzt ganz einfach private Werkstätten einstellen.</p>
+          </div>
           <button className="btn offer-tool" onClick={() => navigate("/workshops/new")}>
             Werkstatt anbieten
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="page-header">
         <div className="stack">
           <h1>Werkstätten</h1>
-          <p className="subtitle">Klicke auf eine Werkstatt, um Details und Buchungsfenster in einem Fenster zu sehen.</p>
         </div>
       </div>
 
-      {currentUser && (
+      {false && currentUser && (
         <Surface title="Meine Werkstätten" subtitle="Eigene Räume und Verfügbarkeiten auf einen Blick.">
           {ownedWorkshops.length > 0 ? (
             <div className="workshop-dashboard">
@@ -416,10 +620,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                 </label>
                 <input
                   id="capacity-slider"
+                  className="capacity-slider"
                   type="range"
                   min={1}
-                  max={20}
+                  max={10}
                   value={maxCapacityFilter}
+                  style={{ "--range-progress": `${((maxCapacityFilter - 1) / 9) * 100}%` } as CSSProperties}
                   onChange={(e) => setMaxCapacityFilter(Number(e.target.value))}
                 />
               </div>
@@ -449,11 +655,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           const ownerName = item.workshop.ownerName ?? "Unbekannt";
           const primaryImage = item.workshop.imageUrls[0];
           const cardImage = primaryImage || DEFAULT_PLACEHOLDER_IMAGE;
-          const isWorkshopAvailable = item.slots.some((slot) => !slot.blockedByOwner);
+          const availableSlotCount = item.slots.filter((slot) => !slot.blockedByOwner).length;
           return (
             <article
               key={item.workshop.id}
-              className={`ds-workshop-card card-enter ${selectedWorkshop?.workshop.id === item.workshop.id ? "selected" : ""}`}
+              className="ds-workshop-card card-enter"
               role="button"
               tabIndex={0}
               onClick={() => openWorkshop(item)}
@@ -465,8 +671,8 @@ export function WorkshopsPage({ token, currentUser }: Props) {
               }}
             >
               <div className="ds-workshop-card-media">
-                <span className={`ds-workshop-card-badge ${isWorkshopAvailable ? "" : "unavailable"}`.trim()}>
-                  {isWorkshopAvailable ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
+                <span className={`ds-workshop-card-badge ${availableSlotCount > 0 ? "" : "unavailable"}`.trim()}>
+                  {availableSlotCount} {availableSlotCount === 1 ? "Slot" : "Slots"}
                 </span>
                 {cardImage ? (
                   <img className="ds-workshop-card-image" src={cardImage} alt={item.workshop.name} />
@@ -493,16 +699,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           );
         })}
       </div>
+        </>
+      )}
 
       {selectedWorkshop && (
-        <div className="workshop-modal-backdrop" role="presentation" onClick={closeWorkshop}>
-          <div
-            className="workshop-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={selectedWorkshop.workshop.name}
-            onClick={(event) => event.stopPropagation()}
-          >
+        <div className="workshop-detail-page" role="region" aria-label={selectedWorkshop.workshop.name}>
+          <div className="workshop-detail-page-content">
             <div className="workshop-modal-toolbar">
               <DetailTopBar onBack={closeWorkshop}>
                 {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
@@ -528,6 +730,347 @@ export function WorkshopsPage({ token, currentUser }: Props) {
               />
             )}
 
+            <div className="workshop-detail-gallery">
+              <div className={`workshop-detail-gallery-grid ${selectedWorkshopImages.length === 1 ? "single" : ""}`.trim()}>
+                <button
+                  type="button"
+                  className="workshop-detail-image-main"
+                  onClick={() => openWorkshopImage(0)}
+                  aria-label={
+                    selectedWorkshopImages[0] === DEFAULT_PLACEHOLDER_IMAGE
+                      ? "Keine Bilder vorhanden"
+                      : `${selectedWorkshop.workshop.name} vergrößern`
+                  }
+                >
+                  <img src={selectedWorkshopImages[0]} alt={selectedWorkshop.workshop.name} />
+                </button>
+                {selectedWorkshopImages.length > 1 && (
+                  <div className="workshop-detail-image-stack">
+                    {selectedWorkshopImages.slice(1, 3).map((imageUrl, index) => (
+                      <button
+                        type="button"
+                        key={`${imageUrl}-${index}`}
+                        className="workshop-detail-image-thumb"
+                        onClick={() => openWorkshopImage(index + 1)}
+                        aria-label={
+                          imageUrl === DEFAULT_PLACEHOLDER_IMAGE
+                            ? "Keine Bilder vorhanden"
+                            : `Bild ${index + 2} von ${selectedWorkshop.workshop.name} vergrößern`
+                        }
+                      >
+                        <img src={imageUrl} alt={`${selectedWorkshop.workshop.name} ${index + 2}`} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="workshop-detail-layout">
+              <div className="workshop-detail-main">
+                <header className="workshop-detail-header">
+                  <h2>{selectedWorkshop.workshop.name}</h2>
+                  <div className="workshop-modal-meta">
+                    <span className="status-pill neutral">{selectedWorkshop.workshop.maxCapacity} Plätze</span>
+                    <span className="status-pill neutral">{selectedWorkshop.slots.length} Zeitfenster</span>
+                    {currentUser && selectedWorkshop.workshop.ownerId === currentUser.id && (
+                      <span className="status-pill warning">Eigene Werkstatt</span>
+                    )}
+                  </div>
+                </header>
+
+                {selectedWorkshop.tools.length > 0 && (
+                  <section className="workshop-detail-section">
+                    <h3>Werkzeuge</h3>
+                    <ul className="workshop-detail-list">
+                      {selectedWorkshop.tools.map((tool) => (
+                        <li key={tool.id} className={tool.selectable ? "" : "is-muted"}>
+                          {tool.name}
+                          {!tool.selectable && <span>Ausgeliehen</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                <section className="workshop-detail-section">
+                  <h3>Details</h3>
+                  <p>
+                    {isAutoGeneratedWorkshopDescription(selectedWorkshop.workshop)
+                      ? "Für diese Werkstatt wurde keine zusätzliche Beschreibung hinterlegt."
+                      : selectedWorkshop.workshop.description}
+                  </p>
+                </section>
+
+                {selectedWorkshopExtras.length > 0 && (
+                  <section className="workshop-detail-section">
+                    <h3>Extras</h3>
+                    <div className="workshop-detail-chip-grid">
+                      {selectedWorkshopExtras.map((extraValue) => {
+                        const extra = extrasByValue.get(extraValue);
+                        return (
+                          <span key={extraValue} className="workshop-detail-chip">
+                            <span className="material-symbols-outlined">{extra?.icon ?? "construction"}</span>
+                            <span>{extra?.label ?? extraValue}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                <section className="workshop-detail-section">
+                  <h3>Adresse</h3>
+                  <p>{selectedWorkshop.workshop.location}</p>
+                </section>
+
+                <section className="workshop-detail-section">
+                  <h3>Anbieter</h3>
+                  <div className="workshop-detail-provider">
+                    <span className="ds-workshop-card-avatar">{getInitials(selectedWorkshop.workshop.ownerName ?? "Unbekannt")}</span>
+                    <div>
+                      <strong>{selectedWorkshop.workshop.ownerName ?? "Unbekannt"}</strong>
+                      <span>{selectedWorkshopOwnerOfferCount} Angebote</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="workshop-detail-section">
+                  <div className="workshop-calendar-toolbar">
+                    <h3>Verfügbare Tage</h3>
+                    <div className="workshop-calendar-navigation">
+                      <button
+                        type="button"
+                        aria-label="Vorherige Monate"
+                        title="Vorherige Monate"
+                        disabled={calendarMonthOffset === 0}
+                        onClick={() => setCalendarMonthOffset((offset) => Math.max(0, offset - 1))}
+                      >
+                        <span className="material-symbols-outlined">chevron_left</span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Nächste Monate"
+                        title="Nächste Monate"
+                        onClick={() => setCalendarMonthOffset((offset) => offset + 1)}
+                      >
+                        <span className="material-symbols-outlined">chevron_right</span>
+                      </button>
+                    </div>
+                  </div>
+                  <p className="workshop-calendar-instruction">
+                    {isSelectingRangeEnd ? "Wähle jetzt das Ende des Zeitraums." : "Wähle den ersten Tag des Zeitraums."}
+                  </p>
+                  <div className="workshop-calendar-months">
+                    {selectedWorkshopCalendarMonths.map((month) => (
+                      <div key={month.key} className="workshop-calendar-month">
+                        <h4>{month.label}</h4>
+                        <div className="workshop-calendar" aria-label={`Verfügbare Tage im ${month.label}`}>
+                          {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((weekday) => (
+                            <span key={weekday} className="workshop-calendar-weekday">
+                              {weekday}
+                            </span>
+                          ))}
+                          {month.days.map((day) => {
+                            const dateKey = day.dateKey ?? "";
+                            const isRangeStart = dateKey === selectedWorkshopDraft?.startDate;
+                            const isRangeEnd = dateKey === selectedWorkshopDraft?.endDate;
+                            const isInRange = Boolean(
+                              dateKey &&
+                                selectedWorkshopDraft &&
+                                dateKey >= selectedWorkshopDraft.startDate &&
+                                dateKey <= selectedWorkshopDraft.endDate
+                            );
+                            return day.day === null ? (
+                              <span key={day.key} className="workshop-calendar-day empty" />
+                            ) : (
+                              <button
+                                key={day.key}
+                                type="button"
+                                className={`workshop-calendar-day ${day.available ? "available" : "unavailable"} ${
+                                  isInRange ? "in-range" : ""
+                                } ${isRangeStart ? "range-start" : ""} ${isRangeEnd ? "range-end" : ""}`.trim()}
+                                disabled={!day.available}
+                                onClick={() => selectWorkshopCalendarDate(dateKey)}
+                              >
+                                {day.day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="workshop-calendar-legend">
+                    <span>
+                      <i className="available" /> Verfügbar
+                    </span>
+                    <span>
+                      <i className="unavailable" /> Nicht verfügbar
+                    </span>
+                  </div>
+                </section>
+              </div>
+
+              {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
+                <aside className="playtomic-booking-panel workshop-detail-booking">
+                  <h2>Werkstatt buchen</h2>
+
+                  <div className="booking-section">
+                    <div className="booking-section-title">
+                      <span />
+                      <strong>Abholdaten</strong>
+                    </div>
+                    <div className="booking-fields-row">
+                      <label>
+                        <span>Datum</span>
+                        <input
+                          id="workshop-booking-start-date"
+                          aria-label="Abholdatum"
+                          type="date"
+                          className="booking-input"
+                          value={selectedWorkshopDraft?.startDate ?? ""}
+                          onChange={(event) =>
+                            setBookingDraftsByWorkshop((prev) => ({
+                              ...prev,
+                              [selectedWorkshop.workshop.id]: {
+                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                                startDate: event.target.value
+                              }
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>Uhrzeit</span>
+                        <input
+                          aria-label="Abholzeit"
+                          type="time"
+                          className="booking-input"
+                          value={selectedWorkshopDraft?.startTime ?? ""}
+                          onChange={(event) =>
+                            setBookingDraftsByWorkshop((prev) => ({
+                              ...prev,
+                              [selectedWorkshop.workshop.id]: {
+                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                                startTime: event.target.value
+                              }
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="booking-divider" />
+
+                  <div className="booking-section">
+                    <div className="booking-section-title">
+                      <span />
+                      <strong>Abgabedaten</strong>
+                    </div>
+                    <div className="booking-fields-row">
+                      <label>
+                        <span>Datum</span>
+                        <input
+                          aria-label="Abgabedatum"
+                          type="date"
+                          className="booking-input"
+                          value={selectedWorkshopDraft?.endDate ?? ""}
+                          min={selectedWorkshopDraft?.startDate}
+                          onChange={(event) =>
+                            setBookingDraftsByWorkshop((prev) => ({
+                              ...prev,
+                              [selectedWorkshop.workshop.id]: {
+                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                                endDate: event.target.value
+                              }
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        <span>Uhrzeit</span>
+                        <input
+                          aria-label="Abgabezeit"
+                          type="time"
+                          className="booking-input"
+                          value={selectedWorkshopDraft?.endTime ?? ""}
+                          onChange={(event) =>
+                            setBookingDraftsByWorkshop((prev) => ({
+                              ...prev,
+                              [selectedWorkshop.workshop.id]: {
+                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                                endTime: event.target.value
+                              }
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="booking-divider" />
+
+                  <div className="booking-section">
+                    <p className="hint">
+                      <strong>Benötigte Werkzeuge</strong>
+                    </p>
+                    {selectedWorkshop.tools.length > 0 ? (
+                      <div className="workshop-booking-tools">
+                        {selectedWorkshop.tools.map((tool) => {
+                          const selectedToolIds = selectedToolIdsByWorkshop[selectedWorkshop.workshop.id] ?? [];
+                          const checked = selectedToolIds.includes(tool.id);
+                          return (
+                            <label key={tool.id} className={`workshop-booking-tool-option ${tool.selectable ? "" : "is-disabled"}`.trim()}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={!token || !tool.selectable}
+                                onChange={(event) =>
+                                  setSelectedToolIdsByWorkshop((prev) => {
+                                    const current = prev[selectedWorkshop.workshop.id] ?? [];
+                                    const next = event.target.checked
+                                      ? Array.from(new Set([...current, tool.id]))
+                                      : current.filter((id) => id !== tool.id);
+                                    return {
+                                      ...prev,
+                                      [selectedWorkshop.workshop.id]: next
+                                    };
+                                  })
+                                }
+                              />
+                              <span>{tool.name}</span>
+                              <small>{tool.selectable ? (toolCategoryByValue.get(tool.category)?.label ?? tool.category) : "Ausgeliehen"}</small>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="hint">Für diese Werkstatt wurde noch keine Ausstattung hinterlegt.</p>
+                    )}
+                  </div>
+
+                  <div className="booking-actions">
+                    <button
+                      type="button"
+                      className="booking-button"
+                      onClick={() => void bookWorkshop(selectedWorkshop.workshop.id)}
+                      disabled={!selectedWorkshopHasAvailableSlots}
+                    >
+                      {token ? "Anfrage senden" : "Jetzt einloggen"}
+                    </button>
+                    <p className="booking-hint">
+                      {selectedWorkshopHasAvailableSlots
+                        ? "Der Anbieter muss deine Anfrage noch bestätigen."
+                        : "Aktuell ist kein verfügbares Zeitfenster hinterlegt."}
+                    </p>
+                  </div>
+                </aside>
+              )}
+            </div>
+
+            {/*
             <div className="workshop-modal-header">
               <div>
                 <p className="eyebrow">Werkstattdetails</p>
@@ -590,6 +1133,184 @@ export function WorkshopsPage({ token, currentUser }: Props) {
               )}
 
               <div className="time-slots-display">
+                {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
+                  <div className="playtomic-booking-panel">
+                    <h3>Werkstatt buchen</h3>
+
+                    <div className="booking-section">
+                      <label className="booking-label" htmlFor="workshop-booking-start-date">
+                        Von wann?
+                      </label>
+                      <input
+                        id="workshop-booking-start-date"
+                        type="date"
+                        className="booking-input"
+                        value={selectedWorkshopDraft?.startDate ?? ""}
+                        onChange={(event) =>
+                          setBookingDraftsByWorkshop((prev) => ({
+                            ...prev,
+                            [selectedWorkshop.workshop.id]: {
+                              ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                              startDate: event.target.value
+                            }
+                          }))
+                        }
+                      />
+                      <input
+                        type="time"
+                        className="booking-input"
+                        style={{ marginTop: "8px" }}
+                        value={selectedWorkshopDraft?.startTime ?? ""}
+                        onChange={(event) =>
+                          setBookingDraftsByWorkshop((prev) => ({
+                            ...prev,
+                            [selectedWorkshop.workshop.id]: {
+                              ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                              startTime: event.target.value
+                            }
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="booking-section">
+                      <label className="booking-label">Wie lange?</label>
+                      <div className="duration-picker">
+                        <button
+                          type="button"
+                          className="duration-btn"
+                          onClick={() =>
+                            setBookingDraftsByWorkshop((prev) => ({
+                              ...prev,
+                              [selectedWorkshop.workshop.id]: {
+                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                                durationDays: Math.max(
+                                  1,
+                                  (prev[selectedWorkshop.workshop.id]?.durationDays ?? getDefaultBookingDraft().durationDays) - 1
+                                )
+                              }
+                            }))
+                          }
+                        >
+                          −
+                        </button>
+                        <div className="duration-display">
+                          <strong>{selectedWorkshopDraft?.durationDays ?? 1}</strong>
+                          <span className="duration-label">
+                            {(selectedWorkshopDraft?.durationDays ?? 1) === 1 ? "Tag" : "Tage"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="duration-btn"
+                          onClick={() =>
+                            setBookingDraftsByWorkshop((prev) => ({
+                              ...prev,
+                              [selectedWorkshop.workshop.id]: {
+                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
+                                durationDays: Math.min(
+                                  30,
+                                  (prev[selectedWorkshop.workshop.id]?.durationDays ?? getDefaultBookingDraft().durationDays) + 1
+                                )
+                              }
+                            }))
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                      {selectedWorkshopEndIso && (
+                        <p className="booking-end-date">
+                          Ende: <strong>{formatWorkshopDate(selectedWorkshopEndIso)}</strong>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="booking-section">
+                      <p className="hint">
+                        <strong>Benötigte Werkzeuge (mindestens eins)</strong>
+                      </p>
+                      {selectedWorkshop.tools.length > 0 ? (
+                        <>
+                          <div className="row" style={{ marginBottom: "0.5rem" }}>
+                            <button
+                              type="button"
+                              className="btn secondary"
+                              onClick={() =>
+                                setSelectedToolIdsByWorkshop((prev) => ({
+                                  ...prev,
+                                  [selectedWorkshop.workshop.id]: selectedWorkshop.tools
+                                    .filter((tool) => tool.selectable)
+                                    .map((tool) => tool.id)
+                                }))
+                              }
+                            >
+                              Alle auswählen
+                            </button>
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              onClick={() =>
+                                setSelectedToolIdsByWorkshop((prev) => ({
+                                  ...prev,
+                                  [selectedWorkshop.workshop.id]: []
+                                }))
+                              }
+                            >
+                              Auswahl löschen
+                            </button>
+                          </div>
+                          <div className="workshop-booking-tools">
+                            {selectedWorkshop.tools.map((tool) => {
+                              const selectedToolIds = selectedToolIdsByWorkshop[selectedWorkshop.workshop.id] ?? [];
+                              const checked = selectedToolIds.includes(tool.id);
+                              return (
+                                <label key={tool.id} className="workshop-booking-tool-option">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={!token || !tool.selectable}
+                                    onChange={(event) =>
+                                      setSelectedToolIdsByWorkshop((prev) => {
+                                        const current = prev[selectedWorkshop.workshop.id] ?? [];
+                                        const next = event.target.checked
+                                          ? Array.from(new Set([...current, tool.id]))
+                                          : current.filter((id) => id !== tool.id);
+                                        return {
+                                          ...prev,
+                                          [selectedWorkshop.workshop.id]: next
+                                        };
+                                      })
+                                    }
+                                  />
+                                  <span>{tool.name}</span>
+                                  <small>{toolCategoryByValue.get(tool.category)?.label ?? tool.category}</small>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="hint">Für diese Werkstatt wurde noch keine Ausstattung hinterlegt.</p>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="booking-button"
+                      onClick={() => void bookWorkshop(selectedWorkshop.workshop.id)}
+                      disabled={!selectedWorkshopHasAvailableSlots}
+                    >
+                      {token ? "Buchen" : "Login"}
+                    </button>
+                    <p className="booking-hint">
+                      {selectedWorkshopHasAvailableSlots
+                        ? "Der Anbieter muss deine Anfrage noch bestätigen."
+                        : "Aktuell ist kein verfügbares Zeitfenster hinterlegt."}
+                    </p>
+                  </div>
+                )}
+
                 {selectedWorkshop.slots.length > 0 ? (
                   <ul className="meta-list">
                     {selectedWorkshop.slots.map((slot) => (
@@ -600,11 +1321,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                           <strong>{formatWorkshopDate(slot.endIso)}</strong>
                           {slot.blockedByOwner && <span className="slot-badge">blockiert</span>}
                         </div>
-                        {!slot.blockedByOwner && currentUser?.id !== selectedWorkshop.workshop.ownerId && (
-                          <button type="button" className="btn" onClick={() => void bookWorkshop(selectedWorkshop.workshop.id, slot.id)}>
-                            {token ? "Buchen" : "Login"}
-                          </button>
-                        )}
                       </li>
                     ))}
                   </ul>
@@ -613,6 +1329,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                 )}
               </div>
             </div>
+            */}
 
             {currentUser && selectedWorkshop.workshop.ownerId === currentUser.id && (
               <div className="workshop-modal-footer">
@@ -625,6 +1342,65 @@ export function WorkshopsPage({ token, currentUser }: Props) {
               </div>
             )}
           </div>
+
+          {activeImageIndex !== null && (
+            <div
+              className="workshop-image-viewer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Bilder von ${selectedWorkshop.workshop.name}`}
+              onClick={() => setActiveImageIndex(null)}
+            >
+              <button
+                type="button"
+                className="workshop-image-viewer-close"
+                aria-label="Bildansicht schließen"
+                title="Schließen"
+                onClick={() => setActiveImageIndex(null)}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+              {selectedWorkshopImages.length > 1 && (
+                <button
+                  type="button"
+                  className="workshop-image-viewer-nav previous"
+                  aria-label="Vorheriges Bild"
+                  title="Vorheriges Bild"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    showPreviousImage();
+                  }}
+                >
+                  <span className="material-symbols-outlined">chevron_left</span>
+                </button>
+              )}
+              <div className="workshop-image-viewer-content" onClick={(event) => event.stopPropagation()}>
+                <img
+                  src={selectedWorkshopImages[activeImageIndex]}
+                  alt={`${selectedWorkshop.workshop.name}, Bild ${activeImageIndex + 1}`}
+                />
+                {selectedWorkshopImages.length > 1 && (
+                  <span className="workshop-image-viewer-counter">
+                    {activeImageIndex + 1} / {selectedWorkshopImages.length}
+                  </span>
+                )}
+              </div>
+              {selectedWorkshopImages.length > 1 && (
+                <button
+                  type="button"
+                  className="workshop-image-viewer-nav next"
+                  aria-label="Nächstes Bild"
+                  title="Nächstes Bild"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    showNextImage();
+                  }}
+                >
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>

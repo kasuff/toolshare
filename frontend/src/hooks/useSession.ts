@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
+import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../services/sessionEvents";
 import type { User } from "../types/domain";
 
 const TOKEN_STORAGE_KEY = "toolshare_access_token";
@@ -9,6 +10,19 @@ export function useSession() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      setToken(null);
+      setCurrentUser(null);
+      setError(SESSION_EXPIRED_MESSAGE);
+      setIsLoading(false);
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
 
   useEffect(() => {
     const run = async () => {

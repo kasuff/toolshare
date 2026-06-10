@@ -81,6 +81,10 @@ describe("ToolsPage", () => {
     );
 
     expect(await screen.findByText(/Du kannst als Gast stöbern/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bitte anmelden" })).toBeInTheDocument();
+    expect(screen.queryByText("Easy verleihen. Schnell Nachbarn helfen.")).not.toBeInTheDocument();
+    const guestBanner = screen.getByRole("complementary");
+    expect(guestBanner.closest(".search-page")?.firstElementChild).toBe(guestBanner);
     const searchInput = screen.getByPlaceholderText(/Name oder Beschreibung/i);
     const categoryInput = screen.getByRole("combobox", { name: /Kategorie/i });
 

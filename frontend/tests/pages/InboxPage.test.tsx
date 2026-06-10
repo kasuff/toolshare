@@ -3,13 +3,13 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
-import { inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
+import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, decideBooking, createPickupProposal, getNotifications, createReport } = vi.hoisted(() => ({
+const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   decideBooking: vi.fn(),
   createPickupProposal: vi.fn(),
-  getNotifications: vi.fn(),
+  createTimeslotProposal: vi.fn(),
   createReport: vi.fn(),
 }));
 
@@ -18,7 +18,7 @@ vi.mock("../../src/services/api", () => ({
     getBookingsForUser,
     decideBooking,
     createPickupProposal,
-    getNotifications,
+    createTimeslotProposal,
     createReport,
   },
 }));
@@ -49,11 +49,11 @@ const baseOpenBooking = {
 
 describe("InboxPage", () => {
   beforeEach(() => {
+    vi.resetAllMocks();
     localStorage.clear();
-    getNotifications.mockResolvedValue([]);
   });
 
-  it("shows messenger thread list with counterpart name, preview and actions inside request bubble", async () => {
+  it("shows messenger thread list, storybook request card and footer actions", async () => {
     getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
 
     render(
@@ -65,12 +65,119 @@ describe("InboxPage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Nachrichten" })).toBeInTheDocument();
+    expect(screen.queryByText(/Benachrichtigungen/)).not.toBeInTheDocument();
     const threadList = screen.getByLabelText("Konversationen");
     expect(within(threadList).getByText("Max Mustermann")).toBeInTheDocument();
     expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
     expect(within(threadList).getByText(/möchte „Test-Bohrer“ ausleihen/)).toBeInTheDocument();
+    expect(within(threadList).getByText("Test-Bohrer")).toHaveClass("messenger-thread-name");
+    expect(within(threadList).getByText("Max Mustermann")).toHaveClass("messenger-thread-sub");
+    expect(within(threadList).getByRole("button")).toHaveAttribute("aria-current", "true");
+    expect(
+      within(threadList).getByText("Max Mustermann").compareDocumentPosition(within(threadList).getByText("Test-Bohrer")) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(document.querySelector(".messenger-chat-header .msg-avatar")).toHaveTextContent("MM");
+    expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
+    expect(screen.getByText("Abholung")).toBeInTheDocument();
+    expect(screen.getByText("Rückgabe")).toBeInTheDocument();
+    expect(screen.getByText("construction")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Akzeptieren" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alternativvorschlag senden" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ablehnen" })).toBeInTheDocument();
+  });
+
+  it("sorts newest activity first and opens the chat requested by navigation", async () => {
+    const newerBooking = {
+      ...baseOpenBooking,
+      id: "b2",
+      toolId: "tool-2",
+      toolName: "Neue Anfrage",
+      createdIso: "2026-05-08T08:00:00.000Z",
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    const requestedBooking = {
+      ...baseOpenBooking,
+      id: "b1",
+      toolName: "Gezielt geöffnete Anfrage",
+      createdIso: "2026-05-05T08:00:00.000Z",
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    getBookingsForUser.mockResolvedValueOnce([requestedBooking, newerBooking]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[{ pathname: "/inbox", state: { bookingId: "b1" } }]}>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadList = await screen.findByLabelText("Konversationen");
+    const threadButtons = within(threadList).getAllByRole("button");
+
+    expect(threadButtons[0]).toHaveTextContent("Neue Anfrage");
+    expect(threadButtons[1]).toHaveTextContent("Gezielt geöffnete Anfrage");
+    expect(threadButtons[1]).toHaveAttribute("aria-current", "true");
+    expect(document.querySelector(".messenger-chat-header-text strong")).toHaveTextContent(
+      "Gezielt geöffnete Anfrage"
+    );
+  });
+
+  it("shows unread chats with a small count badge instead of a colored thread", async () => {
+    localStorage.setItem(inboxReadSeedKey(currentUser.id), "1");
+    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadList = await screen.findByLabelText("Konversationen");
+    expect(within(threadList).getByLabelText("1 neue Nachricht")).toHaveTextContent("1");
+  });
+
+  it("removes the thread unread badge when the conversation is opened", async () => {
+    localStorage.setItem(inboxReadSeedKey(currentUser.id), "1");
+    const firstBooking = { ...baseOpenBooking, id: "b1", toolName: "Erster Chat", pickupProposals: [] };
+    const secondBooking = {
+      ...baseOpenBooking,
+      id: "b2",
+      toolId: "tool-2",
+      toolName: "Zweiter Chat",
+      createdIso: "2026-05-06T08:00:00.000Z",
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    const onReadChanged = vi.fn();
+    window.addEventListener(INBOX_READ_CHANGED_EVENT, onReadChanged);
+    getBookingsForUser.mockResolvedValueOnce([firstBooking, secondBooking]);
+
+    try {
+      render(
+        <ToastProvider>
+          <MemoryRouter>
+            <InboxPage currentUser={currentUser} token="token-123" />
+          </MemoryRouter>
+        </ToastProvider>
+      );
+
+      const threadList = await screen.findByLabelText("Konversationen");
+      const firstThread = within(threadList).getByRole("button", { name: /Erster Chat/ });
+      expect(within(firstThread).getByLabelText("1 neue Nachricht")).toBeInTheDocument();
+
+      fireEvent.click(firstThread);
+
+      expect(within(firstThread).queryByLabelText("1 neue Nachricht")).not.toBeInTheDocument();
+      expect(onReadChanged).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(INBOX_READ_CHANGED_EVENT, onReadChanged);
+    }
   });
 
   it("marks incoming request bubble unread until clicked", async () => {
@@ -86,16 +193,35 @@ describe("InboxPage", () => {
     );
 
     await screen.findByRole("heading", { name: "Nachrichten" });
-    const zeitraum = screen.getByText(/Zeitraum:/);
-    const bubble = zeitraum.closest(".chat-bubble");
-    expect(bubble).toBeTruthy();
-    expect(bubble).toHaveClass("chat-bubble--unread");
+    const card = screen.getByText("Ausleihanfrage").closest(".request-message-card");
+    expect(card).toBeTruthy();
+    expect(card).toHaveClass("request-message-card--unread");
 
-    fireEvent.click(bubble!);
-    expect(bubble).not.toHaveClass("chat-bubble--unread");
+    fireEvent.click(card!);
+    expect(card).not.toHaveClass("request-message-card--unread");
   });
 
-  it("strikes original request lines after a counter proposal is sent via API", async () => {
+  it("opens a conversation scrolled to its newest message", async () => {
+    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    await screen.findByRole("heading", { name: "Nachrichten" });
+    const chat = document.querySelector(".messenger-chat-scroll") as HTMLDivElement;
+    Object.defineProperty(chat, "scrollHeight", { configurable: true, value: 900 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
+
+    expect(chat.scrollTop).toBe(900);
+  });
+
+  it("opens the counter form and displays the sent proposal as a chat card", async () => {
     getBookingsForUser
       .mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }])
       .mockResolvedValueOnce([
@@ -106,6 +232,7 @@ describe("InboxPage", () => {
               id: "pp-1",
               proposedById: "provider-1",
               proposedPickupIso: "2026-05-06T12:00:00.000Z",
+              proposedReturnIso: "2026-05-07T14:00:00.000Z",
               previousPickupIso: "2026-05-06T09:00:00.000Z",
               status: "PENDING" as const,
               createdIso: "2026-05-05T09:00:00.000Z",
@@ -124,19 +251,147 @@ describe("InboxPage", () => {
     );
 
     await screen.findByRole("heading", { name: "Nachrichten" });
-    fireEvent.change(screen.getByLabelText("Alternativdatum für Gegenvorschlag"), {
+    fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
+    fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum"), {
       target: { value: "2026-05-06" },
     });
-    fireEvent.change(screen.getByLabelText("Alternativuhrzeit für Gegenvorschlag"), {
+    fireEvent.change(screen.getByLabelText("Alternative Abholzeit"), {
       target: { value: "12:00" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Senden" }));
+    fireEvent.change(screen.getByLabelText("Alternatives Rückgabedatum"), {
+      target: { value: "2026-05-07" },
+    });
+    fireEvent.change(screen.getByLabelText("Alternative Rückgabezeit"), {
+      target: { value: "14:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
 
     await waitFor(() => {
-      expect(createPickupProposal).toHaveBeenCalled();
+      expect(createPickupProposal).toHaveBeenCalledWith(
+        "b1",
+        new Date(2026, 4, 6, 12, 0).toISOString(),
+        new Date(2026, 4, 7, 14, 0).toISOString(),
+        "token-123"
+      );
     });
 
-    expect(await screen.findByText(/Alternativvorschlag: Abholung/)).toBeInTheDocument();
-    expect(screen.getByText(/Zeitraum:/)).toHaveClass("is-struck");
+    const proposalLabel = await screen.findByText("Alternativvorschlag · Warte auf Antwort");
+    const proposalCard = proposalLabel.closest(".request-message-card");
+    expect(proposalCard).toBeTruthy();
+    expect(within(proposalCard!).getByText(/06\.05\.2026/)).toBeInTheDocument();
+    expect(within(proposalCard!).getByText(/07\.05\.2026/)).toBeInTheDocument();
+  });
+
+  it("sends workshop counter proposals with explicit start and end date times", async () => {
+    const workshopBooking = {
+      ...baseOpenBooking,
+      id: "w1",
+      type: "WORKSHOP" as const,
+      toolId: undefined,
+      workshopId: "workshop-1",
+      toolName: "Maker Space",
+      startIso: "2026-05-06T08:00:00.000Z",
+      endIso: "2026-05-06T12:00:00.000Z",
+      pickupTimeIso: undefined,
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    getBookingsForUser.mockResolvedValueOnce([workshopBooking]).mockResolvedValueOnce([
+      {
+        ...workshopBooking,
+        timeslotProposals: [
+          {
+            id: "tp-1",
+            proposedById: "provider-1",
+            proposedStartIso: "2026-05-08T09:30:00.000Z",
+            proposedEndIso: "2026-05-08T13:15:00.000Z",
+            status: "PENDING" as const,
+            createdIso: "2026-05-05T09:00:00.000Z"
+          }
+        ]
+      }
+    ]);
+    createTimeslotProposal.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Alternativvorschlag senden" }));
+    fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag"), {
+      target: { value: "2026-05-08" }
+    });
+    fireEvent.change(screen.getByLabelText("Alternativuhrzeit für Werkstattvorschlag"), {
+      target: { value: "09:30" }
+    });
+    fireEvent.change(screen.getByLabelText("Alternativ-Enddatum für Werkstattvorschlag"), {
+      target: { value: "2026-05-08" }
+    });
+    fireEvent.change(screen.getByLabelText("Alternativ-Enduhrzeit für Werkstattvorschlag"), {
+      target: { value: "13:15" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
+
+    await waitFor(() =>
+      expect(createTimeslotProposal).toHaveBeenCalledWith(
+        "w1",
+        new Date(2026, 4, 8, 9, 30).toISOString(),
+        new Date(2026, 4, 8, 13, 15).toISOString(),
+        "token-123"
+      )
+    );
+
+    const workshopProposalLabels = await screen.findAllByText("Alternativvorschlag · Warte auf Antwort");
+    const workshopProposalCard = workshopProposalLabels.at(-1)?.closest(".request-message-card");
+    expect(workshopProposalCard).toBeTruthy();
+    const workshopProposalValues = workshopProposalCard!.querySelectorAll(".request-message-card-metadata strong");
+    expect(workshopProposalValues).toHaveLength(2);
+    expect(workshopProposalValues[0].textContent).not.toBe(workshopProposalValues[1].textContent);
+  });
+
+  it("shows an accepted message card after the provider accepts", async () => {
+    getBookingsForUser
+      .mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }])
+      .mockResolvedValueOnce([{ ...baseOpenBooking, status: "BESTAETIGT", pickupProposals: [] }]);
+    decideBooking.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Akzeptieren" }));
+
+    expect(await screen.findByText("Anfrage angenommen")).toBeInTheDocument();
+    expect(screen.getByText("check")).toBeInTheDocument();
+    expect(decideBooking).toHaveBeenCalledWith("b1", "BESTAETIGT", "token-123");
+  });
+
+  it("shows a declined message card after the provider rejects", async () => {
+    getBookingsForUser
+      .mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }])
+      .mockResolvedValueOnce([{ ...baseOpenBooking, status: "ABGELEHNT", pickupProposals: [] }]);
+    decideBooking.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Ablehnen" }));
+
+    expect(await screen.findByText("Anfrage abgelehnt")).toBeInTheDocument();
+    expect(screen.getByText("close")).toBeInTheDocument();
+    expect(decideBooking).toHaveBeenCalledWith("b1", "ABGELEHNT", "token-123");
   });
 });

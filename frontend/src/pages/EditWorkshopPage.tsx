@@ -1,5 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  AddressInput,
+  EMPTY_ADDRESS,
+  isAddressComplete,
+  parseAddress,
+  toAddressPayload
+} from "../components/AddressInput";
 import { Field, Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
@@ -22,7 +29,8 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
+  const [workshopAddress, setWorkshopAddress] = useState({ ...EMPTY_ADDRESS });
+  const [addressSearchValue, setAddressSearchValue] = useState("");
   const [maxCapacity, setMaxCapacity] = useState(2);
   const [extras, setExtras] = useState<string[]>([]);
   const [equipmentItems, setEquipmentItems] = useState<WorkshopToolDraftItem[]>([]);
@@ -45,7 +53,19 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
         }
 
         setName(detail.workshop.name);
-        setLocation(detail.workshop.location);
+        setAddressSearchValue(detail.workshop.location);
+        const addressValidation = await api.validateAddress(detail.workshop.location);
+        setWorkshopAddress(
+          addressValidation.normalizedParts
+            ? {
+                street: addressValidation.normalizedParts.street,
+                houseNumber: addressValidation.normalizedParts.houseNumber,
+                postalCode: addressValidation.normalizedParts.postalCode,
+                city: addressValidation.normalizedParts.city,
+                country: addressValidation.normalizedParts.country || "Deutschland"
+              }
+            : parseAddress(detail.workshop.location)
+        );
         setMaxCapacity(detail.workshop.maxCapacity);
         setExtras(detail.workshop.extras);
         setEquipmentItems(
@@ -116,8 +136,8 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
       pushToast("Bitte geben Sie einen Werkstatt-Namen ein.", "error");
       return;
     }
-    if (!location.trim()) {
-      pushToast("Bitte geben Sie einen Ort an.", "error");
+    if (!isAddressComplete(workshopAddress)) {
+      pushToast("Bitte geben Sie eine vollständige Werkstattadresse an.", "error");
       return;
     }
     if (maxCapacity < 1) {
@@ -131,12 +151,19 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
 
     setSaving(true);
     try {
+      const location = toAddressPayload(workshopAddress);
+      const validation = await api.validateAddress(location);
+      if (!validation.isValid) {
+        pushToast("Adresse konnte nicht verifiziert werden. Bitte wählen Sie eine vorgeschlagene Adresse.", "error");
+        return;
+      }
+
       await api.updateWorkshop(
         id,
         {
           name,
           description,
-          location,
+          location: validation.normalizedAddress?.trim() || location,
           maxCapacity,
           extras,
           equipmentItems,
@@ -164,11 +191,11 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
           </Field>
 
-          <Field label="Ort">
-            <input
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              placeholder="Adresse oder Gebiet"
+          <Field label="Adresse">
+            <AddressInput
+              value={workshopAddress}
+              onChange={setWorkshopAddress}
+              initialSearchValue={addressSearchValue}
               required
             />
           </Field>

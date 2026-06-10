@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { KebabMenu } from "../components/KebabMenu";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import type { Booking, BookingStatus, BookingType, PickupProposal, User } from "../types/domain";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
+import type { Booking, BookingStatus, BookingType, PickupProposal, TimeslotProposal, User } from "../types/domain";
 import {
   bookingHasUnreadForUser,
   collectAllMessageKeys,
@@ -35,33 +34,48 @@ const bookingStatusLabel: Record<BookingStatus, string> = {
   ABGESCHLOSSEN: "Abgeschlossen",
 };
 
-type DraftPickupParts = { date: string; time: string };
+type DraftToolRangeParts = {
+  pickupDate: string;
+  pickupTime: string;
+  returnDate: string;
+  returnTime: string;
+};
+type DraftWorkshopRangeParts = {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+};
 
 type BookingRow = Booking & {
   pickupProposals: PickupProposal[];
+  timeslotProposals: TimeslotProposal[];
 };
 
 export function InboxPage({ currentUser, token }: Props) {
+  const location = useLocation();
   const { pushToast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [notifications, setNotifications] = useState<Array<{ id: string; message: string; read: boolean; createdIso: string }>>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
-  const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftPickupParts>>({});
+  const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftToolRangeParts>>({});
+  const [draftWorkshopRangeByBooking, setDraftWorkshopRangeByBooking] = useState<
+    Record<string, DraftWorkshopRangeParts>
+  >({});
   const [isLoading, setIsLoading] = useState(false);
   const [showUserReportForm, setShowUserReportForm] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [isReportingUser, setIsReportingUser] = useState(false);
+  const [counterFormBookingId, setCounterFormBookingId] = useState<string | null>(null);
   const draftSeededForThreadRef = useRef<Set<string>>(new Set());
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const [readMessageIds, setReadMessageIds] = useState<Set<string>>(new Set());
 
   const loadData = async () => {
     if (!token) return;
     setIsLoading(true);
     try {
-      const [bookingResult, notificationResult] = await Promise.all([api.getBookingsForUser(token), api.getNotifications(token)]);
-      setBookings(bookingResult);
-      setNotifications(notificationResult);
+      setBookings(await api.getBookingsForUser(token));
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
     } finally {
@@ -100,20 +114,18 @@ export function InboxPage({ currentUser, token }: Props) {
   }, [currentUser?.id, bookings]);
 
   const bookingRows: BookingRow[] = useMemo(
-    () => bookings.map((booking) => ({ ...booking, pickupProposals: booking.pickupProposals ?? [] })),
+    () =>
+      bookings.map((booking) => ({
+        ...booking,
+        pickupProposals: booking.pickupProposals ?? [],
+        timeslotProposals: booking.timeslotProposals ?? []
+      })),
     [bookings]
   );
 
   const sortedRows = useMemo(() => {
-    if (!currentUser?.id) return [...bookingRows];
-    const uid = currentUser.id;
-    return [...bookingRows].sort((a, b) => {
-      const unreadA = threadHasUnread(a, uid, readMessageIds);
-      const unreadB = threadHasUnread(b, uid, readMessageIds);
-      if (unreadA !== unreadB) return unreadA ? -1 : 1;
-      return getBookingCreatedMs(b) - getBookingCreatedMs(a);
-    });
-  }, [bookingRows, currentUser?.id, readMessageIds]);
+    return [...bookingRows].sort((a, b) => getLastActivityMs(b) - getLastActivityMs(a));
+  }, [bookingRows]);
 
   useEffect(() => {
     if (sortedRows.length === 0) {
@@ -121,14 +133,22 @@ export function InboxPage({ currentUser, token }: Props) {
       return;
     }
     if (!selectedBookingId || !sortedRows.some((booking) => booking.id === selectedBookingId)) {
-      setSelectedBookingId(sortedRows[0].id);
+      const requestedBookingId =
+        typeof (location.state as { bookingId?: unknown } | null)?.bookingId === "string"
+          ? (location.state as { bookingId: string }).bookingId
+          : null;
+      const requestedBooking = requestedBookingId
+        ? sortedRows.find((booking) => booking.id === requestedBookingId)
+        : null;
+      setSelectedBookingId(requestedBooking?.id ?? sortedRows[0].id);
     }
-  }, [sortedRows, selectedBookingId]);
+  }, [location.state, sortedRows, selectedBookingId]);
 
   useEffect(() => {
     setShowUserReportForm(false);
     setReportReason("");
     setReportDetails("");
+    setCounterFormBookingId(null);
   }, [selectedBookingId]);
 
   const selectedBooking =
@@ -146,22 +166,49 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!row) return;
     if (draftSeededForThreadRef.current.has(selectedBookingId)) return;
     draftSeededForThreadRef.current.add(selectedBookingId);
-    const baseIso = getEffectivePickupIso(row) ?? row.pickupTimeIso ?? "";
     setDraftPickupByBooking((prev) => ({
       ...prev,
-      [selectedBookingId]: splitIsoToLocalParts(baseIso),
+      [selectedBookingId]: toToolRangeDraft(row),
     }));
+    if (row.type === "WORKSHOP") {
+      setDraftWorkshopRangeByBooking((prev) => ({
+        ...prev,
+        [selectedBookingId]: toWorkshopDraft(row),
+      }));
+    }
   }, [selectedBookingId, sortedRows]);
 
-  const pendingProposal = selectedBooking ? getPendingProposal(selectedBooking) : null;
+  const pendingPickupProposal =
+    selectedBooking?.type === "TOOL" ? getPendingPickupProposal(selectedBooking) : null;
+  const pendingTimeslotProposal =
+    selectedBooking?.type === "WORKSHOP" ? getPendingTimeslotProposal(selectedBooking) : null;
 
-  const canRespondToCounter =
-    Boolean(selectedBooking && pendingProposal && currentUser && pendingProposal.proposedById !== currentUser.id);
+  const canRespondToPickupCounter =
+    Boolean(selectedBooking && pendingPickupProposal && currentUser && pendingPickupProposal.proposedById !== currentUser.id);
+  const canRespondToTimeslotCounter =
+    Boolean(
+      selectedBooking &&
+        pendingTimeslotProposal &&
+        currentUser &&
+        pendingTimeslotProposal.proposedById !== currentUser.id
+    );
   const counterDraft = selectedBooking ? draftPickupByBooking[selectedBooking.id] : undefined;
+  const workshopRangeDraft = selectedBooking ? draftWorkshopRangeByBooking[selectedBooking.id] : undefined;
 
   const isProvider = (b: Booking) => (currentUser ? b.providerId === currentUser.id : false);
 
-  const warningNotifications = notifications.filter((n) => n.message.startsWith("ERMAHNUNG:"));
+  useLayoutEffect(() => {
+    const chat = chatScrollRef.current;
+    if (!chat || !selectedBooking) return;
+    chat.scrollTop = chat.scrollHeight;
+  }, [
+    selectedBooking,
+    selectedBookingId,
+    selectedBooking?.status,
+    selectedBooking?.pickupProposals.length,
+    selectedBooking?.timeslotProposals.length,
+    counterFormBookingId
+  ]);
 
   const markIncomingRead = (messageKey: string) => {
     if (!currentUser?.id) return;
@@ -169,6 +216,27 @@ export function InboxPage({ currentUser, token }: Props) {
       if (prev.has(messageKey)) return prev;
       const next = new Set(prev);
       next.add(messageKey);
+      saveReadMessageIds(currentUser.id, next);
+      window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
+      return next;
+    });
+  };
+
+  const markThreadRead = (booking: BookingRow) => {
+    if (!currentUser?.id) return;
+    const incomingKeys = collectIncomingMessageKeys(booking, currentUser.id);
+    if (incomingKeys.length === 0) return;
+
+    setReadMessageIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const key of incomingKeys) {
+        if (!next.has(key)) {
+          next.add(key);
+          changed = true;
+        }
+      }
+      if (!changed) return prev;
       saveReadMessageIds(currentUser.id, next);
       window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
       return next;
@@ -186,41 +254,75 @@ export function InboxPage({ currentUser, token }: Props) {
     }
   };
 
-  const sendCounterProposal = async (booking: Booking) => {
+  const sendPickupCounterProposal = async (booking: Booking) => {
     if (!token || !currentUser) return;
     if (booking.type !== "TOOL" || !booking.pickupTimeIso) {
       pushToast("Alternativvorschlag ist nur bei Ausleihanfragen mit Abholzeit möglich.", "error");
       return;
     }
-    const parts = draftPickupByBooking[booking.id];
-    const iso = combineLocalDateTimeToIso(parts?.date ?? "", parts?.time ?? "");
-    if (!iso) {
-      pushToast("Bitte Datum und Uhrzeit für den Alternativvorschlag wählen.", "error");
+    const draft = draftPickupByBooking[booking.id];
+    const pickupIso = combineLocalDateTimeToIso(draft?.pickupDate ?? "", draft?.pickupTime ?? "");
+    const returnIso = combineLocalDateTimeToIso(draft?.returnDate ?? "", draft?.returnTime ?? "");
+    if (!pickupIso || !returnIso) {
+      pushToast("Bitte Abholung und Rückgabe jeweils mit Datum und Uhrzeit wählen.", "error");
       return;
     }
-    const payloadIso = clampPickupIsoToBooking(iso, booking);
-    if (payloadIso !== iso) {
-      pushToast("Abholzeit wurde auf den Buchungszeitraum begrenzt.", "info");
+    if (new Date(returnIso).getTime() <= new Date(pickupIso).getTime()) {
+      pushToast("Die Rückgabe muss nach der Abholung liegen.", "error");
+      return;
     }
-    const pendingIncoming = getPendingProposal(booking);
+    const pendingIncoming = getPendingPickupProposal(booking);
     if (pendingIncoming && pendingIncoming.proposedById !== currentUser.id) {
       markIncomingRead(proposalMessageKey(booking.id, pendingIncoming.id));
     }
     try {
-      await api.createPickupProposal(booking.id, payloadIso, token);
+      await api.createPickupProposal(booking.id, pickupIso, returnIso, token);
       await loadData();
       setDraftPickupByBooking((prev) => ({
         ...prev,
-        [booking.id]: { date: "", time: "" },
+        [booking.id]: toToolRangeDraft(booking),
       }));
+      setCounterFormBookingId(null);
       pushToast("Alternativvorschlag gesendet.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Alternativvorschlag konnte nicht gesendet werden.", "error");
     }
   };
 
+  const sendTimeslotCounterProposal = async (booking: Booking) => {
+    if (!token || !currentUser) return;
+    if (booking.type !== "WORKSHOP") {
+      pushToast("Alternativvorschlag ist hier nicht verfügbar.", "error");
+      return;
+    }
+    const draft = draftWorkshopRangeByBooking[booking.id];
+    const startIso = combineLocalDateTimeToIso(draft?.startDate ?? "", draft?.startTime ?? "");
+    const endIso = combineLocalDateTimeToIso(draft?.endDate ?? "", draft?.endTime ?? "");
+    if (!startIso || !endIso) {
+      pushToast("Bitte Start- und Enddatum jeweils mit Uhrzeit wählen.", "error");
+      return;
+    }
+    if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
+      pushToast("Das Ende muss nach dem Start liegen.", "error");
+      return;
+    }
+    const pendingIncoming = getPendingTimeslotProposal(booking);
+    if (pendingIncoming && pendingIncoming.proposedById !== currentUser.id) {
+      markIncomingRead(proposalMessageKey(booking.id, pendingIncoming.id));
+    }
+    try {
+      await api.createTimeslotProposal(booking.id, startIso, endIso, token);
+      await loadData();
+      setDraftWorkshopRangeByBooking((prev) => ({ ...prev, [booking.id]: toWorkshopDraft(booking) }));
+      setCounterFormBookingId(null);
+      pushToast("Alternativzeitraum gesendet.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Alternativzeitraum konnte nicht gesendet werden.", "error");
+    }
+  };
+
   const acceptLatestCounterProposal = async (booking: Booking) => {
-    const pending = getPendingProposal(booking);
+    const pending = getPendingPickupProposal(booking);
     if (!token || !pending) return;
     markIncomingRead(proposalMessageKey(booking.id, pending.id));
     try {
@@ -233,7 +335,7 @@ export function InboxPage({ currentUser, token }: Props) {
   };
 
   const declineLatestCounterProposal = async (booking: Booking) => {
-    const pending = getPendingProposal(booking);
+    const pending = getPendingPickupProposal(booking);
     if (!token || !pending) return;
     markIncomingRead(proposalMessageKey(booking.id, pending.id));
     try {
@@ -242,6 +344,32 @@ export function InboxPage({ currentUser, token }: Props) {
       pushToast("Alternativvorschlag abgelehnt.", "info");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Vorschlag konnte nicht abgelehnt werden.", "error");
+    }
+  };
+
+  const acceptLatestTimeslotProposal = async (booking: Booking) => {
+    const pending = getPendingTimeslotProposal(booking);
+    if (!token || !pending) return;
+    markIncomingRead(proposalMessageKey(booking.id, pending.id));
+    try {
+      await api.respondTimeslotProposal(booking.id, pending.id, "ACCEPT", token);
+      await loadData();
+      pushToast("Alternativzeit angenommen.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Alternativzeit konnte nicht angenommen werden.", "error");
+    }
+  };
+
+  const declineLatestTimeslotProposal = async (booking: Booking) => {
+    const pending = getPendingTimeslotProposal(booking);
+    if (!token || !pending) return;
+    markIncomingRead(proposalMessageKey(booking.id, pending.id));
+    try {
+      await api.respondTimeslotProposal(booking.id, pending.id, "DECLINE", token);
+      await loadData();
+      pushToast("Alternativzeit abgelehnt.", "info");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Alternativzeit konnte nicht abgelehnt werden.", "error");
     }
   };
 
@@ -315,329 +443,447 @@ export function InboxPage({ currentUser, token }: Props) {
         {isLoading && <span className="inbox-loading-hint">Laden…</span>}
       </header>
 
-      <div className="messenger-shell">
-        {warningNotifications.length > 0 && (
-          <Surface title="Moderationshinweise">
-            <ul className="meta-list">
-              {warningNotifications.map((notification) => (
-                <li key={notification.id}>
-                  <strong>{new Date(notification.createdIso).toLocaleString()}:</strong> {notification.message}
-                </li>
-              ))}
-            </ul>
-          </Surface>
-        )}
-        {sortedRows.length === 0 ? (
-          <Surface title="Keine Konversationen">
-            <EmptyState title="Noch nichts hier" text="Sobald jemand eine Ausleihe anfragt oder du eine sendest, erscheint die Unterhaltung hier." />
-          </Surface>
-        ) : (
-          <>
-            <aside className="messenger-thread-list" aria-label="Konversationen">
-              {sortedRows.map((booking) => {
-                const active = selectedBooking?.id === booking.id;
-                const cp = counterparty(booking, currentUser.id);
-                const preview = getThreadPreview(booking, currentUser.id);
-                const lastAt = getLastActivityMs(booking);
-                const threadUnread = threadHasUnread(booking, currentUser.id, readMessageIds);
-                return (
-                  <button
-                    key={booking.id}
-                    type="button"
-                    className={`messenger-thread-item ${active ? "active" : ""}${threadUnread ? " messenger-thread-item--unread" : ""}`}
-                    onClick={() => setSelectedBookingId(booking.id)}
-                  >
+      {sortedRows.length === 0 ? (
+        <Surface title="Keine Konversationen">
+          <EmptyState title="Noch nichts hier" text="Sobald jemand eine Ausleihe anfragt oder du eine sendest, erscheint die Unterhaltung hier." />
+        </Surface>
+      ) : (
+        <div className="messenger-shell">
+          <aside className="messenger-thread-list" aria-label="Konversationen">
+            {sortedRows.map((booking) => {
+              const active = selectedBooking?.id === booking.id;
+              const cp = counterparty(booking, currentUser.id);
+              const preview = getThreadPreview(booking, currentUser.id);
+              const lastAt = getLastActivityMs(booking);
+              const threadUnread = threadHasUnread(booking, currentUser.id, readMessageIds);
+              return (
+                <button
+                  key={booking.id}
+                  type="button"
+                  className={`messenger-thread-item ${active ? "active" : ""}${threadUnread ? " messenger-thread-item--unread" : ""}`}
+                  aria-current={active ? "true" : undefined}
+                  onClick={() => {
+                    setSelectedBookingId(booking.id);
+                    markThreadRead(booking);
+                  }}
+                >
+                  <span className="messenger-thread-avatar-wrap">
                     <UserAvatar name={cp.name} imageUrl={null} size="md" />
-                    <span className="messenger-thread-body">
-                      <span className="messenger-thread-top">
-                        <strong className="messenger-thread-name">{cp.name}</strong>
-                        <time className="messenger-thread-time" dateTime={new Date(lastAt).toISOString()}>
-                          {formatShortClockOrDate(lastAt)}
-                        </time>
+                    {threadUnread && (
+                      <span className="messenger-thread-unread-badge" aria-label="1 neue Nachricht">
+                        1
                       </span>
-                      <span className="messenger-thread-sub">{booking.toolName ?? bookingTypeLabel[booking.type]}</span>
-                      <span className="messenger-thread-preview">{preview}</span>
+                    )}
+                  </span>
+                  <span className="messenger-thread-body">
+                    <span className="messenger-thread-top">
+                      <span className="messenger-thread-sub">{cp.name}</span>
+                      <time className="messenger-thread-time" dateTime={new Date(lastAt).toISOString()}>
+                        {formatShortClockOrDate(lastAt)}
+                      </time>
                     </span>
-                  </button>
-                );
-              })}
-            </aside>
+                    <strong className="messenger-thread-name">
+                      {booking.toolName ?? bookingTypeLabel[booking.type]}
+                    </strong>
+                    <span className="messenger-thread-preview">{preview}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </aside>
 
-            {selectedBooking && (
-              <div className="messenger-chat">
-                <header className="messenger-chat-header">
-                  {(() => {
-                    const cp = counterparty(selectedBooking, currentUser.id);
-                    return (
-                      <>
-                        <UserAvatar name={cp.name} imageUrl={null} size="lg" />
-                        <div className="messenger-chat-header-text">
-                          <strong>{cp.name}</strong>
-                          <span className="messenger-chat-header-sub">
-                            {selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`}
-                          </span>
-                        </div>
-                        <div className="messenger-chat-header-actions">
-                          <StatusPill
-                            label={bookingStatusLabel[selectedBooking.status]}
-                            tone={
-                              selectedBooking.status === "BESTAETIGT"
-                                ? "success"
-                                : selectedBooking.status === "ABGELEHNT"
-                                  ? "danger"
-                                  : "neutral"
-                            }
-                          />
-                          <KebabMenu
-                            ariaLabel="Konversationsaktionen"
-                            items={[
-                              {
-                                id: "report-user",
-                                label: "Nutzer melden",
-                                onSelect: () => setShowUserReportForm(true)
-                              }
-                            ]}
-                          />
-                        </div>
-                      </>
-                    );
-                  })()}
-                </header>
-
-                {showUserReportForm && (
-                  <ReportFormPanel
-                    title="Nutzer melden"
-                    hint="Der komplette Chatverlauf wird als Kontext zur Meldung gespeichert."
-                    reason={reportReason}
-                    details={reportDetails}
-                    isSubmitting={isReportingUser}
-                    submitLabel="Nutzer melden"
-                    onReasonChange={setReportReason}
-                    onDetailsChange={setReportDetails}
-                    onSubmit={() => void reportCurrentCounterparty()}
-                    onCancel={closeUserReportForm}
-                  />
-                )}
-
-                <div className="messenger-chat-scroll">
-                  {/* Ausleihanfrage (wie erste Chat-Nachricht vom Anfragenden) */}
-                  <MessengerRow
-                    variant={selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}
-                    avatar={
-                      selectedBooking.requesterId !== currentUser.id ? (
-                        <UserAvatar name={selectedBooking.requesterName ?? "Anfrage"} imageUrl={null} size="sm" />
-                      ) : undefined
+          {selectedBooking && (
+            <div className="messenger-chat">
+              <header className="messenger-chat-header">
+                <UserAvatar
+                  name={counterparty(selectedBooking, currentUser.id).name}
+                  imageUrl={null}
+                  size="lg"
+                />
+                <div className="messenger-chat-header-text">
+                  <strong>{selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`}</strong>
+                  <span className="messenger-chat-header-sub">{counterparty(selectedBooking, currentUser.id).name}</span>
+                </div>
+                <div className="messenger-chat-header-actions">
+                  <StatusPill
+                    label={bookingStatusLabel[selectedBooking.status]}
+                    tone={
+                      selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
+                        ? "success"
+                        : selectedBooking.status === "ABGELEHNT"
+                          ? "danger"
+                          : "neutral"
                     }
-                  >
-                    <div
-                      className={`chat-bubble ${selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}${
-                        selectedReqUnread ? " chat-bubble--unread" : ""
-                      }`}
-                      onClick={
-                        selectedReqIncoming
-                          ? () => {
-                              markIncomingRead(selectedReqKey);
-                            }
-                          : undefined
+                  />
+                  <KebabMenu
+                    ariaLabel="Konversationsaktionen"
+                    items={[
+                      {
+                        id: "report-user",
+                        label: "Nutzer melden",
+                        onSelect: () => setShowUserReportForm(true)
+                      }
+                    ]}
+                  />
+                </div>
+              </header>
+
+              {showUserReportForm && (
+                <ReportFormPanel
+                  title="Nutzer melden"
+                  hint="Der komplette Chatverlauf wird als Kontext zur Meldung gespeichert."
+                  reason={reportReason}
+                  details={reportDetails}
+                  isSubmitting={isReportingUser}
+                  submitLabel="Nutzer melden"
+                  onReasonChange={setReportReason}
+                  onDetailsChange={setReportDetails}
+                  onSubmit={() => void reportCurrentCounterparty()}
+                  onCancel={closeUserReportForm}
+                />
+              )}
+
+              <div className="messenger-chat-scroll" ref={chatScrollRef}>
+                <MessengerRow
+                  variant={selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}
+                  avatar={<UserAvatar name={selectedBooking.requesterName ?? currentUser.name} imageUrl={null} size="sm" />}
+                >
+                  <RequestMessageCard
+                    label={selectedBooking.type === "WORKSHOP" ? "Werkstattbuchung" : "Ausleihanfrage"}
+                    title={selectedBooking.toolName ?? (selectedBooking.type === "WORKSHOP" ? "Werkstatt" : "Werkzeug")}
+                    icon={selectedBooking.type === "WORKSHOP" ? "home_repair_service" : "construction"}
+                    firstLabel={selectedBooking.type === "TOOL" ? "Abholung" : "Von"}
+                    firstValue={formatDateTime(
+                      selectedBooking.type === "TOOL" ? selectedBooking.pickupTimeIso : selectedBooking.startIso
+                    )}
+                    secondLabel={selectedBooking.type === "TOOL" ? "Rückgabe" : "Bis"}
+                    secondValue={formatDateTime(selectedBooking.endIso)}
+                    unread={selectedReqUnread}
+                    onClick={selectedReqIncoming ? () => markIncomingRead(selectedReqKey) : undefined}
+                  />
+                </MessengerRow>
+
+                {selectedBooking.pickupProposals.map((proposal) => {
+                  const incoming = proposal.proposedById !== currentUser.id;
+                  const key = proposalMessageKey(selectedBooking.id, proposal.id);
+                  return (
+                    <MessengerRow
+                      key={proposal.id}
+                      variant={incoming ? "incoming" : "outgoing"}
+                      avatar={
+                        <UserAvatar
+                          name={incoming ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
+                          imageUrl={null}
+                          size="sm"
+                        />
                       }
                     >
-                      <div className="request-bubble-card">
-                        <div className="request-bubble-visual">
-                          <img
-                            src={selectedBooking.toolImageUrl || DEFAULT_PLACEHOLDER_IMAGE}
-                            alt=""
-                            className="request-bubble-thumb"
-                          />
-                          <div className="request-bubble-intro">
-                            <span className="request-bubble-badge">Ausleihanfrage</span>
-                            <p className="request-bubble-title">{selectedBooking.toolName ?? "Werkzeug"}</p>
-                            <p
-                              className={`request-bubble-line${selectedBooking.pickupProposals.length > 0 ? " is-struck" : ""}`}
-                            >
-                              Zeitraum: {formatDateTime(selectedBooking.startIso)} – {formatDateTime(selectedBooking.endIso)}
-                            </p>
-                            <p
-                              className={`request-bubble-line${selectedBooking.pickupProposals.length > 0 ? " is-struck" : ""}`}
-                            >
-                              Abholung: {formatDateTime(selectedBooking.pickupTimeIso)}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="request-bubble-status">
-                          Status: <strong>{bookingStatusLabel[selectedBooking.status]}</strong>
-                        </p>
+                      <RequestMessageCard
+                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
+                        title={selectedBooking.toolName ?? "Werkzeug"}
+                        icon="help"
+                        firstLabel="Abholung"
+                        firstValue={formatDateTime(proposal.proposedPickupIso)}
+                        secondLabel="Rückgabe"
+                        secondValue={formatDateTime(proposal.proposedReturnIso ?? selectedBooking.endIso)}
+                        unread={incoming && proposal.status === "PENDING" && !readMessageIds.has(key)}
+                        onClick={incoming ? () => markIncomingRead(key) : undefined}
+                      />
+                    </MessengerRow>
+                  );
+                })}
 
-                        {selectedBooking.status === "OFFEN" &&
-                          isProvider(selectedBooking) &&
-                          !pendingProposal &&
-                          selectedBooking.type === "TOOL" &&
-                          Boolean(selectedBooking.pickupTimeIso) && (
-                          <>
-                            <div className="request-bubble-actions">
-                              <button type="button" onClick={() => void decide(selectedBooking.id, true)}>
-                                Akzeptieren
-                              </button>
-                              <button type="button" className="ghost" onClick={() => void decide(selectedBooking.id, false)}>
-                                Ablehnen
-                              </button>
-                            </div>
-                            <div className="request-bubble-counter">
-                              <span className="request-bubble-counter-label">Alternativvorschlag</span>
-                              <div className="request-bubble-counter-row request-bubble-counter-datetime">
-                                <input
-                                  aria-label="Alternativdatum für Gegenvorschlag"
-                                  type="date"
-                                  className="booking-input"
-                                  value={counterDraft?.date ?? ""}
-                                  onChange={(event) =>
-                                    setDraftPickupByBooking((prev) => ({
-                                      ...prev,
-                                      [selectedBooking.id]: {
-                                        ...(prev[selectedBooking.id] ?? { date: "", time: "" }),
-                                        date: event.target.value,
-                                      },
-                                    }))
-                                  }
-                                />
-                                <input
-                                  aria-label="Alternativuhrzeit für Gegenvorschlag"
-                                  type="time"
-                                  className="booking-input"
-                                  value={counterDraft?.time ?? ""}
-                                  onChange={(event) =>
-                                    setDraftPickupByBooking((prev) => ({
-                                      ...prev,
-                                      [selectedBooking.id]: {
-                                        ...(prev[selectedBooking.id] ?? { date: "", time: "" }),
-                                        time: event.target.value,
-                                      },
-                                    }))
-                                  }
-                                />
-                                <button type="button" onClick={() => void sendCounterProposal(selectedBooking)}>
-                                  Senden
-                                </button>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                {selectedBooking.timeslotProposals.map((proposal) => {
+                  const incoming = proposal.proposedById !== currentUser.id;
+                  const key = proposalMessageKey(selectedBooking.id, proposal.id);
+                  return (
+                    <MessengerRow
+                      key={proposal.id}
+                      variant={incoming ? "incoming" : "outgoing"}
+                      avatar={
+                        <UserAvatar
+                          name={incoming ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
+                          imageUrl={null}
+                          size="sm"
+                        />
+                      }
+                    >
+                      <RequestMessageCard
+                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
+                        title={selectedBooking.toolName ?? "Werkstatt"}
+                        icon="help"
+                        firstLabel="Von"
+                        firstValue={formatDateTime(proposal.proposedStartIso)}
+                        secondLabel="Bis"
+                        secondValue={formatDateTime(proposal.proposedEndIso)}
+                        unread={incoming && proposal.status === "PENDING" && !readMessageIds.has(key)}
+                        onClick={incoming ? () => markIncomingRead(key) : undefined}
+                      />
+                    </MessengerRow>
+                  );
+                })}
+
+                {selectedBooking.status !== "OFFEN" && (
+                  <MessengerRow
+                    variant={selectedBooking.providerId === currentUser.id ? "outgoing" : "incoming"}
+                    avatar={<UserAvatar name={selectedBooking.providerName ?? currentUser.name} imageUrl={null} size="sm" />}
+                  >
+                    <RequestMessageCard
+                      label={
+                        selectedBooking.status === "BESTAETIGT"
+                          ? "Anfrage angenommen"
+                          : selectedBooking.status === "ABGELEHNT"
+                            ? "Anfrage abgelehnt"
+                            : "Buchung abgeschlossen"
+                      }
+                      title={selectedBooking.toolName ?? bookingTypeLabel[selectedBooking.type]}
+                      icon={
+                        selectedBooking.status === "BESTAETIGT"
+                          ? "check"
+                          : selectedBooking.status === "ABGELEHNT"
+                            ? "close"
+                            : "task_alt"
+                      }
+                      firstLabel="Von"
+                      firstValue={formatDateTime(selectedBooking.startIso)}
+                      secondLabel="Bis"
+                      secondValue={formatDateTime(selectedBooking.endIso)}
+                    />
                   </MessengerRow>
+                )}
 
-                  {selectedBooking.pickupProposals.map((proposal) => {
-                    const propIncoming = proposal.proposedById !== currentUser.id;
-                    const propKey = proposalMessageKey(selectedBooking.id, proposal.id);
-                    const propUnread =
-                      propIncoming && proposal.status === "PENDING" && !readMessageIds.has(propKey);
-                    return (
-                      <MessengerRow
-                        key={proposal.id}
-                        variant={proposal.proposedById === currentUser.id ? "outgoing" : "incoming"}
-                        avatar={
-                          proposal.proposedById !== currentUser.id ? (
-                            <UserAvatar
-                              name={
-                                proposal.proposedById === selectedBooking.requesterId
-                                  ? (selectedBooking.requesterName ?? "Anfrage")
-                                  : (selectedBooking.providerName ?? "Anbieter")
+                {counterFormBookingId === selectedBooking.id && selectedBooking.status === "OFFEN" && (
+                  <MessengerRow
+                    variant="outgoing"
+                    avatar={<UserAvatar name={currentUser.name} imageUrl={null} size="sm" />}
+                  >
+                    <RequestMessageCard
+                      label="Alternativvorschlag"
+                      title={selectedBooking.toolName ?? bookingTypeLabel[selectedBooking.type]}
+                      icon="help"
+                    >
+                      {selectedBooking.type === "TOOL" ? (
+                        <div className="request-card-form-grid request-card-form-grid--workshop">
+                          <label>
+                            <span>Abholdatum</span>
+                            <input
+                              aria-label="Alternatives Abholdatum"
+                              type="date"
+                              value={counterDraft?.pickupDate ?? ""}
+                              onChange={(event) =>
+                                setDraftPickupByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    pickupDate: event.target.value
+                                  }
+                                }))
                               }
-                              imageUrl={null}
-                              size="sm"
                             />
-                          ) : undefined
-                        }
-                      >
-                      <div
-                        className={`chat-bubble ${proposal.proposedById === currentUser.id ? "outgoing" : "incoming"}${
-                          propUnread ? " chat-bubble--unread" : ""
-                        }`}
-                        onClick={propIncoming ? () => markIncomingRead(propKey) : undefined}
-                      >
-                        <p>
-                          Alternativvorschlag: Abholung {formatDateTime(proposal.proposedPickupIso)}
-                          {proposal.previousPickupIso ? ` (statt ${formatDateTime(proposal.previousPickupIso)})` : ""}
-                        </p>
-                        <small>
-                          {proposal.status === "PENDING"
-                            ? "Warte auf Antwort"
-                            : proposal.status === "ACCEPTED"
-                              ? "Angenommen"
-                              : "Abgelehnt"}
-                        </small>
-
-                        {canRespondToCounter &&
-                          proposal.id === pendingProposal?.id &&
-                          selectedBooking.status === "OFFEN" && (
-                            <div className="proposal-reply-block" onClick={(event) => event.stopPropagation()}>
-                              <div className="request-bubble-actions proposal-reply-actions">
-                                <button type="button" onClick={() => void acceptLatestCounterProposal(selectedBooking)}>
-                                  Annehmen
-                                </button>
-                                <button type="button" className="ghost" onClick={() => void declineLatestCounterProposal(selectedBooking)}>
-                                  Ablehnen
-                                </button>
-                              </div>
-                              {selectedBooking.type === "TOOL" && Boolean(selectedBooking.pickupTimeIso) && (
-                                <div className="request-bubble-counter proposal-counter-inline">
-                                  <span className="request-bubble-counter-label">Mit Alternativvorschlag antworten</span>
-                                  <div className="request-bubble-counter-row request-bubble-counter-datetime">
-                                    <input
-                                      aria-label="Alternativdatum für Antwort auf diesen Vorschlag"
-                                      type="date"
-                                      className="booking-input"
-                                      value={counterDraft?.date ?? ""}
-                                      onChange={(event) =>
-                                        setDraftPickupByBooking((prev) => ({
-                                          ...prev,
-                                          [selectedBooking.id]: {
-                                            ...(prev[selectedBooking.id] ?? { date: "", time: "" }),
-                                            date: event.target.value,
-                                          },
-                                        }))
-                                      }
-                                    />
-                                    <input
-                                      aria-label="Alternativuhrzeit für Antwort auf diesen Vorschlag"
-                                      type="time"
-                                      className="booking-input"
-                                      value={counterDraft?.time ?? ""}
-                                      onChange={(event) =>
-                                        setDraftPickupByBooking((prev) => ({
-                                          ...prev,
-                                          [selectedBooking.id]: {
-                                            ...(prev[selectedBooking.id] ?? { date: "", time: "" }),
-                                            time: event.target.value,
-                                          },
-                                        }))
-                                      }
-                                    />
-                                    <button type="button" onClick={() => void sendCounterProposal(selectedBooking)}>
-                                      Senden
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          </label>
+                          <label>
+                            <span>Abholzeit</span>
+                            <input
+                              aria-label="Alternative Abholzeit"
+                              type="time"
+                              value={counterDraft?.pickupTime ?? ""}
+                              onChange={(event) =>
+                                setDraftPickupByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    pickupTime: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Rückgabedatum</span>
+                            <input
+                              aria-label="Alternatives Rückgabedatum"
+                              type="date"
+                              value={counterDraft?.returnDate ?? ""}
+                              onChange={(event) =>
+                                setDraftPickupByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    returnDate: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Rückgabezeit</span>
+                            <input
+                              aria-label="Alternative Rückgabezeit"
+                              type="time"
+                              value={counterDraft?.returnTime ?? ""}
+                              onChange={(event) =>
+                                setDraftPickupByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
+                                    returnTime: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="request-card-form-grid request-card-form-grid--workshop">
+                          <label>
+                            <span>Startdatum</span>
+                            <input
+                              aria-label="Alternativdatum für Werkstattvorschlag"
+                              type="date"
+                              value={workshopRangeDraft?.startDate ?? ""}
+                              onChange={(event) =>
+                                setDraftWorkshopRangeByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                    startDate: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Uhrzeit</span>
+                            <input
+                              aria-label="Alternativuhrzeit für Werkstattvorschlag"
+                              type="time"
+                              value={workshopRangeDraft?.startTime ?? ""}
+                              onChange={(event) =>
+                                setDraftWorkshopRangeByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                    startTime: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Enddatum</span>
+                            <input
+                              aria-label="Alternativ-Enddatum für Werkstattvorschlag"
+                              type="date"
+                              value={workshopRangeDraft?.endDate ?? ""}
+                              onChange={(event) =>
+                                setDraftWorkshopRangeByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                    endDate: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            <span>Uhrzeit</span>
+                            <input
+                              aria-label="Alternativ-Enduhrzeit für Werkstattvorschlag"
+                              type="time"
+                              value={workshopRangeDraft?.endTime ?? ""}
+                              onChange={(event) =>
+                                setDraftWorkshopRangeByBooking((prev) => ({
+                                  ...prev,
+                                  [selectedBooking.id]: {
+                                    ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
+                                    endTime: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+                      )}
+                      <div className="request-card-form-actions">
+                        <button type="button" className="ghost" onClick={() => setCounterFormBookingId(null)}>
+                          Abbrechen
+                        </button>
+                        <button
+                          type="button"
+                          className="request-card-send-button"
+                          aria-label="Alternativvorschlag senden"
+                          onClick={() =>
+                            void (selectedBooking.type === "TOOL"
+                              ? sendPickupCounterProposal(selectedBooking)
+                              : sendTimeslotCounterProposal(selectedBooking))
+                          }
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">send</span>
+                        </button>
                       </div>
-                      </MessengerRow>
-                    );
-                  })}
-                </div>
-
-                {selectedBooking.status === "BESTAETIGT" && (
-                  <footer className="messenger-chat-footer">
-                    <button type="button" onClick={() => void close(selectedBooking.id)}>
-                      Als abgeschlossen markieren
-                    </button>
-                  </footer>
+                    </RequestMessageCard>
+                  </MessengerRow>
                 )}
               </div>
-            )}
-          </>
-        )}
-      </div>
+
+              {selectedBooking.status === "OFFEN" && counterFormBookingId !== selectedBooking.id && (
+                <>
+                  {isProvider(selectedBooking) && !pendingPickupProposal && !pendingTimeslotProposal && (
+                    <footer className="messenger-chat-footer messenger-chat-footer--actions">
+                      <button type="button" onClick={() => void decide(selectedBooking.id, true)}>
+                        Akzeptieren
+                      </button>
+                      <button type="button" className="secondary" onClick={() => setCounterFormBookingId(selectedBooking.id)}>
+                        Alternativvorschlag senden
+                      </button>
+                      <button type="button" className="ghost inbox-reject-button" onClick={() => void decide(selectedBooking.id, false)}>
+                        Ablehnen
+                      </button>
+                    </footer>
+                  )}
+                  {(canRespondToPickupCounter || canRespondToTimeslotCounter) && (
+                    <footer className="messenger-chat-footer messenger-chat-footer--actions">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void (canRespondToPickupCounter
+                            ? acceptLatestCounterProposal(selectedBooking)
+                            : acceptLatestTimeslotProposal(selectedBooking))
+                        }
+                      >
+                        Annehmen
+                      </button>
+                      <button type="button" className="secondary" onClick={() => setCounterFormBookingId(selectedBooking.id)}>
+                        Alternativvorschlag senden
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost inbox-reject-button"
+                        onClick={() =>
+                          void (canRespondToPickupCounter
+                            ? declineLatestCounterProposal(selectedBooking)
+                            : declineLatestTimeslotProposal(selectedBooking))
+                        }
+                      >
+                        Ablehnen
+                      </button>
+                    </footer>
+                  )}
+                </>
+              )}
+
+              {selectedBooking.status === "BESTAETIGT" && (
+                <footer className="messenger-chat-footer messenger-chat-footer--completion">
+                  <button type="button" onClick={() => void close(selectedBooking.id)}>
+                    Als abgeschlossen markieren
+                  </button>
+                </footer>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -705,12 +951,103 @@ function MessengerRow({
     <div className={`messenger-msg-row ${variant}`}>
       {variant === "incoming" && avatar && <div className="messenger-msg-avatar-col">{avatar}</div>}
       <div className="messenger-msg-bubble-col">{children}</div>
+      {variant === "outgoing" && avatar && <div className="messenger-msg-avatar-col">{avatar}</div>}
     </div>
   );
 }
 
+function RequestMessageCard({
+  label,
+  title,
+  icon,
+  firstLabel,
+  firstValue,
+  secondLabel,
+  secondValue,
+  unread = false,
+  onClick,
+  children
+}: {
+  label: string;
+  title: string;
+  icon: string;
+  firstLabel?: string;
+  firstValue?: string;
+  secondLabel?: string;
+  secondValue?: string;
+  unread?: boolean;
+  onClick?: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <article
+      className={`request-message-card${unread ? " request-message-card--unread" : ""}`}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
+      <div className="request-message-card-head">
+        <span className="request-message-card-icon" aria-hidden="true">
+          <span className="material-symbols-outlined">{icon}</span>
+        </span>
+        <div className="request-message-card-heading">
+          <span>{label}</span>
+          <h3>{title}</h3>
+        </div>
+      </div>
+      {firstLabel && firstValue && secondLabel && secondValue && (
+        <div className="request-message-card-metadata">
+          <div>
+            <span>{firstLabel}</span>
+            <strong>{firstValue}</strong>
+          </div>
+          <div>
+            <span>{secondLabel}</span>
+            <strong>{secondValue}</strong>
+          </div>
+        </div>
+      )}
+      {children}
+    </article>
+  );
+}
+
+function proposalStatusLabel(status: PickupProposal["status"] | TimeslotProposal["status"]): string {
+  if (status === "ACCEPTED") return "Angenommen";
+  if (status === "DECLINED") return "Abgelehnt";
+  return "Warte auf Antwort";
+}
+
 function threadHasUnread(booking: BookingRow, currentUserId: string, readIds: Set<string>): boolean {
   return bookingHasUnreadForUser(booking, currentUserId, readIds);
+}
+
+function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string): string[] {
+  const keys: string[] = [];
+  if (booking.requesterId !== currentUserId) {
+    keys.push(requestMessageKey(booking.id));
+  }
+  for (const proposal of booking.pickupProposals) {
+    if (proposal.status === "PENDING" && proposal.proposedById !== currentUserId) {
+      keys.push(proposalMessageKey(booking.id, proposal.id));
+    }
+  }
+  for (const proposal of booking.timeslotProposals) {
+    if (proposal.status === "PENDING" && proposal.proposedById !== currentUserId) {
+      keys.push(proposalMessageKey(booking.id, proposal.id));
+    }
+  }
+  return keys;
 }
 
 function counterparty(booking: Booking, currentUserId: string): { name: string } {
@@ -721,36 +1058,50 @@ function counterparty(booking: Booking, currentUserId: string): { name: string }
 }
 
 function getThreadPreview(row: BookingRow, currentUserId: string): string {
-  const proposals = row.pickupProposals;
-  if (proposals.length > 0) {
-    const last = proposals[proposals.length - 1];
-    const short = formatShortDateTime(last.proposedPickupIso);
-    if (last.proposedById === currentUserId) {
+  const latestPickup =
+    row.pickupProposals.length > 0 ? row.pickupProposals[row.pickupProposals.length - 1] : null;
+  const latestTimeslot =
+    row.timeslotProposals.length > 0 ? row.timeslotProposals[row.timeslotProposals.length - 1] : null;
+
+  const latestPickupMs = latestPickup ? new Date(latestPickup.createdIso).getTime() : 0;
+  const latestTimeslotMs = latestTimeslot ? new Date(latestTimeslot.createdIso).getTime() : 0;
+
+  if (latestPickup && latestPickupMs >= latestTimeslotMs) {
+    const short = formatShortDateTime(latestPickup.proposedPickupIso);
+    if (latestPickup.proposedById === currentUserId) {
       return `Du: Alternativ ${short}`;
     }
     return `Alternativvorschlag · ${short}`;
   }
-  if (row.requesterId === currentUserId) {
-    return "Du hast eine Ausleihe angefragt";
+
+  if (latestTimeslot) {
+    const short = formatShortDateTime(latestTimeslot.proposedStartIso);
+    if (latestTimeslot.proposedById === currentUserId) {
+      return `Du: Alternativzeit ${short}`;
+    }
+    return `Alternativzeit · ${short}`;
   }
-  return `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "dein Angebot"}“ ausleihen`;
+
+  if (row.requesterId === currentUserId) {
+    return row.type === "WORKSHOP" ? "Du hast eine Werkstatt angefragt" : "Du hast eine Ausleihe angefragt";
+  }
+  return row.type === "WORKSHOP"
+    ? `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "deine Werkstatt"}“ buchen`
+    : `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "dein Angebot"}“ ausleihen`;
 }
 
 function getLastActivityMs(booking: BookingRow): number {
-  let t = 0;
-  for (const c of [booking.pickupTimeIso, booking.startIso, booking.createdIso]) {
-    if (c) t = Math.max(t, new Date(c).getTime());
-  }
+  const createdMs = booking.createdIso ? new Date(booking.createdIso).getTime() : 0;
+  let t = Number.isNaN(createdMs) ? 0 : createdMs;
   for (const p of booking.pickupProposals) {
-    t = Math.max(t, new Date(p.createdIso).getTime());
+    const ms = new Date(p.createdIso).getTime();
+    if (!Number.isNaN(ms)) t = Math.max(t, ms);
+  }
+  for (const p of booking.timeslotProposals) {
+    const ms = new Date(p.createdIso).getTime();
+    if (!Number.isNaN(ms)) t = Math.max(t, ms);
   }
   return t;
-}
-
-function getBookingCreatedMs(booking: BookingRow): number {
-  if (!booking.createdIso) return 0;
-  const ms = new Date(booking.createdIso).getTime();
-  return Number.isNaN(ms) ? 0 : ms;
 }
 
 function formatShortClockOrDate(ms: number) {
@@ -771,21 +1122,26 @@ function formatShortDateTime(iso: string) {
 
 function formatDateTime(value?: string) {
   if (!value) return "-";
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
-function getPendingProposal(booking: Booking): PickupProposal | null {
+function getPendingPickupProposal(booking: Booking): PickupProposal | null {
   const pending = (booking.pickupProposals ?? []).filter((p) => p.status === "PENDING");
   return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
-function getEffectivePickupIso(booking: Booking): string | undefined {
-  const proposals = booking.pickupProposals ?? [];
-  if (proposals.length === 0) return booking.pickupTimeIso;
-  return proposals[proposals.length - 1].proposedPickupIso;
+function getPendingTimeslotProposal(booking: Booking): TimeslotProposal | null {
+  const pending = (booking.timeslotProposals ?? []).filter((p) => p.status === "PENDING");
+  return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
-function splitIsoToLocalParts(iso: string): DraftPickupParts {
+function splitIsoToLocalParts(iso: string): { date: string; time: string } {
   if (!iso.trim()) return { date: "", time: "" };
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return { date: "", time: "" };
@@ -793,6 +1149,20 @@ function splitIsoToLocalParts(iso: string): DraftPickupParts {
   return {
     date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
     time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
+function toToolRangeDraft(booking: Booking): DraftToolRangeParts {
+  const latest = booking.pickupProposals?.length
+    ? booking.pickupProposals[booking.pickupProposals.length - 1]
+    : null;
+  const pickup = splitIsoToLocalParts(latest?.proposedPickupIso ?? booking.pickupTimeIso ?? booking.startIso ?? "");
+  const returnTime = splitIsoToLocalParts(latest?.proposedReturnIso ?? booking.endIso ?? "");
+  return {
+    pickupDate: pickup.date,
+    pickupTime: pickup.time,
+    returnDate: returnTime.date,
+    returnTime: returnTime.time
   };
 }
 
@@ -810,11 +1180,31 @@ function combineLocalDateTimeToIso(date: string, time: string): string | null {
   return dt.toISOString();
 }
 
-function clampPickupIsoToBooking(iso: string, booking: Booking): string {
-  const p = new Date(iso).getTime();
-  const s = booking.startIso ? new Date(booking.startIso).getTime() : NaN;
-  const e = booking.endIso ? new Date(booking.endIso).getTime() : NaN;
-  if (Number.isNaN(p) || Number.isNaN(s) || Number.isNaN(e)) return iso;
-  const clamped = Math.min(Math.max(p, s), e);
-  return new Date(clamped).toISOString();
+function toWorkshopDraft(booking: Booking): DraftWorkshopRangeParts {
+  const latest = booking.timeslotProposals?.length
+    ? booking.timeslotProposals[booking.timeslotProposals.length - 1]
+    : null;
+  const startIso = latest?.proposedStartIso ?? booking.startIso ?? "";
+  const endIso = latest?.proposedEndIso ?? booking.endIso ?? "";
+  const startParts = splitIsoToLocalParts(startIso);
+  const endParts = splitIsoToLocalParts(endIso);
+  if (!startParts.date) {
+    const now = new Date();
+    now.setDate(now.getDate() + 1);
+    const end = new Date(now);
+    end.setHours(end.getHours() + 2);
+    const pad = (value: number) => `${value}`.padStart(2, "0");
+    return {
+      startDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      startTime: "10:00",
+      endDate: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
+      endTime: "12:00"
+    };
+  }
+  return {
+    startDate: startParts.date,
+    startTime: startParts.time || "10:00",
+    endDate: endParts.date || startParts.date,
+    endTime: endParts.time || "12:00"
+  };
 }

@@ -1,67 +1,36 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ButtonLink, HammerIcon, InboxBubbleIcon } from "../components/ui";
-import { api } from "../services/api";
-import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory } from "../utils/categories";
-import type { Tool, Workshop } from "../types/domain";
+import { HammerIcon } from "../components/ui";
+import discoverToolsHero from "../assets/discover-tools-hero.png";
 
 export function DashboardPage() {
-  const [tools, setTools] = useState<Tool[]>([]);
-  const [workshops, setWorkshops] = useState<Workshop[]>([]);
-  const [, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const toolsData = await api.getTools({}, "");
-        setTools(toolsData.slice(0, 4));
-        const workshopsData = await api.getWorkshops({}, "");
-        setWorkshops(workshopsData.slice(0, 3).map(w => w.workshop));
-      } catch (error) {
-        console.error("Failed to load data:", error);
-      }
-    };
-    void loadData();
-  }, []);
-
   return (
-    <section className="dashboard">
-      {/* Hero Section */}
-      <div className="hero-playtomic">
-        <p className="eyebrow">Nachbarschaftlich teilen</p>
-        <h1>Finde Werkzeuge und Werkstätten in deiner Community.</h1>
-        <p>
-          Toolshare verbindet Nachfrage und Angebot für lokale Projekte. Buche verfügbare
-          Ressourcen, entscheide Anfragen über die Glocke oben rechts und verwalte deine Angebote in wenigen Klicks.
-        </p>
-        <div className="row">
-          <ButtonLink to="/tools">
-            Werkzeuge entdecken
-          </ButtonLink>
-          <Link className="btn secondary" to="/workshops">
-            Werkstätten buchen
-          </Link>
+    <section className="dashboard discover-page">
+      <div className="discover-hero">
+        <img
+          src={discoverToolsHero}
+          alt="Werkzeuge auf einer Werkbank in einer gemeinschaftlichen Werkstatt"
+          className="discover-hero-image"
+        />
+        <div className="discover-hero-copy">
+          <p className="eyebrow">Nachbarschaftlich teilen</p>
+          <h1>Finde Werkzeuge und Werkstätten in deiner Community.</h1>
         </div>
       </div>
 
-      {/* Quick Start Cards with Icons */}
-      <div className="quick-start-section">
-        <h2>Schnell starten</h2>
+      <section className="quick-start-section" aria-labelledby="quick-start-title">
+        <h2 id="quick-start-title">Schnell starten</h2>
         <div className="quick-start-grid">
-          {/* Werkzeuge Card */}
           <Link to="/tools" className="quick-start-card">
-            <div className="card-icon tools-icon">
+            <div className="card-icon tools-icon" aria-hidden="true">
               <HammerIcon />
             </div>
             <h3>Werkzeuge entdecken</h3>
             <p>Suche nach Kategorie, Verfügbarkeit und starte eine Ausleihanfrage.</p>
-            <span className="card-arrow">→</span>
+            <span className="material-symbols-outlined card-arrow" aria-hidden="true">arrow_forward</span>
           </Link>
 
-          {/* Werkstätten Card */}
           <Link to="/workshops" className="quick-start-card">
-            <div className="card-icon workshops-icon">
+            <div className="card-icon workshops-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
@@ -69,62 +38,19 @@ export function DashboardPage() {
             </div>
             <h3>Werkstätten buchen</h3>
             <p>Finde freie Zeitslots und buche den passenden Arbeitsraum.</p>
-            <span className="card-arrow">→</span>
+            <span className="material-symbols-outlined card-arrow" aria-hidden="true">arrow_forward</span>
           </Link>
 
           <Link to="/inbox" className="quick-start-card">
-            <div className="card-icon inbox-icon">
-              <InboxBubbleIcon />
+            <div className="card-icon inbox-icon" aria-hidden="true">
+              <span className="material-symbols-outlined">chat_bubble_outline</span>
             </div>
-            <h3>Nachrichten & Anfragen</h3>
-            <p>Zur Inbox für Konversationen und Ausleihanfragen – die Glocke oben rechts geht ebenfalls dorthin.</p>
-            <span className="card-arrow">→</span>
+            <h3>Anfragen verwalten</h3>
+            <p>Status, Benachrichtigungen und Entscheidungen zentral in der Inbox.</p>
+            <span className="material-symbols-outlined card-arrow" aria-hidden="true">arrow_forward</span>
           </Link>
         </div>
-      </div>
-
-      {/* Featured Tools Scroll */}
-      {tools.length > 0 && (
-        <div className="featured-section">
-          <h2>Werkzeuge</h2>
-          <div className="horizontal-scroll">
-            {tools.map((tool) => (
-              <Link key={tool.id} to={`/tools/${tool.id}`} className="scroll-card">
-                <div className="scroll-card-image">
-                  <img src={tool.imageUrl || getPlaceholderImageForCategory(tool.category)} alt={tool.name} />
-                </div>
-                <h4>{tool.name}</h4>
-                <p className="scroll-card-category">{tool.category}</p>
-                <div className="scroll-card-status">
-                  {tool.status === "VERFUEGBAR" ? (
-                    <span className="status-badge available">Verfügbar</span>
-                  ) : (
-                    <span className="status-badge borrowed">Ausgeliehen</span>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Featured Workshops Scroll */}
-      {workshops.length > 0 && (
-        <div className="featured-section">
-          <h2>Verfügbare Werkstätten</h2>
-          <div className="horizontal-scroll">
-            {workshops.map((workshop) => (
-              <div key={workshop.id} className="scroll-card">
-                <div className="scroll-card-image">
-                  <img src={workshop.imageUrls?.[0] || DEFAULT_PLACEHOLDER_IMAGE} alt={workshop.name} />
-                </div>
-                <h4>{workshop.name}</h4>
-                <p>{workshop.location}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </section>
     </section>
   );
 }

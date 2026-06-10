@@ -1,5 +1,17 @@
-import type { Booking, BookingStatus, PickupProposal, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import type {
+  Booking,
+  BookingSelectedTool,
+  BookingStatus,
+  PickupProposal,
+  TimeslotProposal,
+  Tool,
+  User,
+  Workshop,
+  WorkshopSlot
+} from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
+import { beginRequestActivity } from "./requestActivity";
+import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "./sessionEvents";
 
 interface FrontendImportMetaEnv {
   readonly VITE_API_URL?: string;
@@ -139,7 +151,21 @@ type BackendPickupProposal = {
   bookingId: string;
   proposedByUserId: string;
   proposedPickupTime: string;
+  proposedReturnTime: string | null;
   previousPickupTime: string | null;
+  previousReturnTime: string | null;
+  status: BackendPickupProposalStatus;
+  createdAt: string;
+};
+
+type BackendTimeslotProposal = {
+  id: string;
+  bookingId: string;
+  proposedByUserId: string;
+  proposedStartDate: string;
+  proposedEndDate: string;
+  previousStartDate: string | null;
+  previousEndDate: string | null;
   status: BackendPickupProposalStatus;
   createdAt: string;
 };
@@ -152,6 +178,7 @@ type BackendBooking = {
   startDate: string;
   endDate: string;
   pickupTime?: string | null;
+  createdAt?: string;
   status: BackendBookingStatus;
   user?: BackendUser | null;
   tool?: (BackendTool & { owner?: BackendUser | null }) | null;
@@ -167,7 +194,12 @@ type BackendBooking = {
       manager?: BackendUser | null;
     } | null;
   } | null;
+  selectedTools?: Array<{
+    workshopToolId: string;
+    workshopTool: BackendWorkshopTool;
+  }>;
   pickupProposals?: BackendPickupProposal[];
+  timeslotProposals?: BackendTimeslotProposal[];
 };
 
 const roleMap: Record<BackendRole, User["role"]> = {
@@ -226,61 +258,71 @@ function translateValidationMessage(raw: string): string {
 }
 
 async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
-  let response: Response;
+  const finishActivity = beginRequestActivity();
   try {
-    response = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init?.headers ?? {})
-      }
-    });
-  } catch {
-    throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
-  }
-
-  if (!response.ok) {
-    let message = `Anfrage fehlgeschlagen (Fehler ${response.status}).`;
+    let response: Response;
     try {
-      const payload = (await response.json()) as {
-        message?: string;
-        error?: {
+      response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(init?.headers ?? {})
+        }
+      });
+    } catch {
+      throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
+    }
+
+    if (response.status === 401 && token) {
+      notifySessionExpired();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
+
+    if (!response.ok) {
+      let message = `Anfrage fehlgeschlagen (Fehler ${response.status}).`;
+      try {
+        const payload = (await response.json()) as {
           message?: string;
-          code?: string;
-          details?: {
-            fieldErrors?: Record<string, string[] | undefined>;
-            formErrors?: string[];
+          error?: {
+            message?: string;
+            code?: string;
+            details?: {
+              fieldErrors?: Record<string, string[] | undefined>;
+              formErrors?: string[];
+            };
           };
         };
-      };
-      if (payload.error?.message) {
-        message = payload.error.message;
-      } else if (payload.message) {
-        message = payload.message;
+        if (payload.error?.message) {
+          message = payload.error.message;
+        } else if (payload.message) {
+          message = payload.message;
+        }
+        if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
+          message = "Diese E-Mail ist bereits registriert.";
+        }
+        const fieldErrorEntries = payload.error?.details?.fieldErrors
+          ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
+          : [];
+        if (fieldErrorEntries.length > 0) {
+          const [field, errors] = fieldErrorEntries[0];
+          const rawError = errors?.[0] ?? "Ungültige Eingabe.";
+          const translated = translateValidationMessage(rawError);
+          message = field === "body" ? translated : `${field}: ${translated}`;
+        } else if (payload.error?.details?.formErrors?.length) {
+          message = translateValidationMessage(payload.error.details.formErrors[0]);
+        }
+      } catch {
+        // keep fallback message
       }
-      if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
-        message = "Diese E-Mail ist bereits registriert.";
-      }
-      const fieldErrorEntries = payload.error?.details?.fieldErrors
-        ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
-        : [];
-      if (fieldErrorEntries.length > 0) {
-        const [field, errors] = fieldErrorEntries[0];
-        const rawError = errors?.[0] ?? "Ungültige Eingabe.";
-        const translated = translateValidationMessage(rawError);
-        message = field === "body" ? translated : `${field}: ${translated}`;
-      } else if (payload.error?.details?.formErrors?.length) {
-        message = translateValidationMessage(payload.error.details.formErrors[0]);
-      }
-    } catch {
-      // keep fallback message
+      throw new Error(message);
     }
-    throw new Error(message);
-  }
 
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  } finally {
+    finishActivity();
+  }
 }
 
 function mapTool(tool: BackendTool): Tool {
@@ -334,7 +376,22 @@ function mapPickupProposal(p: BackendPickupProposal): PickupProposal {
     id: p.id,
     proposedById: p.proposedByUserId,
     proposedPickupIso: p.proposedPickupTime,
+    proposedReturnIso: p.proposedReturnTime ?? undefined,
     previousPickupIso: p.previousPickupTime ?? undefined,
+    previousReturnIso: p.previousReturnTime ?? undefined,
+    status: p.status,
+    createdIso: p.createdAt
+  };
+}
+
+function mapTimeslotProposal(p: BackendTimeslotProposal): TimeslotProposal {
+  return {
+    id: p.id,
+    proposedById: p.proposedByUserId,
+    proposedStartIso: p.proposedStartDate,
+    proposedEndIso: p.proposedEndDate,
+    previousStartIso: p.previousStartDate ?? undefined,
+    previousEndIso: p.previousEndDate ?? undefined,
     status: p.status,
     createdIso: p.createdAt
   };
@@ -357,6 +414,12 @@ function mapBooking(booking: BackendBooking): Booking {
     toolName = workshop.name;
   }
 
+  const selectedWorkshopTools: BookingSelectedTool[] = (booking.selectedTools ?? []).map((selected) => ({
+    id: selected.workshopTool.id,
+    name: selected.workshopTool.name,
+    category: selected.workshopTool.category
+  }));
+
   return {
     id: booking.id,
     type: booking.toolId ? "TOOL" : "WORKSHOP",
@@ -369,12 +432,14 @@ function mapBooking(booking: BackendBooking): Booking {
     endIso: booking.endDate,
     pickupTimeIso: booking.pickupTime ?? undefined,
     status: bookingStatusMap[booking.status],
-    createdIso: booking.startDate,
+    createdIso: booking.createdAt ?? booking.startDate,
     requesterName,
     providerName,
     toolName,
     toolImageUrl,
-    pickupProposals: (booking.pickupProposals ?? []).map(mapPickupProposal)
+    pickupProposals: (booking.pickupProposals ?? []).map(mapPickupProposal),
+    timeslotProposals: (booking.timeslotProposals ?? []).map(mapTimeslotProposal),
+    selectedWorkshopTools
   };
 }
 
@@ -499,10 +564,18 @@ export const api = {
     };
   },
 
-  async getTools(filters: { q?: string; category?: string }, token: string): Promise<Tool[]> {
+  async getTools(
+    filters: { q?: string; category?: string; ownerId?: string; status?: "VERFUEGBAR" | "AUSGELIEHEN" },
+    token: string
+  ): Promise<Tool[]> {
     const params = new URLSearchParams();
     if (filters.q) params.set("search", filters.q);
     if (filters.category) params.set("category", filters.category);
+    if (filters.ownerId) params.set("ownerId", filters.ownerId);
+    if (filters.status) {
+      const backendStatus = filters.status === "VERFUEGBAR" ? "AVAILABLE" : "BORROWED";
+      params.set("status", backendStatus);
+    }
     const tools = await request<BackendTool[]>(`/tools?${params.toString()}`, undefined, token);
     return tools.map(mapTool);
   },
@@ -732,12 +805,20 @@ export const api = {
     );
   },
 
-  async createWorkshopBooking(input: { slotId: string }, token: string) {
+  async createWorkshopBooking(
+    input: { workshopId: string; startIso: string; endIso: string; workshopToolIds: string[] },
+    token: string
+  ) {
     const booking = await request<BackendBooking>(
       "/bookings/workshop",
       {
         method: "POST",
-        body: JSON.stringify({ timeslotId: input.slotId })
+        body: JSON.stringify({
+          workshopId: input.workshopId,
+          startDate: new Date(input.startIso).toISOString(),
+          endDate: new Date(input.endIso).toISOString(),
+          workshopToolIds: input.workshopToolIds
+        })
       },
       token
     );
@@ -760,16 +841,24 @@ export const api = {
     );
   },
 
-  async createPickupProposal(bookingId: string, pickupTimeIso: string, token: string) {
-    const d = new Date(pickupTimeIso);
-    if (Number.isNaN(d.getTime())) {
-      throw new Error("Ungültige Abholzeit.");
+  async createPickupProposal(bookingId: string, pickupTimeIso: string, returnTimeIso: string, token: string) {
+    const pickup = new Date(pickupTimeIso);
+    const returnTime = new Date(returnTimeIso);
+    if (
+      Number.isNaN(pickup.getTime()) ||
+      Number.isNaN(returnTime.getTime()) ||
+      pickup >= returnTime
+    ) {
+      throw new Error("Ungültiger Abhol- oder Rückgabezeitpunkt.");
     }
     await request(
       `/bookings/${bookingId}/pickup-proposals`,
       {
         method: "POST",
-        body: JSON.stringify({ pickupTime: d.toISOString() })
+        body: JSON.stringify({
+          pickupTime: pickup.toISOString(),
+          returnTime: returnTime.toISOString()
+        })
       },
       token
     );
@@ -783,6 +872,36 @@ export const api = {
   ) {
     await request(
       `/bookings/${bookingId}/pickup-proposals/${proposalId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ decision })
+      },
+      token
+    );
+  },
+
+  async createTimeslotProposal(bookingId: string, startIso: string, endIso: string, token: string) {
+    await request(
+      `/bookings/${bookingId}/timeslot-proposals`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          startDate: new Date(startIso).toISOString(),
+          endDate: new Date(endIso).toISOString()
+        })
+      },
+      token
+    );
+  },
+
+  async respondTimeslotProposal(
+    bookingId: string,
+    proposalId: string,
+    decision: "ACCEPT" | "DECLINE",
+    token: string
+  ) {
+    await request(
+      `/bookings/${bookingId}/timeslot-proposals/${proposalId}`,
       {
         method: "PATCH",
         body: JSON.stringify({ decision })

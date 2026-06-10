@@ -26,7 +26,10 @@ export const createToolBookingSchema = z.object({
 
 export const createWorkshopBookingSchema = z.object({
   body: z.object({
-    timeslotId: z.string().uuid()
+    workshopId: z.string().uuid(),
+    startDate: flexibleIsoDateTime,
+    endDate: flexibleIsoDateTime,
+    workshopToolIds: z.array(z.string().uuid()).min(1)
   }),
   params: z.object({}),
   query: z.object({})
@@ -44,7 +47,8 @@ export const updateBookingStatusSchema = z.object({
 
 export const createPickupProposalSchema = z.object({
   body: z.object({
-    pickupTime: flexibleIsoDateTime
+    pickupTime: flexibleIsoDateTime,
+    returnTime: flexibleIsoDateTime
   }),
   params: z.object({
     id: z.string().uuid()
@@ -53,6 +57,28 @@ export const createPickupProposalSchema = z.object({
 });
 
 export const respondPickupProposalSchema = z.object({
+  body: z.object({
+    decision: z.enum(["ACCEPT", "DECLINE"])
+  }),
+  params: z.object({
+    id: z.string().uuid(),
+    proposalId: z.string().uuid()
+  }),
+  query: z.object({})
+});
+
+export const createTimeslotProposalSchema = z.object({
+  body: z.object({
+    startDate: flexibleIsoDateTime,
+    endDate: flexibleIsoDateTime
+  }),
+  params: z.object({
+    id: z.string().uuid()
+  }),
+  query: z.object({})
+});
+
+export const respondTimeslotProposalSchema = z.object({
   body: z.object({
     decision: z.enum(["ACCEPT", "DECLINE"])
   }),
