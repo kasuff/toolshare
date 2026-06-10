@@ -68,8 +68,8 @@ services:
 
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       prometheus:
         condition: service_healthy
@@ -119,8 +119,8 @@ services:
       # Max. gleichzeitige HTTP-Verbindungen
       - "--web.max-connections=${PROMETHEUS_MAX_CONNECTIONS:-100}"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/alerts:/etc/prometheus/alerts:ro
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts:/etc/prometheus/alerts
       - prometheus-data:/prometheus
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
@@ -148,7 +148,7 @@ services:
       - "${LOKI_PORT:-3100}:3100"
     command: -config.file=/etc/loki/loki-config.yml
     volumes:
-      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml
       - loki-data:/loki
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
@@ -173,7 +173,7 @@ services:
     restart: unless-stopped
     command: -config.file=/etc/promtail/promtail-config.yml
     volumes:
-      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log:ro

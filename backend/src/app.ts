@@ -16,6 +16,7 @@ import { toolsRouter } from "./modules/tools/tools.routes";
 import { usersRouter } from "./modules/users/users.routes";
 import { workshopsRouter } from "./modules/workshops/workshops.routes";
 import { monitoringRouter } from "./modules/monitoring/monitoring.routes";
+import { systemRulesRouter } from "./modules/system-rules/system-rules.routes";
 import { metricsRegistry } from "./utils/metrics";
 
 export const createApp = () => {
@@ -56,6 +57,7 @@ export const createApp = () => {
   app.use("/api/workshops", workshopsRouter);
   app.use("/api/ratings", ratingsRouter);
   app.use("/api/monitoring", monitoringRouter);
+  app.use("/api/system-rules", systemRulesRouter);
 
   app.use(errorHandler);
 

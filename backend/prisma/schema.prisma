@@ -255,3 +255,10 @@ model SuspensionRequest {
   @@index([status])
   @@index([userId])
 }
+
+model SystemRule {
+  id        String   @id @default(uuid())
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

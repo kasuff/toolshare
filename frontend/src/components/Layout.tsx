@@ -164,6 +164,18 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
       <main className="content">
         <Outlet />
       </main>
+
+      <footer className="site-footer">
+        <div className="site-footer-inner">
+          <span className="site-footer-brand">
+            Tool<strong>Share</strong>
+          </span>
+          <nav className="site-footer-nav" aria-label="Rechtliche Informationen">
+            <Link to="/impressum">Impressum</Link>
+            <Link to="/datenschutz">Datenschutzerklärung</Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

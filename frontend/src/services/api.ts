@@ -999,5 +999,33 @@ export const api = {
 
   async getMetrics(token: string): Promise<BackendMetrics> {
     return request<BackendMetrics>("/users/admin/metrics", undefined, token);
+  },
+
+  async listSystemRules(token: string): Promise<Array<{ id: string; text: string }>> {
+    return request<Array<{ id: string; text: string }>>("/system-rules", undefined, token);
+  },
+
+  async createSystemRule(text: string, token: string): Promise<{ id: string; text: string }> {
+    return request<{ id: string; text: string }>(
+      "/system-rules",
+      { method: "POST", body: JSON.stringify({ text }) },
+      token
+    );
+  },
+
+  async updateSystemRule(id: string, text: string, token: string): Promise<{ id: string; text: string }> {
+    return request<{ id: string; text: string }>(
+      `/system-rules/${id}`,
+      { method: "PATCH", body: JSON.stringify({ text }) },
+      token
+    );
+  },
+
+  async deleteSystemRule(id: string, token: string): Promise<void> {
+    return request<void>(
+      `/system-rules/${id}`,
+      { method: "DELETE" },
+      token
+    );
   }
 };

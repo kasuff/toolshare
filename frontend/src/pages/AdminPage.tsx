@@ -6,7 +6,9 @@ import { useToast } from "../hooks/useToast";
 import { api, type SuspensionRequestItem } from "../services/api";
 import type { User } from "../types/domain";
 
-type AdminTab = "management" | "monitoring";
+type AdminTab = "management" | "monitoring" | "rules";
+
+type SystemRule = { id: string; text: string };
 
 type Props = {
   currentUser?: User;
@@ -23,6 +25,11 @@ export function AdminPage({ currentUser, token }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
+  const [rules, setRules] = useState<SystemRule[]>([]);
+  const [newRuleText, setNewRuleText] = useState("");
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [editingRuleText, setEditingRuleText] = useState("");
+  const [isSavingRule, setIsSavingRule] = useState(false);
   const [metrics, setMetrics] = useState({
     users: 0,
     tools: 0,
@@ -36,10 +43,11 @@ export function AdminPage({ currentUser, token }: Props) {
     if (!token) return;
     setIsLoading(true);
     try {
-      const [nextUsers, nextMetrics, nextSuspensionRequests] = await Promise.all([
+      const [nextUsers, nextMetrics, nextSuspensionRequests, nextRules] = await Promise.all([
         api.listUsers(token, { search: search || undefined }),
         api.getMetrics(token),
-        api.listSuspensionRequests(token)
+        api.listSuspensionRequests(token),
+        api.listSystemRules(token)
       ]);
       setUsers(nextUsers);
       setMetrics({
@@ -51,11 +59,68 @@ export function AdminPage({ currentUser, token }: Props) {
         openSuspensionRequests: nextMetrics.openSuspensionRequests ?? 0
       });
       setSuspensionRequests(nextSuspensionRequests);
+      setRules(nextRules);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Admin-Daten konnten nicht geladen werden.", "error");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const addRule = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!token || !newRuleText.trim()) return;
+    setIsSavingRule(true);
+    try {
+      const created = await api.createSystemRule(newRuleText.trim(), token);
+      setRules((prev) => [...prev, created]);
+      setNewRuleText("");
+      pushToast("Regel wurde hinzugefügt.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Regel konnte nicht erstellt werden.", "error");
+    } finally {
+      setIsSavingRule(false);
+    }
+  };
+
+  const saveRule = async (id: string) => {
+    if (!token || !editingRuleText.trim()) return;
+    setIsSavingRule(true);
+    try {
+      const updated = await api.updateSystemRule(id, editingRuleText.trim(), token);
+      setRules((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      setEditingRuleId(null);
+      setEditingRuleText("");
+      pushToast("Regel wurde gespeichert.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Regel konnte nicht gespeichert werden.", "error");
+    } finally {
+      setIsSavingRule(false);
+    }
+  };
+
+  const deleteRule = async (id: string) => {
+    if (!token) return;
+    setIsSavingRule(true);
+    try {
+      await api.deleteSystemRule(id, token);
+      setRules((prev) => prev.filter((r) => r.id !== id));
+      pushToast("Regel wurde gelöscht.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Regel konnte nicht gelöscht werden.", "error");
+    } finally {
+      setIsSavingRule(false);
+    }
+  };
+
+  const startEditing = (rule: SystemRule) => {
+    setEditingRuleId(rule.id);
+    setEditingRuleText(rule.text);
+  };
+
+  const cancelEditing = () => {
+    setEditingRuleId(null);
+    setEditingRuleText("");
   };
 
   useEffect(() => {
@@ -142,6 +207,13 @@ export function AdminPage({ currentUser, token }: Props) {
       </button>
       <button
         type="button"
+        className={`monitoring-tab ${adminTab === "rules" ? "active" : ""}`}
+        onClick={() => setAdminTab("rules")}
+      >
+        Systemregeln
+      </button>
+      <button
+        type="button"
         className={`monitoring-tab ${adminTab === "monitoring" ? "active" : ""}`}
         onClick={() => setAdminTab("monitoring")}
       >
@@ -156,6 +228,104 @@ export function AdminPage({ currentUser, token }: Props) {
         <h1>Admin</h1>
         {tabNav}
         <MonitoringSection token={token} />
+      </section>
+    );
+  }
+
+  if (adminTab === "rules") {
+    return (
+      <section className="stack">
+        <h1>Admin</h1>
+        {tabNav}
+        <Surface
+          title="Systemregeln"
+          subtitle="Regeln gelten plattformweit und werden allen Nutzern angezeigt."
+        >
+          {rules.length === 0 && !isLoading && (
+            <EmptyState title="Keine Regeln" text="Es wurden noch keine Systemregeln definiert." />
+          )}
+          {rules.length > 0 && (
+            <ul className="moderation-report-list">
+              {rules.map((rule) => (
+                <li key={rule.id} className="inbox-item moderation-report">
+                  {editingRuleId === rule.id ? (
+                    <div className="stack">
+                      <textarea
+                        className="rule-textarea"
+                        value={editingRuleText}
+                        onChange={(e) => setEditingRuleText(e.target.value)}
+                        rows={3}
+                        aria-label="Regeltext bearbeiten"
+                      />
+                      <div className="moderation-actions">
+                        <button
+                          type="button"
+                          className="btn mini"
+                          disabled={isSavingRule || !editingRuleText.trim()}
+                          onClick={() => void saveRule(rule.id)}
+                        >
+                          Speichern
+                        </button>
+                        <button
+                          type="button"
+                          className="btn secondary mini"
+                          disabled={isSavingRule}
+                          onClick={cancelEditing}
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="stack">
+                      <p>{rule.text}</p>
+                      <div className="moderation-actions">
+                        <button
+                          type="button"
+                          className="btn secondary mini"
+                          disabled={isSavingRule}
+                          onClick={() => startEditing(rule)}
+                        >
+                          Bearbeiten
+                        </button>
+                        <button
+                          type="button"
+                          className="btn mini"
+                          disabled={isSavingRule}
+                          onClick={() => void deleteRule(rule.id)}
+                        >
+                          Löschen
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <form className="stack" onSubmit={(e) => void addRule(e)}>
+            <label className="form-label">
+              <span>Neue Regel hinzufügen</span>
+              <textarea
+                className="rule-textarea"
+                value={newRuleText}
+                onChange={(e) => setNewRuleText(e.target.value)}
+                placeholder="Regeltext eingeben..."
+                rows={2}
+                aria-label="Neue Systemregel"
+              />
+            </label>
+            <div className="row">
+              <button
+                type="submit"
+                className="btn"
+                disabled={isSavingRule || !newRuleText.trim()}
+              >
+                Regel hinzufügen
+              </button>
+            </div>
+          </form>
+        </Surface>
       </section>
     );
   }
