@@ -33,6 +33,7 @@ const userFriendlyMessageByCode: Record<string, string> = {
   ACCOUNT_BLOCKED: "Dieses Konto ist gesperrt.",
   TIMESLOT_BLOCKED: "Dieses Zeitfenster ist vom Anbieter gesperrt und nicht buchbar.",
   INVALID_STATE: "Diese Aktion ist im aktuellen Status nicht möglich.",
+  BOOKING_NOT_ENDED: "Die Werkstattbuchung kann erst nach Ende des Nutzungszeitraums abgeschlossen werden.",
   INVALID_BOOKING: "Die Buchung ist unvollständig (kein Anbieter zugeordnet).",
   INVALID_PICKUP: "Die angegebene Abholzeit ist ungültig.",
   PROPOSAL_NOT_FOUND: "Der Alternativvorschlag wurde nicht gefunden.",

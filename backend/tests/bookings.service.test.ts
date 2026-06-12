@@ -358,7 +358,7 @@ describe("bookingsService", () => {
     expect(result).toMatchObject({ id: "b2", status: "RETURNED" });
   });
 
-  it("rejects completion by requester and before the accepted period ended", async () => {
+  it("rejects completion by requester", async () => {
     mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
       id: "b1",
       userId: "requester-1",
@@ -375,7 +375,9 @@ describe("bookingsService", () => {
         status: "RETURNED"
       })
     ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+  });
 
+  it("allows a provider to complete a returned tool before the planned end time", async () => {
     mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
       id: "b1",
       userId: "requester-1",
@@ -383,12 +385,33 @@ describe("bookingsService", () => {
       endDate: new Date(Date.now() + 60_000),
       tool: { id: "tool-1", ownerId: "owner-1" }
     } as any);
+    mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
+    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
 
     await expect(
       bookingsService.updateBookingStatus({
         actorId: "owner-1",
         actorRole: "USER",
         bookingId: "b1",
+        status: "RETURNED"
+      })
+    ).resolves.toMatchObject({ id: "b1", status: "RETURNED" });
+  });
+
+  it("rejects workshop completion before the confirmed usage period ended", async () => {
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b2",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date(Date.now() + 60_000),
+      timeslot: { workshop: { managerId: "manager-1" } }
+    } as any);
+
+    await expect(
+      bookingsService.updateBookingStatus({
+        actorId: "manager-1",
+        actorRole: "USER",
+        bookingId: "b2",
         status: "RETURNED"
       })
     ).rejects.toMatchObject({ code: "BOOKING_NOT_ENDED", status: 400 });

@@ -511,4 +511,34 @@ describe("InboxPage", () => {
     expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Als abgeschlossen markieren" })).not.toBeInTheDocument();
   });
+
+  it("does not offer workshop completion before the confirmed usage period ended", async () => {
+    getBookingsForUser.mockResolvedValueOnce([
+      {
+        ...baseOpenBooking,
+        id: "future-workshop-booking",
+        type: "WORKSHOP" as const,
+        providerId: currentUser.id,
+        workshopId: "workshop-1",
+        toolId: undefined,
+        toolName: "Holzwerkstatt",
+        status: "BESTAETIGT" as const,
+        endIso: new Date(Date.now() + 60_000).toISOString(),
+        pickupTimeIso: undefined,
+        pickupProposals: [],
+        timeslotProposals: []
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Als abgeschlossen markieren" })).not.toBeInTheDocument();
+  });
 });

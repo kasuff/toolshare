@@ -146,7 +146,7 @@ export const bookingsService = {
       if (booking.status !== "ACCEPTED") {
         throw new AppError("INVALID_STATE", "Only accepted bookings can be completed", 400);
       }
-      if (booking.endDate.getTime() > Date.now()) {
+      if (booking.timeslot && booking.endDate.getTime() > Date.now()) {
         throw new AppError("BOOKING_NOT_ENDED", "Booking can only be completed after the usage period has ended", 400);
       }
     } else if (!isProvider && !isModeratorOrManager) {
