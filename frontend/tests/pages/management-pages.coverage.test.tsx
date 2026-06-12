@@ -17,8 +17,11 @@ const {
   updateUserRole,
   updateUserSuspension,
   listReports,
+  listClosedReports,
   getRatingsReceived,
   updateReportStatus,
+  listSuspensionRequests,
+  decideSuspensionRequest,
   createWorkshop
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
@@ -30,8 +33,11 @@ const {
   updateUserRole: vi.fn(),
   updateUserSuspension: vi.fn(),
   listReports: vi.fn(),
+  listClosedReports: vi.fn(),
   getRatingsReceived: vi.fn(),
   updateReportStatus: vi.fn(),
+  listSuspensionRequests: vi.fn(),
+  decideSuspensionRequest: vi.fn(),
   createWorkshop: vi.fn()
 }));
 
@@ -51,8 +57,11 @@ vi.mock("../../src/services/api", () => ({
     updateUserRole,
     updateUserSuspension,
     listReports,
+    listClosedReports,
     getRatingsReceived,
     updateReportStatus,
+    listSuspensionRequests,
+    decideSuspensionRequest,
     createWorkshop
   }
 }));
@@ -110,7 +119,28 @@ describe("management pages", () => {
   });
 
   it("loads, searches and updates admin users", async () => {
-    getMetrics.mockResolvedValue({ users: 3, tools: 4, workshops: 2, openBookings: 1, openReports: 0 });
+    getMetrics.mockResolvedValue({
+      users: 3,
+      tools: 4,
+      workshops: 2,
+      openBookings: 1,
+      openReports: 0,
+      openSuspensionRequests: 1
+    });
+    listSuspensionRequests.mockResolvedValue([
+      {
+        id: "sr1",
+        userId: "u2",
+        requestedById: "u4",
+        reportId: "r9",
+        reason: "Wiederholte Verstoesse",
+        status: "PENDING",
+        createdAt: "2026-05-05T11:00:00.000Z",
+        user: { id: "u2", name: "Murat", email: "murat@toolshare.local", isSuspended: false },
+        requestedBy: { id: "u4", name: "Tobias" },
+        report: { id: "r9", reason: "Beleidigung", targetType: "USER", targetId: "u2" }
+      }
+    ]);
     listUsers.mockImplementation(async (_token, filters) => {
       if (filters?.search === "nichts") {
         return [];
@@ -127,8 +157,9 @@ describe("management pages", () => {
     );
 
     expect(await screen.findByText("Nutzer: 3")).toBeInTheDocument();
-    expect(screen.getByText("Murat")).toBeInTheDocument();
-    expect(screen.getByText("Tobias")).toBeInTheDocument();
+    expect(screen.getByText(/Wiederholte Verstoesse/)).toBeInTheDocument();
+    expect(screen.getAllByText("Murat").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Tobias").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("Nutzer suchen"), { target: { value: "nichts" } });
     fireEvent.click(screen.getByRole("button", { name: "Suchen" }));
@@ -139,7 +170,11 @@ describe("management pages", () => {
     fireEvent.change(screen.getByLabelText("Nutzer suchen"), { target: { value: "mur" } });
     fireEvent.click(screen.getByRole("button", { name: "Suchen" }));
 
-    expect(await screen.findByText("Murat")).toBeInTheDocument();
+    decideSuspensionRequest.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole("button", { name: "Sperrung annehmen" }));
+    await waitFor(() => {
+      expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: true }, "token-123");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
 
     expect(await screen.findByText("Tobias")).toBeInTheDocument();
@@ -150,12 +185,25 @@ describe("management pages", () => {
     expect(updateUserSuspension).toHaveBeenCalledWith("u2", false, "token-123");
   });
 
-  it("loads reports and ratings and resolves a moderation item", async () => {
+  it("loads reports and ratings and rejects a moderation item", async () => {
+    listClosedReports.mockResolvedValue([]);
     listReports.mockResolvedValueOnce([
-      { id: "r1", reason: "Defekt", details: "Gehäuse gebrochen", status: "OPEN" }
-    ]).mockResolvedValueOnce([
-      { id: "r1", reason: "Defekt", details: "Gehäuse gebrochen", status: "RESOLVED" }
-    ]);
+      {
+        id: "r1",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Gehäuse gebrochen",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z"
+      }
+    ]).mockResolvedValueOnce([]);
     getRatingsReceived.mockResolvedValue([
       { id: "rt1", score: 5, comment: "Top", createdAt: "2026-05-05T10:00:00.000Z", fromUser: { name: "Lea" } }
     ]);
@@ -169,15 +217,25 @@ describe("management pages", () => {
 
     expect(await screen.findByText(/Gehäuse gebrochen/)).toBeInTheDocument();
     expect(screen.getByText(/Score 5/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Als bearbeitet markieren" }));
+    fireEvent.change(screen.getByPlaceholderText(/Begründung beim Verwerfen/), {
+      target: { value: "Kein Verstoss erkennbar" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
 
     await waitFor(() => {
-      expect(updateReportStatus).toHaveBeenCalledWith("r1", "RESOLVED", "token-123");
+      expect(updateReportStatus).toHaveBeenCalledWith(
+        "r1",
+        {
+          status: "REJECTED",
+          decisionNote: "Kein Verstoss erkennbar"
+        },
+        "token-123"
+      );
     });
     expect(await screen.findByText(/Top/)).toBeInTheDocument();
   });
 
-  it("requires login and submits a new tool with owner data", async () => {
+  it("requires login and submits a new tool with pickup data", async () => {
     getCurrentUser.mockResolvedValueOnce({
       id: "u1",
       name: "Lea",
@@ -201,20 +259,18 @@ describe("management pages", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Deine Kontaktdaten")).toBeInTheDocument();
-    expect(screen.getByText("lea@toolshare.local")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "✓ Werkzeug einstellen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkzeug einstellen" }));
     expect(await screen.findByText("Bitte gib einen Namen für das Werkzeug ein.")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText("z.B. Akku-Bohrmaschine 18V"), {
+    fireEvent.change(screen.getByPlaceholderText("z.B. Akku-Bohrmaschine"), {
       target: { value: "Akkuschrauber" }
     });
-    fireEvent.change(screen.getByPlaceholderText("z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, Ladegerät. Besonderheiten: sehr leise, eingebaute LED"), {
+    fireEvent.change(screen.getByPlaceholderText("z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, 1x Ladegerät. Besonderheiten: sehr leise, eingebaute LED"), {
       target: { value: "Sehr gut erhalten" }
     });
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
 
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
     fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
@@ -226,7 +282,7 @@ describe("management pages", () => {
       target: { files: [new File(["image"], "tool.png", { type: "image/png" })] }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "✓ Werkzeug einstellen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkzeug einstellen" }));
 
     await waitFor(() => {
       expect(createTool).toHaveBeenCalledWith(
@@ -243,8 +299,13 @@ describe("management pages", () => {
     expect(await screen.findByText("Tools Home")).toBeInTheDocument();
   });
 
-  it("builds a workshop payload from the step flow", async () => {
+  it("builds a workshop payload from the combined form", async () => {
     createWorkshop.mockResolvedValueOnce({ id: "workshop-1" });
+    validateAddress.mockResolvedValueOnce({
+      isValid: true,
+      normalizedAddress: "Musterstraße 5, 80331 München, Deutschland",
+      normalizedParts: null
+    });
 
     const { container } = render(
       <MemoryRouter initialEntries={["/workshops/new"]}>
@@ -255,13 +316,20 @@ describe("management pages", () => {
       </MemoryRouter>
     );
 
-    fireEvent.submit(screen.getByRole("button", { name: "Schritt 1 von 3" }).closest("form")!);
+    fireEvent.submit(screen.getByRole("button", { name: "Werkstatt einstellen" }).closest("form")!);
     await waitFor(() => {
-      expect(pushToast).toHaveBeenCalledWith("Bitte geben Sie einen Werkstatt-Namen ein.", "error");
+      expect(pushToast).toHaveBeenCalledWith("Bitte gib einen Namen für die Werkstatt ein.", "error");
     });
 
-    fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Maker Space" } });
-    fireEvent.change(screen.getByPlaceholderText("Adresse oder Gebiet"), { target: { value: "Muenchen Nord" } });
+    fireEvent.change(screen.getByPlaceholderText("z.B. Garagen-Werkstatt"), { target: { value: "Maker Space" } });
+    fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
+      target: { value: "Eine gut ausgestattete Werkstatt." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
+    fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
+    fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "München" } });
     fireEvent.click(screen.getByRole("button", { name: "Personenzahl erhöhen" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
     fireEvent.change(screen.getByPlaceholderText("Werkzeugname (z.B. Bosch Akkuschrauber)"), {
@@ -275,22 +343,22 @@ describe("management pages", () => {
       target: { files: [new File(["photo"], "workshop.png", { type: "image/png" })] }
     });
 
-    fireEvent.submit(screen.getByRole("button", { name: "Schritt 1 von 3" }).closest("form")!);
-    expect(await screen.findByText("Verfügbarkeit & Zeitfenster")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
+    expect(pushToast).toHaveBeenCalledWith("Bitte füge mindestens ein Zeitfenster hinzu.", "error");
 
-    fireEvent.click(screen.getByRole("button", { name: "Werkstatt veröffentlichen" }));
-    expect(pushToast).toHaveBeenCalledWith("Bitte fügen Sie mindestens einen Zeitfenster hinzu.", "error");
-
-    fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "2026-07-01T09:00" } });
-    fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "2026-07-01T12:00" } });
+    fireEvent.change(screen.getByLabelText("Startdatum"), { target: { value: "2026-07-01" } });
+    fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "09:00" } });
+    fireEvent.change(screen.getByLabelText("Enddatum"), { target: { value: "2026-07-01" } });
+    fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "12:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Werkstatt veröffentlichen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => {
       expect(createWorkshop).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "Maker Space",
-          location: "Muenchen Nord",
+          description: "Eine gut ausgestattete Werkstatt.",
+          location: "Musterstraße 5, 80331 München, Deutschland",
           maxCapacity: 3,
           extras: ["wlan"],
           equipmentItems: [{ name: "Bohrmaschine", category: "holz" }],

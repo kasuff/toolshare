@@ -4,9 +4,11 @@ import { validate } from "../../middleware/validate";
 import { bookingsController } from "./bookings.controller";
 import {
   createPickupProposalSchema,
+  createTimeslotProposalSchema,
   createToolBookingSchema,
   createWorkshopBookingSchema,
   respondPickupProposalSchema,
+  respondTimeslotProposalSchema,
   updateBookingStatusSchema
 } from "./bookings.schema";
 
@@ -21,9 +23,19 @@ bookingsRouter.post(
   validate(createPickupProposalSchema),
   bookingsController.createPickupProposal
 );
+bookingsRouter.post(
+  "/:id/timeslot-proposals",
+  validate(createTimeslotProposalSchema),
+  bookingsController.createTimeslotProposal
+);
 bookingsRouter.patch(
   "/:id/pickup-proposals/:proposalId",
   validate(respondPickupProposalSchema),
   bookingsController.respondPickupProposal
+);
+bookingsRouter.patch(
+  "/:id/timeslot-proposals/:proposalId",
+  validate(respondTimeslotProposalSchema),
+  bookingsController.respondTimeslotProposal
 );
 bookingsRouter.patch("/:id/status", validate(updateBookingStatusSchema), bookingsController.updateStatus);

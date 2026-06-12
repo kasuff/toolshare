@@ -4,14 +4,34 @@ export type BookingStatus = "OFFEN" | "BESTAETIGT" | "ABGELEHNT" | "ABGESCHLOSSE
 export type BookingType = "TOOL" | "WORKSHOP";
 
 export type PickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
+export type TimeslotProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
 
 export interface PickupProposal {
   id: string;
   proposedById: string;
   proposedPickupIso: string;
+  proposedReturnIso?: string;
   previousPickupIso?: string;
+  previousReturnIso?: string;
   status: PickupProposalStatus;
   createdIso: string;
+}
+
+export interface TimeslotProposal {
+  id: string;
+  proposedById: string;
+  proposedStartIso: string;
+  proposedEndIso: string;
+  previousStartIso?: string;
+  previousEndIso?: string;
+  status: TimeslotProposalStatus;
+  createdIso: string;
+}
+
+export interface BookingSelectedTool {
+  id: string;
+  name: string;
+  category: string;
 }
 
 export interface User {
@@ -26,6 +46,7 @@ export interface User {
 export interface Tool {
   id: string;
   ownerId: string;
+  ownerName?: string;
   name: string;
   description: string;
   category: string;
@@ -52,6 +73,7 @@ export interface WorkshopToolItem {
 export interface Workshop {
   id: string;
   ownerId: string;
+  ownerName?: string;
   name: string;
   description: string;
   location: string;
@@ -85,6 +107,8 @@ export interface Booking {
   /** Tool listing image when available */
   toolImageUrl?: string;
   pickupProposals?: PickupProposal[];
+  timeslotProposals?: TimeslotProposal[];
+  selectedWorkshopTools?: BookingSelectedTool[];
 }
 
 export interface Notification {

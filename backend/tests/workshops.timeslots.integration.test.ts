@@ -90,7 +90,7 @@ describe.skip("Workshop timeslot integration", () => {
     };
   };
 
-  const createWorkshop = async (owner: TestUser): Promise<{ id: string }> => {
+  const createWorkshop = async (owner: TestUser): Promise<{ id: string; workshopToolId: string }> => {
     const response = await request(app)
       .post("/api/workshops")
       .set("Authorization", `Bearer ${owner.token}`)
@@ -110,7 +110,17 @@ describe.skip("Workshop timeslot integration", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.id).toBeTypeOf("string");
-    return response.body as { id: string };
+
+    const workshopTool = await prisma.workshopTool.findFirst({
+      where: { workshopId: response.body.id as string },
+      select: { id: true }
+    });
+    expect(workshopTool).toBeTruthy();
+
+    return {
+      id: response.body.id as string,
+      workshopToolId: workshopTool!.id
+    };
   };
 
   const createTimeslot = async (
@@ -218,7 +228,10 @@ describe.skip("Workshop timeslot integration", () => {
       .post("/api/bookings/workshop")
       .set("Authorization", `Bearer ${requester.token}`)
       .send({
-        timeslotId: availability.body.id as string
+        workshopId: workshop.id,
+        startDate: "2027-05-05T00:00:00.000Z",
+        endDate: "2027-05-15T00:00:00.000Z",
+        workshopToolIds: [workshop.workshopToolId]
       });
     expect(booking.status).toBe(201);
 
@@ -258,7 +271,10 @@ describe.skip("Workshop timeslot integration", () => {
       .post("/api/bookings/workshop")
       .set("Authorization", `Bearer ${requester.token}`)
       .send({
-        timeslotId: blocked.body.id as string
+        workshopId: workshop.id,
+        startDate: "2027-08-01T09:00:00.000Z",
+        endDate: "2027-08-01T17:00:00.000Z",
+        workshopToolIds: [workshop.workshopToolId]
       });
 
     expect(bookingAttempt.status).toBe(409);

@@ -1,21 +1,51 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { EmptyState, Field, GuestBanner, SkeletonCards, StatusPill, Surface } from "../components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
+import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
+import { TOOL_CATEGORIES } from "../utils/categories";
+import { distanceBetweenLocations, isWithinRadius } from "../utils/searchFilters";
+import type { User } from "../types/domain";
+
 type Props = {
   token?: string;
+  currentUser?: User;
 };
 
-const statusLabel: Record<"VERFUEGBAR" | "AUSGELIEHEN", string> = {
-  VERFUEGBAR: "Verfügbar",
-  AUSGELIEHEN: "Ausgeliehen",
-};
+function categoryMatches(toolCategory: string, selectedCategory: string) {
+  if (!selectedCategory) return true;
+  const normalizedTool = toolCategory.toLowerCase();
+  const category = TOOL_CATEGORIES.find((item) => item.value === selectedCategory);
+  return (
+    normalizedTool.includes(selectedCategory.toLowerCase()) ||
+    Boolean(category && normalizedTool.includes(category.label.toLowerCase())) ||
+    Boolean(category && category.label.toLowerCase().includes(normalizedTool))
+  );
+}
 
-export function ToolsPage({ token }: Props) {
+function formatCardDistance(distance: number | null) {
+  return distance === null ? "Distanz offen" : `${distance.toFixed(1)} km`;
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+export function ToolsPage({ token, currentUser }: Props) {
   const { pushToast } = useToast();
+  const defaultLocation = currentUser?.address ?? "München Zentrum";
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
+  const [borrowFrom, setBorrowFrom] = useState("");
+  const [borrowUntil, setBorrowUntil] = useState("");
+  const [radiusKm, setRadiusKm] = useState(5);
   const [tools, setTools] = useState<Awaited<ReturnType<typeof api.getTools>>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -24,7 +54,7 @@ export function ToolsPage({ token }: Props) {
     const run = async () => {
       setIsLoading(true);
       try {
-        const next = await api.getTools({ q, category }, token ?? "");
+        const next = await api.getTools({ q }, token ?? "");
         setTools(next);
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "Werkzeuge konnten nicht geladen werden.", "error");
@@ -34,30 +64,60 @@ export function ToolsPage({ token }: Props) {
       }
     };
     void run();
-  }, [q, category, token, pushToast]);
+  }, [q, token, pushToast]);
+
+  const candidateTools = useMemo(() => {
+    return tools
+      .filter((tool) => categoryMatches(tool.category, category))
+      .filter((tool) => {
+        if (!borrowFrom && !borrowUntil) return true;
+        return tool.status === "VERFUEGBAR";
+      });
+  }, [borrowFrom, borrowUntil, category, tools]);
+
+  const filteredTools = useMemo(() => {
+    return candidateTools.filter((tool) => isWithinRadius(defaultLocation, tool.pickupLocation, radiusKm));
+  }, [candidateTools, defaultLocation, radiusKm]);
+
+  const hasActiveFilters = Boolean(
+    q || category || borrowFrom || borrowUntil || radiusKm !== 5
+  );
+
+  const resetFilters = () => {
+    setQ("");
+    setCategory("");
+    setBorrowFrom("");
+    setBorrowUntil("");
+    setRadiusKm(5);
+  };
 
   return (
-    <section className="stack">
-      <h1>Werkzeuge</h1>
+    <section className="stack search-page">
+      {!token && (
+        <GuestBanner text="Du kannst als Gast stöbern. Für Ausleihanfragen melde dich bitte an." />
+      )}
 
-      <div className="page-actions">
-        {token && (
+      {token && (
+        <div className="offer-strip">
+          <div>
+            <h2>Easy verleihen. Schnell Nachbarn helfen.</h2>
+            <p>Jetzt ganz einfach privat Werkzeuge einstellen.</p>
+          </div>
           <Link to="/tools/new" className="btn offer-tool">
             Werkzeug anbieten
           </Link>
-        )}
-      </div>
+        </div>
+      )}
+
+      <h1>Werkzeuge</h1>
 
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
           <p className="result-summary">
-            {isLoading ? "Suche läuft..." : `${tools.length} Ergebnis${tools.length === 1 ? "" : "se"}`}
+            {isLoading ? "Suche läuft..." : `${filteredTools.length} Ergebnis${filteredTools.length === 1 ? "" : "se"}`}
           </p>
-          {(q || category) && (
-            <button className="btn secondary" onClick={() => {
-              setQ("");
-              setCategory("");
-            }}>
+          {hasActiveFilters && (
+            <button className="btn secondary" type="button" onClick={resetFilters}>
               Filter zurücksetzen
             </button>
           )}
@@ -67,51 +127,77 @@ export function ToolsPage({ token }: Props) {
             <input placeholder="Name oder Beschreibung" value={q} onChange={(e) => setQ(e.target.value)} />
           </Field>
           <Field label="Kategorie">
-            <input placeholder="z.B. Holz, Garten, Elektro" value={category} onChange={(e) => setCategory(e.target.value)} />
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">Alle Kategorien</option>
+              {TOOL_CATEGORIES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
-        <details>
+        <details className="advanced-filter-panel">
           <summary>Erweiterte Filter anzeigen</summary>
-          <p className="hint">Für weitere Filter ist später Platz (z.B. Entfernung, Verfügbarkeit, Bewertung).</p>
+          <div className="advanced-filter-grid">
+            <div className="advanced-filter-fields">
+              <div className="grid grid-2">
+                <Field label="Ausleihe von">
+                  <input type="date" value={borrowFrom} onChange={(e) => setBorrowFrom(e.target.value)} />
+                </Field>
+                <Field label="Ausleihe bis">
+                  <input type="date" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} />
+                </Field>
+              </div>
+            </div>
+            <SearchRadiusMap
+              centerAddress={defaultLocation}
+              points={candidateTools.map((tool) => ({ id: tool.id, label: tool.name, location: tool.pickupLocation }))}
+              radiusKm={radiusKm}
+              onRadiusChange={setRadiusKm}
+              sliderId="tool-radius-slider"
+            />
+          </div>
         </details>
       </Surface>
-      {!token && (
-        <GuestBanner text="Du kannst als Gast stöbern. Für Ausleihanfragen bitte einloggen." />
-      )}
-
-      <div className="cards">
+      <div className={`cards ${!isLoading && hasLoaded && filteredTools.length === 0 ? "cards-empty" : ""}`}>
         {isLoading && <SkeletonCards />}
-        {!isLoading && hasLoaded && tools.length === 0 && (
-          <EmptyState title="Keine Treffer" text="Passe Suche oder Kategorie an, um passende Werkzeuge zu finden." />
+        {!isLoading && hasLoaded && filteredTools.length === 0 && (
+          <EmptyState title="Kein Werkzeug gefunden" text="Passe Suche oder Kategorie an, um passende Werkzeuge zu finden." />
         )}
-        {tools.map((t) => (
-          <Link key={t.id} to={`/tools/${t.id}`} className="card card-enter card-link">
-            <figure>
-              <img src={t.imageUrl} alt={t.name} />
-            </figure>
-            <div className="card-content">
-              <h3>{t.name}</h3>
-              <p>{t.description}</p>
-              <ul className="meta-list">
-                <li>
-                  <strong>Kategorie:</strong> {t.category}
-                </li>
-                <li>
-                  <strong>Status:</strong>{" "}
-                  <StatusPill
-                    label={statusLabel[t.status]}
-                    tone={t.status === "VERFUEGBAR" ? "success" : "warning"}
-                  />
-                </li>
-              </ul>
-              <div className="row">
-                {q && <span className="chip">Suchbezug: {q}</span>}
-                {category && <span className="chip">Kategorie: {category}</span>}
+        {filteredTools.map((tool) => {
+          const distance = distanceBetweenLocations(defaultLocation, tool.pickupLocation);
+          const ownerName = tool.ownerName ?? "Unbekannt";
+          return (
+            <Link key={tool.id} to={`/tools/${tool.id}`} className="ds-workshop-card card-enter card-link">
+              <div className="ds-workshop-card-media">
+                <span className={`ds-workshop-card-badge ${tool.status === "VERFUEGBAR" ? "" : "unavailable"}`.trim()}>
+                  {tool.status === "VERFUEGBAR" ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
+                </span>
+                {tool.imageUrl ? (
+                  <img className="ds-workshop-card-image" src={tool.imageUrl} alt={tool.name} />
+                ) : (
+                  <div className="ds-workshop-card-icon" aria-label={tool.name} title={tool.name}>
+                    🪛
+                  </div>
+                )}
               </div>
-              <p className="card-link-hint">→ Klicke um Details und Buchung zu sehen</p>
-            </div>
-          </Link>
-        ))}
+              <div className="ds-workshop-card-body">
+                <div className="ds-workshop-card-distance">{formatCardDistance(distance)}</div>
+                <h3>{tool.name}</h3>
+                <p className="ds-workshop-card-description">{tool.description}</p>
+                <div className="ds-workshop-card-divider" />
+                <div className="ds-workshop-card-footer">
+                  <div className="ds-workshop-card-owner">
+                    <span className="ds-workshop-card-avatar">{getInitials(ownerName)}</span>
+                    <span>{ownerName}</span>
+                  </div>
+                  <span className="ds-workshop-card-details">Details</span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );

@@ -34,6 +34,18 @@ enum ReportStatus {
   REJECTED
 }
 
+enum ReportTargetType {
+  TOOL
+  WORKSHOP
+  USER
+}
+
+enum SuspensionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PickupProposalStatus {
   PENDING
   ACCEPTED
@@ -57,6 +69,9 @@ model User {
   ratingsGiven  Rating[]       @relation("RatingsGiven")
   ratingsReceived Rating[]     @relation("RatingsReceived")
   pickupProposalsAuthored BookingPickupProposal[] @relation("PickupProposalAuthor")
+  suspensionRequestsReceived SuspensionRequest[] @relation("SuspensionTarget")
+  suspensionRequestsMade     SuspensionRequest[] @relation("SuspensionRequester")
+  timeslotProposalsAuthored BookingTimeslotProposal[] @relation("TimeslotProposalAuthor")
 }
 
 model Tool {
@@ -94,6 +109,7 @@ model WorkshopTool {
   name       String
   category   String
   workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  selectedInBookings BookingSelectedTool[]
 
   @@index([workshopId])
   @@index([category])
@@ -115,30 +131,61 @@ model Booking {
   toolId     String?
   timeslotId String?
   status     BookingStatus @default(PENDING)
-  startDate  DateTime
-  endDate    DateTime
-  pickupTime DateTime?
+    startDate  DateTime
+    endDate    DateTime
+    pickupTime DateTime?
+    createdAt  DateTime      @default(now())
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   tool       Tool?         @relation(fields: [toolId], references: [id], onDelete: SetNull)
   timeslot   TimeSlot?     @relation(fields: [timeslotId], references: [id], onDelete: SetNull)
   reports    Report[]
   ratings    Rating[]
+  selectedTools BookingSelectedTool[]
   pickupProposals BookingPickupProposal[]
+  timeslotProposals BookingTimeslotProposal[]
 
   @@index([toolId, startDate, endDate])
   @@index([timeslotId])
 }
 
+model BookingSelectedTool {
+  bookingId       String
+  workshopToolId  String
+  booking         Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  workshopTool    WorkshopTool @relation(fields: [workshopToolId], references: [id], onDelete: Cascade)
+
+  @@id([bookingId, workshopToolId])
+  @@index([workshopToolId])
+}
+
 model BookingPickupProposal {
   id                 String               @id @default(uuid())
   bookingId          String
-  proposedByUserId   String
-  proposedPickupTime DateTime
-  previousPickupTime DateTime?
+    proposedByUserId   String
+    proposedPickupTime DateTime
+    proposedReturnTime DateTime?
+    previousPickupTime DateTime?
+    previousReturnTime DateTime?
   status             PickupProposalStatus @default(PENDING)
   createdAt          DateTime             @default(now())
   booking            Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   proposedBy         User                 @relation("PickupProposalAuthor", fields: [proposedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+model BookingTimeslotProposal {
+  id                 String               @id @default(uuid())
+  bookingId          String
+  proposedByUserId   String
+  proposedStartDate  DateTime
+  proposedEndDate    DateTime
+  previousStartDate  DateTime?
+  previousEndDate    DateTime?
+  status             PickupProposalStatus @default(PENDING)
+  createdAt          DateTime             @default(now())
+  booking            Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  proposedBy         User                 @relation("TimeslotProposalAuthor", fields: [proposedByUserId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
 }
@@ -171,13 +218,40 @@ model Notification {
 model Report {
   id           String       @id @default(uuid())
   reporterId   String
+  targetType   ReportTargetType
+  targetId     String
   bookingId    String?
   reason       String
   details      String?
+  conversationContext String?
   status       ReportStatus @default(OPEN)
   moderatorId  String?
+  decisionNote String?
+  decisionAt   DateTime?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   reporter     User         @relation("ReporterReports", fields: [reporterId], references: [id], onDelete: Cascade)
   booking      Booking?     @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  suspensionRequests SuspensionRequest[]
+
+  @@index([targetType, targetId])
+}
+
+model SuspensionRequest {
+  id            String                  @id @default(uuid())
+  userId        String
+  requestedById String
+  reportId      String?
+  reason        String
+  status        SuspensionRequestStatus @default(PENDING)
+  adminId       String?
+  decisionNote  String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  user          User                    @relation("SuspensionTarget", fields: [userId], references: [id], onDelete: Cascade)
+  requestedBy   User                    @relation("SuspensionRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  report        Report?                 @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([userId])
 }

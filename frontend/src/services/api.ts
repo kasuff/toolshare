@@ -1,5 +1,17 @@
-import type { Booking, BookingStatus, PickupProposal, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import type {
+  Booking,
+  BookingSelectedTool,
+  BookingStatus,
+  PickupProposal,
+  TimeslotProposal,
+  Tool,
+  User,
+  Workshop,
+  WorkshopSlot
+} from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
+import { beginRequestActivity } from "./requestActivity";
+import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "./sessionEvents";
 
 interface FrontendImportMetaEnv {
   readonly VITE_API_URL?: string;
@@ -29,6 +41,41 @@ type BackendMetrics = {
   workshops: number;
   openBookings: number;
   openReports: number;
+  openSuspensionRequests: number;
+};
+
+export type ModerationReport = {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  targetType: "TOOL" | "WORKSHOP" | "USER";
+  targetId: string;
+  targetLabel: string;
+  targetHref: string | null;
+  subjectUserId: string | null;
+  subjectUserName: string | null;
+  reason: string;
+  details?: string;
+  conversationContext?: string;
+  status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+  decisionNote?: string | null;
+  decisionAt?: string | null;
+  moderatorId?: string | null;
+  moderatorName?: string | null;
+  createdAt: string;
+};
+
+export type SuspensionRequestItem = {
+  id: string;
+  userId: string;
+  requestedById: string;
+  reportId: string | null;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  user: { id: string; name: string; email: string; isSuspended: boolean };
+  requestedBy: { id: string; name: string };
+  report?: { id: string; reason: string; targetType: string; targetId: string } | null;
 };
 
 export type AddressSuggestion = {
@@ -56,6 +103,7 @@ type AuthPayload = {
 type BackendTool = {
   id: string;
   ownerId: string;
+  owner?: Pick<BackendUser, "id" | "name"> | null;
   name: string;
   description: string;
   category: string;
@@ -68,6 +116,7 @@ type BackendTool = {
 type BackendWorkshop = {
   id: string;
   managerId: string;
+  manager?: Pick<BackendUser, "id" | "name"> | null;
   name: string;
   description: string;
   location: string;
@@ -84,6 +133,7 @@ type BackendWorkshopTool = {
   workshopId?: string;
   name: string;
   category: string;
+  status?: BackendToolStatus;
 };
 
 type BackendWorkshopTimeslot = {
@@ -101,7 +151,21 @@ type BackendPickupProposal = {
   bookingId: string;
   proposedByUserId: string;
   proposedPickupTime: string;
+  proposedReturnTime: string | null;
   previousPickupTime: string | null;
+  previousReturnTime: string | null;
+  status: BackendPickupProposalStatus;
+  createdAt: string;
+};
+
+type BackendTimeslotProposal = {
+  id: string;
+  bookingId: string;
+  proposedByUserId: string;
+  proposedStartDate: string;
+  proposedEndDate: string;
+  previousStartDate: string | null;
+  previousEndDate: string | null;
   status: BackendPickupProposalStatus;
   createdAt: string;
 };
@@ -114,6 +178,7 @@ type BackendBooking = {
   startDate: string;
   endDate: string;
   pickupTime?: string | null;
+  createdAt?: string;
   status: BackendBookingStatus;
   user?: BackendUser | null;
   tool?: (BackendTool & { owner?: BackendUser | null }) | null;
@@ -129,7 +194,12 @@ type BackendBooking = {
       manager?: BackendUser | null;
     } | null;
   } | null;
+  selectedTools?: Array<{
+    workshopToolId: string;
+    workshopTool: BackendWorkshopTool;
+  }>;
   pickupProposals?: BackendPickupProposal[];
+  timeslotProposals?: BackendTimeslotProposal[];
 };
 
 const roleMap: Record<BackendRole, User["role"]> = {
@@ -167,80 +237,99 @@ function toLocalDateTimeInputValue(input: string) {
   )}:${pad(date.getMinutes())}`;
 }
 
-async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init?.headers ?? {})
-      }
-    });
-  } catch {
-    throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
+function translateValidationMessage(raw: string): string {
+  const minCharsMatch = raw.match(/at least (\d+) character/i);
+  if (raw.includes("at least 8 character") || raw.match(/at least 8/i)) {
+    return "Passwort muss mindestens 8 Zeichen lang sein.";
   }
+  if (minCharsMatch) {
+    return `Eingabe muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`;
+  }
+  if (/invalid.*uuid/i.test(raw)) return "Ungültige ID.";
+  if (/invalid.*email/i.test(raw)) return "Ungültige E-Mail-Adresse.";
+  if (/invalid.*datetime/i.test(raw)) return "Ungültiges Datum oder Uhrzeit.";
+  if (/required/i.test(raw)) return "Pflichtfeld fehlt.";
+  if (/expected string/i.test(raw)) return "Text erwartet.";
+  if (/expected number/i.test(raw)) return "Zahl erwartet.";
+  if (/expected boolean/i.test(raw)) return "Ja/Nein-Wert erwartet.";
+  if (raw.includes("Mindestens ein Feld")) return raw;
+  if (raw.includes("Ungültig")) return raw;
+  return raw;
+}
 
-  if (!response.ok) {
-    let message = `Request failed: ${response.status}`;
+async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
+  const finishActivity = beginRequestActivity();
+  try {
+    let response: Response;
     try {
-      const payload = (await response.json()) as {
-        message?: string;
-        error?: {
+      response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(init?.headers ?? {})
+        }
+      });
+    } catch {
+      throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
+    }
+
+    if (response.status === 401 && token) {
+      notifySessionExpired();
+      throw new Error(SESSION_EXPIRED_MESSAGE);
+    }
+
+    if (!response.ok) {
+      let message = `Anfrage fehlgeschlagen (Fehler ${response.status}).`;
+      try {
+        const payload = (await response.json()) as {
           message?: string;
-          code?: string;
-          details?: {
-            fieldErrors?: Record<string, string[] | undefined>;
-            formErrors?: string[];
+          error?: {
+            message?: string;
+            code?: string;
+            details?: {
+              fieldErrors?: Record<string, string[] | undefined>;
+              formErrors?: string[];
+            };
           };
         };
-      };
-      if (payload.error?.message) {
-        message = payload.error.message;
-      } else if (payload.message) {
-        message = payload.message;
-      }
-      if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
-        message = "Diese E-Mail ist bereits registriert.";
-      }
-      const fieldErrorEntries = payload.error?.details?.fieldErrors
-        ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
-        : [];
-      if (fieldErrorEntries.length > 0) {
-        const [field, errors] = fieldErrorEntries[0];
-        const rawError = errors?.[0] ?? "Ungültige Eingabe.";
-        const minCharsMatch = rawError.match(/at least (\d+) character/);
-        if (field === "body") {
-          if (rawError.includes("at least 8 character")) {
-            message = "Passwort muss mindestens 8 Zeichen lang sein.";
-          } else if (minCharsMatch) {
-            message = `Eingabe muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`;
-          } else {
-            message = rawError;
-          }
-        } else {
-          message = minCharsMatch
-            ? `${field}: Muss mindestens ${minCharsMatch[1]} Zeichen lang sein.`
-            : `${field}: ${rawError}`;
+        if (payload.error?.message) {
+          message = payload.error.message;
+        } else if (payload.message) {
+          message = payload.message;
         }
-      } else if (payload.error?.details?.formErrors?.length) {
-        message = payload.error.details.formErrors[0];
+        if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
+          message = "Diese E-Mail ist bereits registriert.";
+        }
+        const fieldErrorEntries = payload.error?.details?.fieldErrors
+          ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
+          : [];
+        if (fieldErrorEntries.length > 0) {
+          const [field, errors] = fieldErrorEntries[0];
+          const rawError = errors?.[0] ?? "Ungültige Eingabe.";
+          const translated = translateValidationMessage(rawError);
+          message = field === "body" ? translated : `${field}: ${translated}`;
+        } else if (payload.error?.details?.formErrors?.length) {
+          message = translateValidationMessage(payload.error.details.formErrors[0]);
+        }
+      } catch {
+        // keep fallback message
       }
-    } catch {
-      // keep fallback message
+      throw new Error(message);
     }
-    throw new Error(message);
-  }
 
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  } finally {
+    finishActivity();
+  }
 }
 
 function mapTool(tool: BackendTool): Tool {
   return {
     id: tool.id,
     ownerId: tool.ownerId,
+    ownerName: tool.owner?.name,
     name: tool.name,
     description: tool.description,
     category: tool.category,
@@ -256,6 +345,7 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
   return {
     id: workshop.id,
     ownerId: workshop.managerId,
+    ownerName: workshop.manager?.name,
     name: workshop.name,
     description: workshop.description,
     location: workshop.location,
@@ -286,7 +376,22 @@ function mapPickupProposal(p: BackendPickupProposal): PickupProposal {
     id: p.id,
     proposedById: p.proposedByUserId,
     proposedPickupIso: p.proposedPickupTime,
+    proposedReturnIso: p.proposedReturnTime ?? undefined,
     previousPickupIso: p.previousPickupTime ?? undefined,
+    previousReturnIso: p.previousReturnTime ?? undefined,
+    status: p.status,
+    createdIso: p.createdAt
+  };
+}
+
+function mapTimeslotProposal(p: BackendTimeslotProposal): TimeslotProposal {
+  return {
+    id: p.id,
+    proposedById: p.proposedByUserId,
+    proposedStartIso: p.proposedStartDate,
+    proposedEndIso: p.proposedEndDate,
+    previousStartIso: p.previousStartDate ?? undefined,
+    previousEndIso: p.previousEndDate ?? undefined,
     status: p.status,
     createdIso: p.createdAt
   };
@@ -309,6 +414,12 @@ function mapBooking(booking: BackendBooking): Booking {
     toolName = workshop.name;
   }
 
+  const selectedWorkshopTools: BookingSelectedTool[] = (booking.selectedTools ?? []).map((selected) => ({
+    id: selected.workshopTool.id,
+    name: selected.workshopTool.name,
+    category: selected.workshopTool.category
+  }));
+
   return {
     id: booking.id,
     type: booking.toolId ? "TOOL" : "WORKSHOP",
@@ -321,12 +432,14 @@ function mapBooking(booking: BackendBooking): Booking {
     endIso: booking.endDate,
     pickupTimeIso: booking.pickupTime ?? undefined,
     status: bookingStatusMap[booking.status],
-    createdIso: booking.startDate,
+    createdIso: booking.createdAt ?? booking.startDate,
     requesterName,
     providerName,
     toolName,
     toolImageUrl,
-    pickupProposals: (booking.pickupProposals ?? []).map(mapPickupProposal)
+    pickupProposals: (booking.pickupProposals ?? []).map(mapPickupProposal),
+    timeslotProposals: (booking.timeslotProposals ?? []).map(mapTimeslotProposal),
+    selectedWorkshopTools
   };
 }
 
@@ -451,10 +564,18 @@ export const api = {
     };
   },
 
-  async getTools(filters: { q?: string; category?: string }, token: string): Promise<Tool[]> {
+  async getTools(
+    filters: { q?: string; category?: string; ownerId?: string; status?: "VERFUEGBAR" | "AUSGELIEHEN" },
+    token: string
+  ): Promise<Tool[]> {
     const params = new URLSearchParams();
     if (filters.q) params.set("search", filters.q);
     if (filters.category) params.set("category", filters.category);
+    if (filters.ownerId) params.set("ownerId", filters.ownerId);
+    if (filters.status) {
+      const backendStatus = filters.status === "VERFUEGBAR" ? "AVAILABLE" : "BORROWED";
+      params.set("status", backendStatus);
+    }
     const tools = await request<BackendTool[]>(`/tools?${params.toString()}`, undefined, token);
     return tools.map(mapTool);
   },
@@ -504,7 +625,10 @@ export const api = {
     return mapBooking(created);
   },
 
-  async getWorkshops(filters: { q?: string }, token: string): Promise<Array<{ workshop: Workshop; slots: WorkshopSlot[] }>> {
+  async getWorkshops(
+    filters: { q?: string },
+    token: string
+  ): Promise<Array<{ workshop: Workshop; slots: WorkshopSlot[]; tools: Array<Tool & { selectable: boolean }> }>> {
     const params = new URLSearchParams();
     if (filters.q) params.set("search", filters.q);
     const workshops = await request<BackendWorkshop[]>(`/workshops?${params.toString()}`, undefined, token);
@@ -512,7 +636,22 @@ export const api = {
       workshops.map(async (workshop) => {
         const detail = await request<BackendWorkshop>(`/workshops/${workshop.id}`, undefined, token);
         const slots = (detail.timeslots ?? []).map(mapWorkshopSlot);
-        return { workshop: mapWorkshop(workshop), slots };
+        const mappedWorkshop = mapWorkshop(detail);
+        const tools = mappedWorkshop.equipmentItems.map((tool) => {
+          const backendTool = detail.workshopTools?.find((entry) => entry.id === tool.id);
+          const status = backendTool?.status ? toolStatusMap[backendTool.status] : ("VERFUEGBAR" as const);
+          return {
+            id: tool.id,
+            ownerId: mappedWorkshop.ownerId,
+            name: tool.name,
+            description: "Werkstatt-Werkzeug",
+            category: tool.category,
+            imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+            status,
+            selectable: status === "VERFUEGBAR",
+          };
+        });
+        return { workshop: mappedWorkshop, slots, tools };
       })
     );
     return withSlots;
@@ -666,12 +805,20 @@ export const api = {
     );
   },
 
-  async createWorkshopBooking(input: { slotId: string }, token: string) {
+  async createWorkshopBooking(
+    input: { workshopId: string; startIso: string; endIso: string; workshopToolIds: string[] },
+    token: string
+  ) {
     const booking = await request<BackendBooking>(
       "/bookings/workshop",
       {
         method: "POST",
-        body: JSON.stringify({ timeslotId: input.slotId })
+        body: JSON.stringify({
+          workshopId: input.workshopId,
+          startDate: new Date(input.startIso).toISOString(),
+          endDate: new Date(input.endIso).toISOString(),
+          workshopToolIds: input.workshopToolIds
+        })
       },
       token
     );
@@ -694,16 +841,24 @@ export const api = {
     );
   },
 
-  async createPickupProposal(bookingId: string, pickupTimeIso: string, token: string) {
-    const d = new Date(pickupTimeIso);
-    if (Number.isNaN(d.getTime())) {
-      throw new Error("Ungültige Abholzeit.");
+  async createPickupProposal(bookingId: string, pickupTimeIso: string, returnTimeIso: string, token: string) {
+    const pickup = new Date(pickupTimeIso);
+    const returnTime = new Date(returnTimeIso);
+    if (
+      Number.isNaN(pickup.getTime()) ||
+      Number.isNaN(returnTime.getTime()) ||
+      pickup >= returnTime
+    ) {
+      throw new Error("Ungültiger Abhol- oder Rückgabezeitpunkt.");
     }
     await request(
       `/bookings/${bookingId}/pickup-proposals`,
       {
         method: "POST",
-        body: JSON.stringify({ pickupTime: d.toISOString() })
+        body: JSON.stringify({
+          pickupTime: pickup.toISOString(),
+          returnTime: returnTime.toISOString()
+        })
       },
       token
     );
@@ -725,6 +880,36 @@ export const api = {
     );
   },
 
+  async createTimeslotProposal(bookingId: string, startIso: string, endIso: string, token: string) {
+    await request(
+      `/bookings/${bookingId}/timeslot-proposals`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          startDate: new Date(startIso).toISOString(),
+          endDate: new Date(endIso).toISOString()
+        })
+      },
+      token
+    );
+  },
+
+  async respondTimeslotProposal(
+    bookingId: string,
+    proposalId: string,
+    decision: "ACCEPT" | "DECLINE",
+    token: string
+  ) {
+    await request(
+      `/bookings/${bookingId}/timeslot-proposals/${proposalId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ decision })
+      },
+      token
+    );
+  },
+
   async getNotifications(token: string) {
     const notifications = await request<Array<{ id: string; userId: string; message: string; read: boolean; createdAt: string }>>(
       "/notifications/me",
@@ -735,19 +920,70 @@ export const api = {
   },
 
   async listReports(token: string) {
-    return request<Array<{ id: string; reason: string; details?: string; status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED" }>>(
+    return request<ModerationReport[]>("/moderation/reports", undefined, token);
+  },
+
+  async listClosedReports(token: string) {
+    return request<ModerationReport[]>("/moderation/reports/closed", undefined, token);
+  },
+
+  async createReport(
+    input: {
+      targetType: "TOOL" | "WORKSHOP" | "USER";
+      targetId: string;
+      reason: string;
+      details?: string;
+      bookingId?: string;
+      conversationContext?: string;
+    },
+    token: string
+  ) {
+    return request(
       "/moderation/reports",
-      undefined,
+      {
+        method: "POST",
+        body: JSON.stringify(input)
+      },
       token
     );
   },
 
-  async updateReportStatus(reportId: string, status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED", token: string) {
+  async updateReportStatus(
+    reportId: string,
+    input: {
+      status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
+      decisionNote?: string;
+      warnUserId?: string;
+      warningReason?: string;
+      requestSuspensionUserId?: string;
+      suspensionReason?: string;
+    },
+    token: string
+  ) {
     await request(
       `/moderation/reports/${reportId}`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status })
+        body: JSON.stringify(input)
+      },
+      token
+    );
+  },
+
+  async listSuspensionRequests(token: string) {
+    return request<SuspensionRequestItem[]>("/users/admin/suspension-requests", undefined, token);
+  },
+
+  async decideSuspensionRequest(
+    requestId: string,
+    input: { approve: boolean; decisionNote?: string },
+    token: string
+  ) {
+    return request<SuspensionRequestItem>(
+      `/users/admin/suspension-requests/${requestId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input)
       },
       token
     );

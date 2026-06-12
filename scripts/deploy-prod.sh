@@ -102,12 +102,4 @@ COMPOSE="$(compose_cmd)"
 $COMPOSE -f "$COMPOSE_FILE" up -d --build
 wait_for_containers
 
-# Optional: Run database migrations if you have them
-# This command assumes your backend service is named 'backend' in the docker-compose file
-# and that you have a script for migrations in your package.json
-$COMPOSE -f "$COMPOSE_FILE" exec -T backend npm run prisma:migrate
-
-# Run health check again after migrations in case app restarts internally.
-wait_for_containers
-
 echo "Deployment finished successfully!"

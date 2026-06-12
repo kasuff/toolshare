@@ -74,12 +74,18 @@ export function GuestBanner({
   cta?: string;
 }) {
   return (
-    <div className="guest-banner">
-      <p>{text}</p>
+    <aside className="guest-banner" aria-labelledby="guest-banner-title">
+      <span className="guest-banner-icon material-symbols-outlined" aria-hidden="true">
+        login
+      </span>
+      <div className="guest-banner-copy">
+        <h2 id="guest-banner-title">Bitte anmelden</h2>
+        <p>{text}</p>
+      </div>
       <Link to="/auth" className="btn">
         {cta}
       </Link>
-    </div>
+    </aside>
   );
 }
 
@@ -120,10 +126,13 @@ export function ToastViewport() {
   return (
     <aside className="toast-viewport" aria-live="polite" aria-atomic="false">
       {toasts.map((toast) => (
-        <article key={toast.id} className={`toast ${toast.tone}`}>
+        <article key={toast.id} className={`toast ${toast.tone}`} role={toast.tone === "error" ? "alert" : "status"}>
+          <span className="toast-icon material-symbols-outlined" aria-hidden="true">
+            {toast.tone === "success" ? "check_circle" : toast.tone === "error" ? "error" : "info"}
+          </span>
           <p>{toast.text}</p>
           <button className="icon-button" onClick={() => removeToast(toast.id)} aria-label="Meldung schließen">
-            x
+            <span className="material-symbols-outlined" aria-hidden="true">close</span>
           </button>
         </article>
       ))}

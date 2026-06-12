@@ -4,16 +4,18 @@ import { bookingsRepository } from "../src/modules/bookings/bookings.repository"
 const mocks = vi.hoisted(() => ({
   bookingFindMany: vi.fn(),
   toolFindUnique: vi.fn(),
+  toolUpdate: vi.fn(),
   bookingFindUnique: vi.fn(),
   bookingFindFirst: vi.fn(),
-  bookingCreate: vi.fn(),
   bookingUpdate: vi.fn(),
-  toolUpdate: vi.fn(),
   txToolFindUnique: vi.fn(),
-  txTimeSlotFindUnique: vi.fn(),
+  txWorkshopFindUnique: vi.fn(),
   txTimeSlotFindFirst: vi.fn(),
   txBookingFindFirst: vi.fn(),
+  txWorkshopToolFindMany: vi.fn(),
   txBookingCreate: vi.fn(),
+  txBookingFindUnique: vi.fn(),
+  txBookingSelectedToolCreateMany: vi.fn(),
   prismaTransaction: vi.fn()
 }));
 
@@ -23,7 +25,6 @@ vi.mock("../src/config/prisma", () => ({
       findMany: mocks.bookingFindMany,
       findUnique: mocks.bookingFindUnique,
       findFirst: mocks.bookingFindFirst,
-      create: mocks.bookingCreate,
       update: mocks.bookingUpdate
     },
     tool: {
@@ -38,6 +39,31 @@ describe("bookingsRepository", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  const setupToolBookingTx = () => {
+    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
+      handler({
+        tool: { findUnique: mocks.txToolFindUnique },
+        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate }
+      })
+    );
+  };
+
+  const setupWorkshopBookingTx = () => {
+    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
+      handler({
+        workshop: { findUnique: mocks.txWorkshopFindUnique },
+        timeSlot: { findFirst: mocks.txTimeSlotFindFirst },
+        booking: {
+          findFirst: mocks.txBookingFindFirst,
+          create: mocks.txBookingCreate,
+          findUnique: mocks.txBookingFindUnique
+        },
+        workshopTool: { findMany: mocks.txWorkshopToolFindMany },
+        bookingSelectedTool: { createMany: mocks.txBookingSelectedToolCreateMany }
+      })
+    );
+  };
 
   it("lists bookings for requester, tool owner and workshop manager context", async () => {
     mocks.bookingFindMany.mockResolvedValueOnce([{ id: "b1" }]);
@@ -56,12 +82,17 @@ describe("bookingsRepository", () => {
         user: true,
         tool: { include: { owner: true } },
         timeslot: { include: { workshop: { include: { manager: true } } } },
+        selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
+          orderBy: { createdAt: "asc" },
+          include: { proposedBy: { select: { id: true, name: true } } }
+        },
+        timeslotProposals: {
           orderBy: { createdAt: "asc" },
           include: { proposedBy: { select: { id: true, name: true } } }
         }
       },
-      orderBy: { startDate: "desc" }
+      orderBy: { createdAt: "desc" }
     });
     expect(result).toEqual([{ id: "b1" }]);
   });
@@ -76,51 +107,19 @@ describe("bookingsRepository", () => {
     expect(mocks.toolFindUnique).toHaveBeenCalledWith({ where: { id: "tool-1" } });
     expect(mocks.bookingFindUnique).toHaveBeenCalledWith({
       where: { id: "booking-1" },
-      include: { tool: true, timeslot: { include: { workshop: true } } }
+      include: {
+        tool: true,
+        timeslot: { include: { workshop: true } },
+        selectedTools: { include: { workshopTool: true } }
+      }
     });
     expect(tool).toEqual({ id: "tool-1" });
     expect(booking).toEqual({ id: "booking-1" });
   });
 
-  it("finds overlapping booking windows", async () => {
-    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
-      handler({
-        tool: { findUnique: mocks.txToolFindUnique },
-        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate }
-      })
-    );
-    mocks.txToolFindUnique.mockResolvedValueOnce({ id: "tool-1" });
-    mocks.txBookingFindFirst.mockResolvedValueOnce({ id: "booking-overlap" });
-    const startDate = new Date("2026-06-01T10:00:00.000Z");
-    const endDate = new Date("2026-06-01T12:00:00.000Z");
-
-    const overlap = await bookingsRepository.createToolBookingTransaction({
-      userId: "user-1",
-      toolId: "tool-1",
-      startDate,
-      endDate,
-      pickupTime: new Date("2026-06-01T09:30:00.000Z")
-    });
-
-    expect(mocks.txBookingFindFirst).toHaveBeenCalledWith({
-      where: {
-        toolId: "tool-1",
-        status: { in: ["PENDING", "ACCEPTED"] },
-        startDate: { lt: endDate },
-        endDate: { gt: startDate }
-      }
-    });
-    expect(overlap).toBe("CONFLICT");
-  });
-
-  it("creates and updates tool bookings", async () => {
-    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
-      handler({
-        tool: { findUnique: mocks.txToolFindUnique },
-        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate }
-      })
-    );
-    mocks.txToolFindUnique.mockResolvedValueOnce({ id: "tool-1" });
+  it("creates tool bookings, updates status and releases tools", async () => {
+    setupToolBookingTx();
+    mocks.txToolFindUnique.mockResolvedValueOnce({ id: "tool-1", ownerId: "owner-1" });
     mocks.txBookingFindFirst.mockResolvedValueOnce(null);
     mocks.txBookingCreate.mockResolvedValueOnce({ id: "booking-created" });
     mocks.bookingUpdate.mockResolvedValueOnce({ id: "booking-created", status: "ACCEPTED" });
@@ -134,7 +133,7 @@ describe("bookingsRepository", () => {
       pickupTime: new Date("2026-06-01T09:30:00.000Z")
     });
     const updated = await bookingsRepository.updateStatus("booking-created", "ACCEPTED");
-    const releasedTool = await bookingsRepository.markToolAvailable("tool-1");
+    const released = await bookingsRepository.markToolAvailable("tool-1");
 
     expect(mocks.txBookingCreate).toHaveBeenCalledWith({
       data: {
@@ -154,69 +153,72 @@ describe("bookingsRepository", () => {
       where: { id: "tool-1" },
       data: { status: "AVAILABLE" }
     });
-    expect(created).toEqual({ booking: { id: "booking-created" }, tool: { id: "tool-1" } });
+    expect(created).toEqual({
+      booking: { id: "booking-created" },
+      tool: { id: "tool-1", ownerId: "owner-1" }
+    });
     expect(updated).toEqual({ id: "booking-created", status: "ACCEPTED" });
-    expect(releasedTool).toEqual({ id: "tool-1", status: "AVAILABLE" });
+    expect(released).toEqual({ id: "tool-1", status: "AVAILABLE" });
   });
 
-  it("creates workshop booking transaction for free timeslot", async () => {
-    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
-      handler({
-        tool: { findUnique: mocks.txToolFindUnique },
-        timeSlot: { findUnique: mocks.txTimeSlotFindUnique, findFirst: mocks.txTimeSlotFindFirst },
-        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate }
-      })
-    );
-    mocks.txToolFindUnique.mockResolvedValueOnce({ id: "tool-1" });
-    mocks.txTimeSlotFindUnique.mockResolvedValueOnce({
-      id: "slot-1",
-      startTime: new Date("2026-06-01T10:00:00.000Z"),
-      endTime: new Date("2026-06-01T12:00:00.000Z")
+  it("returns null or conflict in tool booking transaction", async () => {
+    setupToolBookingTx();
+    mocks.txToolFindUnique.mockResolvedValueOnce(null);
+
+    const missingToolResult = await bookingsRepository.createToolBookingTransaction({
+      userId: "user-1",
+      toolId: "missing-tool",
+      startDate: new Date("2026-06-01T10:00:00.000Z"),
+      endDate: new Date("2026-06-01T12:00:00.000Z"),
+      pickupTime: new Date("2026-06-01T09:30:00.000Z")
     });
+
+    expect(missingToolResult).toBeNull();
+
+    setupToolBookingTx();
+    mocks.txToolFindUnique.mockResolvedValueOnce({ id: "tool-1", ownerId: "owner-1" });
+    mocks.txBookingFindFirst.mockResolvedValueOnce({ id: "existing-overlap" });
+
+    const conflictResult = await bookingsRepository.createToolBookingTransaction({
+      userId: "user-1",
+      toolId: "tool-1",
+      startDate: new Date("2026-06-01T10:00:00.000Z"),
+      endDate: new Date("2026-06-01T12:00:00.000Z"),
+      pickupTime: new Date("2026-06-01T09:30:00.000Z")
+    });
+
+    expect(conflictResult).toBe("CONFLICT");
+  });
+
+  it("creates workshop booking transaction for available range", async () => {
+    setupWorkshopBookingTx();
+    mocks.txWorkshopFindUnique.mockResolvedValueOnce({ id: "workshop-1", managerId: "manager-1" });
+    mocks.txTimeSlotFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "slot-available",
+        workshopId: "workshop-1",
+        startTime: new Date("2026-06-01T10:00:00.000Z"),
+        endTime: new Date("2026-06-05T10:00:00.000Z"),
+        blockedByOwner: false
+      });
     mocks.txBookingFindFirst.mockResolvedValueOnce(null);
+    mocks.txWorkshopToolFindMany.mockResolvedValueOnce([{ id: "wt-1", workshopId: "workshop-1" }]);
     mocks.txBookingCreate.mockResolvedValueOnce({ id: "booking-slot-1" });
+    mocks.txBookingSelectedToolCreateMany.mockResolvedValueOnce({ count: 1 });
+    mocks.txBookingFindUnique.mockResolvedValueOnce({ id: "booking-slot-1" });
 
     const result = await bookingsRepository.createWorkshopBookingTransaction({
       userId: "user-1",
-      timeslotId: "slot-1"
+      workshopId: "workshop-1",
+      startDate: new Date("2026-06-02T10:00:00.000Z"),
+      endDate: new Date("2026-06-03T10:00:00.000Z"),
+      workshopToolIds: ["wt-1"]
     });
 
     expect(result).toEqual({ id: "booking-slot-1" });
-  });
-
-  it("returns null or conflict in workshop booking transaction", async () => {
-    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
-      handler({
-        tool: { findUnique: mocks.txToolFindUnique },
-        timeSlot: { findUnique: mocks.txTimeSlotFindUnique, findFirst: mocks.txTimeSlotFindFirst },
-        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate }
-      })
-    );
-    mocks.txTimeSlotFindUnique.mockResolvedValueOnce(null);
-    const missingResult = await bookingsRepository.createWorkshopBookingTransaction({
-      userId: "user-1",
-      timeslotId: "missing-slot"
+    expect(mocks.txBookingSelectedToolCreateMany).toHaveBeenCalledWith({
+      data: [{ bookingId: "booking-slot-1", workshopToolId: "wt-1" }]
     });
-    expect(missingResult).toBeNull();
-
-    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
-      handler({
-        tool: { findUnique: mocks.txToolFindUnique },
-        timeSlot: { findUnique: mocks.txTimeSlotFindUnique, findFirst: mocks.txTimeSlotFindFirst },
-        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate }
-      })
-    );
-    mocks.txTimeSlotFindUnique.mockResolvedValueOnce({
-      id: "slot-1",
-      startTime: new Date("2026-06-01T10:00:00.000Z"),
-      endTime: new Date("2026-06-01T12:00:00.000Z")
-    });
-    mocks.txBookingFindFirst.mockResolvedValueOnce({ id: "existing" });
-
-    const conflictResult = await bookingsRepository.createWorkshopBookingTransaction({
-      userId: "user-1",
-      timeslotId: "slot-1"
-    });
-    expect(conflictResult).toBe("CONFLICT");
   });
 });

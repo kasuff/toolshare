@@ -147,10 +147,15 @@ backend:build:
 
 deploy:production:
   stage: deploy
-  image: alpine:latest
+  image:
+    name: docker:27.3.1-cli
+    entrypoint: [""]
   tags:
     - server
     - deploy
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+    DOCKER_TLS_CERTDIR: ""
   needs:
     - frontend:build
     - backend:build
@@ -159,9 +164,9 @@ deploy:production:
   environment:
     name: production
   before_script:
-    - apk add --no-cache docker-cli docker-cli-compose
-  script:
+    - apk add --no-cache docker-cli-compose
     - chmod +x scripts/deploy-prod.sh
+  script:
     - ./scripts/deploy-prod.sh
 
 # === PAGES JOB ===
@@ -698,9 +703,5 @@ security:container:trivy:
   only:
     - merge_requests
     - main
-
-# === MERGE REQUEST RULES ===
-# Konfiguration in GitLab UI:
-# - Mindestens 1 Approval erforderlich
 # - Alle Pipelines-Jobs müssen erfolgreich sein
 # - Push-Protektion auf main-Branch

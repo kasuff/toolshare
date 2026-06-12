@@ -363,6 +363,8 @@ describe.skip("Controller route integration coverage", () => {
         .post("/api/moderation/reports")
         .set("Authorization", `Bearer ${managerToken()}`)
         .send({
+          targetType: "USER",
+          targetId: TARGET_USER_ID,
           bookingId: BOOKING_ID,
           reason: "Spam report",
           details: "Details"
@@ -382,6 +384,8 @@ describe.skip("Controller route integration coverage", () => {
       expect(updateResponse.status).toBe(200);
       expect(mockedModerationService.createReport).toHaveBeenCalledWith({
         reporterId: MANAGER_ID,
+        targetType: "USER",
+        targetId: TARGET_USER_ID,
         bookingId: BOOKING_ID,
         reason: "Spam report",
         details: "Details"
@@ -390,7 +394,10 @@ describe.skip("Controller route integration coverage", () => {
       expect(mockedModerationService.updateReportStatus).toHaveBeenCalledWith({
         reportId: REPORT_ID,
         status: "RESOLVED",
-        moderatorId: MANAGER_ID
+        moderatorId: MANAGER_ID,
+        decisionNote: undefined,
+        warnUserId: undefined,
+        warningReason: undefined
       });
     });
   });

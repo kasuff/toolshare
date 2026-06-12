@@ -1,25 +1,271 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import type { User } from "../types/domain";
+import { api, type ModerationReport } from "../services/api";
 
 type Props = {
-  currentUser?: User;
   token?: string;
 };
 
+type DialogMode = "warn" | "suspend" | null;
+
+const targetTypeLabel: Record<ModerationReport["targetType"], string> = {
+  TOOL: "Werkzeug",
+  WORKSHOP: "Werkstatt",
+  USER: "Nutzer"
+};
+
+const statusPresentation: Record<
+  ModerationReport["status"],
+  { label: string; tone: "warning" | "success" | "danger" | "neutral" }
+> = {
+  OPEN: { label: "Offen", tone: "warning" },
+  IN_REVIEW: { label: "In Bearbeitung", tone: "warning" },
+  RESOLVED: { label: "Erledigt", tone: "success" },
+  REJECTED: { label: "Verworfen", tone: "danger" }
+};
+
+function formatWhen(value: string | null | undefined) {
+  if (!value) return null;
+  return new Date(value).toLocaleString("de-DE");
+}
+
+function ReportSummary({ report, showDecision }: { report: ModerationReport; showDecision?: boolean }) {
+  const status = statusPresentation[report.status];
+
+  return (
+    <>
+      <div className="moderation-report-head">
+        <StatusPill label={status.label} tone={status.tone} />
+        <span className="moderation-report-meta">
+          Gemeldet {formatWhen(report.createdAt)} · von {report.reporterName}
+        </span>
+      </div>
+
+      <p>
+        <strong>{targetTypeLabel[report.targetType]}:</strong>{" "}
+        {report.targetHref ? (
+          <Link to={report.targetHref} className="moderation-target-link">
+            {report.targetLabel}
+          </Link>
+        ) : (
+          report.targetLabel
+        )}
+      </p>
+
+      {report.subjectUserName && (
+        <p className="hint">
+          Betroffener Nutzer: <strong>{report.subjectUserName}</strong>
+        </p>
+      )}
+
+      <p>
+        <strong>Meldegrund:</strong> {report.reason}
+      </p>
+      {report.details && <p>{report.details}</p>}
+
+      {showDecision && (
+        <div className="moderation-decision-box">
+          <p>
+            <strong>Entscheidung:</strong> {report.decisionNote?.trim() || "—"}
+          </p>
+          <p className="hint">
+            {status.label} am {formatWhen(report.decisionAt) ?? "—"}
+            {report.moderatorName ? ` · durch ${report.moderatorName}` : ""}
+          </p>
+        </div>
+      )}
+
+      {report.conversationContext && (
+        <details>
+          <summary>Chatverlauf (Kontext)</summary>
+          <pre className="hint moderation-context">{report.conversationContext}</pre>
+        </details>
+      )}
+    </>
+  );
+}
+
+function ReportActions({
+  report,
+  token,
+  onDone
+}: {
+  report: ModerationReport;
+  token: string;
+  onDone: () => Promise<void>;
+}) {
+  const { pushToast } = useToast();
+  const [decisionNote, setDecisionNote] = useState("");
+  const [dialogMode, setDialogMode] = useState<DialogMode>(null);
+  const [actionReason, setActionReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const subjectId = report.subjectUserId;
+  const canActOnUser = Boolean(subjectId);
+
+  const runUpdate = async (payload: Parameters<typeof api.updateReportStatus>[1]) => {
+    setBusy(true);
+    try {
+      await api.updateReportStatus(report.id, payload, token);
+      await onDone();
+      pushToast("Meldung bearbeitet.", "success");
+      setDialogMode(null);
+      setActionReason("");
+      setDecisionNote("");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Aktion fehlgeschlagen.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reject = () => {
+    const note = decisionNote.trim();
+    if (note.length < 3) {
+      pushToast("Bitte eine Begründung für die Ablehnung eintragen (min. 3 Zeichen).", "error");
+      return;
+    }
+    void runUpdate({ status: "REJECTED", decisionNote: note });
+  };
+
+  const submitDialog = (event: FormEvent) => {
+    event.preventDefault();
+    const reason = actionReason.trim();
+    if (reason.length < 3) {
+      pushToast("Bitte einen Grund angeben (min. 3 Zeichen).", "error");
+      return;
+    }
+    if (!subjectId) {
+      pushToast("Kein betroffener Nutzer für diese Meldung gefunden.", "error");
+      return;
+    }
+
+    const note = decisionNote.trim() || undefined;
+    if (dialogMode === "warn") {
+      void runUpdate({
+        status: "RESOLVED",
+        decisionNote: note,
+        warnUserId: subjectId,
+        warningReason: reason
+      });
+      return;
+    }
+
+    if (dialogMode === "suspend") {
+      void runUpdate({
+        status: "RESOLVED",
+        decisionNote: note,
+        requestSuspensionUserId: subjectId,
+        suspensionReason: reason
+      });
+    }
+  };
+
+  return (
+    <div className="moderation-actions-block">
+      <label className="field">
+        <span>Interne Notiz / Entscheidung</span>
+        <textarea
+          value={decisionNote}
+          onChange={(event) => setDecisionNote(event.target.value)}
+          placeholder="Begründung beim Verwerfen (Pflicht)"
+          rows={2}
+        />
+      </label>
+      <div className="moderation-actions">
+        <button type="button" className="btn secondary mini" disabled={busy} onClick={() => void reject()}>
+          Verwerfen
+        </button>
+        <button
+          type="button"
+          className="btn mini"
+          disabled={busy || !canActOnUser}
+          title={canActOnUser ? undefined : "Kein Nutzerbezug für Ermahnung"}
+          onClick={() => setDialogMode("warn")}
+        >
+          Nutzer ermahnen
+        </button>
+        <button
+          type="button"
+          className="btn mini"
+          disabled={busy || !canActOnUser}
+          title={canActOnUser ? undefined : "Kein Nutzerbezug für Sperranfrage"}
+          onClick={() => setDialogMode("suspend")}
+        >
+          Sperrung anfordern
+        </button>
+      </div>
+
+      {dialogMode && (
+        <div className="report-form-backdrop" role="presentation" onClick={() => setDialogMode(null)}>
+          <section
+            className="report-form-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="moderation-action-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="report-form-head">
+              <h2 id="moderation-action-title">
+                {dialogMode === "warn" ? "Nutzer ermahnen" : "Sperrung anfordern"}
+              </h2>
+              <button type="button" className="icon-button" onClick={() => setDialogMode(null)} aria-label="Schließen">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </header>
+            <form className="stack" onSubmit={submitDialog}>
+              <p className="hint">
+                {dialogMode === "warn"
+                  ? `Die Ermahnung wird an ${report.subjectUserName ?? "den Nutzer"} in der Inbox zugestellt.`
+                  : `Der Admin erhält eine Anfrage zur Sperrung von ${report.subjectUserName ?? "dem Nutzer"}.`}
+              </p>
+              <label className="field">
+                <span>{dialogMode === "warn" ? "Begründung der Ermahnung" : "Begründung der Sperranfrage"}</span>
+                <textarea
+                  value={actionReason}
+                  onChange={(event) => setActionReason(event.target.value)}
+                  required
+                  minLength={3}
+                  rows={4}
+                  placeholder="Was ist passiert und warum ist diese Maßnahme angemessen?"
+                />
+              </label>
+              <div className="row">
+                <button type="button" className="btn secondary" onClick={() => setDialogMode(null)} disabled={busy}>
+                  Abbrechen
+                </button>
+                <button type="submit" className="btn" disabled={busy}>
+                  {dialogMode === "warn" ? "Ermahnung senden" : "Sperrung anfordern"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ModerationPage({ token }: Props) {
   const { pushToast } = useToast();
-  const [reports, setReports] = useState<Array<{ id: string; reason: string; details?: string; status: string }>>([]);
-  const [ratings, setRatings] = useState<Array<{ id: string; score: number; comment?: string; createdAt: string; fromUser?: { name?: string } }>>([]);
+  const [reports, setReports] = useState<ModerationReport[]>([]);
+  const [closedReports, setClosedReports] = useState<ModerationReport[]>([]);
+  const [ratings, setRatings] = useState<
+    Array<{ id: string; score: number; comment?: string; createdAt: string; fromUser?: { name?: string } }>
+  >([]);
 
   const loadData = async () => {
     if (!token) return;
     try {
-      const [nextReports, nextRatings] = await Promise.all([api.listReports(token), api.getRatingsReceived(token)]);
+      const [nextReports, nextClosedReports, nextRatings] = await Promise.all([
+        api.listReports(token),
+        api.listClosedReports(token),
+        api.getRatingsReceived(token)
+      ]);
       setReports(nextReports);
+      setClosedReports(nextClosedReports);
       setRatings(nextRatings);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Moderationsdaten konnten nicht geladen werden.", "error");
@@ -32,16 +278,7 @@ export function ModerationPage({ token }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const resolve = async (id: string) => {
-    if (!token) return;
-    try {
-      await api.updateReportStatus(id, "RESOLVED", token);
-      await loadData();
-      pushToast("Meldung als bearbeitet markiert.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Report konnte nicht aktualisiert werden.", "error");
-    }
-  };
+  const rejectedCount = closedReports.filter((r) => r.status === "REJECTED").length;
 
   if (!token) {
     return (
@@ -61,26 +298,46 @@ export function ModerationPage({ token }: Props) {
   return (
     <section className="stack">
       <h1>Moderation</h1>
-      <Surface title="Meldungen">
+      <p className="hint">
+        Offene Meldungen prüfen, Ziel ansehen, verwerfen oder mit Ermahnung bzw. Sperranfrage abschließen.
+      </p>
+
+      <Surface title="Offene Meldungen" subtitle="Verwerfen = unbegründet. Ermahnen oder Sperrung = bestätigt mit Folge.">
         {reports.length === 0 ? (
-          <EmptyState title="Keine Meldungen" text="Aktuell warten keine Meldungen auf Bearbeitung." />
+          <EmptyState title="Keine offenen Meldungen" text="Aktuell warten keine Meldungen auf Bearbeitung." />
         ) : (
-          <ul>
-            {reports.map((r) => (
-              <li key={r.id} className="inbox-item">
-                <p>
-                  <strong>Report</strong> | {r.reason} | Status: <StatusPill label={r.status} tone={r.status === "RESOLVED" ? "success" : "warning"} />
-                </p>
-                {r.details && <p>{r.details}</p>}
-                {(r.status === "OPEN" || r.status === "IN_REVIEW") && (
-                  <div className="row">
-                    <button onClick={() => void resolve(r.id)}>Als bearbeitet markieren</button>
-                  </div>
-                )}
+          <ul className="moderation-report-list">
+            {reports.map((report) => (
+              <li key={report.id} className="inbox-item moderation-report">
+                <ReportSummary report={report} />
+                <ReportActions report={report} token={token} onDone={loadData} />
               </li>
             ))}
           </ul>
         )}
+      </Surface>
+
+      <Surface title="Archiv" subtitle="Abgeschlossene Meldungen mit dokumentierter Entscheidung.">
+        <details className="moderation-archive">
+          <summary>
+            Abgeschlossene Meldungen anzeigen ({closedReports.length}
+            {rejectedCount > 0 ? `, davon ${rejectedCount} verworfen` : ""})
+          </summary>
+          {closedReports.length === 0 ? (
+            <p className="hint moderation-archive-empty">Noch keine abgeschlossenen Meldungen vorhanden.</p>
+          ) : (
+            <ul className="moderation-report-list">
+              {closedReports.map((report) => (
+                <li
+                  key={report.id}
+                  className={`inbox-item moderation-report moderation-report--closed${report.status === "REJECTED" ? " moderation-report--rejected" : ""}`}
+                >
+                  <ReportSummary report={report} showDecision />
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
       </Surface>
 
       <Surface title="Bewertungen (eingehend)">
@@ -88,10 +345,11 @@ export function ModerationPage({ token }: Props) {
           <EmptyState title="Keine Bewertungen" text="Es sind derzeit keine eingehenden Bewertungen vorhanden." />
         ) : (
           <ul className="meta-list">
-            {ratings.map((r) => (
-              <li key={r.id}>
-                {new Date(r.createdAt).toLocaleString()} | Score {r.score} | von {r.fromUser?.name ?? "Unbekannt"}
-                {r.comment ? ` | "${r.comment}"` : ""}
+            {ratings.map((rating) => (
+              <li key={rating.id}>
+                {new Date(rating.createdAt).toLocaleString()} | Score {rating.score} | von{" "}
+                {rating.fromUser?.name ?? "Unbekannt"}
+                {rating.comment ? ` | "${rating.comment}"` : ""}
               </li>
             ))}
           </ul>

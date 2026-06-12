@@ -25,7 +25,8 @@ describe("ToolsPage", () => {
         description: "Leistungsstark",
         category: "Elektro",
         imageUrl: "https://example.com/tool.jpg",
-        status: "VERFUEGBAR"
+        status: "VERFUEGBAR",
+        pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland"
       }
     ]);
 
@@ -40,7 +41,7 @@ describe("ToolsPage", () => {
     const toolLink = await screen.findByRole("link", { name: /Akkuschrauber Bosch/i });
     expect(toolLink).toHaveAttribute("href", "/tools/t1");
     expect(screen.queryByText("Ausleihanfrage vorbereiten")).not.toBeInTheDocument();
-    expect(screen.getByText(/Klicke um Details und Buchung zu sehen/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Details$/i)).toBeInTheDocument();
     await waitFor(() => expect(getTools).toHaveBeenCalled());
   });
 
@@ -50,22 +51,24 @@ describe("ToolsPage", () => {
         {
           id: "t1",
           ownerId: "u1",
-          name: "Saege",
+          name: "Säge",
           description: "Holz",
           category: "Holz",
           imageUrl: "https://example.com/tool.jpg",
-          status: "VERFUEGBAR"
+          status: "VERFUEGBAR",
+          pickupLocation: "Heidemannstraße 20, 80939 München, Deutschland"
         }
       ])
       .mockResolvedValue([
         {
           id: "t1",
           ownerId: "u1",
-          name: "Saege",
+          name: "Säge",
           description: "Holz",
           category: "Holz",
           imageUrl: "https://example.com/tool.jpg",
-          status: "VERFUEGBAR"
+          status: "VERFUEGBAR",
+          pickupLocation: "Heidemannstraße 20, 80939 München, Deutschland"
         }
       ]);
 
@@ -78,11 +81,15 @@ describe("ToolsPage", () => {
     );
 
     expect(await screen.findByText(/Du kannst als Gast stöbern/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bitte anmelden" })).toBeInTheDocument();
+    expect(screen.queryByText("Easy verleihen. Schnell Nachbarn helfen.")).not.toBeInTheDocument();
+    const guestBanner = screen.getByRole("complementary");
+    expect(guestBanner.closest(".search-page")?.firstElementChild).toBe(guestBanner);
     const searchInput = screen.getByPlaceholderText(/Name oder Beschreibung/i);
-    const categoryInput = screen.getByPlaceholderText(/z\.B\. Holz/i);
+    const categoryInput = screen.getByRole("combobox", { name: /Kategorie/i });
 
     fireEvent.change(searchInput, { target: { value: "Bohr" } });
-    fireEvent.change(categoryInput, { target: { value: "Elektro" } });
+    fireEvent.change(categoryInput, { target: { value: "elektro" } });
 
     const resetButton = await screen.findByRole("button", { name: /Filter zurücksetzen/i });
     fireEvent.click(resetButton);

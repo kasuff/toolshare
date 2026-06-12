@@ -8,6 +8,11 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.{test,spec}.{ts,tsx}', 'src/tests/**/*.{test,spec}.{ts,tsx}'],
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+    pool: 'forks',
+    maxWorkers: process.env.CI ? 1 : undefined,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],

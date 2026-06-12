@@ -9,31 +9,27 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ onImageSelect, currentImage, placeholderImage, label, hint }: ImageUploadProps) {
-  const [preview, setPreview] = useState<string | null>(currentImage || placeholderImage);
+  const [preview, setPreview] = useState<string | null>(currentImage || null);
   const [fileName, setFileName] = useState<string>("");
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setPreview(currentImage || placeholderImage);
-  }, [currentImage, placeholderImage]);
+    setPreview(currentImage || null);
+  }, [currentImage]);
 
   const openFileDialog = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Limit file size to 5MB
+  const applyFile = (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
       alert("Datei ist zu groß. Maximum 5MB.");
       return;
     }
 
-    // Check file type
     if (!file.type.startsWith("image/")) {
-      alert("Bitte wähle eine Bilddatei aus (JPG, PNG, etc.)");
+      alert("Bitte wähle eine Bilddatei aus (JPG, PNG, etc.).");
       return;
     }
 
@@ -45,6 +41,23 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
       onImageSelect(imageData);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    applyFile(file);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      applyFile(file);
+    }
   };
 
   const handleClear = () => {
@@ -63,19 +76,46 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
       </label>
       {hint && <p className="hint">{hint}</p>}
 
-      <button type="button" className="image-preview-container" onClick={openFileDialog}>
+      <button
+        type="button"
+        className={`image-preview-container ${isDragging ? "is-dragging" : ""}`.trim()}
+        onClick={openFileDialog}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setIsDragging(false);
+        }}
+        onDrop={handleDrop}
+      >
         {preview ? (
           <>
             <img src={preview} alt="Preview" className="image-preview" />
             <div className="image-info">
               <p>{fileName || "Standardbild verwendet"}</p>
-              <p>Klicken zum Ersetzen</p>
+              <p>Klicken oder Datei hier ablegen, um das Bild zu ersetzen</p>
             </div>
           </>
         ) : (
           <div className="image-placeholder">
-            <p>Klick zum Bild hochladen</p>
-            <p>JPG, PNG, max. 5 MB</p>
+            <span className="upload-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 15V5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M8.5 8.5 12 5l3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M5 14.5v2.25A2.25 2.25 0 0 0 7.25 19h9.5A2.25 2.25 0 0 0 19 16.75V14.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span className="upload-copy">
+              <span className="upload-title">Bilddatei hochladen</span>
+              <span className="upload-description">Ziehe dein Werkzeugfoto hierher oder klicke zum Auswählen.</span>
+            </span>
+            <span className="upload-meta">JPG, PNG, WebP · max. 5 MB</span>
           </div>
         )}
       </button>

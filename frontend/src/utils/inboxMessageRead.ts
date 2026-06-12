@@ -1,4 +1,4 @@
-import type { Booking, PickupProposal } from "../types/domain";
+import type { Booking, PickupProposal, TimeslotProposal } from "../types/domain";
 
 const STORAGE_VER = "v1";
 
@@ -21,11 +21,16 @@ export function proposalMessageKey(bookingId: string, proposalId: string): strin
   return `prop:${bookingId}:${proposalId}`;
 }
 
-export function collectAllMessageKeys(bookings: Array<Booking & { pickupProposals?: PickupProposal[] }>): string[] {
+export function collectAllMessageKeys(
+  bookings: Array<Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] }>
+): string[] {
   const keys: string[] = [];
   for (const b of bookings) {
     keys.push(requestMessageKey(b.id));
     for (const p of b.pickupProposals ?? []) {
+      keys.push(proposalMessageKey(b.id, p.id));
+    }
+    for (const p of b.timeslotProposals ?? []) {
       keys.push(proposalMessageKey(b.id, p.id));
     }
   }
@@ -54,7 +59,7 @@ export function saveReadMessageIds(userId: string, ids: Set<string>): void {
  * Abgeschlossene Vorschläge (angenommen/abgelehnt) blockieren „Ungelesen“ nicht mehr.
  */
 export function bookingHasUnreadForUser(
-  booking: Booking & { pickupProposals?: PickupProposal[] },
+  booking: Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] },
   userId: string,
   readIds: Set<string>
 ): boolean {
@@ -62,6 +67,12 @@ export function bookingHasUnreadForUser(
     return true;
   }
   for (const p of booking.pickupProposals ?? []) {
+    if (p.status !== "PENDING") continue;
+    if (p.proposedById !== userId && !readIds.has(proposalMessageKey(booking.id, p.id))) {
+      return true;
+    }
+  }
+  for (const p of booking.timeslotProposals ?? []) {
     if (p.status !== "PENDING") continue;
     if (p.proposedById !== userId && !readIds.has(proposalMessageKey(booking.id, p.id))) {
       return true;

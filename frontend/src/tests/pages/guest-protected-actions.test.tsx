@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,7 +14,8 @@ vi.mock("../../services/api", async () => {
     api: {
       ...actual.api,
       getTools: vi.fn(),
-      getWorkshops: vi.fn()
+      getWorkshops: vi.fn(),
+      createWorkshopBooking: vi.fn()
     }
   };
 });
@@ -31,6 +31,7 @@ function renderWithRoutes(element: ReactElement, path: string) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path={path} element={element} />
+          <Route path="/workshops/:id" element={element} />
           <Route path="/auth" element={<AuthStateProbe />} />
         </Routes>
       </MemoryRouter>
@@ -52,7 +53,8 @@ describe("Guest protected actions", () => {
         description: "Leistungsstark",
         category: "Elektro",
         status: "VERFUEGBAR",
-        imageUrl: "https://example.com/tool.jpg"
+        imageUrl: "https://example.com/tool.jpg",
+        pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland"
       }
     ]);
 
@@ -61,21 +63,12 @@ describe("Guest protected actions", () => {
         <MemoryRouter initialEntries={["/tools/tool-1"]}>
           <Routes>
             <Route path="/tools/:id" element={<ToolDetailPage />} />
-            <Route path="/auth" element={<AuthStateProbe />} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>
     );
 
-    const user = userEvent.setup();
-  const loginCta = await screen
-    .findByRole("link", { name: /einloggen/i })
-    .catch(async () => screen.findByRole("button", { name: /einloggen/i }));
-  await user.click(loginCta);
-
-    expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
-      "Bitte melde dich an, um eine Ausleihe anzufragen."
-    );
+    expect(await screen.findByRole("link", { name: "Jetzt einloggen" })).toHaveAttribute("href", "/auth");
   });
 
   it("redirects guests to auth when booking a workshop slot", async () => {
@@ -86,7 +79,7 @@ describe("Guest protected actions", () => {
           ownerId: "owner-1",
           name: "Holzwerkstatt",
           description: "Mit Betreuung",
-          location: "Muenchen",
+          location: "München",
           maxCapacity: 5,
           extras: [],
           equipmentItems: [],
@@ -101,17 +94,72 @@ describe("Guest protected actions", () => {
             endIso: "2026-05-06T12:00",
             blockedByOwner: false
           }
+        ],
+        tools: []
+      }
+    ]);
+
+    renderWithRoutes(<WorkshopsPage />, "/workshops");
+
+    fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
+    fireEvent.click(await screen.findByRole("button", { name: "Jetzt einloggen" }));
+
+    expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
+      "Bitte melde dich an, um eine Werkstatt zu buchen."
+    );
+  });
+
+  it("keeps borrowed workshop tools out of the selectable filter and marks them in details", async () => {
+    vi.mocked(api.getWorkshops).mockResolvedValue([
+      {
+        workshop: {
+          id: "workshop-1",
+          ownerId: "owner-1",
+          name: "Holzwerkstatt",
+          description: "Mit Betreuung",
+          location: "München",
+          maxCapacity: 5,
+          extras: [],
+          equipmentItems: [],
+          imageUrls: [],
+          toolIds: []
+        },
+        slots: [],
+        tools: [
+          {
+            id: "tool-available",
+            ownerId: "owner-1",
+            name: "Bandsäge",
+            description: "Werkstatt-Werkzeug",
+            category: "holz",
+            status: "VERFUEGBAR",
+            imageUrl: "https://example.com/available.jpg",
+            selectable: true
+          },
+          {
+            id: "tool-borrowed",
+            ownerId: "owner-1",
+            name: "Schleifer",
+            description: "Werkstatt-Werkzeug",
+            category: "holz",
+            status: "AUSGELIEHEN",
+            imageUrl: "https://example.com/borrowed.jpg",
+            selectable: false
+          }
         ]
       }
     ]);
 
     renderWithRoutes(<WorkshopsPage />, "/workshops");
 
-    fireEvent.click(await screen.findByRole("button", { name: /Holzwerkstatt/i }));
-    fireEvent.click(await screen.findByRole("button", { name: "Login" }));
+    const toolFilter = await screen.findByRole("combobox", { name: /Werkzeugfilter/i });
+    expect(toolFilter).toHaveTextContent("Bandsäge");
+    expect(toolFilter).not.toHaveTextContent("Schleifer");
 
-    expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
-      "Bitte melde dich an, um eine Werkstatt zu buchen."
-    );
+    fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
+
+    expect((await screen.findAllByText("Bandsäge")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Schleifer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ausgeliehen").length).toBeGreaterThan(0);
   });
 });
