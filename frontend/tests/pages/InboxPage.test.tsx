@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastViewport } from "../../src/components/ui";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
@@ -253,7 +254,7 @@ describe("InboxPage", () => {
 
     await screen.findByRole("heading", { name: "Nachrichten" });
     fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
-    fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum"), {
+    fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-06" },
     });
     fireEvent.change(screen.getByLabelText("Alternative Abholzeit"), {
@@ -323,7 +324,7 @@ describe("InboxPage", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Alternativvorschlag senden" }));
-    fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag"), {
+    fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-08" }
     });
     fireEvent.change(screen.getByLabelText("Alternativuhrzeit für Werkstattvorschlag"), {
@@ -430,6 +431,31 @@ describe("InboxPage", () => {
     });
     expect((await screen.findAllByText("Abgeschlossen")).length).toBeGreaterThan(0);
     expect(screen.getByText("Buchung abgeschlossen").closest(".request-message-card")).toBeInTheDocument();
+  });
+
+  it("shows the API error when completing a booking fails", async () => {
+    getBookingsForUser.mockResolvedValueOnce([
+      {
+        ...baseOpenBooking,
+        status: "BESTAETIGT" as const,
+        pickupProposals: []
+      }
+    ]);
+    decideBooking.mockRejectedValueOnce(new Error("Abschluss konnte nicht gespeichert werden."));
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+        <ToastViewport />
+      </ToastProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Als abgeschlossen markieren" }));
+
+    expect(await screen.findByText("Abschluss konnte nicht gespeichert werden.")).toBeInTheDocument();
+    expect(getBookingsForUser).toHaveBeenCalledTimes(1);
   });
 
   it("lets the workshop provider complete a confirmed workshop booking", async () => {

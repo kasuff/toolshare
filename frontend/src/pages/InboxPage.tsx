@@ -16,6 +16,7 @@ import {
   requestMessageKey,
   saveReadMessageIds,
 } from "../utils/inboxMessageRead";
+import { canProviderCompleteBooking } from "../utils/bookingCompletion";
 
 type Props = {
   currentUser?: User;
@@ -196,10 +197,6 @@ export function InboxPage({ currentUser, token }: Props) {
   const workshopRangeDraft = selectedBooking ? draftWorkshopRangeByBooking[selectedBooking.id] : undefined;
 
   const isProvider = (b: Booking) => (currentUser ? b.providerId === currentUser.id : false);
-  const canComplete = (b: Booking) =>
-    isProvider(b) &&
-    b.status === "BESTAETIGT" &&
-    (b.type === "TOOL" || (Boolean(b.endIso) && new Date(b.endIso!).getTime() <= Date.now()));
 
   useLayoutEffect(() => {
     const chat = chatScrollRef.current;
@@ -877,7 +874,7 @@ export function InboxPage({ currentUser, token }: Props) {
                 </>
               )}
 
-              {canComplete(selectedBooking) && (
+              {canProviderCompleteBooking(selectedBooking, currentUser.id) && (
                 <footer className="messenger-chat-footer messenger-chat-footer--completion">
                   <button type="button" onClick={() => void close(selectedBooking.id)}>
                     Als abgeschlossen markieren

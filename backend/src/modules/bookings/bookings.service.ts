@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma";
 import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
+import { assertBookingCanBeCompleted } from "./bookings.completion";
 
 const BLOCKING_BOOKING_STATUSES: Array<"PENDING" | "ACCEPTED"> = ["PENDING", "ACCEPTED"];
 
@@ -140,15 +141,10 @@ export const bookingsService = {
     const isModeratorOrManager = input.actorRole === "MODERATOR" || input.actorRole === "MANAGER";
 
     if (input.status === "RETURNED") {
-      if (!isProvider && !isModeratorOrManager) {
-        throw new AppError("FORBIDDEN", "Only the provider can complete a booking", 403);
-      }
-      if (booking.status !== "ACCEPTED") {
-        throw new AppError("INVALID_STATE", "Only accepted bookings can be completed", 400);
-      }
-      if (booking.timeslot && booking.endDate.getTime() > Date.now()) {
-        throw new AppError("BOOKING_NOT_ENDED", "Booking can only be completed after the usage period has ended", 400);
-      }
+      assertBookingCanBeCompleted(booking, {
+        actorId: input.actorId,
+        actorRole: input.actorRole
+      });
     } else if (!isProvider && !isModeratorOrManager) {
       throw new AppError("FORBIDDEN", "Only provider or moderation roles can update booking", 403);
     }
