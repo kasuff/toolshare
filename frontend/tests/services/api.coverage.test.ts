@@ -3,8 +3,6 @@ import { api } from "../../src/services/api";
 
 const fetchMock = vi.fn();
 
-vi.stubGlobal("fetch", fetchMock);
-
 function responseJson(body: unknown, init?: ResponseInit) {
   const status = init?.status ?? 200;
   return {
@@ -24,6 +22,7 @@ function responseNoContent(status = 204) {
 
 beforeEach(() => {
   fetchMock.mockReset();
+  vi.stubGlobal("fetch", fetchMock);
 });
 
 describe("api coverage", () => {
