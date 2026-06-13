@@ -467,6 +467,14 @@ export const api = {
     });
   },
 
+  async changePassword(currentPassword: string, newPassword: string, token: string): Promise<void> {
+    return request<void>(
+      "/auth/change-password",
+      { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) },
+      token
+    );
+  },
+
   async suggestAddresses(query: string): Promise<AddressSuggestion[]> {
     if (query.trim().length < 3) return [];
     try {

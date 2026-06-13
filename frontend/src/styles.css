@@ -1453,6 +1453,12 @@ button.mini {
   justify-self: start;
 }
 
+.profile-password-form {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
 .profile-settings-form {
   display: grid;
   gap: var(--space-4);

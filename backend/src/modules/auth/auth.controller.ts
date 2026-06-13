@@ -24,5 +24,14 @@ export const authController = {
   refresh: asyncHandler(async (req: Request, res: Response) => {
     const result = await authService.refresh(req.body.refreshToken);
     res.status(200).json(result);
+  }),
+
+  changePassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.changePassword({
+      userId: req.authUser!.userId,
+      currentPassword: req.body.currentPassword as string,
+      newPassword: req.body.newPassword as string
+    });
+    res.status(204).send();
   })
 };
