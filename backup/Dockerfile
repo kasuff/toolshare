@@ -17,7 +17,8 @@ ARG SUPERCRONIC_VERSION=v0.2.33
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates curl; \
+    # awscli: nur zum Messen der Bucket-Belegung (Size-Budget in backup.sh).
+    apt-get install -y --no-install-recommends ca-certificates curl awscli; \
     # WAL-G (Postgres-Variante, statisch gegen glibc)
     curl -fsSL -o /tmp/wal-g.tar.gz \
       "https://github.com/wal-g/wal-g/releases/download/${WALG_VERSION}/wal-g-pg-ubuntu-20.04-amd64.tar.gz"; \

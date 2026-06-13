@@ -104,13 +104,20 @@ describe("bookings controller – metrics instrumentation", () => {
   });
 
   describe("POST /api/bookings/workshop", () => {
+    const validWorkshopBody = {
+      workshopId: "33333333-3333-3333-3333-333333333333",
+      startDate: "2026-07-01T00:00:00.000Z",
+      endDate: "2026-07-01T02:00:00.000Z",
+      workshopToolIds: ["44444444-4444-4444-4444-444444444444"]
+    };
+
     it("increments bookingsCreatedTotal on successful workshop booking", async () => {
       mockedBookingsService.createWorkshopBooking.mockResolvedValue({ id: "b2" } as never);
 
       await request(app)
         .post("/api/bookings/workshop")
         .set("Authorization", `Bearer ${token}`)
-        .send({ timeslotId: "44444444-4444-4444-4444-444444444444" });
+        .send(validWorkshopBody);
 
       expect(mockedBookingsCreated.inc).toHaveBeenCalledOnce();
     });
@@ -121,7 +128,7 @@ describe("bookings controller – metrics instrumentation", () => {
       await request(app)
         .post("/api/bookings/workshop")
         .set("Authorization", `Bearer ${token}`)
-        .send({ timeslotId: "44444444-4444-4444-4444-444444444444" });
+        .send(validWorkshopBody);
 
       expect(mockedBookingsCreated.inc).not.toHaveBeenCalled();
     });

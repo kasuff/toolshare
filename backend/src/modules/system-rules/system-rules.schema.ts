@@ -1,27 +1,12 @@
 import { z } from "zod";
+import { SYSTEM_SETTING_KEYS } from "./system-settings.config";
 
-export const createSystemRuleSchema = z.object({
+export const updateSystemSettingSchema = z.object({
   body: z.object({
-    text: z.string().min(1)
-  }),
-  params: z.object({}),
-  query: z.object({})
-});
-
-export const updateSystemRuleSchema = z.object({
-  body: z.object({
-    text: z.string().min(1)
+    value: z.number().int()
   }),
   params: z.object({
-    id: z.string().uuid()
-  }),
-  query: z.object({})
-});
-
-export const systemRuleIdParamSchema = z.object({
-  body: z.object({}),
-  params: z.object({
-    id: z.string().uuid()
+    key: z.enum(SYSTEM_SETTING_KEYS as [string, ...string[]])
   }),
   query: z.object({})
 });

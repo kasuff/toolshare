@@ -5,17 +5,14 @@ export function ImpressumPage() {
 
       <h2 id="m46">Diensteanbieter</h2>
       <p>
-        Sauerwein Alexander<br />
-        Freisinger Landstraße 86<br />
-        80939 München
+        [Name des Diensteanbieters]<br />
+        [Straße und Hausnummer]<br />
+        [PLZ und Ort]
       </p>
 
       <h2 id="m56">Kontaktmöglichkeiten</h2>
-      <p>
-        E-Mail-Adresse:{" "}
-        <a href="mailto:alex.sauerwe@gmail.com">alex.sauerwe@gmail.com</a>
-      </p>
-      <p>Telefon: 015259593474</p>
+      <p>E-Mail-Adresse: [E-Mail-Adresse]</p>
+      <p>Telefon: [Telefonnummer]</p>
 
       <h2 id="m65">Haftungs- und Schutzrechtshinweise</h2>
       <p>

@@ -31,14 +31,11 @@ export function DatenschutzPage() {
 
       <h2 id="m3">Verantwortlicher</h2>
       <p>
-        Sauerwein Alexander<br />
-        Freisinger Landstraße 86<br />
-        80939 München
+        [Name des Verantwortlichen]<br />
+        [Straße und Hausnummer]<br />
+        [PLZ und Ort]
       </p>
-      <p>
-        E-Mail-Adresse:{" "}
-        <a href="mailto:alex.sauerwe@gmail.com">alex.sauerwe@gmail.com</a>
-      </p>
+      <p>E-Mail-Adresse: [E-Mail-Adresse]</p>
 
       <h2 id="mOverview">Übersicht der Verarbeitungen</h2>
       <p>

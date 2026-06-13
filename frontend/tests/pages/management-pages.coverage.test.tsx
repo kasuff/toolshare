@@ -22,7 +22,8 @@ const {
   updateReportStatus,
   listSuspensionRequests,
   decideSuspensionRequest,
-  createWorkshop
+  createWorkshop,
+  getSystemSettings
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
@@ -38,7 +39,8 @@ const {
   updateReportStatus: vi.fn(),
   listSuspensionRequests: vi.fn(),
   decideSuspensionRequest: vi.fn(),
-  createWorkshop: vi.fn()
+  createWorkshop: vi.fn(),
+  getSystemSettings: vi.fn()
 }));
 
 vi.mock("../../src/hooks/useToast", () => ({
@@ -62,7 +64,8 @@ vi.mock("../../src/services/api", () => ({
     updateReportStatus,
     listSuspensionRequests,
     decideSuspensionRequest,
-    createWorkshop
+    createWorkshop,
+    getSystemSettings
   }
 }));
 
@@ -106,6 +109,7 @@ describe("management pages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("FileReader", FileReaderMock as unknown as typeof FileReader);
+    getSystemSettings.mockResolvedValue([]);
   });
 
   it("guards admin access when no token is available", () => {

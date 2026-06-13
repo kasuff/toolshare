@@ -3,12 +3,10 @@ import { Link } from "react-router-dom";
 import { MonitoringSection } from "../components/MonitoringSection";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api, type SuspensionRequestItem } from "../services/api";
+import { api, type SuspensionRequestItem, type SystemSetting } from "../services/api";
 import type { User } from "../types/domain";
 
 type AdminTab = "management" | "monitoring" | "rules";
-
-type SystemRule = { id: string; text: string };
 
 type Props = {
   currentUser?: User;
@@ -25,11 +23,9 @@ export function AdminPage({ currentUser, token }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
-  const [rules, setRules] = useState<SystemRule[]>([]);
-  const [newRuleText, setNewRuleText] = useState("");
-  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
-  const [editingRuleText, setEditingRuleText] = useState("");
-  const [isSavingRule, setIsSavingRule] = useState(false);
+  const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [savingSettingKey, setSavingSettingKey] = useState<string | null>(null);
   const [metrics, setMetrics] = useState({
     users: 0,
     tools: 0,
@@ -43,11 +39,11 @@ export function AdminPage({ currentUser, token }: Props) {
     if (!token) return;
     setIsLoading(true);
     try {
-      const [nextUsers, nextMetrics, nextSuspensionRequests, nextRules] = await Promise.all([
+      const [nextUsers, nextMetrics, nextSuspensionRequests, nextSettings] = await Promise.all([
         api.listUsers(token, { search: search || undefined }),
         api.getMetrics(token),
         api.listSuspensionRequests(token),
-        api.listSystemRules(token)
+        api.getSystemSettings(token)
       ]);
       setUsers(nextUsers);
       setMetrics({
@@ -59,7 +55,8 @@ export function AdminPage({ currentUser, token }: Props) {
         openSuspensionRequests: nextMetrics.openSuspensionRequests ?? 0
       });
       setSuspensionRequests(nextSuspensionRequests);
-      setRules(nextRules);
+      setSettings(nextSettings);
+      setDraftValues(Object.fromEntries(nextSettings.map((s) => [s.key, String(s.value)])));
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Admin-Daten konnten nicht geladen werden.", "error");
     } finally {
@@ -67,60 +64,29 @@ export function AdminPage({ currentUser, token }: Props) {
     }
   };
 
-  const addRule = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!token || !newRuleText.trim()) return;
-    setIsSavingRule(true);
-    try {
-      const created = await api.createSystemRule(newRuleText.trim(), token);
-      setRules((prev) => [...prev, created]);
-      setNewRuleText("");
-      pushToast("Regel wurde hinzugefügt.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Regel konnte nicht erstellt werden.", "error");
-    } finally {
-      setIsSavingRule(false);
-    }
-  };
-
-  const saveRule = async (id: string) => {
-    if (!token || !editingRuleText.trim()) return;
-    setIsSavingRule(true);
-    try {
-      const updated = await api.updateSystemRule(id, editingRuleText.trim(), token);
-      setRules((prev) => prev.map((r) => (r.id === id ? updated : r)));
-      setEditingRuleId(null);
-      setEditingRuleText("");
-      pushToast("Regel wurde gespeichert.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Regel konnte nicht gespeichert werden.", "error");
-    } finally {
-      setIsSavingRule(false);
-    }
-  };
-
-  const deleteRule = async (id: string) => {
+  const saveSetting = async (setting: SystemSetting) => {
     if (!token) return;
-    setIsSavingRule(true);
-    try {
-      await api.deleteSystemRule(id, token);
-      setRules((prev) => prev.filter((r) => r.id !== id));
-      pushToast("Regel wurde gelöscht.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Regel konnte nicht gelöscht werden.", "error");
-    } finally {
-      setIsSavingRule(false);
+    const raw = draftValues[setting.key];
+    const value = Number(raw);
+    if (raw === undefined || raw === "" || !Number.isInteger(value)) {
+      pushToast("Bitte eine ganze Zahl eingeben.", "error");
+      return;
     }
-  };
-
-  const startEditing = (rule: SystemRule) => {
-    setEditingRuleId(rule.id);
-    setEditingRuleText(rule.text);
-  };
-
-  const cancelEditing = () => {
-    setEditingRuleId(null);
-    setEditingRuleText("");
+    if (value < setting.min || value > setting.max) {
+      pushToast(`Wert muss zwischen ${setting.min} und ${setting.max} liegen.`, "error");
+      return;
+    }
+    setSavingSettingKey(setting.key);
+    try {
+      const updated = await api.updateSystemSetting(setting.key, value, token);
+      setSettings((prev) => prev.map((s) => (s.key === updated.key ? updated : s)));
+      setDraftValues((prev) => ({ ...prev, [updated.key]: String(updated.value) }));
+      pushToast("Einstellung wurde gespeichert.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Einstellung konnte nicht gespeichert werden.", "error");
+    } finally {
+      setSavingSettingKey(null);
+    }
   };
 
   useEffect(() => {
@@ -239,92 +205,45 @@ export function AdminPage({ currentUser, token }: Props) {
         {tabNav}
         <Surface
           title="Systemregeln"
-          subtitle="Regeln gelten plattformweit und werden allen Nutzern angezeigt."
+          subtitle="Diese Werte gelten plattformweit. Nur die Zahl ist anpassbar – Änderungen werden sofort übernommen."
         >
-          {rules.length === 0 && !isLoading && (
-            <EmptyState title="Keine Regeln" text="Es wurden noch keine Systemregeln definiert." />
-          )}
-          {rules.length > 0 && (
-            <ul className="moderation-report-list">
-              {rules.map((rule) => (
-                <li key={rule.id} className="inbox-item moderation-report">
-                  {editingRuleId === rule.id ? (
-                    <div className="stack">
-                      <textarea
-                        className="rule-textarea"
-                        value={editingRuleText}
-                        onChange={(e) => setEditingRuleText(e.target.value)}
-                        rows={3}
-                        aria-label="Regeltext bearbeiten"
+          {isLoading && settings.length === 0 && <p className="hint">Lade Systemregeln...</p>}
+          {settings.length > 0 && (
+            <ul className="system-settings-list">
+              {settings.map((setting) => {
+                const draft = draftValues[setting.key] ?? String(setting.value);
+                const isDirty = draft !== String(setting.value);
+                return (
+                  <li key={setting.key} className="system-setting-row">
+                    <span className="system-setting-label">{setting.label}:</span>
+                    <div className="system-setting-control">
+                      <input
+                        type="number"
+                        className="system-setting-input"
+                        value={draft}
+                        min={setting.min}
+                        max={setting.max}
+                        step={1}
+                        aria-label={setting.label}
+                        onChange={(e) =>
+                          setDraftValues((prev) => ({ ...prev, [setting.key]: e.target.value }))
+                        }
                       />
-                      <div className="moderation-actions">
-                        <button
-                          type="button"
-                          className="btn mini"
-                          disabled={isSavingRule || !editingRuleText.trim()}
-                          onClick={() => void saveRule(rule.id)}
-                        >
-                          Speichern
-                        </button>
-                        <button
-                          type="button"
-                          className="btn secondary mini"
-                          disabled={isSavingRule}
-                          onClick={cancelEditing}
-                        >
-                          Abbrechen
-                        </button>
-                      </div>
+                      {setting.unit && <span className="system-setting-unit">{setting.unit}</span>}
+                      <button
+                        type="button"
+                        className="btn mini"
+                        disabled={!isDirty || savingSettingKey === setting.key}
+                        onClick={() => void saveSetting(setting)}
+                      >
+                        Speichern
+                      </button>
                     </div>
-                  ) : (
-                    <div className="stack">
-                      <p>{rule.text}</p>
-                      <div className="moderation-actions">
-                        <button
-                          type="button"
-                          className="btn secondary mini"
-                          disabled={isSavingRule}
-                          onClick={() => startEditing(rule)}
-                        >
-                          Bearbeiten
-                        </button>
-                        <button
-                          type="button"
-                          className="btn mini"
-                          disabled={isSavingRule}
-                          onClick={() => void deleteRule(rule.id)}
-                        >
-                          Löschen
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
-          <form className="stack" onSubmit={(e) => void addRule(e)}>
-            <label className="form-label">
-              <span>Neue Regel hinzufügen</span>
-              <textarea
-                className="rule-textarea"
-                value={newRuleText}
-                onChange={(e) => setNewRuleText(e.target.value)}
-                placeholder="Regeltext eingeben..."
-                rows={2}
-                aria-label="Neue Systemregel"
-              />
-            </label>
-            <div className="row">
-              <button
-                type="submit"
-                className="btn"
-                disabled={isSavingRule || !newRuleText.trim()}
-              >
-                Regel hinzufügen
-              </button>
-            </div>
-          </form>
         </Surface>
       </section>
     );

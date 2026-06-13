@@ -78,6 +78,15 @@ export type SuspensionRequestItem = {
   report?: { id: string; reason: string; targetType: string; targetId: string } | null;
 };
 
+export type SystemSetting = {
+  key: string;
+  label: string;
+  unit: string;
+  value: number;
+  min: number;
+  max: number;
+};
+
 export type AddressSuggestion = {
   label: string;
   street: string;
@@ -1001,30 +1010,14 @@ export const api = {
     return request<BackendMetrics>("/users/admin/metrics", undefined, token);
   },
 
-  async listSystemRules(token: string): Promise<Array<{ id: string; text: string }>> {
-    return request<Array<{ id: string; text: string }>>("/system-rules", undefined, token);
+  async getSystemSettings(token: string): Promise<SystemSetting[]> {
+    return request<SystemSetting[]>("/system-rules", undefined, token);
   },
 
-  async createSystemRule(text: string, token: string): Promise<{ id: string; text: string }> {
-    return request<{ id: string; text: string }>(
-      "/system-rules",
-      { method: "POST", body: JSON.stringify({ text }) },
-      token
-    );
-  },
-
-  async updateSystemRule(id: string, text: string, token: string): Promise<{ id: string; text: string }> {
-    return request<{ id: string; text: string }>(
-      `/system-rules/${id}`,
-      { method: "PATCH", body: JSON.stringify({ text }) },
-      token
-    );
-  },
-
-  async deleteSystemRule(id: string, token: string): Promise<void> {
-    return request<void>(
-      `/system-rules/${id}`,
-      { method: "DELETE" },
+  async updateSystemSetting(key: string, value: number, token: string): Promise<SystemSetting> {
+    return request<SystemSetting>(
+      `/system-rules/${key}`,
+      { method: "PUT", body: JSON.stringify({ value }) },
       token
     );
   }

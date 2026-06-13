@@ -7,6 +7,7 @@ import {
   toAddressPayload
 } from "../components/AddressInput";
 import { Surface } from "../components/ui";
+import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { ImageUpload } from "../components/ImageUpload";
 import { CategorySelect } from "../components/CategorySelect";
 import { useToast } from "../hooks/useToast";
@@ -121,6 +122,8 @@ export function NewToolPage({ token }: Props) {
   return (
     <section className="new-tool-page">
       <h1>Werkzeug einstellen</h1>
+
+      <SystemRulesInfo token={token} />
 
       <form className="new-tool-form" onSubmit={onSubmit} noValidate>
         <p className="required-note">Pflichtfelder werden mit einem * markiert!</p>

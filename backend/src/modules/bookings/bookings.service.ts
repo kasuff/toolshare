@@ -2,9 +2,54 @@ import { AppError } from "../../utils/app-error";
 import { prisma } from "../../config/prisma";
 import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
+import { systemRulesService } from "../system-rules/system-rules.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 
 const BLOCKING_BOOKING_STATUSES: Array<"PENDING" | "ACCEPTED"> = ["PENDING", "ACCEPTED"];
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+// Erzwingt die buchungsbezogenen Systemregeln (Vorlauf, Vorausbuchungszeit und
+// – nur bei Werkzeugen – die maximale Ausleihdauer). Die Werte stammen live aus
+// den Admin-Systemeinstellungen, Änderungen wirken also sofort.
+async function assertBookingRules(
+  startDate: Date,
+  endDate: Date,
+  options: { checkLoanDuration: boolean }
+): Promise<void> {
+  const values = await systemRulesService.getValues();
+  const now = Date.now();
+
+  const leadMs = values.minBookingLeadTimeHours * HOUR_MS;
+  if (startDate.getTime() - now < leadMs) {
+    throw new AppError(
+      "BOOKING_LEAD_TIME",
+      `Buchungen müssen mindestens ${values.minBookingLeadTimeHours} Stunden im Voraus erfolgen.`,
+      400
+    );
+  }
+
+  const advanceMs = values.maxAdvanceBookingDays * DAY_MS;
+  if (startDate.getTime() - now > advanceMs) {
+    throw new AppError(
+      "BOOKING_TOO_FAR_AHEAD",
+      `Buchungen sind höchstens ${values.maxAdvanceBookingDays} Tage im Voraus möglich.`,
+      400
+    );
+  }
+
+  if (options.checkLoanDuration) {
+    const maxDurationMs = values.maxLoanDurationDays * DAY_MS;
+    if (endDate.getTime() - startDate.getTime() > maxDurationMs) {
+      throw new AppError(
+        "BOOKING_TOO_LONG",
+        `Die maximale Ausleihdauer beträgt ${values.maxLoanDurationDays} Tage.`,
+        400
+      );
+    }
+  }
+}
 
 function getProviderId(booking: {
   tool?: { ownerId: string } | null;
@@ -39,6 +84,8 @@ export const bookingsService = {
     ) {
       throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
+
+    await assertBookingRules(startDate, endDate, { checkLoanDuration: true });
 
     const result = await bookingsRepository.createToolBookingTransaction({
       userId: input.requesterId,
@@ -75,6 +122,8 @@ export const bookingsService = {
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate >= endDate) {
       throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
+
+    await assertBookingRules(startDate, endDate, { checkLoanDuration: false });
 
     const result = await bookingsRepository.createWorkshopBookingTransaction({
       userId: input.requesterId,

@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../hooks/useToast";
-import { api } from "../../services/api";
+import { api, type SystemSetting } from "../../services/api";
 import { AdminPage } from "../../pages/AdminPage";
 import type { User } from "../../types/domain";
 
@@ -15,10 +15,8 @@ vi.mock("../../services/api", async () => {
       listUsers: vi.fn(),
       getMetrics: vi.fn(),
       listSuspensionRequests: vi.fn(),
-      listSystemRules: vi.fn(),
-      createSystemRule: vi.fn(),
-      updateSystemRule: vi.fn(),
-      deleteSystemRule: vi.fn()
+      getSystemSettings: vi.fn(),
+      updateSystemSetting: vi.fn()
     }
   };
 });
@@ -29,6 +27,15 @@ const adminUser: User = {
   email: "admin@example.com",
   role: "ADMIN",
   isSuspended: false
+};
+
+const loanSetting: SystemSetting = {
+  key: "maxLoanDurationDays",
+  label: "Maximale Ausleihdauer eines Werkzeugs",
+  unit: "Tage",
+  value: 14,
+  min: 1,
+  max: 365
 };
 
 function renderAdminPage(user: User | undefined = adminUser, token?: string) {
@@ -64,7 +71,7 @@ describe("AdminPage – Systemregeln", () => {
       openSuspensionRequests: 0
     });
     vi.mocked(api.listSuspensionRequests).mockResolvedValue([]);
-    vi.mocked(api.listSystemRules).mockResolvedValue([]);
+    vi.mocked(api.getSystemSettings).mockResolvedValue([loanSetting]);
   });
 
   it("Given: ich bin Admin – zeigt den Tab Systemregeln an", async () => {
@@ -73,41 +80,37 @@ describe("AdminPage – Systemregeln", () => {
     expect(await screen.findByRole("button", { name: "Systemregeln" })).toBeInTheDocument();
   });
 
-  it("Given: ich bin Admin – When: Systemregeln-Tab öffne, Then: sehe ich Kennzahlen und Regelbereich", async () => {
-    vi.mocked(api.listSystemRules).mockResolvedValue([
-      { id: "rule-1", text: "Werkzeuge pfleglich behandeln." }
-    ]);
-
+  it("Given: ich bin Admin – When: Systemregeln-Tab öffne, Then: sehe ich Label und editierbares Zahlenfeld", async () => {
     renderAdminPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Systemregeln" }));
 
-    expect(await screen.findByText("Werkzeuge pfleglich behandeln.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Neue Systemregel")).toBeInTheDocument();
+    expect(await screen.findByText("Maximale Ausleihdauer eines Werkzeugs:")).toBeInTheDocument();
+    const input = screen.getByLabelText("Maximale Ausleihdauer eines Werkzeugs") as HTMLInputElement;
+    expect(input).toHaveValue(14);
+    expect(screen.getByText("Tage")).toBeInTheDocument();
   });
 
-  it("Given: ich bin Admin – When: neue Regel speichern, Then: wird sie im System angewendet", async () => {
-    const created = { id: "rule-new", text: "Rückgabe innerhalb von 7 Tagen." };
-    vi.mocked(api.createSystemRule).mockResolvedValue(created);
+  it("Given: ich bin Admin – When: Wert ändern und speichern, Then: wird er übernommen", async () => {
+    vi.mocked(api.updateSystemSetting).mockResolvedValue({ ...loanSetting, value: 21 });
 
     renderAdminPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Systemregeln" }));
 
-    const textarea = await screen.findByLabelText("Neue Systemregel");
-    fireEvent.change(textarea, { target: { value: "Rückgabe innerhalb von 7 Tagen." } });
-    fireEvent.click(screen.getByRole("button", { name: "Regel hinzufügen" }));
+    const input = await screen.findByLabelText("Maximale Ausleihdauer eines Werkzeugs");
+    fireEvent.change(input, { target: { value: "21" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => {
-      expect(api.createSystemRule).toHaveBeenCalledWith("Rückgabe innerhalb von 7 Tagen.", "test-token");
+      expect(api.updateSystemSetting).toHaveBeenCalledWith("maxLoanDurationDays", 21, "test-token");
     });
-    expect(await screen.findByText("Rückgabe innerhalb von 7 Tagen.")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("21")).toBeInTheDocument();
   });
 
-  it("Given: ich bin nicht Admin (kein Token) – Then: wird kein Systemregeln-Tab angeboten", async () => {
+  it("Given: ich bin nicht eingeloggt (kein Token) – Then: wird kein Systemregeln-Tab angeboten", async () => {
     renderAdminPageNoToken(adminUser);
 
-    // When token is absent the component renders the login prompt, not the tab nav
     expect(await screen.findByText("Einloggen")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Systemregeln" })).not.toBeInTheDocument();
   });

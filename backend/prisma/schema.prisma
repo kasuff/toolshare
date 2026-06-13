@@ -256,9 +256,8 @@ model SuspensionRequest {
   @@index([userId])
 }
 
-model SystemRule {
-  id        String   @id @default(uuid())
-  text      String
-  createdAt DateTime @default(now())
+model SystemSetting {
+  key       String   @id
+  value     Int
   updatedAt DateTime @updatedAt
 }

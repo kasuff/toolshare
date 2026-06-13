@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
 import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
 import { bookingsService } from "../src/modules/bookings/bookings.service";
+import { systemRulesService } from "../src/modules/system-rules/system-rules.service";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -44,12 +45,38 @@ vi.mock("../src/modules/notifications/notifications.repository", () => ({
   }
 }));
 
+vi.mock("../src/modules/system-rules/system-rules.service", () => ({
+  systemRulesService: {
+    getValues: vi.fn()
+  }
+}));
+
 const mockedBookingsRepository = vi.mocked(bookingsRepository);
 const mockedNotificationsRepository = vi.mocked(notificationsRepository);
+const mockedSystemRulesService = vi.mocked(systemRulesService);
+
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+// Gültiges Buchungsfenster relativ zu "jetzt": 2 Tage Vorlauf, 1 Tag Dauer.
+const futureIso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
+const validStart = () => futureIso(2 * DAY);
+const validEnd = () => futureIso(3 * DAY);
+const validPickup = () => futureIso(2 * DAY - HOUR);
 
 describe("bookingsService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedSystemRulesService.getValues.mockResolvedValue({
+      maxLoanDurationDays: 14,
+      minBookingLeadTimeHours: 12,
+      maxAdvanceBookingDays: 60,
+      maxConcurrentLoansPerUser: 5,
+      unansweredRequestExpiryHours: 48,
+      warningsUntilSuspension: 3,
+      temporarySuspensionDurationDays: 7,
+      maxSearchRadiusKm: 20,
+      maxActiveOffersPerUser: 20
+    });
   });
 
   it("creates a tool counter proposal with pickup and return times", async () => {
@@ -188,11 +215,50 @@ describe("bookingsService", () => {
       bookingsService.createToolBooking({
         requesterId: "u1",
         toolId: "missing",
-        startDate: "2026-06-01T10:00:00.000Z",
-        endDate: "2026-06-02T10:00:00.000Z",
-        pickupTime: "2026-06-01T09:00:00.000Z"
+        startDate: validStart(),
+        endDate: validEnd(),
+        pickupTime: validPickup()
       })
     ).rejects.toMatchObject({ code: "TOOL_NOT_FOUND", status: 404 });
+  });
+
+  it("rejects tool booking when it starts inside the minimum lead time", async () => {
+    await expect(
+      bookingsService.createToolBooking({
+        requesterId: "u1",
+        toolId: "t1",
+        startDate: futureIso(HOUR),
+        endDate: futureIso(2 * HOUR),
+        pickupTime: futureIso(HOUR)
+      })
+    ).rejects.toMatchObject({ code: "BOOKING_LEAD_TIME", status: 400 });
+    expect(mockedBookingsRepository.createToolBookingTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects tool booking that exceeds the maximum advance booking window", async () => {
+    await expect(
+      bookingsService.createToolBooking({
+        requesterId: "u1",
+        toolId: "t1",
+        startDate: futureIso(90 * DAY),
+        endDate: futureIso(91 * DAY),
+        pickupTime: futureIso(90 * DAY - HOUR)
+      })
+    ).rejects.toMatchObject({ code: "BOOKING_TOO_FAR_AHEAD", status: 400 });
+    expect(mockedBookingsRepository.createToolBookingTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects tool booking that exceeds the maximum loan duration", async () => {
+    await expect(
+      bookingsService.createToolBooking({
+        requesterId: "u1",
+        toolId: "t1",
+        startDate: futureIso(2 * DAY),
+        endDate: futureIso(20 * DAY),
+        pickupTime: futureIso(2 * DAY - HOUR)
+      })
+    ).rejects.toMatchObject({ code: "BOOKING_TOO_LONG", status: 400 });
+    expect(mockedBookingsRepository.createToolBookingTransaction).not.toHaveBeenCalled();
   });
 
   it("rejects tool booking with invalid time range", async () => {
@@ -214,9 +280,9 @@ describe("bookingsService", () => {
       bookingsService.createToolBooking({
         requesterId: "u1",
         toolId: "t1",
-        startDate: "2026-06-01T10:00:00.000Z",
-        endDate: "2026-06-02T10:00:00.000Z",
-        pickupTime: "2026-06-01T09:00:00.000Z"
+        startDate: validStart(),
+        endDate: validEnd(),
+        pickupTime: validPickup()
       })
     ).rejects.toMatchObject({ code: "BOOKING_CONFLICT", status: 409 });
   });
@@ -230,9 +296,9 @@ describe("bookingsService", () => {
     const result = await bookingsService.createToolBooking({
       requesterId: "u1",
       toolId: "t1",
-      startDate: "2026-06-01T10:00:00.000Z",
-      endDate: "2026-06-02T10:00:00.000Z",
-      pickupTime: "2026-06-01T09:00:00.000Z"
+      startDate: validStart(),
+      endDate: validEnd(),
+      pickupTime: validPickup()
     });
 
     expect(mockedBookingsRepository.createToolBookingTransaction).toHaveBeenCalled();
@@ -246,19 +312,21 @@ describe("bookingsService", () => {
       timeslot: { workshop: { managerId: "manager-1" } }
     } as any);
 
+    const startDate = validStart();
+    const endDate = validEnd();
     const result = await bookingsService.createWorkshopBooking({
       requesterId: "user-1",
       workshopId: "workshop-1",
-      startDate: "2026-06-01T10:00:00.000Z",
-      endDate: "2026-06-02T10:00:00.000Z",
+      startDate,
+      endDate,
       workshopToolIds: ["wt-1"]
     });
 
     expect(mockedBookingsRepository.createWorkshopBookingTransaction).toHaveBeenCalledWith({
       userId: "user-1",
       workshopId: "workshop-1",
-      startDate: new Date("2026-06-01T10:00:00.000Z"),
-      endDate: new Date("2026-06-02T10:00:00.000Z"),
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
       workshopToolIds: ["wt-1"]
     });
     expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("manager-1", expect.stringContaining("Werkstatt"));
@@ -272,8 +340,8 @@ describe("bookingsService", () => {
       bookingsService.createWorkshopBooking({
         requesterId: "user-1",
         workshopId: "workshop-1",
-        startDate: "2026-06-01T10:00:00.000Z",
-        endDate: "2026-06-02T10:00:00.000Z",
+        startDate: validStart(),
+        endDate: validEnd(),
         workshopToolIds: []
       })
     ).rejects.toMatchObject({ code: "WORKSHOP_TOOLS_REQUIRED", status: 400 });

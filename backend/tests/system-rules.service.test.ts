@@ -1,105 +1,96 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { systemRulesService } from "../src/modules/system-rules/system-rules.service";
 import { systemRulesRepository } from "../src/modules/system-rules/system-rules.repository";
+import { ENFORCED_SETTING_DEFS } from "../src/modules/system-rules/system-settings.config";
 
 vi.mock("../src/modules/system-rules/system-rules.repository", () => ({
   systemRulesRepository: {
-    list: vi.fn(),
-    findById: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    remove: vi.fn()
+    findAllValues: vi.fn(),
+    upsert: vi.fn()
   }
 }));
 
 const mockedRepo = vi.mocked(systemRulesRepository);
 
-const RULE_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-
-const makeRule = (overrides: Partial<{ id: string; text: string }> = {}) => ({
-  id: RULE_ID,
-  text: "Keine Beschädigung der Werkzeuge.",
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  ...overrides
-});
-
-describe("systemRulesService.listRules", () => {
+describe("systemRulesService.listSettings", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns all rules from the repository", async () => {
-    const rules = [makeRule()];
-    mockedRepo.list.mockResolvedValueOnce(rules);
+  it("returns only the enforced settings with default values when nothing is stored", async () => {
+    mockedRepo.findAllValues.mockResolvedValueOnce(new Map());
 
-    const result = await systemRulesService.listRules();
+    const result = await systemRulesService.listSettings();
 
-    expect(result).toEqual(rules);
-    expect(mockedRepo.list).toHaveBeenCalledTimes(1);
+    expect(result).toHaveLength(ENFORCED_SETTING_DEFS.length);
+    expect(result.map((s) => s.key)).toEqual(ENFORCED_SETTING_DEFS.map((d) => d.key));
+    expect(result.every((s) => s.enforced)).toBe(true);
+    for (const setting of result) {
+      const def = ENFORCED_SETTING_DEFS.find((d) => d.key === setting.key)!;
+      expect(setting.value).toBe(def.defaultValue);
+      expect(setting.label).toBe(def.label);
+      expect(setting.unit).toBe(def.unit);
+    }
+  });
+
+  it("overrides defaults with stored values", async () => {
+    mockedRepo.findAllValues.mockResolvedValueOnce(new Map([["maxLoanDurationDays", 21]]));
+
+    const result = await systemRulesService.listSettings();
+
+    const loan = result.find((s) => s.key === "maxLoanDurationDays");
+    expect(loan?.value).toBe(21);
   });
 });
 
-describe("systemRulesService.createRule", () => {
+describe("systemRulesService.updateSetting", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("creates a rule and returns it", async () => {
-    const rule = makeRule({ text: "Neue Regel" });
-    mockedRepo.create.mockResolvedValueOnce(rule);
-
-    const result = await systemRulesService.createRule("Neue Regel");
-
-    expect(result).toEqual(rule);
-    expect(mockedRepo.create).toHaveBeenCalledWith("Neue Regel");
-  });
-});
-
-describe("systemRulesService.updateRule", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("throws RULE_NOT_FOUND when the rule does not exist", async () => {
-    mockedRepo.findById.mockResolvedValueOnce(null);
-
-    await expect(systemRulesService.updateRule(RULE_ID, "Geändert")).rejects.toMatchObject({
-      code: "RULE_NOT_FOUND",
+  it("throws SETTING_NOT_FOUND for an unknown key", async () => {
+    await expect(systemRulesService.updateSetting("unknownKey", 5)).rejects.toMatchObject({
+      code: "SETTING_NOT_FOUND",
       status: 404
     });
-
-    expect(mockedRepo.update).not.toHaveBeenCalled();
+    expect(mockedRepo.upsert).not.toHaveBeenCalled();
   });
 
-  it("updates and returns the rule when it exists", async () => {
-    const existing = makeRule();
-    const updated = makeRule({ text: "Geändert" });
-    mockedRepo.findById.mockResolvedValueOnce(existing);
-    mockedRepo.update.mockResolvedValueOnce(updated);
-
-    const result = await systemRulesService.updateRule(RULE_ID, "Geändert");
-
-    expect(result).toEqual(updated);
-    expect(mockedRepo.update).toHaveBeenCalledWith(RULE_ID, "Geändert");
-  });
-});
-
-describe("systemRulesService.deleteRule", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("throws RULE_NOT_FOUND when the rule does not exist", async () => {
-    mockedRepo.findById.mockResolvedValueOnce(null);
-
-    await expect(systemRulesService.deleteRule(RULE_ID)).rejects.toMatchObject({
-      code: "RULE_NOT_FOUND",
+  it("throws SETTING_NOT_FOUND for a known but non-enforced key", async () => {
+    await expect(systemRulesService.updateSetting("maxSearchRadiusKm", 10)).rejects.toMatchObject({
+      code: "SETTING_NOT_FOUND",
       status: 404
     });
-
-    expect(mockedRepo.remove).not.toHaveBeenCalled();
+    expect(mockedRepo.upsert).not.toHaveBeenCalled();
   });
 
-  it("deletes the rule when it exists", async () => {
-    const existing = makeRule();
-    mockedRepo.findById.mockResolvedValueOnce(existing);
-    mockedRepo.remove.mockResolvedValueOnce(existing);
+  it("throws SETTING_OUT_OF_RANGE when value exceeds the allowed range", async () => {
+    await expect(systemRulesService.updateSetting("maxLoanDurationDays", 10_000)).rejects.toMatchObject({
+      code: "SETTING_OUT_OF_RANGE",
+      status: 400
+    });
+    expect(mockedRepo.upsert).not.toHaveBeenCalled();
+  });
 
-    await systemRulesService.deleteRule(RULE_ID);
+  it("throws SETTING_OUT_OF_RANGE for non-integer values", async () => {
+    await expect(systemRulesService.updateSetting("maxLoanDurationDays", 3.5)).rejects.toMatchObject({
+      code: "SETTING_OUT_OF_RANGE",
+      status: 400
+    });
+    expect(mockedRepo.upsert).not.toHaveBeenCalled();
+  });
 
-    expect(mockedRepo.remove).toHaveBeenCalledWith(RULE_ID);
+  it("upserts and returns the resolved setting when valid", async () => {
+    mockedRepo.upsert.mockResolvedValueOnce({
+      key: "maxLoanDurationDays",
+      value: 30,
+      updatedAt: new Date()
+    });
+
+    const result = await systemRulesService.updateSetting("maxLoanDurationDays", 30);
+
+    expect(mockedRepo.upsert).toHaveBeenCalledWith("maxLoanDurationDays", 30);
+    expect(result).toMatchObject({
+      key: "maxLoanDurationDays",
+      value: 30,
+      label: "Maximale Ausleihdauer eines Werkzeugs",
+      unit: "Tage"
+    });
   });
 });
