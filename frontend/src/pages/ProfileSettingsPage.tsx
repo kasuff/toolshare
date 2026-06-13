@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { AddressInput } from "../components/AddressInput";
 import {
-  AddressInput,
   isAddressComplete,
   parseAddress,
   toAddressPayload,
   type AddressFormFields
-} from "../components/AddressInput";
+} from "../utils/address";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";

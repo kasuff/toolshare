@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AddressInput, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./components/AddressInput";
+import { AddressInput } from "./components/AddressInput";
+import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./utils/address";
 import { Layout } from "./components/Layout";
 import { GlobalProgressBar } from "./components/GlobalProgressBar";
 import { ToastViewport } from "./components/ui";

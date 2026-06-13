@@ -1,12 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import {
-  AddressInput,
-  EMPTY_ADDRESS,
-  isAddressComplete,
-  parseAddress,
-  toAddressPayload
-} from "../components/AddressInput";
+import { AddressInput } from "../components/AddressInput";
+import { EMPTY_ADDRESS, isAddressComplete, parseAddress, toAddressPayload } from "../utils/address";
 import { Field, Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
