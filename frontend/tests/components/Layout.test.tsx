@@ -57,6 +57,10 @@ describe("Layout", () => {
     );
 
     fireEvent.click(screen.getByLabelText("Profil-Menü öffnen"));
+    const offersLink = screen.getByRole("link", { name: "Meine Angebote" });
+    const settingsLink = screen.getByRole("link", { name: "Einstellungen" });
+    expect(offersLink).toHaveAttribute("href", "/offers");
+    expect(offersLink.compareDocumentPosition(settingsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Einstellungen")).toBeVisible();
 
     fireEvent.mouseDown(document.body);

@@ -190,6 +190,35 @@ describe("bookingsRepository", () => {
     expect(conflictResult).toBe("CONFLICT");
   });
 
+  it("rejects an owner block that overlaps an accepted booking", async () => {
+    setupToolBookingTx();
+    mocks.txToolFindUnique.mockResolvedValueOnce({ id: "tool-1", ownerId: "owner-1" });
+    mocks.txBookingFindFirst.mockResolvedValueOnce({
+      id: "accepted-booking",
+      status: "ACCEPTED"
+    });
+
+    const startDate = new Date("2026-07-01T10:00:00.000Z");
+    const endDate = new Date("2026-07-01T12:00:00.000Z");
+    const result = await bookingsRepository.createToolOwnerBlockTransaction({
+      ownerId: "owner-1",
+      toolId: "tool-1",
+      startDate,
+      endDate
+    });
+
+    expect(result).toBe("CONFLICT");
+    expect(mocks.txBookingFindFirst).toHaveBeenCalledWith({
+      where: {
+        toolId: "tool-1",
+        status: { in: ["PENDING", "ACCEPTED"] },
+        startDate: { lt: endDate },
+        endDate: { gt: startDate }
+      }
+    });
+    expect(mocks.txBookingCreate).not.toHaveBeenCalled();
+  });
+
   it("creates workshop booking transaction for available range", async () => {
     setupWorkshopBookingTx();
     mocks.txWorkshopFindUnique.mockResolvedValueOnce({ id: "workshop-1", managerId: "manager-1" });

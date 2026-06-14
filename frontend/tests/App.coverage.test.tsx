@@ -55,6 +55,7 @@ vi.mock("../src/components/Layout", () => ({
 vi.mock("../src/pages/DashboardPage", () => ({ DashboardPage: () => <div>Dashboard mock</div> }));
 vi.mock("../src/pages/ToolsPage", () => ({ ToolsPage: () => <div>Tools mock</div> }));
 vi.mock("../src/pages/ToolDetailPage", () => ({ ToolDetailPage: () => <div>Tool detail mock</div> }));
+vi.mock("../src/pages/EditToolPage", () => ({ EditToolPage: () => <div>Edit tool mock</div> }));
 vi.mock("../src/pages/NewToolPage", () => ({ NewToolPage: () => <div>New tool mock</div> }));
 vi.mock("../src/pages/WorkshopsPage", () => ({ WorkshopsPage: () => <div>Workshops mock</div> }));
 vi.mock("../src/pages/NewWorkshopPage", () => ({ NewWorkshopPage: () => <div>New workshop mock</div> }));
@@ -63,6 +64,7 @@ vi.mock("../src/pages/WorkshopAvailabilityPage", () => ({ WorkshopAvailabilityPa
 vi.mock("../src/pages/InboxPage", () => ({ InboxPage: () => <div>Inbox mock</div> }));
 vi.mock("../src/pages/AdminPage", () => ({ AdminPage: () => <div>Admin mock</div> }));
 vi.mock("../src/pages/ModerationPage", () => ({ ModerationPage: () => <div>Moderation mock</div> }));
+vi.mock("../src/pages/MyOffersPage", () => ({ MyOffersPage: () => <div>My offers mock</div> }));
 vi.mock("../src/pages/ProfileSettingsPage", () => ({ ProfileSettingsPage: () => <div>Profile mock</div> }));
 
 function resetSession() {
@@ -211,6 +213,29 @@ describe("App", () => {
 
     expect(screen.getByText("Bitte melde dich an, um diese Funktion zu nutzen.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Willkommen zurück" })).toBeInTheDocument();
+  });
+
+  it("protects the offers overview and renders it for authenticated users", () => {
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/offers"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Bitte melde dich an, um diese Funktion zu nutzen.")).toBeInTheDocument();
+    unmount();
+
+    session.token = "token-123";
+    session.currentUser = { id: "u5", name: "Sabine", role: "NUTZER" };
+    session.users = [{ id: "u5", name: "Sabine", role: "NUTZER" }];
+
+    render(
+      <MemoryRouter initialEntries={["/offers"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("My offers mock")).toBeInTheDocument();
   });
 
   it("renders the dashboard when an authenticated user lands on the app", () => {
