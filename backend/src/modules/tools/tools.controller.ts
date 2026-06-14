@@ -18,6 +18,16 @@ export const toolsController = {
     res.status(200).json(tool);
   }),
 
+  listBlockingPeriods: asyncHandler(async (req: Request, res: Response) => {
+    const periods = await toolsService.listBlockingPeriods(req.params.id);
+    res.status(200).json(
+      periods.map((period) => ({
+        startDate: period.startDate.toISOString(),
+        endDate: period.endDate.toISOString()
+      }))
+    );
+  }),
+
   create: asyncHandler(async (req: Request, res: Response) => {
     const tool = await toolsService.create({
       ownerId: req.authUser!.userId,

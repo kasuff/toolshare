@@ -144,6 +144,9 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
                 </summary>
                 <div className="profile-menu-panel">
                   <p className="profile-menu-meta">{currentUser.name}</p>
+                  <Link to="/offers" className="profile-menu-item">
+                    Meine Angebote
+                  </Link>
                   <Link to="/profile" className="profile-menu-item">
                     Einstellungen
                   </Link>

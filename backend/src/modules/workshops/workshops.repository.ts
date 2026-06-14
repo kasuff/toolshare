@@ -151,6 +151,15 @@ export const workshopsRepository = {
     return prisma.workshop.delete({ where: { id } });
   },
 
+  findActiveBooking(workshopId: string) {
+    return prisma.booking.findFirst({
+      where: {
+        timeslot: { workshopId },
+        status: { in: ["PENDING", "ACCEPTED"] }
+      }
+    });
+  },
+
   findOverlappingTimeslot(workshopId: string, startTime: Date, endTime: Date, excludeTimeslotId?: string) {
     return prisma.timeSlot.findFirst({
       where: {
@@ -195,7 +204,9 @@ export const workshopsRepository = {
         const activeBooking = await tx.booking.findFirst({
           where: {
             timeslotId: { in: slotIds },
-            status: { in: ["PENDING", "ACCEPTED"] }
+            status: { in: ["PENDING", "ACCEPTED"] },
+            startDate: { lt: input.endTime },
+            endDate: { gt: input.startTime }
           }
         });
         if (activeBooking) {
