@@ -290,7 +290,7 @@ describe("api coverage", () => {
       status: "AUSGELIEHEN"
     });
 
-    const workshops = await api.getWorkshops({ q: "maker" }, "token-123");
+    const workshops = await api.getWorkshops({ q: "maker", managerId: "u2" }, "token-123");
     expect(workshops[0].workshop).toMatchObject({
       id: "w1",
       ownerId: "u2"

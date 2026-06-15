@@ -12,7 +12,9 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     pool: 'forks',
-    maxWorkers: process.env.CI ? 1 : undefined,
+    // A single long-lived fork accumulates enough jsdom and V8 coverage data
+    // to be killed by the memory-constrained GitLab runner near the end.
+    maxWorkers: process.env.CI ? 2 : undefined,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],

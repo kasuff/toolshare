@@ -74,6 +74,11 @@ export const workshopsService = {
       throw new AppError("FORBIDDEN", "Only the workshop manager can delete this workshop", 403);
     }
 
+    const activeBooking = await workshopsRepository.findActiveBooking(input.workshopId);
+    if (activeBooking) {
+      throw new AppError("ACTIVE_BOOKING_EXISTS", "Workshop has active bookings and cannot be deleted", 409);
+    }
+
     await workshopsRepository.remove(input.workshopId);
   },
 
@@ -159,12 +164,16 @@ export const workshopsService = {
     }
 
     const hasTimeRangeChange = input.startTime !== undefined || input.endTime !== undefined;
-    if (hasTimeRangeChange) {
+    const becomesBlocked =
+      input.blockedByOwner === true && timeslot.blockedByOwner === false;
+    if (hasTimeRangeChange || becomesBlocked) {
       const booking = await workshopsRepository.findActiveBookingForTimeslot(input.timeslotId);
       if (booking) {
         throw new AppError(
           "ACTIVE_BOOKING_EXISTS",
-          "Timeslot has active bookings and cannot change time range",
+          becomesBlocked
+            ? "Timeslot has active bookings and cannot be blocked"
+            : "Timeslot has active bookings and cannot change time range",
           409
         );
       }

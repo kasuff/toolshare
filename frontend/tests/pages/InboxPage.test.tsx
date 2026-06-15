@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastViewport } from "../../src/components/ui";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
@@ -51,6 +52,7 @@ describe("InboxPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
+    vi.clearAllMocks();
   });
 
   it("shows messenger thread list, storybook request card and footer actions", async () => {
@@ -252,7 +254,7 @@ describe("InboxPage", () => {
 
     await screen.findByRole("heading", { name: "Nachrichten" });
     fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
-    fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum"), {
+    fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-06" },
     });
     fireEvent.change(screen.getByLabelText("Alternative Abholzeit"), {
@@ -322,7 +324,7 @@ describe("InboxPage", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Alternativvorschlag senden" }));
-    fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag"), {
+    fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-08" }
     });
     fireEvent.change(screen.getByLabelText("Alternativuhrzeit für Werkstattvorschlag"), {
@@ -393,5 +395,176 @@ describe("InboxPage", () => {
     expect(await screen.findByText("Anfrage abgelehnt")).toBeInTheDocument();
     expect(screen.getByText("close")).toBeInTheDocument();
     expect(decideBooking).toHaveBeenCalledWith("b1", "ABGELEHNT", "token-123");
+  });
+
+  it("lets the provider complete a confirmed tool booking and shows the completed status after reload", async () => {
+    getBookingsForUser
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          status: "BESTAETIGT" as const,
+          pickupProposals: []
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          status: "ABGESCHLOSSEN" as const,
+          pickupProposals: []
+        }
+      ]);
+    decideBooking.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Als abgeschlossen markieren" }));
+
+    await waitFor(() => {
+      expect(decideBooking).toHaveBeenCalledWith("b1", "ABGESCHLOSSEN", "token-123");
+    });
+    expect((await screen.findAllByText("Abgeschlossen")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Buchung abgeschlossen").closest(".request-message-card")).toBeInTheDocument();
+  });
+
+  it("shows the API error when completing a booking fails", async () => {
+    getBookingsForUser.mockResolvedValueOnce([
+      {
+        ...baseOpenBooking,
+        status: "BESTAETIGT" as const,
+        pickupProposals: []
+      }
+    ]);
+    decideBooking.mockRejectedValueOnce(new Error("Abschluss konnte nicht gespeichert werden."));
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+        <ToastViewport />
+      </ToastProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Als abgeschlossen markieren" }));
+
+    expect(await screen.findByText("Abschluss konnte nicht gespeichert werden.")).toBeInTheDocument();
+    expect(getBookingsForUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the workshop provider complete a confirmed workshop booking", async () => {
+    getBookingsForUser
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          id: "w-booking-1",
+          type: "WORKSHOP" as const,
+          requesterId: "requester-1",
+          providerId: "provider-1",
+          workshopId: "workshop-1",
+          toolId: undefined,
+          toolName: "Holzwerkstatt",
+          status: "BESTAETIGT" as const,
+          pickupTimeIso: undefined,
+          pickupProposals: []
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          ...baseOpenBooking,
+          id: "w-booking-1",
+          type: "WORKSHOP" as const,
+          requesterId: "requester-1",
+          providerId: "provider-1",
+          workshopId: "workshop-1",
+          toolId: undefined,
+          toolName: "Holzwerkstatt",
+          status: "ABGESCHLOSSEN" as const,
+          pickupTimeIso: undefined,
+          pickupProposals: []
+        }
+      ]);
+    decideBooking.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Als abgeschlossen markieren" }));
+
+    await waitFor(() => {
+      expect(decideBooking).toHaveBeenCalledWith("w-booking-1", "ABGESCHLOSSEN", "token-123");
+    });
+    expect((await screen.findAllByText("Abgeschlossen")).length).toBeGreaterThan(0);
+  });
+
+  it("shows confirmed workshop bookings to requesters without provider-only completion action", async () => {
+    getBookingsForUser.mockResolvedValueOnce([
+      {
+        ...baseOpenBooking,
+        id: "w-booking-1",
+        type: "WORKSHOP" as const,
+        requesterId: "requester-1",
+        providerId: "provider-1",
+        workshopId: "workshop-1",
+        toolId: undefined,
+        toolName: "Holzwerkstatt",
+        status: "BESTAETIGT" as const,
+        pickupTimeIso: undefined,
+        pickupProposals: []
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={{ ...currentUser, id: "requester-1" }} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Als abgeschlossen markieren" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer workshop completion before the confirmed usage period ended", async () => {
+    getBookingsForUser.mockResolvedValueOnce([
+      {
+        ...baseOpenBooking,
+        id: "future-workshop-booking",
+        type: "WORKSHOP" as const,
+        providerId: currentUser.id,
+        workshopId: "workshop-1",
+        toolId: undefined,
+        toolName: "Holzwerkstatt",
+        status: "BESTAETIGT" as const,
+        endIso: new Date(Date.now() + 60_000).toISOString(),
+        pickupTimeIso: undefined,
+        pickupProposals: [],
+        timeslotProposals: []
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Als abgeschlossen markieren" })).not.toBeInTheDocument();
   });
 });

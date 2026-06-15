@@ -19,6 +19,16 @@ export const bookingsController = {
     res.status(201).json(booking);
   }),
 
+  createToolOwnerBlock: asyncHandler(async (req: Request, res: Response) => {
+    const booking = await bookingsService.createToolOwnerBlock({
+      ownerId: req.authUser!.userId,
+      toolId: req.body.toolId,
+      startDate: req.body.startDate,
+      endDate: req.body.endDate
+    });
+    res.status(201).json(booking);
+  }),
+
   createWorkshopBooking: asyncHandler(async (req: Request, res: Response) => {
     const booking = await bookingsService.createWorkshopBooking({
       requesterId: req.authUser!.userId,

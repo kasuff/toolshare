@@ -23,6 +23,14 @@ export const toolsService = {
     return tool;
   },
 
+  async listBlockingPeriods(id: string) {
+    const tool = await toolsRepository.findById(id);
+    if (!tool) {
+      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
+    }
+    return toolsRepository.listBlockingPeriods(id);
+  },
+
   create(input: {
     ownerId: string;
     name: string;
