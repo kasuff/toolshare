@@ -1,5 +1,5 @@
 import type { AppDb } from "../types/domain";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE, normalizePlaceholderImage } from "../utils/categories";
 
 const STORAGE_KEY = "toolshare_mvp_db_v1";
 
@@ -80,8 +80,16 @@ export function loadDb(): AppDb {
   const parsed = JSON.parse(raw) as AppDb;
   parsed.tools = parsed.tools.map((tool) => ({
     ...tool,
+    imageUrl: normalizePlaceholderImage(tool.imageUrl),
     pickupLocation: tool.pickupLocation ?? "",
     pickupLocationNote: tool.pickupLocationNote ?? ""
+  }));
+  parsed.workshops = parsed.workshops.map((workshop) => ({
+    ...workshop,
+    imageUrls:
+      workshop.imageUrls.length > 0
+        ? workshop.imageUrls.map(normalizePlaceholderImage)
+        : [DEFAULT_PLACEHOLDER_IMAGE]
   }));
   return parsed;
 }

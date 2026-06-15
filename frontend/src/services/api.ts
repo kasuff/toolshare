@@ -9,7 +9,7 @@ import type {
   Workshop,
   WorkshopSlot
 } from "../types/domain";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE, normalizePlaceholderImage } from "../utils/categories";
 import { beginRequestActivity } from "./requestActivity";
 import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "./sessionEvents";
 
@@ -334,7 +334,7 @@ function mapTool(tool: BackendTool): Tool {
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE,
+    imageUrl: normalizePlaceholderImage(tool.imageUrl),
     pickupLocation: tool.pickupLocation ?? "",
     pickupLocationNote: tool.pickupLocationNote ?? undefined
   };
@@ -356,7 +356,10 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
       name: tool.name,
       category: tool.category
     })),
-    imageUrls: workshop.imageUrls && workshop.imageUrls.length > 0 ? workshop.imageUrls : [DEFAULT_PLACEHOLDER_IMAGE],
+    imageUrls:
+      workshop.imageUrls && workshop.imageUrls.length > 0
+        ? workshop.imageUrls.map(normalizePlaceholderImage)
+        : [DEFAULT_PLACEHOLDER_IMAGE],
     toolIds: []
   };
 }
