@@ -2859,9 +2859,22 @@ td {
 
   .report-form-actions > .btn,
   .report-form-actions > button,
+  .confirm-dialog-actions > .btn,
+  .confirm-dialog-actions > button,
+  .my-offers-actions > .btn,
+  .my-offers-actions > button,
+  .owner-detail-actions > .btn,
+  .owner-detail-actions > button,
   .workshop-modal-footer > .btn,
   .workshop-modal-footer > button {
     width: 100%;
+  }
+
+  .confirm-dialog-actions,
+  .my-offers-actions,
+  .owner-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
