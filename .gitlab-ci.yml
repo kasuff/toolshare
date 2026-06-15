@@ -109,9 +109,11 @@ frontend:lint:
 
 frontend:test:
   stage: test
-  image: node:20-alpine
+  image: node:20-slim   # glibc (debian) -> avoids intermittent musl/jsdom fork crashes
   extends: .frontend_cache
   timeout: 15m
+  variables:
+    NODE_OPTIONS: "--max-old-space-size=2048"   # headroom so the test fork is not OOM-killed
   script:
     - cd frontend
     - npm ci --prefer-offline --cache .npm
