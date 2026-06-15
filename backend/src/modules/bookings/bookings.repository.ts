@@ -8,12 +8,18 @@ export const bookingsRepository = {
   listForUserContext(userId: string) {
     return prisma.booking.findMany({
       where: {
-        OR: [{ userId }, { tool: { ownerId: userId } }, { timeslot: { workshop: { managerId: userId } } }]
+        OR: [
+          { userId },
+          { tool: { ownerId: userId } },
+          { workshop: { managerId: userId } },
+          { timeslot: { workshop: { managerId: userId } } }
+        ]
       },
       include: {
         user: true,
         tool: { include: { owner: true } },
-        timeslot: { include: { workshop: { include: { manager: true } } } },
+        workshop: { include: { manager: { select: { id: true, name: true } } } },
+        timeslot: { include: { workshop: { include: { manager: { select: { id: true, name: true } } } } } },
         selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
           orderBy: { createdAt: "asc" },
@@ -39,6 +45,7 @@ export const bookingsRepository = {
       where: { id },
       include: {
         tool: true,
+        workshop: true,
         timeslot: { include: { workshop: true } },
         selectedTools: { include: { workshopTool: true } }
       }
@@ -50,6 +57,7 @@ export const bookingsRepository = {
       where: { id: bookingId },
       include: {
         tool: true,
+        workshop: true,
         timeslot: { include: { workshop: true } },
         selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
@@ -65,6 +73,7 @@ export const bookingsRepository = {
       where: { id: bookingId },
       include: {
         tool: true,
+        workshop: true,
         timeslot: { include: { workshop: true } },
         selectedTools: { include: { workshopTool: true } },
         timeslotProposals: {
@@ -191,9 +200,6 @@ export const bookingsRepository = {
   }) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const uniqueWorkshopToolIds = Array.from(new Set(input.workshopToolIds));
-      if (uniqueWorkshopToolIds.length === 0) {
-        return "TOOLS_REQUIRED" as const;
-      }
 
       const workshop = await tx.workshop.findUnique({
         where: { id: input.workshopId }
@@ -202,6 +208,8 @@ export const bookingsRepository = {
         return "WORKSHOP_NOT_FOUND" as const;
       }
 
+      // Eine Werkstatt ist standardmäßig verfügbar. Nur vom Anbieter blockierte Zeiten
+      // (blockedByOwner=true) schließen einen Zeitraum aus.
       const overlappingBlockedSlot = await tx.timeSlot.findFirst({
         where: {
           workshopId: input.workshopId,
@@ -214,22 +222,9 @@ export const bookingsRepository = {
         return "BLOCKED" as const;
       }
 
-      const requestedInAvailability = await tx.timeSlot.findFirst({
-        where: {
-          workshopId: input.workshopId,
-          blockedByOwner: false,
-          startTime: { lte: input.startDate },
-          endTime: { gte: input.endDate }
-        },
-        orderBy: { startTime: "asc" }
-      });
-      if (!requestedInAvailability) {
-        return "OUTSIDE_AVAILABILITY" as const;
-      }
-
       const existing = await tx.booking.findFirst({
         where: {
-          timeslot: { workshopId: input.workshopId },
+          OR: [{ workshopId: input.workshopId }, { timeslot: { workshopId: input.workshopId } }],
           status: { in: BLOCKING_BOOKING_STATUSES },
           startDate: { lt: input.endDate },
           endDate: { gt: input.startDate }
@@ -240,36 +235,41 @@ export const bookingsRepository = {
         return "CONFLICT" as const;
       }
 
-      const selectedWorkshopTools = await tx.workshopTool.findMany({
-        where: {
-          id: { in: uniqueWorkshopToolIds },
-          workshopId: input.workshopId
+      if (uniqueWorkshopToolIds.length > 0) {
+        const selectedWorkshopTools = await tx.workshopTool.findMany({
+          where: {
+            id: { in: uniqueWorkshopToolIds },
+            workshopId: input.workshopId
+          }
+        });
+        if (selectedWorkshopTools.length !== uniqueWorkshopToolIds.length) {
+          return "TOOLS_INVALID" as const;
         }
-      });
-      if (selectedWorkshopTools.length !== uniqueWorkshopToolIds.length) {
-        return "TOOLS_INVALID" as const;
       }
 
       const booking = await tx.booking.create({
         data: {
           userId: input.userId,
-          timeslotId: requestedInAvailability.id,
+          workshopId: input.workshopId,
           startDate: input.startDate,
           endDate: input.endDate,
           status: "PENDING"
         }
       });
 
-      await tx.bookingSelectedTool.createMany({
-        data: uniqueWorkshopToolIds.map((workshopToolId) => ({
-          bookingId: booking.id,
-          workshopToolId
-        }))
-      });
+      if (uniqueWorkshopToolIds.length > 0) {
+        await tx.bookingSelectedTool.createMany({
+          data: uniqueWorkshopToolIds.map((workshopToolId) => ({
+            bookingId: booking.id,
+            workshopToolId
+          }))
+        });
+      }
 
       return tx.booking.findUnique({
         where: { id: booking.id },
         include: {
+          workshop: { include: { manager: { select: { id: true, name: true } } } },
           timeslot: { include: { workshop: true } },
           selectedTools: { include: { workshopTool: true } }
         }

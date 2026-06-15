@@ -7,6 +7,7 @@ import type {
   Tool,
   User,
   Workshop,
+  WorkshopBookedRange,
   WorkshopSlot
 } from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
@@ -120,6 +121,7 @@ type BackendTool = {
   pickupLocation?: string | null;
   pickupLocationNote?: string | null;
   status: BackendToolStatus;
+  bookings?: BackendWorkshopBookedRange[];
 };
 
 type BackendWorkshop = {
@@ -135,6 +137,14 @@ type BackendWorkshop = {
   imageUrls?: string[];
   workshopTools?: BackendWorkshopTool[];
   timeslots?: BackendWorkshopTimeslot[];
+  bookings?: BackendWorkshopBookedRange[];
+};
+
+type BackendWorkshopBookedRange = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  status: BackendBookingStatus;
 };
 
 type BackendWorkshopTool = {
@@ -184,6 +194,7 @@ type BackendBooking = {
   userId: string;
   toolId?: string | null;
   timeslotId?: string | null;
+  workshopId?: string | null;
   startDate: string;
   endDate: string;
   pickupTime?: string | null;
@@ -191,6 +202,12 @@ type BackendBooking = {
   status: BackendBookingStatus;
   user?: BackendUser | null;
   tool?: (BackendTool & { owner?: BackendUser | null }) | null;
+  workshop?: {
+    id: string;
+    name: string;
+    managerId: string;
+    manager?: BackendUser | null;
+  } | null;
   timeslot?: {
     id: string;
     workshopId: string;
@@ -345,7 +362,8 @@ function mapTool(tool: BackendTool): Tool {
     status: toolStatusMap[tool.status],
     imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE,
     pickupLocation: tool.pickupLocation ?? "",
-    pickupLocationNote: tool.pickupLocationNote ?? undefined
+    pickupLocationNote: tool.pickupLocationNote ?? undefined,
+    bookedRanges: mapWorkshopBookedRanges(tool.bookings)
   };
 }
 
@@ -380,6 +398,13 @@ function mapWorkshopSlot(slot: BackendWorkshopTimeslot): WorkshopSlot {
   };
 }
 
+function mapWorkshopBookedRanges(bookings?: BackendWorkshopBookedRange[]): WorkshopBookedRange[] {
+  return (bookings ?? []).map((booking) => ({
+    startIso: booking.startDate,
+    endIso: booking.endDate
+  }));
+}
+
 function mapPickupProposal(p: BackendPickupProposal): PickupProposal {
   return {
     id: p.id,
@@ -408,7 +433,7 @@ function mapTimeslotProposal(p: BackendTimeslotProposal): TimeslotProposal {
 
 function mapBooking(booking: BackendBooking): Booking {
   const tool = booking.tool;
-  const workshop = booking.timeslot?.workshop;
+  const workshop = booking.workshop ?? booking.timeslot?.workshop;
 
   const providerId = tool?.ownerId ?? workshop?.managerId ?? "";
   const requesterName = booking.user?.name;
@@ -622,6 +647,37 @@ export const api = {
     return mapTool(created);
   },
 
+  async getToolById(toolId: string, token: string): Promise<Tool> {
+    const tool = await request<BackendTool>(`/tools/${toolId}`, undefined, token);
+    return mapTool(tool);
+  },
+
+  async updateTool(
+    toolId: string,
+    input: {
+      name: string;
+      description: string;
+      category: string;
+      imageUrl?: string;
+      pickupLocation: string;
+      pickupLocationNote?: string;
+    },
+    token: string
+  ): Promise<Tool> {
+    const updated = await request<BackendTool>(
+      `/tools/${toolId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...input,
+          pickupLocationNote: input.pickupLocationNote?.trim() || undefined
+        })
+      },
+      token
+    );
+    return mapTool(updated);
+  },
+
   async createToolRequest(
     input: { toolId: string; startIso: string; endIso: string; pickupTimeIso: string },
     token: string
@@ -645,7 +701,14 @@ export const api = {
   async getWorkshops(
     filters: { q?: string },
     token: string
-  ): Promise<Array<{ workshop: Workshop; slots: WorkshopSlot[]; tools: Array<Tool & { selectable: boolean }> }>> {
+  ): Promise<
+    Array<{
+      workshop: Workshop;
+      slots: WorkshopSlot[];
+      bookedRanges: WorkshopBookedRange[];
+      tools: Array<Tool & { selectable: boolean }>;
+    }>
+  > {
     const params = new URLSearchParams();
     if (filters.q) params.set("search", filters.q);
     const workshops = await request<BackendWorkshop[]>(`/workshops?${params.toString()}`, undefined, token);
@@ -653,6 +716,7 @@ export const api = {
       workshops.map(async (workshop) => {
         const detail = await request<BackendWorkshop>(`/workshops/${workshop.id}`, undefined, token);
         const slots = (detail.timeslots ?? []).map(mapWorkshopSlot);
+        const bookedRanges = mapWorkshopBookedRanges(detail.bookings);
         const mappedWorkshop = mapWorkshop(detail);
         const tools = mappedWorkshop.equipmentItems.map((tool) => {
           const backendTool = detail.workshopTools?.find((entry) => entry.id === tool.id);
@@ -668,17 +732,21 @@ export const api = {
             selectable: status === "VERFUEGBAR",
           };
         });
-        return { workshop: mappedWorkshop, slots, tools };
+        return { workshop: mappedWorkshop, slots, bookedRanges, tools };
       })
     );
     return withSlots;
   },
 
-  async getWorkshopById(workshopId: string, token: string): Promise<{ workshop: Workshop; slots: WorkshopSlot[] }> {
+  async getWorkshopById(
+    workshopId: string,
+    token: string
+  ): Promise<{ workshop: Workshop; slots: WorkshopSlot[]; bookedRanges: WorkshopBookedRange[] }> {
     const detail = await request<BackendWorkshop>(`/workshops/${workshopId}`, undefined, token);
     return {
       workshop: mapWorkshop(detail),
-      slots: (detail.timeslots ?? []).map(mapWorkshopSlot)
+      slots: (detail.timeslots ?? []).map(mapWorkshopSlot),
+      bookedRanges: mapWorkshopBookedRanges(detail.bookings)
     };
   },
 
@@ -823,7 +891,7 @@ export const api = {
   },
 
   async createWorkshopBooking(
-    input: { workshopId: string; startIso: string; endIso: string; workshopToolIds: string[] },
+    input: { workshopId: string; startIso: string; endIso: string },
     token: string
   ) {
     const booking = await request<BackendBooking>(
@@ -833,8 +901,7 @@ export const api = {
         body: JSON.stringify({
           workshopId: input.workshopId,
           startDate: new Date(input.startIso).toISOString(),
-          endDate: new Date(input.endIso).toISOString(),
-          workshopToolIds: input.workshopToolIds
+          endDate: new Date(input.endIso).toISOString()
         })
       },
       token

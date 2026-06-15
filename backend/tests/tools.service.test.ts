@@ -7,6 +7,7 @@ vi.mock("../src/modules/tools/tools.repository", () => ({
     list: vi.fn(),
     findById: vi.fn(),
     findActiveBooking: vi.fn(),
+    findActiveBookingRanges: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn()
@@ -29,12 +30,17 @@ describe("toolsService", () => {
     expect(result).toEqual([{ id: "t1" }]);
   });
 
-  it("returns tool by id", async () => {
+  it("returns tool by id with merged active booking ranges", async () => {
     mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1" } as any);
+    mockedToolsRepository.findActiveBookingRanges.mockResolvedValueOnce([
+      { id: "b1", startDate: new Date(), endDate: new Date(), status: "ACCEPTED" }
+    ] as any);
 
     const result = await toolsService.getById("t1");
 
+    expect(mockedToolsRepository.findActiveBookingRanges).toHaveBeenCalledWith("t1");
     expect(result).toMatchObject({ id: "t1" });
+    expect((result as any).bookings).toHaveLength(1);
   });
 
   it("throws for unknown tool id", async () => {

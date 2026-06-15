@@ -15,7 +15,8 @@ const { createWorkshopBooking, getWorkshops } = vi.hoisted(() => ({
 vi.mock("../../src/services/api", () => ({
   api: {
     createWorkshopBooking,
-    getWorkshops
+    getWorkshops,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 
@@ -228,14 +229,15 @@ describe("WorkshopsPage search filters", () => {
     renderPage();
 
     const blockedCard = (await screen.findByText("Blockierte Werkstatt")).closest("article")!;
-    expect(within(blockedCard).getByText("0 Slots")).toHaveClass("unavailable");
+    // Werkstätten sind standardmäßig verfügbar; Blockaden zeigen sich erst im Detail-Kalender.
+    expect(within(blockedCard).getByText("Verfügbar")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Nähstube").closest("article")!);
 
     expect(await screen.findByRole("region", { name: "Nähstube" })).toBeInTheDocument();
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops/available");
     expect(screen.getByText("Leopoldstraße 120, München")).toBeInTheDocument();
-    expect(screen.getAllByText("Nähmaschine").length).toBeGreaterThan(1);
+    expect(screen.getByText("Nähmaschine")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Nähstube vergrößern" }));
     const imageViewer = screen.getByRole("dialog", { name: "Bilder von Nähstube" });
@@ -249,12 +251,12 @@ describe("WorkshopsPage search filters", () => {
     await waitFor(() =>
       expect(createWorkshopBooking).toHaveBeenCalledWith(
         expect.objectContaining({
-          workshopId: "available",
-          workshopToolIds: ["needle"]
+          workshopId: "available"
         }),
         "token-123"
       )
     );
+    expect(createWorkshopBooking.mock.calls[0][0]).not.toHaveProperty("workshopToolIds");
     expect(screen.getByTestId("location-path")).toHaveTextContent("/inbox");
   });
 

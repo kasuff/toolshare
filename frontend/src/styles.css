@@ -6647,22 +6647,54 @@ button.active {
 }
 
 .system-rules-info {
-  margin-bottom: var(--space-5);
-  padding: var(--space-4);
+  margin-top: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-brand-soft);
+  background: var(--color-surface-muted, #f9fafb);
+  overflow: hidden;
+}
+
+.system-rules-info-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.92rem;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.system-rules-info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.system-rules-info-summary .material-symbols-outlined {
+  font-size: 1.15rem;
+  color: var(--color-brand-strong, var(--color-brand));
 }
 
 .system-rules-info-title {
-  margin: 0 0 var(--space-3);
-  font-size: 1rem;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.system-rules-info-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.system-rules-info[open] .system-rules-info-chevron {
+  transform: rotate(180deg);
 }
 
 .system-rules-info-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 var(--space-4) var(--space-4);
   display: grid;
   gap: var(--space-2);
   font-size: 0.92rem;

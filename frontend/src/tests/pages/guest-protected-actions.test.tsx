@@ -14,6 +14,7 @@ vi.mock("../../services/api", async () => {
     api: {
       ...actual.api,
       getTools: vi.fn(),
+      getToolById: vi.fn(),
       getWorkshops: vi.fn(),
       createWorkshopBooking: vi.fn()
     }
@@ -45,18 +46,16 @@ describe("Guest protected actions", () => {
   });
 
   it("redirects guests to auth when requesting a tool", async () => {
-    vi.mocked(api.getTools).mockResolvedValue([
-      {
-        id: "tool-1",
-        ownerId: "owner-1",
-        name: "Bohrmaschine",
-        description: "Leistungsstark",
-        category: "Elektro",
-        status: "VERFUEGBAR",
-        imageUrl: "https://example.com/tool.jpg",
-        pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland"
-      }
-    ]);
+    vi.mocked(api.getToolById).mockResolvedValue({
+      id: "tool-1",
+      ownerId: "owner-1",
+      name: "Bohrmaschine",
+      description: "Leistungsstark",
+      category: "Elektro",
+      status: "VERFUEGBAR",
+      imageUrl: "https://example.com/tool.jpg",
+      pickupLocation: "Leopoldstraße 120, 80802 München, Deutschland"
+    });
 
     render(
       <ToastProvider>
@@ -95,6 +94,7 @@ describe("Guest protected actions", () => {
             blockedByOwner: false
           }
         ],
+        bookedRanges: [],
         tools: []
       }
     ]);
@@ -125,6 +125,7 @@ describe("Guest protected actions", () => {
           toolIds: []
         },
         slots: [],
+        bookedRanges: [],
         tools: [
           {
             id: "tool-available",

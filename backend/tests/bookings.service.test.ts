@@ -334,7 +334,7 @@ describe("bookingsService", () => {
   });
 
   it("maps workshop booking repository errors to app errors", async () => {
-    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("TOOLS_REQUIRED" as any);
+    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("BLOCKED" as any);
 
     await expect(
       bookingsService.createWorkshopBooking({
@@ -344,7 +344,19 @@ describe("bookingsService", () => {
         endDate: validEnd(),
         workshopToolIds: []
       })
-    ).rejects.toMatchObject({ code: "WORKSHOP_TOOLS_REQUIRED", status: 400 });
+    ).rejects.toMatchObject({ code: "TIMESLOT_BLOCKED", status: 409 });
+
+    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("TOOLS_INVALID" as any);
+
+    await expect(
+      bookingsService.createWorkshopBooking({
+        requesterId: "user-1",
+        workshopId: "workshop-1",
+        startDate: validStart(),
+        endDate: validEnd(),
+        workshopToolIds: ["not-a-real-tool"]
+      })
+    ).rejects.toMatchObject({ code: "WORKSHOP_TOOLS_INVALID", status: 400 });
   });
 
   it("rejects booking status updates when booking is missing", async () => {

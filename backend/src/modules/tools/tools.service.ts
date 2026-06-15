@@ -20,7 +20,9 @@ export const toolsService = {
     if (!tool) {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
-    return tool;
+    // Belegte Zeiträume mitliefern, damit der Kalender gebuchte Tage durchstreichen kann.
+    const bookings = await toolsRepository.findActiveBookingRanges(id);
+    return { ...tool, bookings };
   },
 
   create(input: {

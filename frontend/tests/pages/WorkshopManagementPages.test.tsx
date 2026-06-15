@@ -20,7 +20,8 @@ vi.mock("../../src/services/api", () => ({
     getWorkshopById,
     updateWorkshop,
     validateAddress,
-    suggestAddresses
+    suggestAddresses,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 
@@ -98,7 +99,7 @@ describe("Workshop management pages", () => {
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "09:00" } });
     fireEvent.change(screen.getByLabelText("Enddatum"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => expect(createWorkshop).toHaveBeenCalledTimes(1));
@@ -112,7 +113,7 @@ describe("Workshop management pages", () => {
       maxCapacity: 2,
       extras: ["wlan"],
       equipmentItems: [{ name: "Tischkreissaege", category: "holz" }],
-      slots: [{ startIso: "2026-07-01T09:00", endIso: "2026-07-01T12:00", blockedByOwner: false }]
+      slots: [{ startIso: "2026-07-01T09:00", endIso: "2026-07-01T12:00", blockedByOwner: true }]
     });
     expect((payload.imageUrls as string[])[0]).toContain("data:image/png;base64,mock-photo");
   });

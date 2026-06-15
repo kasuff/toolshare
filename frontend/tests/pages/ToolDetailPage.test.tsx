@@ -6,33 +6,32 @@ import { ToolDetailPage } from "../../src/pages/ToolDetailPage";
 import { ToastViewport } from "../../src/components/ui";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 
-const { getTools, createToolRequest, createReport } = vi.hoisted(() => ({
-  getTools: vi.fn(),
+const { getToolById, createToolRequest, createReport } = vi.hoisted(() => ({
+  getToolById: vi.fn(),
   createToolRequest: vi.fn(),
   createReport: vi.fn()
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
-    getTools,
+    getToolById,
     createToolRequest,
-    createReport
+    createReport,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 
 describe("ToolDetailPage", () => {
   it("shows the design-system detail layout with calendar and discrete booking inputs", async () => {
-    getTools.mockResolvedValueOnce([
-      {
-        id: "t1",
-        ownerId: "u1",
-        name: "Akkuschrauber Bosch",
-        description: "Leistungsstark",
-        category: "Elektro",
-        imageUrl: "https://example.com/tool.jpg",
-        status: "VERFUEGBAR"
-      }
-    ]);
+    getToolById.mockResolvedValueOnce({
+      id: "t1",
+      ownerId: "u1",
+      name: "Akkuschrauber Bosch",
+      description: "Leistungsstark",
+      category: "Elektro",
+      imageUrl: "https://example.com/tool.jpg",
+      status: "VERFUEGBAR"
+    });
 
     render(
       <ToastProvider>
@@ -61,21 +60,19 @@ describe("ToolDetailPage", () => {
     expect(screen.getByRole("dialog", { name: "Bild von Akkuschrauber Bosch" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Bildansicht schließen" }));
     expect(screen.queryByRole("dialog", { name: "Bild von Akkuschrauber Bosch" })).not.toBeInTheDocument();
-    await waitFor(() => expect(getTools).toHaveBeenCalled());
+    await waitFor(() => expect(getToolById).toHaveBeenCalled());
   });
 
   it("shows a notice instead of opening the default image", async () => {
-    getTools.mockResolvedValueOnce([
-      {
-        id: "t1",
-        ownerId: "u1",
-        name: "Akkuschrauber Bosch",
-        description: "Leistungsstark",
-        category: "Elektro",
-        imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
-        status: "VERFUEGBAR"
-      }
-    ]);
+    getToolById.mockResolvedValueOnce({
+      id: "t1",
+      ownerId: "u1",
+      name: "Akkuschrauber Bosch",
+      description: "Leistungsstark",
+      category: "Elektro",
+      imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+      status: "VERFUEGBAR"
+    });
 
     render(
       <ToastProvider>
@@ -95,17 +92,15 @@ describe("ToolDetailPage", () => {
   });
 
   it("creates the request from the selected pickup and return data", async () => {
-    getTools.mockResolvedValueOnce([
-      {
-        id: "t1",
-        ownerId: "u1",
-        name: "Akkuschrauber Bosch",
-        description: "Leistungsstark",
-        category: "Elektro",
-        imageUrl: "https://example.com/tool.jpg",
-        status: "VERFUEGBAR"
-      }
-    ]);
+    getToolById.mockResolvedValueOnce({
+      id: "t1",
+      ownerId: "u1",
+      name: "Akkuschrauber Bosch",
+      description: "Leistungsstark",
+      category: "Elektro",
+      imageUrl: "https://example.com/tool.jpg",
+      status: "VERFUEGBAR"
+    });
     createToolRequest.mockResolvedValueOnce({ id: "b1" });
 
     render(
@@ -142,17 +137,15 @@ describe("ToolDetailPage", () => {
   });
 
   it("rejects an invalid return before pickup", async () => {
-    getTools.mockResolvedValueOnce([
-      {
-        id: "t1",
-        ownerId: "u1",
-        name: "Akkuschrauber Bosch",
-        description: "Leistungsstark",
-        category: "Elektro",
-        imageUrl: "https://example.com/tool.jpg",
-        status: "VERFUEGBAR"
-      }
-    ]);
+    getToolById.mockResolvedValueOnce({
+      id: "t1",
+      ownerId: "u1",
+      name: "Akkuschrauber Bosch",
+      description: "Leistungsstark",
+      category: "Elektro",
+      imageUrl: "https://example.com/tool.jpg",
+      status: "VERFUEGBAR"
+    });
 
     render(
       <ToastProvider>
@@ -175,29 +168,25 @@ describe("ToolDetailPage", () => {
   });
 
   it("shows unavailable and guest states with proper actions", async () => {
-    getTools
-      .mockResolvedValueOnce([
-        {
-          id: "t1",
-          ownerId: "u1",
-          name: "Akkuschrauber Bosch",
-          description: "Leistungsstark",
-          category: "Elektro",
-          imageUrl: "https://example.com/tool.jpg",
-          status: "AUSGELIEHEN"
-        }
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: "t1",
-          ownerId: "u1",
-          name: "Akkuschrauber Bosch",
-          description: "Leistungsstark",
-          category: "Elektro",
-          imageUrl: "https://example.com/tool.jpg",
-          status: "VERFUEGBAR"
-        }
-      ]);
+    getToolById
+      .mockResolvedValueOnce({
+        id: "t1",
+        ownerId: "u1",
+        name: "Akkuschrauber Bosch",
+        description: "Leistungsstark",
+        category: "Elektro",
+        imageUrl: "https://example.com/tool.jpg",
+        status: "AUSGELIEHEN"
+      })
+      .mockResolvedValueOnce({
+        id: "t1",
+        ownerId: "u1",
+        name: "Akkuschrauber Bosch",
+        description: "Leistungsstark",
+        category: "Elektro",
+        imageUrl: "https://example.com/tool.jpg",
+        status: "VERFUEGBAR"
+      });
 
     const { unmount } = render(
       <ToastProvider>

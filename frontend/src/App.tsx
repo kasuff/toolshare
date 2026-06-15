@@ -11,6 +11,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ToolsPage } from "./pages/ToolsPage";
 import { ToolDetailPage } from "./pages/ToolDetailPage";
 import { NewToolPage } from "./pages/NewToolPage";
+import { EditToolPage } from "./pages/EditToolPage";
 import { WorkshopsPage } from "./pages/WorkshopsPage";
 import { NewWorkshopPage } from "./pages/NewWorkshopPage";
 import { EditWorkshopPage } from "./pages/EditWorkshopPage";
@@ -325,6 +326,14 @@ function AppWithProviders() {
           element={
             <RequireAuth token={token}>
               <NewToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="tools/:id/edit"
+          element={
+            <RequireAuth token={token}>
+              <EditToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
             </RequireAuth>
           }
         />

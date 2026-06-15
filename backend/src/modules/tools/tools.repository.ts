@@ -60,6 +60,19 @@ export const toolsRepository = {
     });
   },
 
+  // Liefert die belegten Zeiträume eines Werkzeugs für die Kalenderansicht
+  // (durchgestrichen). Bewusst ohne Nutzeridentität.
+  findActiveBookingRanges(toolId: string) {
+    return prisma.booking.findMany({
+      where: {
+        toolId,
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: { id: true, startDate: true, endDate: true, status: true },
+      orderBy: { startDate: "asc" }
+    });
+  },
+
   create(input: {
     ownerId: string;
     name: string;

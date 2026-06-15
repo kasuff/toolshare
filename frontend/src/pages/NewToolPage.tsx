@@ -119,8 +119,6 @@ export function NewToolPage({ token }: Props) {
     <section className="new-tool-page">
       <h1>Werkzeug einstellen</h1>
 
-      <SystemRulesInfo token={token} />
-
       <form className="new-tool-form" onSubmit={onSubmit} noValidate>
         <p className="required-note">Pflichtfelder werden mit einem * markiert!</p>
 
@@ -216,6 +214,8 @@ export function NewToolPage({ token }: Props) {
             Abbrechen
           </Link>
         </div>
+
+        <SystemRulesInfo token={token} />
       </form>
     </section>
   );

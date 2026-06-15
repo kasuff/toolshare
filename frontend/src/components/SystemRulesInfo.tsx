@@ -10,7 +10,7 @@ type Props = {
 
 // Zeigt die plattformweiten Systemregeln als Info-Box an (z.B. für Werkzeug-Anbieter).
 // Die Werte werden live aus den Admin-Einstellungen geladen, damit Änderungen sofort sichtbar sind.
-export function SystemRulesInfo({ token, keys, title = "Plattformregeln für dein Angebot" }: Props) {
+export function SystemRulesInfo({ token, keys, title = "Plattformregeln" }: Props) {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
 
   useEffect(() => {
@@ -35,8 +35,16 @@ export function SystemRulesInfo({ token, keys, title = "Plattformregeln für dei
   if (visible.length === 0) return null;
 
   return (
-    <aside className="system-rules-info">
-      <h2 className="system-rules-info-title">{title}</h2>
+    <details className="system-rules-info">
+      <summary className="system-rules-info-summary">
+        <span className="material-symbols-outlined" aria-hidden="true">
+          info
+        </span>
+        <span className="system-rules-info-title">{title}</span>
+        <span className="material-symbols-outlined system-rules-info-chevron" aria-hidden="true">
+          expand_more
+        </span>
+      </summary>
       <ul className="system-rules-info-list">
         {visible.map((setting) => (
           <li key={setting.key}>
@@ -48,6 +56,6 @@ export function SystemRulesInfo({ token, keys, title = "Plattformregeln für dei
           </li>
         ))}
       </ul>
-    </aside>
+    </details>
   );
 }

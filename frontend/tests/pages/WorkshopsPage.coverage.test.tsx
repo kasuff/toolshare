@@ -13,7 +13,8 @@ const { getWorkshops, createWorkshopBooking } = vi.hoisted(() => ({
 vi.mock("../../src/services/api", () => ({
   api: {
     getWorkshops,
-    createWorkshopBooking
+    createWorkshopBooking,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 
@@ -115,11 +116,11 @@ describe("WorkshopsPage coverage", () => {
     await waitFor(() => {
       expect(createWorkshopBooking).toHaveBeenCalledWith(
         expect.objectContaining({
-          workshopId: "w2",
-          workshopToolIds: []
+          workshopId: "w2"
         }),
         "token-123"
       );
     });
+    expect(createWorkshopBooking.mock.calls[0][0]).not.toHaveProperty("workshopToolIds");
   });
 });

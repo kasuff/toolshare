@@ -2,10 +2,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ReportFormPanel } from "../components/ReportFormPanel";
+import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "../utils/categories";
-import type { Tool, User } from "../types/domain";
+import type { Tool, User, WorkshopBookedRange } from "../types/domain";
 
 type Props = {
   token?: string;
@@ -36,7 +37,17 @@ function getDefaultDates() {
   return { startDate: toLocalDateKey(start), endDate: toLocalDateKey(end) };
 }
 
-function getCalendarDays(monthDate: Date, isAvailable: boolean): CalendarDay[] {
+function rangeOverlapsDay(startIso: string, endIso: string, day: Date) {
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
+  const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0);
+  return new Date(startIso) < dayEnd && new Date(endIso) > dayStart;
+}
+
+function isDayBooked(day: Date, bookedRanges: WorkshopBookedRange[]) {
+  return bookedRanges.some((range) => rangeOverlapsDay(range.startIso, range.endIso, day));
+}
+
+function getCalendarDays(monthDate: Date, isAvailable: boolean, bookedRanges: WorkshopBookedRange[]): CalendarDay[] {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
@@ -49,16 +60,30 @@ function getCalendarDays(monthDate: Date, isAvailable: boolean): CalendarDay[] {
   }
 
   for (let day = 1; day <= daysInMonth; day += 1) {
-    const dateKey = toLocalDateKey(new Date(year, month, day));
+    const date = new Date(year, month, day);
+    const dateKey = toLocalDateKey(date);
     days.push({
       key: dateKey,
       day,
       dateKey,
-      available: isAvailable && dateKey > today
+      available: isAvailable && dateKey > today && !isDayBooked(date, bookedRanges)
     });
   }
 
   return days;
+}
+
+function isDateRangeAvailable(startDate: string, endDate: string, bookedRanges: WorkshopBookedRange[]) {
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return false;
+
+  const current = new Date(start);
+  while (current <= end) {
+    if (isDayBooked(current, bookedRanges)) return false;
+    current.setDate(current.getDate() + 1);
+  }
+  return true;
 }
 
 function getInitials(name: string) {
@@ -96,14 +121,8 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       if (!id) return;
       setIsLoading(true);
       try {
-        const tools = await api.getTools({}, token ?? "");
-        const foundTool = tools.find((entry) => entry.id === id);
-        if (foundTool) {
-          setTool(foundTool);
-        } else {
-          pushToast("Werkzeug nicht gefunden.", "error");
-          navigate("/tools");
-        }
+        const foundTool = await api.getToolById(id, token ?? "");
+        setTool(foundTool);
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht geladen werden.", "error");
         navigate("/tools");
@@ -115,6 +134,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   }, [id, token, navigate, pushToast]);
 
   const isAvailable = tool?.status === "VERFUEGBAR";
+  const bookedRanges = useMemo(() => tool?.bookedRanges ?? [], [tool]);
   const toolImage = tool ? tool.imageUrl || getPlaceholderImageForCategory(tool.category) : "";
   const hasUploadedImage = Boolean(tool?.imageUrl && tool.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE);
   const categoryLabel = tool
@@ -131,16 +151,20 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       return {
         key: `${monthDate.getFullYear()}-${monthDate.getMonth()}`,
         label: new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(monthDate),
-        days: getCalendarDays(monthDate, isAvailable)
+        days: getCalendarDays(monthDate, isAvailable, bookedRanges)
       };
     });
-  }, [calendarMonthOffset, isAvailable]);
+  }, [calendarMonthOffset, isAvailable, bookedRanges]);
 
   const selectCalendarDate = (dateKey: string) => {
     if (!isSelectingRangeEnd || dateKey < startDate) {
       setStartDate(dateKey);
       setEndDate(dateKey);
       setIsSelectingRangeEnd(true);
+      return;
+    }
+    if (!isDateRangeAvailable(startDate, dateKey, bookedRanges)) {
+      pushToast("Der gewählte Zeitraum enthält bereits gebuchte Tage.", "error");
       return;
     }
     setEndDate(dateKey);
@@ -172,6 +196,9 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       const endIso = `${endDate}T${endTime}`;
       if (new Date(endIso) <= new Date(startIso)) {
         throw new Error("Der gewählte Zeitraum ist ungültig. Bitte eine spätere Abgabe wählen.");
+      }
+      if (!isDateRangeAvailable(startDate, endDate, bookedRanges)) {
+        throw new Error("Der gewählte Zeitraum enthält bereits gebuchte Tage.");
       }
 
       const createdBooking = await api.createToolRequest(
@@ -376,6 +403,17 @@ export function ToolDetailPage({ token, currentUser }: Props) {
           </section>
         </div>
 
+        {isOwnTool ? (
+          <aside className="playtomic-booking-panel tool-detail-booking">
+            <h2>Dein Werkzeug</h2>
+            <p className="booking-hint">Dies ist dein eigenes Angebot. Hier kannst du es bearbeiten.</p>
+            <div className="booking-actions">
+              <Link to={`/tools/${tool.id}/edit`} className="booking-button">
+                Werkzeug bearbeiten
+              </Link>
+            </div>
+          </aside>
+        ) : (
         <aside className={`playtomic-booking-panel tool-detail-booking ${!isAvailable ? "unavailable" : ""}`.trim()}>
           <h2>Werkzeug buchen</h2>
           {isAvailable ? (
@@ -459,7 +497,9 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               <p className="booking-hint">Nach der Rückgabe kann es wieder angefragt werden.</p>
             </>
           )}
+          {token && <SystemRulesInfo token={token} />}
         </aside>
+        )}
       </div>
 
       {isImageOpen && (

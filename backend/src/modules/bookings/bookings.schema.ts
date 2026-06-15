@@ -29,7 +29,9 @@ export const createWorkshopBookingSchema = z.object({
     workshopId: z.string().uuid(),
     startDate: flexibleIsoDateTime,
     endDate: flexibleIsoDateTime,
-    workshopToolIds: z.array(z.string().uuid()).min(1)
+    // Werkzeugauswahl bei der Buchung ist nicht mehr nötig: Eine Werkstatt wird ohnehin
+    // nur von einer Person gleichzeitig gebucht. Optional bleibt das Feld abwärtskompatibel.
+    workshopToolIds: z.array(z.string().uuid()).optional().default([])
   }),
   params: z.object({}),
   query: z.object({})

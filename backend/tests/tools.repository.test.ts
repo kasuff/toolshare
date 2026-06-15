@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   toolCreate: vi.fn(),
   toolUpdate: vi.fn(),
   toolDelete: vi.fn(),
-  bookingFindFirst: vi.fn()
+  bookingFindFirst: vi.fn(),
+  bookingFindMany: vi.fn()
 }));
 
 vi.mock("../src/config/prisma", () => ({
@@ -20,7 +21,8 @@ vi.mock("../src/config/prisma", () => ({
       delete: mocks.toolDelete
     },
     booking: {
-      findFirst: mocks.bookingFindFirst
+      findFirst: mocks.bookingFindFirst,
+      findMany: mocks.bookingFindMany
     }
   }
 }));
@@ -93,6 +95,22 @@ describe("toolsRepository", () => {
     });
     expect(tool).toEqual({ id: "t1" });
     expect(booking).toEqual({ id: "b1" });
+  });
+
+  it("loads active booking ranges for a tool", async () => {
+    mocks.bookingFindMany.mockResolvedValueOnce([{ id: "b1" }]);
+
+    const result = await toolsRepository.findActiveBookingRanges("t1");
+
+    expect(mocks.bookingFindMany).toHaveBeenCalledWith({
+      where: {
+        toolId: "t1",
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: { id: true, startDate: true, endDate: true, status: true },
+      orderBy: { startDate: "asc" }
+    });
+    expect(result).toEqual([{ id: "b1" }]);
   });
 
   it("creates, updates and removes tools", async () => {

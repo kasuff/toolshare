@@ -169,7 +169,11 @@ export function ToolsPage({ token, currentUser }: Props) {
           const distance = distanceBetweenLocations(defaultLocation, tool.pickupLocation);
           const ownerName = tool.ownerName ?? "Unbekannt";
           return (
-            <Link key={tool.id} to={`/tools/${tool.id}`} className="ds-workshop-card card-enter card-link">
+            <Link
+              key={tool.id}
+              to={`/tools/${tool.id}`}
+              className="ds-workshop-card card-enter card-link"
+            >
               <div className="ds-workshop-card-media">
                 <span className={`ds-workshop-card-badge ${tool.status === "VERFUEGBAR" ? "" : "unavailable"}`.trim()}>
                   {tool.status === "VERFUEGBAR" ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
