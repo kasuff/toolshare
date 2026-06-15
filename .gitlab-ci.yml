@@ -10,39 +10,113 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
   NODE_ENV: "test"
+  # --- Performance / robustness tuning ---
+  GIT_DEPTH: "20"                  # shallow clones -> faster checkouts
+  FF_USE_FASTZIP: "true"           # faster cache (de)compression
+  CACHE_COMPRESSION_LEVEL: "fast"
+  TRANSFER_METER_FREQUENCY: "5s"
+  NPM_CONFIG_AUDIT: "false"        # skip the audit pass on every install
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_PROGRESS: "false"
+
+# Applied to every job unless overridden: auto-cancel superseded pipelines
+# and transparently retry transient infrastructure failures -- the
+# "red once, green on re-run" class of errors.
+default:
+  interruptible: true
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - unknown_failure
+      - api_failure
+      - scheduler_failure
+      - data_integrity_failure
+
+# Run pipelines only for merge requests and the default branch, and never
+# run a redundant branch-pipeline next to an MR pipeline (saves ~half the
+# compute on branches that have an open MR).
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# npm's download cache, keyed by the lockfile. node_modules itself is NOT
+# cached on purpose: `npm ci` deletes it on every run, so caching it buys
+# nothing -- caching the tarball store and using `--prefer-offline` does.
+.frontend_cache:
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+      prefix: frontend-npm
+    paths:
+      - frontend/.npm/
+    policy: pull
+
+.backend_cache:
+  cache:
+    key:
+      files:
+        - backend/package-lock.json
+      prefix: backend-npm
+    paths:
+      - backend/.npm/
+    policy: pull
+
+# Block until the Postgres service actually accepts TCP connections before
+# touching it. Removes the race where `prisma db push` runs before the DB
+# is up -- the main cause of flaky backend:test runs.
+.pg_wait:
+  script:
+    - |
+      echo "Waiting for Postgres to accept connections..."
+      node -e '
+        const net = require("net");
+        const host = "postgres", port = 5432, deadline = Date.now() + 60000;
+        (function probe() {
+          const sock = net.connect(port, host);
+          sock.setTimeout(2000);
+          const retry = (e) => {
+            sock.destroy();
+            if (Date.now() > deadline) { console.error("Postgres not ready:", e && e.message); process.exit(1); }
+            setTimeout(probe, 1500);
+          };
+          sock.on("connect", () => { sock.end(); console.log("Postgres is ready."); process.exit(0); });
+          sock.on("error", retry);
+          sock.on("timeout", () => retry(new Error("timeout")));
+        })();
+      '
 
 # === FRONTEND JOBS ===
 
 frontend:lint:
   stage: lint
   image: node:20-alpine
+  extends: .frontend_cache
+  cache:
+    policy: pull-push   # lint runs first -> it seeds the shared npm cache
   script:
     - cd frontend
-    - npm ci
+    - npm ci --prefer-offline --cache .npm
     - npm run lint -- -f html -o ../frontend-lint-report.html || true
     - npm run lint
-  only:
-    - merge_requests
-    - main
   artifacts:
     when: always
     paths:
       - frontend-lint-report.html
-  cache:
-    paths:
-      - frontend/node_modules/
 
 frontend:test:
   stage: test
   image: node:20-alpine
+  extends: .frontend_cache
+  timeout: 15m
   script:
     - cd frontend
-    - npm ci
+    - npm ci --prefer-offline --cache .npm
     - npm run test -- --coverage
     - node ../scripts/check-coverage.js coverage
-  only:
-    - merge_requests
-    - main
   coverage: '/Coverage: \d+\.\d+%/'
   artifacts:
     reports:
@@ -53,9 +127,6 @@ frontend:test:
     paths:
       - frontend/coverage/
     expire_in: 1 week
-  cache:
-    paths:
-      - frontend/node_modules/
 
 
 # === BACKEND JOBS ===
@@ -63,21 +134,18 @@ frontend:test:
 backend:lint:
   stage: lint
   image: node:20
+  extends: .backend_cache
+  cache:
+    policy: pull-push   # lint runs first -> it seeds the shared npm cache
   script:
     - cd backend
-    - npm ci
+    - npm ci --prefer-offline --cache .npm
     - npm run lint -- -f html -o ../backend-lint-report.html || true
     - npm run lint
-  only:
-    - merge_requests
-    - main
   artifacts:
     when: always
     paths:
       - backend-lint-report.html
-  cache:
-    paths:
-      - backend/node_modules/
 
 backend:test:
   stage: test
@@ -90,15 +158,19 @@ backend:test:
     POSTGRES_PASSWORD: testpass
     POSTGRES_HOST_AUTH_METHOD: trust
     DATABASE_URL: "postgresql://toolshare:testpass@postgres:5432/toolshare_test"
+  extends: .backend_cache
+  timeout: 15m
   script:
     - cd backend
-    - npm ci
-    - npx prisma db push
+    - npm ci --prefer-offline --cache .npm
+    - !reference [.pg_wait, script]
+    - |
+      for attempt in 1 2 3; do
+        npx prisma db push --skip-generate && break
+        echo "prisma db push failed (attempt $attempt) -- retrying in 3s"; sleep 3
+      done
     - npm run test -- --coverage
     - node ../scripts/check-coverage.js coverage
-  only:
-    - merge_requests
-    - main
   coverage: '/All files\s+\|\s+(\d+\.\d+)/'
   artifacts:
     reports:
@@ -109,39 +181,26 @@ backend:test:
     paths:
       - backend/coverage/
     expire_in: 1 week
-  cache:
-    paths:
-      - backend/node_modules/
 
 # === BUILD JOBS ===
 
 frontend:build:
   stage: build
   image: node:20-alpine
+  extends: .frontend_cache
   script:
     - cd frontend
-    - npm ci
+    - npm ci --prefer-offline --cache .npm
     - npm run build
-  only:
-    - merge_requests
-    - main
-  cache:
-    paths:
-      - frontend/node_modules/
 
 backend:build:
   stage: build
   image: node:20
+  extends: .backend_cache
   script:
     - cd backend
-    - npm ci
+    - npm ci --prefer-offline --cache .npm
     - npm run build
-  only:
-    - merge_requests
-    - main
-  cache:
-    paths:
-      - backend/node_modules/
 
 # === DEPLOY JOB ===
 
@@ -159,8 +218,9 @@ deploy:production:
   needs:
     - frontend:build
     - backend:build
-  only:
-    - main
+  interruptible: false   # never cancel an in-flight production deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
   environment:
     name: production
   before_script:
@@ -663,9 +723,6 @@ security:audit:
   script:
     - (cd backend && npm audit --audit-level=moderate)
     - (cd frontend && npm audit --audit-level=moderate)
-  only:
-    - merge_requests
-    - main
 
 semgrep-sast:
   stage: test
@@ -683,9 +740,6 @@ semgrep-sast:
     reports:
       sast: gl-sast-report.json
     when: always
-  only:
-    - merge_requests
-    - main
 
 security:container:trivy:
   stage: test
@@ -700,8 +754,5 @@ security:container:trivy:
     when: always
     paths:
       - trivy-report.txt
-  only:
-    - merge_requests
-    - main
 # - Alle Pipelines-Jobs müssen erfolgreich sein
 # - Push-Protektion auf main-Branch
