@@ -5,6 +5,7 @@ services:
       target: prod
       args:
         VITE_API_URL: /api
+        VITE_GRAFANA_URL: /grafana
     ports:
       - "3000:80"
     depends_on:

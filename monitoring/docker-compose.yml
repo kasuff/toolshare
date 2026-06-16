@@ -28,8 +28,13 @@ services:
       GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
       GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
-      # Grafana URL (für Embedding und Alerts)
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      # Grafana URL (für Embedding und Alerts).
+      # Muss den Sub-Pfad /grafana enthalten, da Grafana hinter dem Frontend-nginx
+      # unter <origin>/grafana/ ausgeliefert wird (siehe frontend/nginx.conf).
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001/grafana/}
+      # Assets/Links mit /grafana-Prefix generieren und Requests unter dem
+      # Sub-Pfad korrekt verarbeiten.
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       # Embedding per iframe erlauben (für Admin-Portal)
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       # Plugins
