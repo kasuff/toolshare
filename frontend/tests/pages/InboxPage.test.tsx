@@ -6,12 +6,14 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport } = vi.hoisted(() => ({
+const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, getNotifications, markNotificationAsRead } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   decideBooking: vi.fn(),
   createPickupProposal: vi.fn(),
   createTimeslotProposal: vi.fn(),
   createReport: vi.fn(),
+  getNotifications: vi.fn(),
+  markNotificationAsRead: vi.fn(),
 }));
 
 vi.mock("../../src/services/api", () => ({
@@ -21,6 +23,8 @@ vi.mock("../../src/services/api", () => ({
     createPickupProposal,
     createTimeslotProposal,
     createReport,
+    getNotifications,
+    markNotificationAsRead,
   },
 }));
 
@@ -53,6 +57,8 @@ describe("InboxPage", () => {
     vi.resetAllMocks();
     localStorage.clear();
     vi.clearAllMocks();
+    getNotifications.mockResolvedValue([]);
+    markNotificationAsRead.mockResolvedValue(undefined);
   });
 
   it("shows messenger thread list, storybook request card and footer actions", async () => {
@@ -252,7 +258,7 @@ describe("InboxPage", () => {
       </ToastProvider>
     );
 
-    await screen.findByRole("heading", { name: "Nachrichten" });
+    await screen.findByRole("button", { name: /Test-Bohrer/, current: true }, { timeout: 5_000 });
     fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
     fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-06" },
@@ -323,7 +329,8 @@ describe("InboxPage", () => {
       </ToastProvider>
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Alternativvorschlag senden" }));
+    await screen.findByRole("button", { name: /Maker Space/, current: true }, { timeout: 5_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
     fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-08" }
     });

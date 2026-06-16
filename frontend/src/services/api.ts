@@ -1109,6 +1109,8 @@ export const api = {
       warningReason?: string;
       requestSuspensionUserId?: string;
       suspensionReason?: string;
+      deleteTool?: boolean;
+      deleteWorkshop?: boolean;
     },
     token: string
   ) {

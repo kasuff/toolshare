@@ -35,7 +35,9 @@ export const moderationController = {
       warnUserId: req.body.warnUserId,
       warningReason: req.body.warningReason,
       requestSuspensionUserId: req.body.requestSuspensionUserId,
-      suspensionReason: req.body.suspensionReason
+      suspensionReason: req.body.suspensionReason,
+      deleteTool: req.body.deleteTool,
+      deleteWorkshop: req.body.deleteWorkshop
     });
     res.status(200).json(report);
   })

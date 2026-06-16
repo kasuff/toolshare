@@ -163,9 +163,13 @@ export function InboxPage({ currentUser, token }: Props) {
         timeslotProposals: booking.timeslotProposals ?? []
       })),
       ...notifications
-        .filter((n) => n.message.startsWith("ERMAHNUNG:"))
+        .filter((n) => {
+          const m = n.message;
+          return m.startsWith("ERMAHNUNG:") || m.includes("wurde storniert") || m.includes("wurde gelöscht");
+        })
         .map((n) => {
-          const parsed = parseWarningMessage(n.message);
+          const isWarning = n.message.startsWith("ERMAHNUNG:");
+          const parsed = isWarning ? parseWarningMessage(n.message) : { reason: n.message, moderator: "System", hint: "" };
           return {
             id: n.id,
             type: "SYSTEM_WARNING" as BookingType,
@@ -175,7 +179,7 @@ export function InboxPage({ currentUser, token }: Props) {
             createdIso: n.createdIso,
             providerName: parsed.moderator,
             requesterName: currentUser?.name ?? "Du",
-            toolName: "Ermahnung der Moderation",
+            toolName: isWarning ? "Ermahnung der Moderation" : "System-Benachrichtigung",
             pickupProposals: [],
             timeslotProposals: [],
             selectedWorkshopTools: [],
@@ -588,15 +592,15 @@ export function InboxPage({ currentUser, token }: Props) {
                   size="lg"
                 />
                 <div className="messenger-chat-header-text">
-                  <strong>{selectedBooking.type === "SYSTEM_WARNING" ? "Ermahnung der Moderation" : (selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`)}</strong>
+                  <strong>{selectedBooking.type === "SYSTEM_WARNING" ? (selectedBooking.toolName ?? "System-Meldung") : (selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`)}</strong>
                   <span className="messenger-chat-header-sub">{counterparty(selectedBooking, currentUser.id).name}</span>
                 </div>
                 <div className="messenger-chat-header-actions">
                   <StatusPill
-                    label={selectedBooking.type === "SYSTEM_WARNING" ? "Verwarnung" : bookingStatusLabel[selectedBooking.status]}
+                    label={selectedBooking.type === "SYSTEM_WARNING" ? (selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ? "Verwarnung" : "Info") : bookingStatusLabel[selectedBooking.status]}
                     tone={
                       selectedBooking.type === "SYSTEM_WARNING"
-                        ? "danger"
+                        ? (selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ? "danger" : "neutral")
                         : selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
                           ? "success"
                           : selectedBooking.status === "ABGELEHNT"
@@ -638,8 +642,9 @@ export function InboxPage({ currentUser, token }: Props) {
                 {selectedBooking.type === "SYSTEM_WARNING" ? (
                   <MessengerRow
                     variant="incoming"
-                    avatar={<UserAvatar name={selectedBooking.providerName ?? "Moderator"} imageUrl={null} size="sm" />}
+                    avatar={<UserAvatar name={selectedBooking.providerName ?? "System"} imageUrl={null} size="sm" />}
                   >
+                    {selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ? (
                     <RequestMessageCard
                       label="Sicherheitsmeldung"
                       title="Ermahnung der Moderation"
@@ -663,6 +668,17 @@ export function InboxPage({ currentUser, token }: Props) {
                         );
                       })()}
                     </RequestMessageCard>
+                    ) : (
+                    <RequestMessageCard
+                      label="Benachrichtigung"
+                      title="System-Benachrichtigung"
+                      icon="info"
+                    >
+                      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <p style={{ margin: 0 }}>{selectedBooking.systemWarningText}</p>
+                      </div>
+                    </RequestMessageCard>
+                    )}
                   </MessengerRow>
                 ) : (
                   <>
@@ -1178,7 +1194,7 @@ function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string):
 
 function counterparty(booking: Booking, currentUserId: string): { name: string } {
   if (booking.type === "SYSTEM_WARNING") {
-    return { name: "Moderator" };
+    return { name: booking.providerName ?? "System" };
   }
   if (booking.providerId === currentUserId) {
     return { name: booking.requesterName ?? "Anfragender" };
