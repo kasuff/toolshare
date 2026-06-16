@@ -191,6 +191,40 @@ export const bookingsRepository = {
     });
   },
 
+  createToolOwnerBlockTransaction(input: {
+    ownerId: string;
+    toolId: string;
+    startDate: Date;
+    endDate: Date;
+  }) {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const tool = await tx.tool.findUnique({ where: { id: input.toolId } });
+      if (!tool) return "TOOL_NOT_FOUND" as const;
+      if (tool.ownerId !== input.ownerId) return "FORBIDDEN" as const;
+
+      const overlap = await tx.booking.findFirst({
+        where: {
+          toolId: input.toolId,
+          status: { in: BLOCKING_BOOKING_STATUSES },
+          startDate: { lt: input.endDate },
+          endDate: { gt: input.startDate }
+        }
+      });
+      if (overlap) return "CONFLICT" as const;
+
+      return tx.booking.create({
+        data: {
+          userId: input.ownerId,
+          toolId: input.toolId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          pickupTime: input.startDate,
+          status: "ACCEPTED"
+        }
+      });
+    });
+  },
+
   createWorkshopBookingTransaction(input: {
     userId: string;
     workshopId: string;

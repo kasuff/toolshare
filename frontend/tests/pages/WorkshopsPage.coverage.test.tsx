@@ -116,11 +116,11 @@ describe("WorkshopsPage coverage", () => {
     await waitFor(() => {
       expect(createWorkshopBooking).toHaveBeenCalledWith(
         expect.objectContaining({
-          workshopId: "w2"
+          workshopId: "w2",
+          workshopToolIds: []
         }),
         "token-123"
       );
     });
-    expect(createWorkshopBooking.mock.calls[0][0]).not.toHaveProperty("workshopToolIds");
   });
 });

@@ -1,11 +1,13 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { OfferCard } from "../components/OfferCard";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import { TOOL_CATEGORIES } from "../utils/categories";
 import { distanceBetweenLocations, isWithinRadius } from "../utils/searchFilters";
+import { formatOfferDistance } from "../utils/offerFormatting";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -22,20 +24,6 @@ function categoryMatches(toolCategory: string, selectedCategory: string) {
     Boolean(category && normalizedTool.includes(category.label.toLowerCase())) ||
     Boolean(category && category.label.toLowerCase().includes(normalizedTool))
   );
-}
-
-function formatCardDistance(distance: number | null) {
-  return distance === null ? "Distanz offen" : `${distance.toFixed(1)} km`;
-}
-
-function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }
 
 export function ToolsPage({ token, currentUser }: Props) {
@@ -169,37 +157,17 @@ export function ToolsPage({ token, currentUser }: Props) {
           const distance = distanceBetweenLocations(defaultLocation, tool.pickupLocation);
           const ownerName = tool.ownerName ?? "Unbekannt";
           return (
-            <Link
+            <OfferCard
               key={tool.id}
               to={`/tools/${tool.id}`}
-              className="ds-workshop-card card-enter card-link"
-            >
-              <div className="ds-workshop-card-media">
-                <span className={`ds-workshop-card-badge ${tool.status === "VERFUEGBAR" ? "" : "unavailable"}`.trim()}>
-                  {tool.status === "VERFUEGBAR" ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
-                </span>
-                {tool.imageUrl ? (
-                  <img className="ds-workshop-card-image" src={tool.imageUrl} alt={tool.name} />
-                ) : (
-                  <div className="ds-workshop-card-icon" aria-label={tool.name} title={tool.name}>
-                    🪛
-                  </div>
-                )}
-              </div>
-              <div className="ds-workshop-card-body">
-                <div className="ds-workshop-card-distance">{formatCardDistance(distance)}</div>
-                <h3>{tool.name}</h3>
-                <p className="ds-workshop-card-description">{tool.description}</p>
-                <div className="ds-workshop-card-divider" />
-                <div className="ds-workshop-card-footer">
-                  <div className="ds-workshop-card-owner">
-                    <span className="ds-workshop-card-avatar">{getInitials(ownerName)}</span>
-                    <span>{ownerName}</span>
-                  </div>
-                  <span className="ds-workshop-card-details">Details</span>
-                </div>
-              </div>
-            </Link>
+              name={tool.name}
+              description={tool.description}
+              imageUrl={tool.imageUrl}
+              badgeLabel={tool.status === "VERFUEGBAR" ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
+              badgeUnavailable={tool.status !== "VERFUEGBAR"}
+              meta={formatOfferDistance(distance)}
+              ownerName={ownerName}
+            />
           );
         })}
       </div>

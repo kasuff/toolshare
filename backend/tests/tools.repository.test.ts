@@ -113,6 +113,29 @@ describe("toolsRepository", () => {
     expect(result).toEqual([{ id: "b1" }]);
   });
 
+  it("lists pending and accepted blocking periods", async () => {
+    mocks.bookingFindMany.mockResolvedValueOnce([
+      {
+        startDate: new Date("2026-07-06T09:00:00.000Z"),
+        endDate: new Date("2026-07-06T12:00:00.000Z")
+      }
+    ]);
+
+    await toolsRepository.listBlockingPeriods("t1");
+
+    expect(mocks.bookingFindMany).toHaveBeenCalledWith({
+      where: {
+        toolId: "t1",
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: {
+        startDate: true,
+        endDate: true
+      },
+      orderBy: { startDate: "asc" }
+    });
+  });
+
   it("creates, updates and removes tools", async () => {
     mocks.toolCreate.mockResolvedValueOnce({ id: "t2" });
     mocks.toolUpdate.mockResolvedValueOnce({ id: "t2", name: "Neu" });

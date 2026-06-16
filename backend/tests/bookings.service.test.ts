@@ -26,6 +26,7 @@ vi.mock("../src/modules/bookings/bookings.repository", () => ({
   bookingsRepository: {
     listForUserContext: vi.fn(),
     createToolBookingTransaction: vi.fn(),
+    createToolOwnerBlockTransaction: vi.fn(),
     createWorkshopBookingTransaction: vi.fn(),
     findBookingById: vi.fn(),
     findBookingForPickupProposal: vi.fn(),
@@ -438,7 +439,7 @@ describe("bookingsService", () => {
     expect(result).toMatchObject({ id: "b2", status: "RETURNED" });
   });
 
-  it("rejects completion by requester and before the accepted period ended", async () => {
+  it("rejects completion by requester", async () => {
     mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
       id: "b1",
       userId: "requester-1",
@@ -455,7 +456,56 @@ describe("bookingsService", () => {
         status: "RETURNED"
       })
     ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+  });
 
+  it("creates an accepted owner block without sending a notification", async () => {
+    mockedBookingsRepository.createToolOwnerBlockTransaction.mockResolvedValueOnce({
+      id: "owner-block-1",
+      userId: "owner-1",
+      toolId: "tool-1",
+      status: "ACCEPTED"
+    } as any);
+
+    await expect(
+      bookingsService.createToolOwnerBlock({
+        ownerId: "owner-1",
+        toolId: "tool-1",
+        startDate: "2026-07-01T09:00:00.000Z",
+        endDate: "2026-07-01T12:00:00.000Z"
+      })
+    ).resolves.toMatchObject({ status: "ACCEPTED" });
+
+    expect(mockedNotificationsRepository.create).not.toHaveBeenCalled();
+  });
+
+  it("returns a booking conflict when an owner block overlaps a booking", async () => {
+    mockedBookingsRepository.createToolOwnerBlockTransaction.mockResolvedValueOnce("CONFLICT");
+
+    await expect(
+      bookingsService.createToolOwnerBlock({
+        ownerId: "owner-1",
+        toolId: "tool-1",
+        startDate: "2026-07-01T09:00:00.000Z",
+        endDate: "2026-07-01T12:00:00.000Z"
+      })
+    ).rejects.toMatchObject({
+      code: "BOOKING_CONFLICT",
+      status: 409
+    });
+  });
+
+  it("removes self bookings from the inbox context", async () => {
+    mockedBookingsRepository.listForUserContext.mockResolvedValueOnce([
+      { id: "self", userId: "owner-1", tool: { ownerId: "owner-1" } },
+      { id: "external", userId: "requester-2", tool: { ownerId: "owner-1" } }
+    ] as any);
+
+    await expect(bookingsService.listForUserContext("owner-1")).resolves.toEqual([
+      expect.objectContaining({ id: "external" })
+    ]);
+  });
+
+  it("allows a provider to complete a returned tool before the planned end time", async () => {
     mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
       id: "b1",
       userId: "requester-1",
@@ -463,6 +513,8 @@ describe("bookingsService", () => {
       endDate: new Date(Date.now() + 60_000),
       tool: { id: "tool-1", ownerId: "owner-1" }
     } as any);
+    mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
+    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
 
     await expect(
       bookingsService.updateBookingStatus({
@@ -471,6 +523,26 @@ describe("bookingsService", () => {
         bookingId: "b1",
         status: "RETURNED"
       })
+    ).resolves.toMatchObject({ id: "b1", status: "RETURNED" });
+  });
+
+  it("rejects workshop completion before the confirmed usage period ended", async () => {
+    mockedBookingsRepository.findBookingById.mockResolvedValueOnce({
+      id: "b2",
+      userId: "requester-1",
+      status: "ACCEPTED",
+      endDate: new Date(Date.now() + 60_000),
+      timeslot: { workshop: { managerId: "manager-1" } }
+    } as any);
+
+    await expect(
+      bookingsService.updateBookingStatus({
+        actorId: "manager-1",
+        actorRole: "USER",
+        bookingId: "b2",
+        status: "RETURNED"
+      })
     ).rejects.toMatchObject({ code: "BOOKING_NOT_ENDED", status: 400 });
   });
+
 });

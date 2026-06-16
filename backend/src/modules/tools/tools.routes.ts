@@ -12,6 +12,11 @@ import {
 export const toolsRouter = Router();
 
 toolsRouter.get("/", validate(listToolsSchema), toolsController.list);
+toolsRouter.get(
+  "/:id/blocking-periods",
+  validate(toolIdParamSchema),
+  toolsController.listBlockingPeriods
+);
 toolsRouter.get("/:id", validate(toolIdParamSchema), toolsController.getById);
 
 toolsRouter.post("/", requireAuth, validate(createToolSchema), toolsController.create);

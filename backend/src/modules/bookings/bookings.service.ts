@@ -4,6 +4,7 @@ import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
 import { systemRulesService } from "../system-rules/system-rules.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
+import { assertBookingCanBeCompleted } from "./bookings.completion";
 
 const BLOCKING_BOOKING_STATUSES: Array<"PENDING" | "ACCEPTED"> = ["PENDING", "ACCEPTED"];
 
@@ -72,8 +73,12 @@ function getWorkshopId(booking: {
 }
 
 export const bookingsService = {
-  listForUserContext(userId: string) {
-    return bookingsRepository.listForUserContext(userId);
+  async listForUserContext(userId: string) {
+    const bookings = await bookingsRepository.listForUserContext(userId);
+    return bookings.filter((booking) => {
+      const providerId = getProviderId(booking);
+      return !(booking.userId === userId && providerId === userId);
+    });
   },
 
   async createToolBooking(input: {
@@ -119,6 +124,36 @@ export const bookingsService = {
 
     await notificationsRepository.create(result.tool.ownerId, "Neue Ausleihanfrage für dein Werkzeug.");
     return result.booking;
+  },
+
+  async createToolOwnerBlock(input: {
+    ownerId: string;
+    toolId: string;
+    startDate: string;
+    endDate: string;
+  }) {
+    const startDate = new Date(input.startDate);
+    const endDate = new Date(input.endDate);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate >= endDate) {
+      throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
+    }
+
+    const result = await bookingsRepository.createToolOwnerBlockTransaction({
+      ownerId: input.ownerId,
+      toolId: input.toolId,
+      startDate,
+      endDate
+    });
+    if (result === "TOOL_NOT_FOUND") {
+      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
+    }
+    if (result === "FORBIDDEN") {
+      throw new AppError("FORBIDDEN", "Only the tool owner can block this tool", 403);
+    }
+    if (result === "CONFLICT") {
+      throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
+    }
+    return result;
   },
 
   async createWorkshopBooking(input: {
@@ -190,15 +225,10 @@ export const bookingsService = {
     const isModeratorOrManager = input.actorRole === "MODERATOR" || input.actorRole === "MANAGER";
 
     if (input.status === "RETURNED") {
-      if (!isProvider && !isModeratorOrManager) {
-        throw new AppError("FORBIDDEN", "Only the provider can complete a booking", 403);
-      }
-      if (booking.status !== "ACCEPTED") {
-        throw new AppError("INVALID_STATE", "Only accepted bookings can be completed", 400);
-      }
-      if (booking.endDate.getTime() > Date.now()) {
-        throw new AppError("BOOKING_NOT_ENDED", "Booking can only be completed after the usage period has ended", 400);
-      }
+      assertBookingCanBeCompleted(booking, {
+        actorId: input.actorId,
+        actorRole: input.actorRole
+      });
     } else if (!isProvider && !isModeratorOrManager) {
       throw new AppError("FORBIDDEN", "Only provider or moderation roles can update booking", 403);
     }

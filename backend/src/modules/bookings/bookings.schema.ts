@@ -24,6 +24,16 @@ export const createToolBookingSchema = z.object({
   query: z.object({})
 });
 
+export const createToolOwnerBlockSchema = z.object({
+  body: z.object({
+    toolId: z.string().uuid(),
+    startDate: flexibleIsoDateTime,
+    endDate: flexibleIsoDateTime
+  }),
+  params: z.object({}),
+  query: z.object({})
+});
+
 export const createWorkshopBookingSchema = z.object({
   body: z.object({
     workshopId: z.string().uuid(),

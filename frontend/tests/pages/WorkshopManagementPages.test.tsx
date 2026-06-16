@@ -6,10 +6,22 @@ import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
 import { EditWorkshopPage } from "../../src/pages/EditWorkshopPage";
 import type { User } from "../../src/types/domain";
 
-const { createWorkshop, getWorkshopById, updateWorkshop, validateAddress, suggestAddresses } = vi.hoisted(() => ({
+const {
+  createWorkshop,
+  getWorkshopById,
+  updateWorkshop,
+  createWorkshopTimeslot,
+  updateWorkshopTimeslot,
+  deleteWorkshopTimeslot,
+  validateAddress,
+  suggestAddresses
+} = vi.hoisted(() => ({
   createWorkshop: vi.fn(),
   getWorkshopById: vi.fn(),
   updateWorkshop: vi.fn(),
+  createWorkshopTimeslot: vi.fn(),
+  updateWorkshopTimeslot: vi.fn(),
+  deleteWorkshopTimeslot: vi.fn(),
   validateAddress: vi.fn(),
   suggestAddresses: vi.fn()
 }));
@@ -19,6 +31,9 @@ vi.mock("../../src/services/api", () => ({
     createWorkshop,
     getWorkshopById,
     updateWorkshop,
+    createWorkshopTimeslot,
+    updateWorkshopTimeslot,
+    deleteWorkshopTimeslot,
     validateAddress,
     suggestAddresses,
     getSystemSettings: vi.fn().mockResolvedValue([])
@@ -132,7 +147,15 @@ describe("Workshop management pages", () => {
         imageUrls: ["data:image/png;base64,existing"],
         toolIds: []
       },
-      slots: []
+      slots: [
+        {
+          id: "slot-1",
+          workshopId: "workshop-1",
+          startIso: "2026-07-01T09:00:00.000Z",
+          endIso: "2026-07-01T12:00:00.000Z",
+          blockedByOwner: false
+        }
+      ]
     });
     updateWorkshop.mockResolvedValueOnce({
       id: "workshop-1"
@@ -164,6 +187,7 @@ describe("Workshop management pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
 
     await waitFor(() => expect(updateWorkshop).toHaveBeenCalledTimes(1));
+    expect(validateAddress).toHaveBeenCalledTimes(1);
     expect(updateWorkshop).toHaveBeenCalledWith(
       "workshop-1",
       expect.objectContaining({

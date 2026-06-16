@@ -1,14 +1,20 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AddressInput } from "../components/AddressInput";
-import { EMPTY_ADDRESS, isAddressComplete, parseAddress, toAddressPayload } from "../utils/address";
+import {
+  EMPTY_ADDRESS,
+  isAddressComplete,
+  parseAddress,
+  toAddressPayload,
+  type AddressFormFields
+} from "../utils/address";
 import { Field, Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import type { User } from "../types/domain";
+import type { User, WorkshopSlot } from "../types/domain";
 
 type Props = {
   currentUser?: User;
@@ -25,12 +31,18 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
 
   const [name, setName] = useState("");
   const [workshopAddress, setWorkshopAddress] = useState({ ...EMPTY_ADDRESS });
+  const [originalWorkshopAddress, setOriginalWorkshopAddress] = useState<AddressFormFields | null>(null);
+  const [originalLocation, setOriginalLocation] = useState("");
   const [addressSearchValue, setAddressSearchValue] = useState("");
   const [maxCapacity, setMaxCapacity] = useState(2);
   const [extras, setExtras] = useState<string[]>([]);
   const [equipmentItems, setEquipmentItems] = useState<WorkshopToolDraftItem[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [description, setDescription] = useState("Werkstatt");
+  const [slots, setSlots] = useState<WorkshopSlot[]>([]);
+  const [slotStart, setSlotStart] = useState("");
+  const [slotEnd, setSlotEnd] = useState("");
+  const [slotBlocked, setSlotBlocked] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -49,9 +61,9 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
 
         setName(detail.workshop.name);
         setAddressSearchValue(detail.workshop.location);
+        setOriginalLocation(detail.workshop.location);
         const addressValidation = await api.validateAddress(detail.workshop.location);
-        setWorkshopAddress(
-          addressValidation.normalizedParts
+        const parsedWorkshopAddress = addressValidation.normalizedParts
             ? {
                 street: addressValidation.normalizedParts.street,
                 houseNumber: addressValidation.normalizedParts.houseNumber,
@@ -59,8 +71,9 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
                 city: addressValidation.normalizedParts.city,
                 country: addressValidation.normalizedParts.country || "Deutschland"
               }
-            : parseAddress(detail.workshop.location)
-        );
+            : parseAddress(detail.workshop.location);
+        setWorkshopAddress(parsedWorkshopAddress);
+        setOriginalWorkshopAddress(parsedWorkshopAddress);
         setMaxCapacity(detail.workshop.maxCapacity);
         setExtras(detail.workshop.extras);
         setEquipmentItems(
@@ -71,6 +84,7 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
         );
         setPhotos(detail.workshop.imageUrls);
         setDescription(detail.workshop.description);
+        setSlots(detail.slots);
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "Werkstatt konnte nicht geladen werden.", "error");
       } finally {
@@ -127,11 +141,26 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
     event.preventDefault();
     if (saving) return;
 
+    const addressWasChanged =
+      !originalWorkshopAddress ||
+      Object.keys(workshopAddress).some(
+        (key) =>
+          workshopAddress[key as keyof AddressFormFields] !==
+          originalWorkshopAddress[key as keyof AddressFormFields]
+      );
+    const hasValidLocation =
+      isAddressComplete(workshopAddress) ||
+      (!addressWasChanged && originalLocation.trim().length >= 5);
+
     if (!name.trim()) {
       pushToast("Bitte geben Sie einen Werkstatt-Namen ein.", "error");
       return;
     }
-    if (!isAddressComplete(workshopAddress)) {
+    if (description.trim().length < 5) {
+      pushToast("Bitte gib eine Beschreibung mit mindestens 5 Zeichen ein.", "error");
+      return;
+    }
+    if (!hasValidLocation) {
       pushToast("Bitte geben Sie eine vollständige Werkstattadresse an.", "error");
       return;
     }
@@ -143,11 +172,19 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
       pushToast("Bitte laden Sie mindestens ein Foto hoch.", "error");
       return;
     }
+    if (slots.length === 0) {
+      pushToast("Bitte füge mindestens ein Zeitfenster hinzu.", "error");
+      return;
+    }
 
     setSaving(true);
     try {
-      const location = toAddressPayload(workshopAddress);
-      const validation = await api.validateAddress(location);
+      const location = addressWasChanged
+        ? toAddressPayload(workshopAddress)
+        : originalLocation;
+      const validation = addressWasChanged
+        ? await api.validateAddress(location)
+        : { isValid: true, normalizedAddress: originalLocation };
       if (!validation.isValid) {
         pushToast("Adresse konnte nicht verifiziert werden. Bitte wählen Sie eine vorgeschlagene Adresse.", "error");
         return;
@@ -168,7 +205,7 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
       );
 
       pushToast("Werkstatt aktualisiert.", "success");
-      navigate("/workshops");
+      navigate(`/workshops/${id}?manage=1`);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Werkstatt konnte nicht aktualisiert werden.", "error");
     } finally {
@@ -176,17 +213,81 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
     }
   };
 
+  const addSlot = async () => {
+    if (!id || !slotStart || !slotEnd || new Date(slotStart) >= new Date(slotEnd)) {
+      pushToast("Bitte einen gültigen Zeitraum für das Zeitfenster angeben.", "error");
+      return;
+    }
+    try {
+      const created = await api.createWorkshopTimeslot(
+        id,
+        { startIso: slotStart, endIso: slotEnd, blockedByOwner: slotBlocked },
+        token
+      );
+      setSlots((current) => [...current, created]);
+      setSlotStart("");
+      setSlotEnd("");
+      setSlotBlocked(false);
+      pushToast("Zeitfenster hinzugefügt.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht gespeichert werden.", "error");
+    }
+  };
+
+  const toggleSlot = async (slot: WorkshopSlot) => {
+    if (!id) return;
+    try {
+      const updated = await api.updateWorkshopTimeslot(
+        id,
+        slot.id,
+        { blockedByOwner: !slot.blockedByOwner },
+        token
+      );
+      setSlots((current) => current.map((entry) => (entry.id === slot.id ? updated : entry)));
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
+    }
+  };
+
+  const removeSlot = async (slotId: string) => {
+    if (!id) return;
+    try {
+      await api.deleteWorkshopTimeslot(id, slotId, token);
+      setSlots((current) => current.filter((entry) => entry.id !== slotId));
+      pushToast("Zeitfenster entfernt.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht entfernt werden.", "error");
+    }
+  };
+
   return (
-    <section className="stack">
+    <section className="new-tool-page new-workshop-page">
       <h1>Werkstatt bearbeiten</h1>
       <p className="subtitle">Aktualisiere Name, Standort, Ausstattung, Extras und Fotos deiner Werkstatt.</p>
-      <Surface title="Stammdaten">
-        <form className="stack" onSubmit={(event) => void onSubmit(event)}>
-          <Field label="Werkstattname">
+        <form className="new-tool-form new-workshop-form" onSubmit={(event) => void onSubmit(event)} noValidate>
+          <p className="required-note">Pflichtfelder werden mit einem * markiert!</p>
+          <WorkshopPhotoUpload
+            photos={photos}
+            onPhotosChange={setPhotos}
+            label="Werkstatt Fotos *"
+            hint="Du kannst die Fotos austauschen oder ergänzen."
+            maxPhotos={3}
+          />
+          <Field label="Werkstattname *">
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
           </Field>
 
-          <Field label="Adresse">
+          <Field label="Beschreibung *">
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={5}
+              maxLength={1000}
+              required
+            />
+          </Field>
+
+          <Field label="Adresse *">
             <AddressInput
               value={workshopAddress}
               onChange={setWorkshopAddress}
@@ -197,7 +298,7 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
 
           <div className="field">
             <label htmlFor="edit-workshop-capacity">
-              <strong>Maximale Personenzahl</strong>
+              <strong>Maximale Personenzahl *</strong>
             </label>
             <div className="capacity-input">
               <button
@@ -241,16 +342,53 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
             hint="Optionale Zusatzmerkmale wie WLAN, Starkstrom oder Parkplatz."
           />
 
-          <WorkshopPhotoUpload
-            photos={photos}
-            onPhotosChange={setPhotos}
-            label="Fotos deiner Werkstatt"
-            hint="Du kannst die Fotos austauschen oder ergänzen."
-            maxPhotos={3}
-          />
+          <section className="workshop-availability-section" aria-labelledby="edit-workshop-slots-title">
+            <div className="workshop-form-section-heading">
+              <span className="workshop-section-kicker">Buchungsplanung</span>
+              <h2 id="edit-workshop-slots-title">Verfügbare Zeitfenster *</h2>
+              <p>Verwalte verfügbare Zeiten und Blockierungen direkt zusammen mit dem Angebot.</p>
+            </div>
+            <div className="workshop-slot-builder">
+              <Field label="Start">
+                <input type="datetime-local" value={slotStart} onChange={(event) => setSlotStart(event.target.value)} />
+              </Field>
+              <Field label="Ende">
+                <input type="datetime-local" value={slotEnd} onChange={(event) => setSlotEnd(event.target.value)} />
+              </Field>
+            </div>
+            <div className="workshop-slot-editor-actions">
+              <label className="workshop-block-toggle">
+                <input type="checkbox" checked={slotBlocked} onChange={(event) => setSlotBlocked(event.target.checked)} />
+                <span><strong>Zeitraum blockieren</strong><small>Für Wartung oder Eigenbedarf</small></span>
+              </label>
+              <button type="button" className="btn btn-outline" onClick={() => void addSlot()}>
+                Zeitfenster hinzufügen
+              </button>
+            </div>
+            <ul className="meta-list workshop-created-slots">
+              {slots.map((slot) => (
+                <li key={slot.id} className="slot-item">
+                  <div>
+                    <strong>{new Date(slot.startIso).toLocaleString("de-DE")}</strong>
+                    {" bis "}
+                    <strong>{new Date(slot.endIso).toLocaleString("de-DE")}</strong>
+                    {slot.blockedByOwner && <span className="slot-badge">Blockiert</span>}
+                  </div>
+                  <div className="row slot-actions">
+                    <button type="button" className="btn secondary" onClick={() => void toggleSlot(slot)}>
+                      {slot.blockedByOwner ? "Freigeben" : "Blockieren"}
+                    </button>
+                    <button type="button" className="btn ghost danger" onClick={() => void removeSlot(slot.id)}>
+                      Entfernen
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
 
-          <div className="row">
-            <Link to="/workshops" className="btn secondary">
+          <div className="new-tool-actions workshop-form-actions">
+            <Link to={`/workshops/${id}?manage=1`} className="btn btn-outline">
               Abbrechen
             </Link>
             <button type="submit" disabled={saving}>
@@ -258,7 +396,6 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
             </button>
           </div>
         </form>
-      </Surface>
     </section>
   );
 }

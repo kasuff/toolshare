@@ -8,6 +8,7 @@ vi.mock("../src/modules/tools/tools.repository", () => ({
     findById: vi.fn(),
     findActiveBooking: vi.fn(),
     findActiveBookingRanges: vi.fn(),
+    listBlockingPeriods: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn()
@@ -50,6 +51,19 @@ describe("toolsService", () => {
       code: "TOOL_NOT_FOUND",
       status: 404
     });
+  });
+
+  it("returns blocking periods for an existing tool", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1" } as any);
+    mockedToolsRepository.listBlockingPeriods.mockResolvedValueOnce([
+      {
+        startDate: new Date("2026-07-06T09:00:00.000Z"),
+        endDate: new Date("2026-07-06T12:00:00.000Z")
+      }
+    ] as any);
+
+    await expect(toolsService.listBlockingPeriods("t1")).resolves.toHaveLength(1);
+    expect(mockedToolsRepository.listBlockingPeriods).toHaveBeenCalledWith("t1");
   });
 
   it("creates tools", async () => {
