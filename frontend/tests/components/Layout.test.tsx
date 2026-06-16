@@ -9,13 +9,15 @@ import {
   saveReadMessageIds
 } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser } = vi.hoisted(() => ({
-  getBookingsForUser: vi.fn()
+const { getBookingsForUser, getNotifications } = vi.hoisted(() => ({
+  getBookingsForUser: vi.fn(),
+  getNotifications: vi.fn()
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
-    getBookingsForUser
+    getBookingsForUser,
+    getNotifications
   }
 }));
 
@@ -28,6 +30,7 @@ describe("Layout", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
+    getNotifications.mockResolvedValue([]);
   });
 
   it("shows bell, nav actions and closes profile menu on outside click", async () => {

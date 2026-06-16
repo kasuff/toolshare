@@ -84,10 +84,10 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
         const readIds = loadReadMessageIds(userId);
         let count = countUnreadInboxThreads(bookings, userId, readIds);
         
-        const unreadWarnings = notifications.filter(
-          (n) => n.message.startsWith("ERMAHNUNG:") && !n.read
+        const unreadNotifications = notifications.filter(
+          (n) => !n.read && (n.message.startsWith("ERMAHNUNG:") || n.message.includes("wurde storniert") || n.message.includes("wurde gelöscht"))
         );
-        count += unreadWarnings.length;
+        count += unreadNotifications.length;
 
         setUnreadRequestBellCount(count);
       } catch {

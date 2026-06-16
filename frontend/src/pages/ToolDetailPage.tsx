@@ -324,14 +324,12 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   return (
     <section className="tool-detail-page" aria-label={tool.name}>
       <DetailTopBar onBack={() => navigate(isManageMode ? "/offers" : "/tools")}>
-        {!isOwnTool && (
-          <button type="button" className="detail-report-trigger" onClick={openReportForm}>
-            Werkzeug melden
-          </button>
-        )}
+        <button type="button" className="detail-report-trigger" onClick={openReportForm}>
+          Werkzeug melden
+        </button>
       </DetailTopBar>
 
-      {showReportForm && !isOwnTool && (
+      {showReportForm && (
         <ReportFormPanel
           title="Werkzeug melden"
           hint="Melde unangemessene Inhalte an die Moderation."
