@@ -172,7 +172,9 @@ export const moderationService = {
     );
 
     if (input.warnUserId && input.warningReason) {
-      await notificationsService.createWarning(input.warnUserId, input.warningReason);
+      const moderators = await moderationRepository.findUsersByIds([input.moderatorId]);
+      const moderatorName = (moderators && moderators[0]?.name) || "Moderator";
+      await notificationsService.createWarning(input.warnUserId, input.warningReason, moderatorName);
     }
 
     if (input.requestSuspensionUserId && input.suspensionReason) {

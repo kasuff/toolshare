@@ -5,7 +5,7 @@ import { ReportFormPanel } from "../components/ReportFormPanel";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import type { Booking, BookingStatus, BookingType, PickupProposal, TimeslotProposal, User } from "../types/domain";
+import type { Booking, BookingStatus, BookingType, PickupProposal, TimeslotProposal, User, Notification } from "../types/domain";
 import {
   bookingHasUnreadForUser,
   collectAllMessageKeys,
@@ -26,7 +26,41 @@ type Props = {
 const bookingTypeLabel: Record<BookingType, string> = {
   TOOL: "Werkzeug",
   WORKSHOP: "Werkstatt",
+  SYSTEM_WARNING: "System-Meldung"
 };
+
+interface ParsedWarning {
+  reason: string;
+  moderator: string;
+  hint: string;
+}
+
+function parseWarningMessage(message: string): ParsedWarning {
+  if (!message.startsWith("ERMAHNUNG:")) {
+    return { reason: message, moderator: "Moderator", hint: "" };
+  }
+  
+  const content = message.replace("ERMAHNUNG:", "").trim();
+  const lines = content.split("\n");
+  
+  let reason = "";
+  let moderator = "Moderator";
+  let hint = "";
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("Moderator:")) {
+      moderator = trimmed.replace("Moderator:", "").trim();
+    } else if (trimmed.startsWith("Hinweis:")) {
+      hint = trimmed;
+    } else if (trimmed) {
+      if (reason) reason += "\n" + trimmed;
+      else reason = trimmed;
+    }
+  }
+  
+  return { reason, moderator, hint };
+}
 
 const bookingStatusLabel: Record<BookingStatus, string> = {
   OFFEN: "Offen",
@@ -57,6 +91,7 @@ export function InboxPage({ currentUser, token }: Props) {
   const location = useLocation();
   const { pushToast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftToolRangeParts>>({});
   const [draftWorkshopRangeByBooking, setDraftWorkshopRangeByBooking] = useState<
@@ -76,7 +111,12 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!token) return;
     setIsLoading(true);
     try {
-      setBookings(await api.getBookingsForUser(token));
+      const [fetchedBookings, fetchedNotifications] = await Promise.all([
+        api.getBookingsForUser(token),
+        api.getNotifications(token)
+      ]);
+      setBookings(fetchedBookings);
+      setNotifications(fetchedNotifications);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
     } finally {
@@ -115,13 +155,35 @@ export function InboxPage({ currentUser, token }: Props) {
   }, [currentUser?.id, bookings]);
 
   const bookingRows: BookingRow[] = useMemo(
-    () =>
-      bookings.map((booking) => ({
+    () => [
+      ...bookings.map((booking) => ({
         ...booking,
         pickupProposals: booking.pickupProposals ?? [],
         timeslotProposals: booking.timeslotProposals ?? []
       })),
-    [bookings]
+      ...notifications
+        .filter((n) => n.message.startsWith("ERMAHNUNG:"))
+        .map((n) => {
+          const parsed = parseWarningMessage(n.message);
+          return {
+            id: n.id,
+            type: "SYSTEM_WARNING" as BookingType,
+            requesterId: currentUser?.id ?? "",
+            providerId: "system",
+            status: "BESTAETIGT" as BookingStatus,
+            createdIso: n.createdIso,
+            providerName: parsed.moderator,
+            requesterName: currentUser?.name ?? "Du",
+            toolName: "Ermahnung der Moderation",
+            pickupProposals: [],
+            timeslotProposals: [],
+            selectedWorkshopTools: [],
+            systemWarningText: n.message,
+            isNotificationRead: n.read
+          };
+        })
+    ],
+    [bookings, notifications, currentUser]
   );
 
   const sortedRows = useMemo(() => {
@@ -165,6 +227,12 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!selectedBookingId) return;
     const row = sortedRows.find((b) => b.id === selectedBookingId);
     if (!row) return;
+    if (row.type === "SYSTEM_WARNING") {
+      if (!row.isNotificationRead) {
+        void markNotificationRead(row.id);
+      }
+      return;
+    }
     if (draftSeededForThreadRef.current.has(selectedBookingId)) return;
     draftSeededForThreadRef.current.add(selectedBookingId);
     setDraftPickupByBooking((prev) => ({
@@ -242,6 +310,19 @@ export function InboxPage({ currentUser, token }: Props) {
       window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
       return next;
     });
+  };
+
+  const markNotificationRead = async (notificationId: string) => {
+    if (!token) return;
+    try {
+      await api.markNotificationAsRead(notificationId, token);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+      );
+      window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
+    } catch (error) {
+      console.error("Fehler beim Markieren der Benachrichtigung als gelesen:", error);
+    }
   };
 
   const decide = async (bookingId: string, accept: boolean) => {
@@ -465,7 +546,9 @@ export function InboxPage({ currentUser, token }: Props) {
                   aria-current={active ? "true" : undefined}
                   onClick={() => {
                     setSelectedBookingId(booking.id);
-                    markThreadRead(booking);
+                    if (booking.type !== "SYSTEM_WARNING") {
+                      markThreadRead(booking);
+                    }
                   }}
                 >
                   <span className="messenger-thread-avatar-wrap">
@@ -502,30 +585,34 @@ export function InboxPage({ currentUser, token }: Props) {
                   size="lg"
                 />
                 <div className="messenger-chat-header-text">
-                  <strong>{selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`}</strong>
+                  <strong>{selectedBooking.type === "SYSTEM_WARNING" ? "Ermahnung der Moderation" : (selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`)}</strong>
                   <span className="messenger-chat-header-sub">{counterparty(selectedBooking, currentUser.id).name}</span>
                 </div>
                 <div className="messenger-chat-header-actions">
                   <StatusPill
-                    label={bookingStatusLabel[selectedBooking.status]}
+                    label={selectedBooking.type === "SYSTEM_WARNING" ? "Verwarnung" : bookingStatusLabel[selectedBooking.status]}
                     tone={
-                      selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
-                        ? "success"
-                        : selectedBooking.status === "ABGELEHNT"
-                          ? "danger"
-                          : "neutral"
+                      selectedBooking.type === "SYSTEM_WARNING"
+                        ? "danger"
+                        : selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
+                          ? "success"
+                          : selectedBooking.status === "ABGELEHNT"
+                            ? "danger"
+                            : "neutral"
                     }
                   />
-                  <KebabMenu
-                    ariaLabel="Konversationsaktionen"
-                    items={[
-                      {
-                        id: "report-user",
-                        label: "Nutzer melden",
-                        onSelect: () => setShowUserReportForm(true)
-                      }
-                    ]}
-                  />
+                  {selectedBooking.type !== "SYSTEM_WARNING" && (
+                    <KebabMenu
+                      ariaLabel="Konversationsaktionen"
+                      items={[
+                        {
+                          id: "report-user",
+                          label: "Nutzer melden",
+                          onSelect: () => setShowUserReportForm(true)
+                        }
+                      ]}
+                    />
+                  )}
                 </div>
               </header>
 
@@ -545,6 +632,37 @@ export function InboxPage({ currentUser, token }: Props) {
               )}
 
               <div className="messenger-chat-scroll" ref={chatScrollRef}>
+                {selectedBooking.type === "SYSTEM_WARNING" ? (
+                  <MessengerRow
+                    variant="incoming"
+                    avatar={<UserAvatar name={selectedBooking.providerName ?? "Moderator"} imageUrl={null} size="sm" />}
+                  >
+                    <RequestMessageCard
+                      label="Sicherheitsmeldung"
+                      title="Ermahnung der Moderation"
+                      icon="gavel"
+                    >
+                      {(() => {
+                        const parsed = parseWarningMessage(selectedBooking.systemWarningText ?? "");
+                        return (
+                          <div className="warning-card-body" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <p style={{ margin: 0, fontWeight: 'bold' }}>Grund der Ermahnung:</p>
+                            <blockquote style={{ margin: '0 0 12px 0', padding: '8px 12px', borderLeft: '4px solid var(--color-warning)', background: 'rgba(217, 119, 6, 0.08)', fontStyle: 'italic', borderRadius: '0 4px 4px 0' }}>
+                              {parsed.reason}
+                            </blockquote>
+                            {parsed.hint && (
+                              <p style={{ margin: 0, fontSize: '0.9em', color: '#dc2626', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.2em' }}>warning</span>
+                                {parsed.hint}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </RequestMessageCard>
+                  </MessengerRow>
+                ) : (
+                  <>
                 <MessengerRow
                   variant={selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}
                   avatar={<UserAvatar name={selectedBooking.requesterName ?? currentUser.name} imageUrl={null} size="sm" />}
@@ -826,6 +944,8 @@ export function InboxPage({ currentUser, token }: Props) {
                     </RequestMessageCard>
                   </MessengerRow>
                 )}
+                  </>
+                )}
               </div>
 
               {selectedBooking.status === "OFFEN" && counterFormBookingId !== selectedBooking.id && (
@@ -1030,11 +1150,17 @@ function proposalStatusLabel(status: PickupProposal["status"] | TimeslotProposal
 }
 
 function threadHasUnread(booking: BookingRow, currentUserId: string, readIds: Set<string>): boolean {
+  if (booking.type === "SYSTEM_WARNING") {
+    return !booking.isNotificationRead;
+  }
   return bookingHasUnreadForUser(booking, currentUserId, readIds);
 }
 
 function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string): string[] {
   const keys: string[] = [];
+  if (booking.type === "SYSTEM_WARNING") {
+    return keys;
+  }
   if (booking.requesterId !== currentUserId) {
     keys.push(requestMessageKey(booking.id));
   }
@@ -1052,6 +1178,9 @@ function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string):
 }
 
 function counterparty(booking: Booking, currentUserId: string): { name: string } {
+  if (booking.type === "SYSTEM_WARNING") {
+    return { name: "Moderator" };
+  }
   if (booking.providerId === currentUserId) {
     return { name: booking.requesterName ?? "Anfragender" };
   }
@@ -1059,6 +1188,10 @@ function counterparty(booking: Booking, currentUserId: string): { name: string }
 }
 
 function getThreadPreview(row: BookingRow, currentUserId: string): string {
+  if (row.type === "SYSTEM_WARNING") {
+    const parsed = parseWarningMessage(row.systemWarningText ?? "");
+    return parsed.reason;
+  }
   const latestPickup =
     row.pickupProposals.length > 0 ? row.pickupProposals[row.pickupProposals.length - 1] : null;
   const latestTimeslot =

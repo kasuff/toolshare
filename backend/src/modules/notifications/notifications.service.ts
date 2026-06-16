@@ -7,9 +7,9 @@ export const notificationsService = {
     return notificationsRepository.listByUser(userId);
   },
 
-  async createWarning(userId: string, reason: string) {
+  async createWarning(userId: string, reason: string, moderatorName = "Moderator") {
     const safeReason = reason.trim();
-    const message = `ERMAHNUNG: ${safeReason}\nHinweis: Bei weiteren Verstößen kann dein Konto gesperrt werden.`;
+    const message = `ERMAHNUNG: ${safeReason}\nModerator: ${moderatorName}\nHinweis: Bei weiteren Verstößen kann dein Konto gesperrt werden.`;
     return notificationsRepository.create(userId, message);
   },
 
