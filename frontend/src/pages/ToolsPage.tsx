@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
@@ -131,10 +132,10 @@ export function ToolsPage({ token, currentUser }: Props) {
             <div className="advanced-filter-fields">
               <div className="grid grid-2">
                 <Field label="Ausleihe von">
-                  <input type="date" value={borrowFrom} onChange={(e) => setBorrowFrom(e.target.value)} />
+                  <DateInput value={borrowFrom} onChange={setBorrowFrom} />
                 </Field>
                 <Field label="Ausleihe bis">
-                  <input type="date" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} />
+                  <DateInput value={borrowUntil} onChange={setBorrowUntil} />
                 </Field>
               </div>
             </div>

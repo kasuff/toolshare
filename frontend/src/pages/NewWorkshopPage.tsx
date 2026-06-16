@@ -6,6 +6,7 @@ import {
   isAddressComplete,
   toAddressPayload
 } from "../components/AddressInput";
+import { DateInput } from "../components/DateInput";
 import { Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
@@ -304,12 +305,11 @@ export function NewWorkshopPage({ token }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label="Startdatum"
-                      type="date"
                       className="booking-input"
                       value={slot.startDate}
-                      onChange={(event) => setSlot((current) => ({ ...current, startDate: event.target.value }))}
+                      onChange={(value) => setSlot((current) => ({ ...current, startDate: value }))}
                     />
                   </label>
                   <label>
@@ -329,13 +329,12 @@ export function NewWorkshopPage({ token }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label="Enddatum"
-                      type="date"
                       className="booking-input"
                       value={slot.endDate}
                       min={slot.startDate}
-                      onChange={(event) => setSlot((current) => ({ ...current, endDate: event.target.value }))}
+                      onChange={(value) => setSlot((current) => ({ ...current, endDate: value }))}
                     />
                   </label>
                   <label>

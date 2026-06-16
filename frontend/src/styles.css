@@ -86,6 +86,60 @@ input[type="datetime-local"]::-webkit-datetime-edit {
   text-transform: lowercase;
 }
 
+.date-input-control {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.date-input-control > input:not(.date-input-picker-native) {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.date-input-picker-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 44px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-brand);
+  cursor: pointer;
+}
+
+.date-input-picker-button:hover,
+.date-input-picker-button:focus-visible {
+  background: transparent;
+  color: var(--color-brand-strong);
+}
+
+.date-input-calendar-icon {
+  font-size: 20px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.date-input-picker-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.date-input-control.is-disabled .date-input-picker-button {
+  cursor: not-allowed;
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -798,6 +852,7 @@ button.mini {
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
+  padding: 0;
 }
 
 .new-workshop-form .capacity-display {

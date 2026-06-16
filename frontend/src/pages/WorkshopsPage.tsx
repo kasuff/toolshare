@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
@@ -667,10 +668,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
             <div className="advanced-filter-fields">
               <div className="grid grid-2">
                 <Field label="Ausleihe von">
-                  <input type="date" value={borrowFrom} onChange={(e) => setBorrowFrom(e.target.value)} />
+                  <DateInput value={borrowFrom} onChange={setBorrowFrom} />
                 </Field>
                 <Field label="Ausleihe bis">
-                  <input type="date" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} />
+                  <DateInput value={borrowUntil} onChange={setBorrowUntil} />
                 </Field>
               </div>
               <div className="slider-row">
@@ -955,18 +956,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="booking-fields-row">
                       <label>
                         <span>Datum</span>
-                        <input
+                        <DateInput
                           id="workshop-booking-start-date"
                           aria-label={selectedWorkshopIsOwn ? "Startdatum Eigenbedarf" : "Abholdatum"}
-                          type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.startDate ?? ""}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setBookingDraftsByWorkshop((prev) => ({
                               ...prev,
                               [selectedWorkshop.workshop.id]: {
                                 ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                startDate: event.target.value
+                                startDate: value
                               }
                             }))
                           }
@@ -1003,18 +1003,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="booking-fields-row">
                       <label>
                         <span>Datum</span>
-                        <input
+                        <DateInput
                           aria-label={selectedWorkshopIsOwn ? "Enddatum Eigenbedarf" : "Abgabedatum"}
-                          type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.endDate ?? ""}
                           min={selectedWorkshopDraft?.startDate}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setBookingDraftsByWorkshop((prev) => ({
                               ...prev,
                               [selectedWorkshop.workshop.id]: {
                                 ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                endDate: event.target.value
+                                endDate: value
                               }
                             }))
                           }
@@ -1178,17 +1177,16 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                       <label className="booking-label" htmlFor="workshop-booking-start-date">
                         Von wann?
                       </label>
-                      <input
+                      <DateInput
                         id="workshop-booking-start-date"
-                        type="date"
                         className="booking-input"
                         value={selectedWorkshopDraft?.startDate ?? ""}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setBookingDraftsByWorkshop((prev) => ({
                             ...prev,
                             [selectedWorkshop.workshop.id]: {
                               ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                              startDate: event.target.value
+                              startDate: value
                             }
                           }))
                         }

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { DateInput } from "../components/DateInput";
 import { KebabMenu } from "../components/KebabMenu";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
@@ -667,16 +668,15 @@ export function InboxPage({ currentUser, token }: Props) {
                         <div className="request-card-form-grid request-card-form-grid--workshop">
                           <label>
                             <span>Abholdatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternatives Abholdatum"
-                              type="date"
                               value={counterDraft?.pickupDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftPickupByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
-                                    pickupDate: event.target.value
+                                    pickupDate: value
                                   }
                                 }))
                               }
@@ -701,16 +701,15 @@ export function InboxPage({ currentUser, token }: Props) {
                           </label>
                           <label>
                             <span>Rückgabedatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternatives Rückgabedatum"
-                              type="date"
                               value={counterDraft?.returnDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftPickupByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
-                                    returnDate: event.target.value
+                                    returnDate: value
                                   }
                                 }))
                               }
@@ -738,16 +737,15 @@ export function InboxPage({ currentUser, token }: Props) {
                         <div className="request-card-form-grid request-card-form-grid--workshop">
                           <label>
                             <span>Startdatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternativdatum für Werkstattvorschlag"
-                              type="date"
                               value={workshopRangeDraft?.startDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftWorkshopRangeByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
-                                    startDate: event.target.value
+                                    startDate: value
                                   }
                                 }))
                               }
@@ -772,16 +770,15 @@ export function InboxPage({ currentUser, token }: Props) {
                           </label>
                           <label>
                             <span>Enddatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternativ-Enddatum für Werkstattvorschlag"
-                              type="date"
                               value={workshopRangeDraft?.endDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftWorkshopRangeByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
-                                    endDate: event.target.value
+                                    endDate: value
                                   }
                                 }))
                               }
