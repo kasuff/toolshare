@@ -306,6 +306,15 @@ export const api = {
     return loadDb().notifications.filter((n) => n.userId === userId);
   },
 
+  markNotificationAsRead(notificationId: string, token?: string): void {
+    const db = loadDb();
+    const n = db.notifications.find((it) => it.id === notificationId);
+    if (n) {
+      n.read = true;
+      saveDb(db);
+    }
+  },
+
   createReport(input: Omit<Report, "id" | "status" | "createdIso">): void {
     const db = loadDb();
     db.reports.unshift({

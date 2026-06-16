@@ -1,7 +1,7 @@
 export type Role = "NUTZER" | "MODERATOR" | "ADMIN";
 export type ToolStatus = "VERFUEGBAR" | "AUSGELIEHEN";
 export type BookingStatus = "OFFEN" | "BESTAETIGT" | "ABGELEHNT" | "ABGESCHLOSSEN";
-export type BookingType = "TOOL" | "WORKSHOP";
+export type BookingType = "TOOL" | "WORKSHOP" | "SYSTEM_WARNING";
 
 export type PickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
 export type TimeslotProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
@@ -117,6 +117,8 @@ export interface Booking {
   pickupProposals?: PickupProposal[];
   timeslotProposals?: TimeslotProposal[];
   selectedWorkshopTools?: BookingSelectedTool[];
+  systemWarningText?: string;
+  isNotificationRead?: boolean;
 }
 
 export interface Notification {
