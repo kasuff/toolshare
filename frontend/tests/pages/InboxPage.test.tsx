@@ -36,6 +36,20 @@ const currentUser = {
   isSuspended: false,
 };
 
+function mockMatchMedia(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
 const baseOpenBooking = {
   id: "b1",
   type: "TOOL" as const,
@@ -57,6 +71,7 @@ describe("InboxPage", () => {
     vi.resetAllMocks();
     localStorage.clear();
     vi.clearAllMocks();
+    mockMatchMedia(false);
     getNotifications.mockResolvedValue([]);
     markNotificationAsRead.mockResolvedValue(undefined);
   });
@@ -132,6 +147,53 @@ describe("InboxPage", () => {
     expect(document.querySelector(".messenger-chat-header-text strong")).toHaveTextContent(
       "Gezielt geöffnete Anfrage"
     );
+  });
+
+  it("shows only the thread list on small screens until a chat is opened", async () => {
+    mockMatchMedia(true);
+    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadList = await screen.findByLabelText("Konversationen");
+    expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
+    expect(screen.queryByText("Ausleihanfrage")).not.toBeInTheDocument();
+    expect(document.querySelector(".messenger-shell")).not.toHaveClass("messenger-shell--chat-open");
+
+    fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
+
+    expect(document.querySelector(".messenger-shell")).toHaveClass("messenger-shell--chat-open");
+    expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zurück zur Chatliste" })).toBeInTheDocument();
+  });
+
+  it("returns to the thread list on small screens when back is pressed", async () => {
+    mockMatchMedia(true);
+    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadList = await screen.findByLabelText("Konversationen");
+    fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
+    expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zur Chatliste" }));
+
+    expect(screen.queryByText("Ausleihanfrage")).not.toBeInTheDocument();
+    expect(document.querySelector(".messenger-shell")).not.toHaveClass("messenger-shell--chat-open");
+    expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
   });
 
   it("shows unread chats with a small count badge instead of a colored thread", async () => {

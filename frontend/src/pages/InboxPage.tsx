@@ -109,8 +109,26 @@ type BookingRow = Booking & {
   timeslotProposals: TimeslotProposal[];
 };
 
+const MOBILE_INBOX_MEDIA_QUERY = "(max-width: 900px)";
+
+function useMobileInboxLayout() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(MOBILE_INBOX_MEDIA_QUERY).matches
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(MOBILE_INBOX_MEDIA_QUERY);
+    const onChange = () => setIsMobile(mediaQuery.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
+
+  return isMobile;
+}
+
 export function InboxPage({ currentUser, token }: Props) {
   const location = useLocation();
+  const isMobileInbox = useMobileInboxLayout();
   const { pushToast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -231,9 +249,17 @@ export function InboxPage({ currentUser, token }: Props) {
       const requestedBooking = requestedBookingId
         ? sortedRows.find((booking) => booking.id === requestedBookingId)
         : null;
-      setSelectedBookingId(requestedBooking?.id ?? sortedRows[0].id);
+      if (requestedBooking) {
+        setSelectedBookingId(requestedBooking.id);
+        return;
+      }
+      if (isMobileInbox) {
+        setSelectedBookingId(null);
+        return;
+      }
+      setSelectedBookingId(sortedRows[0].id);
     }
-  }, [location.state, sortedRows, selectedBookingId]);
+  }, [isMobileInbox, location.state, sortedRows, selectedBookingId]);
 
   const prevSelectedBookingIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -251,7 +277,11 @@ export function InboxPage({ currentUser, token }: Props) {
   }, [selectedBookingId]);
 
   const selectedBooking =
-    sortedRows.find((booking) => booking.id === selectedBookingId) ?? (sortedRows.length > 0 ? sortedRows[0] : null);
+    selectedBookingId != null
+      ? sortedRows.find((booking) => booking.id === selectedBookingId) ?? null
+      : isMobileInbox
+        ? null
+        : sortedRows[0] ?? null;
 
   const selectedReqIncoming = Boolean(
     selectedBooking && currentUser && selectedBooking.requesterId !== currentUser.id
@@ -560,10 +590,12 @@ export function InboxPage({ currentUser, token }: Props) {
           <EmptyState title="Noch nichts hier" text="Sobald jemand eine Ausleihe anfragt oder du eine sendest, erscheint die Unterhaltung hier." />
         </Surface>
       ) : (
-        <div className="messenger-shell">
+        <div
+          className={`messenger-shell${isMobileInbox && selectedBooking ? " messenger-shell--chat-open" : ""}`}
+        >
           <aside className="messenger-thread-list" aria-label="Konversationen">
             {sortedRows.map((booking) => {
-              const active = selectedBooking?.id === booking.id;
+              const active = selectedBookingId === booking.id;
               const cp = counterparty(booking, currentUser.id);
               const preview = getThreadPreview(booking, currentUser.id);
               const lastAt = getLastActivityMs(booking);
@@ -609,6 +641,18 @@ export function InboxPage({ currentUser, token }: Props) {
           {selectedBooking && (
             <div className="messenger-chat">
               <header className="messenger-chat-header">
+                {isMobileInbox && (
+                  <button
+                    type="button"
+                    className="btn icon-button messenger-back-button"
+                    aria-label="Zurück zur Chatliste"
+                    onClick={() => setSelectedBookingId(null)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      arrow_back
+                    </span>
+                  </button>
+                )}
                 <UserAvatar
                   name={counterparty(selectedBooking, currentUser.id).name}
                   imageUrl={null}
