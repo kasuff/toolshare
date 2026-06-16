@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   timeSlotFindUnique: vi.fn(),
   timeSlotDelete: vi.fn(),
   bookingFindFirst: vi.fn(),
+  bookingFindMany: vi.fn(),
   prismaTransaction: vi.fn()
 }));
 
@@ -31,7 +32,8 @@ vi.mock("../src/config/prisma", () => ({
       delete: mocks.timeSlotDelete
     },
     booking: {
-      findFirst: mocks.bookingFindFirst
+      findFirst: mocks.bookingFindFirst,
+      findMany: mocks.bookingFindMany
     },
     $transaction: mocks.prismaTransaction
   }
@@ -108,6 +110,22 @@ describe("workshopsRepository", () => {
       }
     });
     expect(result).toEqual({ id: "w1" });
+  });
+
+  it("loads active booking ranges via direct and legacy timeslot links", async () => {
+    mocks.bookingFindMany.mockResolvedValueOnce([{ id: "b1" }]);
+
+    const result = await workshopsRepository.findActiveBookingRanges("w1");
+
+    expect(mocks.bookingFindMany).toHaveBeenCalledWith({
+      where: {
+        status: { in: ["PENDING", "ACCEPTED"] },
+        OR: [{ workshopId: "w1" }, { timeslot: { workshopId: "w1" } }]
+      },
+      select: { id: true, startDate: true, endDate: true, status: true },
+      orderBy: { startDate: "asc" }
+    });
+    expect(result).toEqual([{ id: "b1" }]);
   });
 
   it("creates, updates and removes workshops", async () => {

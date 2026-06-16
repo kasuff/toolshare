@@ -1,0 +1,83 @@
+groups:
+  - name: system.alerts
+    interval: 30s
+    rules:
+
+      # ── CPU ────────────────────────────────────────────────────────────────
+      - alert: HighCpuUsage
+        expr: |
+          100 - (avg by (instance) (
+            irate(node_cpu_seconds_total{mode="idle"}[5m])
+          ) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hohe CPU-Auslastung auf {{ $labels.instance }}"
+          description: "CPU-Auslastung liegt bei {{ printf \"%.1f\" $value }}% (Schwellwert: 85%) seit 5 Minuten."
+
+      - alert: CriticalCpuUsage
+        expr: |
+          100 - (avg by (instance) (
+            irate(node_cpu_seconds_total{mode="idle"}[5m])
+          ) * 100) > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kritische CPU-Auslastung auf {{ $labels.instance }}"
+          description: "CPU-Auslastung liegt bei {{ printf \"%.1f\" $value }}% (Schwellwert: 95%) seit 2 Minuten."
+
+      # ── RAM ────────────────────────────────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hohe RAM-Auslastung auf {{ $labels.instance }}"
+          description: "RAM-Auslastung liegt bei {{ printf \"%.1f\" $value }}% (Schwellwert: 85%)."
+
+      - alert: CriticalMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kritische RAM-Auslastung auf {{ $labels.instance }}"
+          description: "RAM-Auslastung liegt bei {{ printf \"%.1f\" $value }}% (Schwellwert: 95%)."
+
+      # ── Disk ───────────────────────────────────────────────────────────────
+      - alert: DiskSpaceLow
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"})) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Wenig Festplattenspeicher auf {{ $labels.instance }}"
+          description: "Festplatte {{ $labels.mountpoint }} ist zu {{ printf \"%.1f\" $value }}% belegt."
+
+      - alert: DiskSpaceCritical
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kritisch: Festplattenspeicher voll auf {{ $labels.instance }}"
+          description: "Festplatte {{ $labels.mountpoint }} ist zu {{ printf \"%.1f\" $value }}% belegt."
+
+      # ── Instance Down ──────────────────────────────────────────────────────
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service nicht erreichbar: {{ $labels.job }}"
+          description: "{{ $labels.job }} auf {{ $labels.instance }} ist seit 1 Minute nicht erreichbar."

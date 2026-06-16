@@ -60,6 +60,21 @@ export const workshopsRepository = {
     });
   },
 
+  // Liefert die belegten Zeiträume einer Werkstatt für die Kalenderansicht
+  // (durchgestrichen). Erfasst sowohl neue Buchungen mit direktem workshopId-FK
+  // als auch Altbuchungen, die noch über einen TimeSlot (timeslotId) verknüpft sind.
+  // Bewusst ohne Nutzeridentität.
+  findActiveBookingRanges(workshopId: string) {
+    return prisma.booking.findMany({
+      where: {
+        status: { in: ["PENDING", "ACCEPTED"] },
+        OR: [{ workshopId }, { timeslot: { workshopId } }]
+      },
+      select: { id: true, startDate: true, endDate: true, status: true },
+      orderBy: { startDate: "asc" }
+    });
+  },
+
   create(input: {
     managerId: string;
     name: string;

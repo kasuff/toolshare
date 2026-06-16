@@ -21,7 +21,8 @@ vi.mock("../../src/services/api", () => ({
     createWorkshopTimeslot,
     deleteWorkshop,
     getWorkshopById,
-    getWorkshops
+    getWorkshops,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 

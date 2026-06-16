@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   toolUpdate: vi.fn(),
   toolDelete: vi.fn(),
   bookingFindFirst: vi.fn(),
-  bookingFindMany: vi.fn()
+  bookingFindMany: vi.fn(),
+  bookingFindUnique: vi.fn(),
+  bookingDelete: vi.fn()
 }));
 
 vi.mock("../src/config/prisma", () => ({
@@ -22,7 +24,9 @@ vi.mock("../src/config/prisma", () => ({
     },
     booking: {
       findFirst: mocks.bookingFindFirst,
-      findMany: mocks.bookingFindMany
+      findMany: mocks.bookingFindMany,
+      findUnique: mocks.bookingFindUnique,
+      delete: mocks.bookingDelete
     }
   }
 }));
@@ -97,6 +101,22 @@ describe("toolsRepository", () => {
     expect(booking).toEqual({ id: "b1" });
   });
 
+  it("loads active booking ranges for a tool", async () => {
+    mocks.bookingFindMany.mockResolvedValueOnce([{ id: "b1" }]);
+
+    const result = await toolsRepository.findActiveBookingRanges("t1");
+
+    expect(mocks.bookingFindMany).toHaveBeenCalledWith({
+      where: {
+        toolId: "t1",
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: { id: true, startDate: true, endDate: true, status: true },
+      orderBy: { startDate: "asc" }
+    });
+    expect(result).toEqual([{ id: "b1" }]);
+  });
+
   it("lists pending and accepted blocking periods", async () => {
     mocks.bookingFindMany.mockResolvedValueOnce([
       {
@@ -118,6 +138,61 @@ describe("toolsRepository", () => {
       },
       orderBy: { startDate: "asc" }
     });
+  });
+
+  it("lists owner blocks for the owner with ids", async () => {
+    mocks.bookingFindMany.mockResolvedValueOnce([{ id: "b1" }]);
+
+    const result = await toolsRepository.listOwnerBlocks("t1", "owner-1");
+
+    expect(mocks.bookingFindMany).toHaveBeenCalledWith({
+      where: {
+        toolId: "t1",
+        userId: "owner-1",
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: { id: true, startDate: true, endDate: true },
+      orderBy: { startDate: "asc" }
+    });
+    expect(result).toEqual([{ id: "b1" }]);
+  });
+
+  it("deletes an owner block when it is the owner's self-block", async () => {
+    mocks.bookingFindUnique.mockResolvedValueOnce({
+      id: "b1",
+      toolId: "t1",
+      userId: "owner-1",
+      tool: { id: "t1", ownerId: "owner-1" }
+    });
+    mocks.bookingDelete.mockResolvedValueOnce({ id: "b1" });
+
+    const result = await toolsRepository.deleteOwnerBlock("b1", "owner-1");
+
+    expect(mocks.bookingDelete).toHaveBeenCalledWith({ where: { id: "b1" } });
+    expect(result).toBe("OK");
+  });
+
+  it("does not delete a block that is not the owner's own", async () => {
+    mocks.bookingFindUnique.mockResolvedValueOnce({
+      id: "b1",
+      toolId: "t1",
+      userId: "borrower-9",
+      tool: { id: "t1", ownerId: "owner-1" }
+    });
+
+    const result = await toolsRepository.deleteOwnerBlock("b1", "owner-1");
+
+    expect(result).toBe("FORBIDDEN");
+    expect(mocks.bookingDelete).not.toHaveBeenCalled();
+  });
+
+  it("returns NOT_FOUND when the block does not exist", async () => {
+    mocks.bookingFindUnique.mockResolvedValueOnce(null);
+
+    const result = await toolsRepository.deleteOwnerBlock("missing", "owner-1");
+
+    expect(result).toBe("NOT_FOUND");
+    expect(mocks.bookingDelete).not.toHaveBeenCalled();
   });
 
   it("creates, updates and removes tools", async () => {

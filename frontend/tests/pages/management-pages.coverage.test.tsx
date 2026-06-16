@@ -22,7 +22,8 @@ const {
   updateReportStatus,
   listSuspensionRequests,
   decideSuspensionRequest,
-  createWorkshop
+  createWorkshop,
+  getSystemSettings
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
@@ -38,7 +39,8 @@ const {
   updateReportStatus: vi.fn(),
   listSuspensionRequests: vi.fn(),
   decideSuspensionRequest: vi.fn(),
-  createWorkshop: vi.fn()
+  createWorkshop: vi.fn(),
+  getSystemSettings: vi.fn()
 }));
 
 vi.mock("../../src/hooks/useToast", () => ({
@@ -62,7 +64,8 @@ vi.mock("../../src/services/api", () => ({
     updateReportStatus,
     listSuspensionRequests,
     decideSuspensionRequest,
-    createWorkshop
+    createWorkshop,
+    getSystemSettings
   }
 }));
 
@@ -106,6 +109,7 @@ describe("management pages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("FileReader", FileReaderMock as unknown as typeof FileReader);
+    getSystemSettings.mockResolvedValue([]);
   });
 
   it("guards admin access when no token is available", () => {
@@ -343,14 +347,12 @@ describe("management pages", () => {
       target: { files: [new File(["photo"], "workshop.png", { type: "image/png" })] }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
-    expect(pushToast).toHaveBeenCalledWith("Bitte füge mindestens ein Zeitfenster hinzu.", "error");
-
+    // Zeitfenster sind jetzt optional: ein blockierter Zeitraum kann optional angelegt werden.
     fireEvent.change(screen.getByLabelText("Startdatum"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "09:00" } });
     fireEvent.change(screen.getByLabelText("Enddatum"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => {
@@ -363,7 +365,7 @@ describe("management pages", () => {
           extras: ["wlan"],
           equipmentItems: [{ name: "Bohrmaschine", category: "holz" }],
           imageUrls: ["data:image/png;base64,mock-file"],
-          slots: [{ startIso: "2026-07-01T09:00", endIso: "2026-07-01T12:00", blockedByOwner: false }]
+          slots: [{ startIso: "2026-07-01T09:00", endIso: "2026-07-01T12:00", blockedByOwner: true }]
         }),
         "token-123"
       );

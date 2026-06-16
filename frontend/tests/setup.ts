@@ -40,6 +40,9 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  // Globale Stubs (z.B. FileReader, fetch) zurücksetzen, damit sie nicht in
+  // andere Test-Dateien lecken – im CI laufen alle Dateien in einem Worker.
+  vi.unstubAllGlobals();
   if (typeof localStorage?.clear === "function") {
     localStorage.clear();
   }

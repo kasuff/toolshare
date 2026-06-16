@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AddressInput, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./components/AddressInput";
+import { AddressInput } from "./components/AddressInput";
+import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./utils/address";
 import { Layout } from "./components/Layout";
 import { GlobalProgressBar } from "./components/GlobalProgressBar";
 import { ToastViewport } from "./components/ui";
@@ -22,6 +23,8 @@ import { MyOffersPage } from "./pages/MyOffersPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { api } from "./services/api";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./services/sessionEvents";
+import { ImpressumPage } from "./pages/ImpressumPage";
+import { DatenschutzPage } from "./pages/DatenschutzPage";
 
 function AuthScreen({
   onLogin,
@@ -373,7 +376,7 @@ function AppWithProviders() {
           path="profile"
           element={
             <RequireAuth token={token}>
-              <ProfileSettingsPage currentUser={currentUser ?? undefined} onSave={updateProfile} />
+              <ProfileSettingsPage currentUser={currentUser ?? undefined} token={token ?? undefined} onSave={updateProfile} />
             </RequireAuth>
           }
         />
@@ -401,6 +404,8 @@ function AppWithProviders() {
             )
           }
         />
+        <Route path="impressum" element={<ImpressumPage />} />
+        <Route path="datenschutz" element={<DatenschutzPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

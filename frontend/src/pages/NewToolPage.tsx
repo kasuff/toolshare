@@ -1,12 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  AddressInput,
-  EMPTY_ADDRESS,
-  isAddressComplete,
-  toAddressPayload
-} from "../components/AddressInput";
+import { AddressInput } from "../components/AddressInput";
+import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "../utils/address";
 import { Surface } from "../components/ui";
+import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { ImageUpload } from "../components/ImageUpload";
 import { CategorySelect } from "../components/CategorySelect";
 import { useToast } from "../hooks/useToast";
@@ -217,6 +214,8 @@ export function NewToolPage({ token }: Props) {
             Abbrechen
           </Link>
         </div>
+
+        <SystemRulesInfo token={token} />
       </form>
     </section>
   );

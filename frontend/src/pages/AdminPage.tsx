@@ -1,9 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { MonitoringSection } from "../components/MonitoringSection";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api, type SuspensionRequestItem } from "../services/api";
+import { api, type SuspensionRequestItem, type SystemSetting } from "../services/api";
 import type { User } from "../types/domain";
+
+type AdminTab = "management" | "monitoring" | "rules";
 
 type Props = {
   currentUser?: User;
@@ -12,6 +15,7 @@ type Props = {
 
 export function AdminPage({ currentUser, token }: Props) {
   const { pushToast } = useToast();
+  const [adminTab, setAdminTab] = useState<AdminTab>("management");
   const [users, setUsers] = useState<User[]>([]);
   const [suspensionRequests, setSuspensionRequests] = useState<SuspensionRequestItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
@@ -19,6 +23,9 @@ export function AdminPage({ currentUser, token }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
+  const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [savingSettingKey, setSavingSettingKey] = useState<string | null>(null);
   const [metrics, setMetrics] = useState({
     users: 0,
     tools: 0,
@@ -32,10 +39,11 @@ export function AdminPage({ currentUser, token }: Props) {
     if (!token) return;
     setIsLoading(true);
     try {
-      const [nextUsers, nextMetrics, nextSuspensionRequests] = await Promise.all([
+      const [nextUsers, nextMetrics, nextSuspensionRequests, nextSettings] = await Promise.all([
         api.listUsers(token, { search: search || undefined }),
         api.getMetrics(token),
-        api.listSuspensionRequests(token)
+        api.listSuspensionRequests(token),
+        api.getSystemSettings(token)
       ]);
       setUsers(nextUsers);
       setMetrics({
@@ -47,10 +55,37 @@ export function AdminPage({ currentUser, token }: Props) {
         openSuspensionRequests: nextMetrics.openSuspensionRequests ?? 0
       });
       setSuspensionRequests(nextSuspensionRequests);
+      setSettings(nextSettings);
+      setDraftValues(Object.fromEntries(nextSettings.map((s) => [s.key, String(s.value)])));
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Admin-Daten konnten nicht geladen werden.", "error");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const saveSetting = async (setting: SystemSetting) => {
+    if (!token) return;
+    const raw = draftValues[setting.key];
+    const value = Number(raw);
+    if (raw === undefined || raw === "" || !Number.isInteger(value)) {
+      pushToast("Bitte eine ganze Zahl eingeben.", "error");
+      return;
+    }
+    if (value < setting.min || value > setting.max) {
+      pushToast(`Wert muss zwischen ${setting.min} und ${setting.max} liegen.`, "error");
+      return;
+    }
+    setSavingSettingKey(setting.key);
+    try {
+      const updated = await api.updateSystemSetting(setting.key, value, token);
+      setSettings((prev) => prev.map((s) => (s.key === updated.key ? updated : s)));
+      setDraftValues((prev) => ({ ...prev, [updated.key]: String(updated.value) }));
+      pushToast("Einstellung wurde gespeichert.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Einstellung konnte nicht gespeichert werden.", "error");
+    } finally {
+      setSavingSettingKey(null);
     }
   };
 
@@ -127,9 +162,97 @@ export function AdminPage({ currentUser, token }: Props) {
     );
   }
 
+  const tabNav = (
+    <nav className="monitoring-tabs">
+      <button
+        type="button"
+        className={`monitoring-tab ${adminTab === "management" ? "active" : ""}`}
+        onClick={() => setAdminTab("management")}
+      >
+        Verwaltung
+      </button>
+      <button
+        type="button"
+        className={`monitoring-tab ${adminTab === "rules" ? "active" : ""}`}
+        onClick={() => setAdminTab("rules")}
+      >
+        Systemregeln
+      </button>
+      <button
+        type="button"
+        className={`monitoring-tab ${adminTab === "monitoring" ? "active" : ""}`}
+        onClick={() => setAdminTab("monitoring")}
+      >
+        Monitoring
+      </button>
+    </nav>
+  );
+
+  if (adminTab === "monitoring") {
+    return (
+      <section className="stack">
+        <h1>Admin</h1>
+        {tabNav}
+        <MonitoringSection token={token} />
+      </section>
+    );
+  }
+
+  if (adminTab === "rules") {
+    return (
+      <section className="stack">
+        <h1>Admin</h1>
+        {tabNav}
+        <Surface
+          title="Systemregeln"
+          subtitle="Diese Werte gelten plattformweit. Nur die Zahl ist anpassbar – Änderungen werden sofort übernommen."
+        >
+          {isLoading && settings.length === 0 && <p className="hint">Lade Systemregeln...</p>}
+          {settings.length > 0 && (
+            <ul className="system-settings-list">
+              {settings.map((setting) => {
+                const draft = draftValues[setting.key] ?? String(setting.value);
+                const isDirty = draft !== String(setting.value);
+                return (
+                  <li key={setting.key} className="system-setting-row">
+                    <span className="system-setting-label">{setting.label}:</span>
+                    <div className="system-setting-control">
+                      <input
+                        type="number"
+                        className="system-setting-input"
+                        value={draft}
+                        min={setting.min}
+                        max={setting.max}
+                        step={1}
+                        aria-label={setting.label}
+                        onChange={(e) =>
+                          setDraftValues((prev) => ({ ...prev, [setting.key]: e.target.value }))
+                        }
+                      />
+                      {setting.unit && <span className="system-setting-unit">{setting.unit}</span>}
+                      <button
+                        type="button"
+                        className="btn mini"
+                        disabled={!isDirty || savingSettingKey === setting.key}
+                        onClick={() => void saveSetting(setting)}
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Surface>
+      </section>
+    );
+  }
+
   return (
     <section className="stack">
       <h1>Admin</h1>
+      {tabNav}
       <Surface title="Systemnutzung" subtitle="Schnellüberblick über die aktuelle Plattformaktivität.">
         <ul className="meta-list">
           <li>Nutzer: {metrics.users}</li>

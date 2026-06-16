@@ -1,15 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  AddressInput,
-  EMPTY_ADDRESS,
-  isAddressComplete,
-  toAddressPayload
-} from "../components/AddressInput";
+import { AddressInput } from "../components/AddressInput";
+import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "../utils/address";
 import { Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
+import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import type { User } from "../types/domain";
@@ -84,7 +81,9 @@ export function NewWorkshopPage({ token }: Props) {
         : "Bitte gib eine Beschreibung mit mindestens 5 Zeichen ein.",
     location: isWorkshopAddressComplete ? null : "Bitte gib eine vollständige Werkstattadresse an.",
     photos: photos.length > 0 ? null : "Bitte lade mindestens ein Foto hoch.",
-    slots: slots.length > 0 ? null : "Bitte füge mindestens ein Zeitfenster hinzu."
+    // Zeitfenster sind optional: Eine Werkstatt ist standardmäßig verfügbar; hier können
+    // optional bereits Zeiträume blockiert werden.
+    slots: null
   };
 
   const showFieldError = (field: WorkshopFormField) =>
@@ -106,7 +105,7 @@ export function NewWorkshopPage({ token }: Props) {
       return;
     }
 
-    setSlots((current) => [...current, { startIso, endIso, blockedByOwner: slot.blockedByOwner }]);
+    setSlots((current) => [...current, { startIso, endIso, blockedByOwner: true }]);
     setSlot(EMPTY_SLOT);
     setTouchedFields((current) => ({ ...current, slots: true }));
   };
@@ -286,15 +285,18 @@ export function NewWorkshopPage({ token }: Props) {
         <section className="workshop-availability-section" aria-labelledby="workshop-availability-title">
           <div className="workshop-form-section-heading">
             <span className="workshop-section-kicker">Buchungsplanung</span>
-            <h2 id="workshop-availability-title">Verfügbare Zeitfenster</h2>
-            <p>Lege fest, wann die Werkstatt buchbar ist. Blockierte Zeiträume sind für Nutzer nicht auswählbar.</p>
+            <h2 id="workshop-availability-title">Zeiten blockieren (optional)</h2>
+            <p>
+              Deine Werkstatt ist standardmäßig immer buchbar. Optional kannst du hier schon Zeiträume blockieren, in denen
+              sie nicht gebucht werden kann. Das geht auch später jederzeit über „Zeiten blockieren“.
+            </p>
           </div>
 
           <div className="workshop-slot-editor">
             <div className="workshop-slot-editor-heading">
               <div>
-                <strong>Neues Zeitfenster</strong>
-                <span>Start und Ende des Zeitraums festlegen</span>
+                <strong>Zeitraum blockieren</strong>
+                <span>Start und Ende des blockierten Zeitraums festlegen</span>
               </div>
             </div>
 
@@ -353,28 +355,15 @@ export function NewWorkshopPage({ token }: Props) {
             </div>
 
             <div className="workshop-slot-editor-actions">
-              <label className="workshop-block-toggle">
-                <input
-                  type="checkbox"
-                  checked={slot.blockedByOwner}
-                  onChange={(event) =>
-                    setSlot((current) => ({ ...current, blockedByOwner: event.target.checked }))
-                  }
-                />
-                <span>
-                  <strong>Zeitraum blockieren</strong>
-                  <small>Für Wartung oder private Nutzung sperren</small>
-                </span>
-              </label>
               <button type="button" className="btn btn-outline workshop-add-slot" onClick={addSlot}>
                 <span className="material-symbols-outlined" aria-hidden="true">add</span>
-                Zeitfenster hinzufügen
+                Zeitraum blockieren
               </button>
             </div>
           </div>
 
           <div className="workshop-slot-list-heading">
-            <strong>Geplante Zeitfenster</strong>
+            <strong>Blockierte Zeiten</strong>
             <span>{slots.length === 0 ? "Noch keine Einträge" : `${slots.length} Einträge`}</span>
           </div>
           <div className={`time-slots-list ${showFieldError("slots") ? "input-invalid" : ""}`}>
@@ -417,6 +406,8 @@ export function NewWorkshopPage({ token }: Props) {
             Abbrechen
           </Link>
         </div>
+
+        <SystemRulesInfo token={token} />
       </form>
     </section>
   );

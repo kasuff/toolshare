@@ -28,6 +28,26 @@ export const toolsController = {
     );
   }),
 
+  listOwnerBlocks: asyncHandler(async (req: Request, res: Response) => {
+    const blocks = await toolsService.listOwnerBlocks(req.params.id, req.authUser!.userId);
+    res.status(200).json(
+      blocks.map((block) => ({
+        id: block.id,
+        startDate: block.startDate.toISOString(),
+        endDate: block.endDate.toISOString()
+      }))
+    );
+  }),
+
+  deleteOwnerBlock: asyncHandler(async (req: Request, res: Response) => {
+    await toolsService.deleteOwnerBlock({
+      toolId: req.params.id,
+      bookingId: req.params.bookingId,
+      actorId: req.authUser!.userId
+    });
+    res.status(204).send();
+  }),
+
   create: asyncHandler(async (req: Request, res: Response) => {
     const tool = await toolsService.create({
       ownerId: req.authUser!.userId,

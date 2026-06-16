@@ -7,6 +7,7 @@ import type {
   Tool,
   User,
   Workshop,
+  WorkshopBookedRange,
   WorkshopSlot
 } from "../types/domain";
 import { DEFAULT_PLACEHOLDER_IMAGE, normalizePlaceholderImage } from "../utils/categories";
@@ -78,6 +79,15 @@ export type SuspensionRequestItem = {
   report?: { id: string; reason: string; targetType: string; targetId: string } | null;
 };
 
+export type SystemSetting = {
+  key: string;
+  label: string;
+  unit: string;
+  value: number;
+  min: number;
+  max: number;
+};
+
 export type AddressSuggestion = {
   label: string;
   street: string;
@@ -111,6 +121,7 @@ type BackendTool = {
   pickupLocation?: string | null;
   pickupLocationNote?: string | null;
   status: BackendToolStatus;
+  bookings?: BackendWorkshopBookedRange[];
 };
 
 type BackendWorkshop = {
@@ -126,6 +137,14 @@ type BackendWorkshop = {
   imageUrls?: string[];
   workshopTools?: BackendWorkshopTool[];
   timeslots?: BackendWorkshopTimeslot[];
+  bookings?: BackendWorkshopBookedRange[];
+};
+
+type BackendWorkshopBookedRange = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  status: BackendBookingStatus;
 };
 
 type BackendWorkshopTool = {
@@ -175,6 +194,7 @@ type BackendBooking = {
   userId: string;
   toolId?: string | null;
   timeslotId?: string | null;
+  workshopId?: string | null;
   startDate: string;
   endDate: string;
   pickupTime?: string | null;
@@ -182,6 +202,12 @@ type BackendBooking = {
   status: BackendBookingStatus;
   user?: BackendUser | null;
   tool?: (BackendTool & { owner?: BackendUser | null }) | null;
+  workshop?: {
+    id: string;
+    name: string;
+    managerId: string;
+    manager?: BackendUser | null;
+  } | null;
   timeslot?: {
     id: string;
     workshopId: string;
@@ -336,7 +362,8 @@ function mapTool(tool: BackendTool): Tool {
     status: toolStatusMap[tool.status],
     imageUrl: normalizePlaceholderImage(tool.imageUrl),
     pickupLocation: tool.pickupLocation ?? "",
-    pickupLocationNote: tool.pickupLocationNote ?? undefined
+    pickupLocationNote: tool.pickupLocationNote ?? undefined,
+    bookedRanges: mapWorkshopBookedRanges(tool.bookings)
   };
 }
 
@@ -374,6 +401,13 @@ function mapWorkshopSlot(slot: BackendWorkshopTimeslot): WorkshopSlot {
   };
 }
 
+function mapWorkshopBookedRanges(bookings?: BackendWorkshopBookedRange[]): WorkshopBookedRange[] {
+  return (bookings ?? []).map((booking) => ({
+    startIso: booking.startDate,
+    endIso: booking.endDate
+  }));
+}
+
 function mapPickupProposal(p: BackendPickupProposal): PickupProposal {
   return {
     id: p.id,
@@ -402,7 +436,7 @@ function mapTimeslotProposal(p: BackendTimeslotProposal): TimeslotProposal {
 
 function mapBooking(booking: BackendBooking): Booking {
   const tool = booking.tool;
-  const workshop = booking.timeslot?.workshop;
+  const workshop = booking.workshop ?? booking.timeslot?.workshop;
 
   const providerId = tool?.ownerId ?? workshop?.managerId ?? "";
   const requesterName = booking.user?.name;
@@ -459,6 +493,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     });
+  },
+
+  async changePassword(currentPassword: string, newPassword: string, token: string): Promise<void> {
+    return request<void>(
+      "/auth/change-password",
+      { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) },
+      token
+    );
   },
 
   async suggestAddresses(query: string): Promise<AddressSuggestion[]> {
@@ -608,6 +650,11 @@ export const api = {
     return mapTool(created);
   },
 
+  async getToolById(toolId: string, token: string): Promise<Tool> {
+    const tool = await request<BackendTool>(`/tools/${toolId}`, undefined, token);
+    return mapTool(tool);
+  },
+
   async updateTool(
     toolId: string,
     input: {
@@ -624,7 +671,10 @@ export const api = {
       `/tools/${toolId}`,
       {
         method: "PATCH",
-        body: JSON.stringify(input)
+        body: JSON.stringify({
+          ...input,
+          pickupLocationNote: input.pickupLocationNote?.trim() || undefined
+        })
       },
       token
     );
@@ -645,6 +695,26 @@ export const api = {
       startIso: period.startDate,
       endIso: period.endDate
     }));
+  },
+
+  async getToolOwnerBlocks(
+    toolId: string,
+    token: string
+  ): Promise<Array<{ id: string; startIso: string; endIso: string }>> {
+    const blocks = await request<Array<{ id: string; startDate: string; endDate: string }>>(
+      `/tools/${toolId}/owner-blocks`,
+      {},
+      token
+    );
+    return blocks.map((block) => ({
+      id: block.id,
+      startIso: block.startDate,
+      endIso: block.endDate
+    }));
+  },
+
+  async deleteToolOwnerBlock(toolId: string, bookingId: string, token: string) {
+    await request<void>(`/tools/${toolId}/owner-blocks/${bookingId}`, { method: "DELETE" }, token);
   },
 
   async createToolOwnerBlock(
@@ -689,7 +759,14 @@ export const api = {
   async getWorkshops(
     filters: { q?: string; managerId?: string },
     token: string
-  ): Promise<Array<{ workshop: Workshop; slots: WorkshopSlot[]; tools: Array<Tool & { selectable: boolean }> }>> {
+  ): Promise<
+    Array<{
+      workshop: Workshop;
+      slots: WorkshopSlot[];
+      bookedRanges: WorkshopBookedRange[];
+      tools: Array<Tool & { selectable: boolean }>;
+    }>
+  > {
     const params = new URLSearchParams();
     if (filters.q) params.set("search", filters.q);
     if (filters.managerId) params.set("managerId", filters.managerId);
@@ -698,6 +775,7 @@ export const api = {
       workshops.map(async (workshop) => {
         const detail = await request<BackendWorkshop>(`/workshops/${workshop.id}`, undefined, token);
         const slots = (detail.timeslots ?? []).map(mapWorkshopSlot);
+        const bookedRanges = mapWorkshopBookedRanges(detail.bookings);
         const mappedWorkshop = mapWorkshop(detail);
         const tools = mappedWorkshop.equipmentItems.map((tool) => {
           const backendTool = detail.workshopTools?.find((entry) => entry.id === tool.id);
@@ -713,17 +791,21 @@ export const api = {
             selectable: status === "VERFUEGBAR",
           };
         });
-        return { workshop: mappedWorkshop, slots, tools };
+        return { workshop: mappedWorkshop, slots, bookedRanges, tools };
       })
     );
     return withSlots;
   },
 
-  async getWorkshopById(workshopId: string, token: string): Promise<{ workshop: Workshop; slots: WorkshopSlot[] }> {
+  async getWorkshopById(
+    workshopId: string,
+    token: string
+  ): Promise<{ workshop: Workshop; slots: WorkshopSlot[]; bookedRanges: WorkshopBookedRange[] }> {
     const detail = await request<BackendWorkshop>(`/workshops/${workshopId}`, undefined, token);
     return {
       workshop: mapWorkshop(detail),
-      slots: (detail.timeslots ?? []).map(mapWorkshopSlot)
+      slots: (detail.timeslots ?? []).map(mapWorkshopSlot),
+      bookedRanges: mapWorkshopBookedRanges(detail.bookings)
     };
   },
 
@@ -1065,5 +1147,17 @@ export const api = {
 
   async getMetrics(token: string): Promise<BackendMetrics> {
     return request<BackendMetrics>("/users/admin/metrics", undefined, token);
+  },
+
+  async getSystemSettings(token: string): Promise<SystemSetting[]> {
+    return request<SystemSetting[]>("/system-rules", undefined, token);
+  },
+
+  async updateSystemSetting(key: string, value: number, token: string): Promise<SystemSetting> {
+    return request<SystemSetting>(
+      `/system-rules/${key}`,
+      { method: "PUT", body: JSON.stringify({ value }) },
+      token
+    );
   }
 };

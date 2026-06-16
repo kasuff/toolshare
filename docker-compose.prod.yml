@@ -9,6 +9,8 @@ services:
       - "3000:80"
     depends_on:
       - backend
+    networks:
+      - toolshare-network
 
   backend:
     build:
@@ -22,27 +24,120 @@ services:
       PORT: 4000
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
-
     depends_on:
       db:
         condition: service_healthy
     command: sh -c "npx prisma db push && node dist/index.js"
     restart: unless-stopped
+    networks:
+      - toolshare-network
 
   db:
-    image: postgres:16-alpine
+    # Custom-Image (statt postgres:16-alpine): enthält das wal-g-Binary, das
+    # archive_command für die kontinuierliche WAL-Archivierung benötigt.
+    build:
+      context: ./backup
+    # Eigene postgresql.conf aktiviert wal_level/archive_mode/archive_command.
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       POSTGRES_USER: toolshare
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: toolshare
+    # S3-/WAL-G-Variablen: archive_command (= wal-g wal-push) erbt dieses Env.
+    env_file:
+      - .env.backup
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./backup/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U toolshare"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - toolshare-network
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # WAL-G Backup-Runner: erstellt per Cron Full-/Delta-Backups in den privaten
+  # S3-Bucket und hält 4 Full-Backup-Ketten (~4 Wochen) vor.
+  #   - Wöchentlich  So 02:00 → FULL  (neue Basis-Kette)
+  #   - Täglich   Mo–Sa 02:00 → DELTA (Differenz seit letztem Full)
+  # Teilt sich das pgdata-Volume (read-only) mit db und verbindet sich für
+  # pg_backup_start/stop über das Docker-Netz (PGHOST=db).
+  # ───────────────────────────────────────────────────────────────────────────
+  #
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  RESTORE-GUIDE  (Wiederherstellung aus einem WAL-G-Backup)
+  # ═══════════════════════════════════════════════════════════════════════════
+  #
+  #  Voraussetzung: .env.backup ist befüllt (gleicher Bucket + Credentials).
+  #
+  #  1) Verfügbare Backups auflisten:
+  #       docker compose -f docker-compose.prod.yml run --rm \
+  #         --entrypoint wal-g walg-backup backup-list
+  #
+  #  2) App + DB stoppen, damit nichts ins Datenverzeichnis schreibt:
+  #       docker compose -f docker-compose.prod.yml stop backend db walg-backup
+  #
+  #  3) Altes Datenverzeichnis leeren (ACHTUNG: löscht aktuellen DB-Stand!):
+  #       docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  #         --entrypoint sh db -c 'rm -rf /var/lib/postgresql/data/*'
+  #
+  #  4) Backup zurückspielen (LATEST = neuestes; oder konkreter Name aus Schritt 1).
+  #     Das pgdata-Volume muss hier SCHREIBBAR sein → eigener One-Off-Container:
+  #       docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  #         --entrypoint sh db -c \
+  #         'wal-g backup-fetch /var/lib/postgresql/data LATEST'
+  #
+  #  5) Point-in-Time-Recovery aktivieren, damit Postgres die WALs nachspielt:
+  #       docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  #         --entrypoint sh db -c '
+  #           echo "restore_command = '\''wal-g wal-fetch %f %p'\''" \
+  #             >> /var/lib/postgresql/data/postgresql.auto.conf;
+  #           touch /var/lib/postgresql/data/recovery.signal'
+  #     (Für PITR auf einen Zeitpunkt zusätzlich:
+  #        recovery_target_time = '2026-06-13 01:30:00+00'  in postgresql.auto.conf)
+  #
+  #  6) DB starten — Postgres holt fehlende WALs via restore_command, spielt sie
+  #     ein und verlässt den Recovery-Modus automatisch:
+  #       docker compose -f docker-compose.prod.yml up -d db
+  #       docker compose -f docker-compose.prod.yml logs -f db   # "database system is ready"
+  #
+  #  7) Rest hochfahren:
+  #       docker compose -f docker-compose.prod.yml up -d
+  # ═══════════════════════════════════════════════════════════════════════════
+  walg-backup:
+    build:
+      context: ./backup
+    # Standard-Entrypoint (Postgres) durch supercronic ersetzen → reiner Cron-Runner.
+    entrypoint: ["/usr/local/bin/supercronic", "/etc/supercronic/crontab"]
+    user: postgres
+    environment:
+      # Verbindung zur laufenden DB für pg_backup_start/stop.
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: toolshare
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: toolshare
+    # S3-/WAL-G-Variablen (WALG_S3_PREFIX, AWS_*, Kompression, Delta-Steps).
+    env_file:
+      - .env.backup
+    volumes:
+      # backup-push liest nur das Datenverzeichnis → read-only genügt.
+      - pgdata:/var/lib/postgresql/data:ro
+      - ./backup/crontab:/etc/supercronic/crontab:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - toolshare-network
 
 volumes:
   pgdata:
+
+networks:
+  toolshare-network:
+    name: toolshare-network
+    driver: bridge

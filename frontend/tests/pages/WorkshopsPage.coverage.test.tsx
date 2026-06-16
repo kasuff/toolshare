@@ -13,7 +13,8 @@ const { getWorkshops, createWorkshopBooking } = vi.hoisted(() => ({
 vi.mock("../../src/services/api", () => ({
   api: {
     getWorkshops,
-    createWorkshopBooking
+    createWorkshopBooking,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 
