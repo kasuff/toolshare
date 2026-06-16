@@ -6,12 +6,13 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, getRatingsGiven, getRatingsReceived } = vi.hoisted(() => ({
+const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, createRating, getRatingsGiven, getRatingsReceived } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   decideBooking: vi.fn(),
   createPickupProposal: vi.fn(),
   createTimeslotProposal: vi.fn(),
   createReport: vi.fn(),
+  createRating: vi.fn(),
   getRatingsGiven: vi.fn().mockResolvedValue([]),
   getRatingsReceived: vi.fn().mockResolvedValue([])
 }));
@@ -23,6 +24,7 @@ vi.mock("../../src/services/api", () => ({
     createPickupProposal,
     createTimeslotProposal,
     createReport,
+    createRating,
     getRatingsGiven,
     getRatingsReceived
   },
@@ -380,6 +382,97 @@ describe("InboxPage", () => {
     expect(await screen.findByText("Anfrage angenommen")).toBeInTheDocument();
     expect(screen.getByText("check")).toBeInTheDocument();
     expect(decideBooking).toHaveBeenCalledWith("b1", "BESTAETIGT", "token-123");
+  });
+
+  it("submits a rating from requester and shows it as chat message", async () => {
+    const requesterUser = { ...currentUser, id: "requester-1", name: "Max Mustermann" };
+    const completedBooking = {
+      ...baseOpenBooking,
+      status: "ABGESCHLOSSEN" as const,
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    getBookingsForUser.mockResolvedValue([completedBooking]);
+    getRatingsGiven
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "rating-1",
+          bookingId: "b1",
+          fromUserId: requesterUser.id,
+          toUserId: "provider-1",
+          score: 4,
+          comment: "Sehr gut",
+          status: "SICHTBAR" as const,
+          createdIso: "2026-05-08T10:00:00.000Z",
+          fromUserName: requesterUser.name
+        }
+      ]);
+    createRating.mockResolvedValue(undefined);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={requesterUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Bewertung abgeben" }));
+    fireEvent.click(screen.getByRole("button", { name: "4 von 5 Sternen" }));
+    fireEvent.change(screen.getByLabelText("Kommentar (optional)"), { target: { value: "Sehr gut" } });
+    fireEvent.click(screen.getByRole("button", { name: "Bewertung speichern" }));
+
+    await waitFor(() => {
+      expect(createRating).toHaveBeenCalledWith(
+        {
+          bookingId: "b1",
+          score: 4,
+          comment: "Sehr gut"
+        },
+        "token-123"
+      );
+    });
+    expect(await screen.findByText("4 von 5 Sternen")).toBeInTheDocument();
+    expect(screen.getByText("Sehr gut")).toBeInTheDocument();
+  });
+
+  it("marks incoming rating message as unread until clicked", async () => {
+    localStorage.setItem(inboxReadSeedKey(currentUser.id), "1");
+    const completedBooking = {
+      ...baseOpenBooking,
+      status: "ABGESCHLOSSEN" as const,
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    getBookingsForUser.mockResolvedValueOnce([completedBooking]);
+    getRatingsReceived.mockResolvedValueOnce([
+      {
+        id: "rating-2",
+        bookingId: "b1",
+        fromUserId: "requester-1",
+        toUserId: currentUser.id,
+        score: 5,
+        comment: "Top!",
+        status: "SICHTBAR" as const,
+        createdIso: "2026-05-09T11:00:00.000Z",
+        fromUserName: "Max Mustermann"
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const ratingCard = (await screen.findByText("Bewertung")).closest(".request-message-card");
+    expect(ratingCard).toHaveClass("request-message-card--unread");
+
+    fireEvent.click(ratingCard!);
+    expect(ratingCard).not.toHaveClass("request-message-card--unread");
   });
 
   it("shows a declined message card after the provider rejects", async () => {
