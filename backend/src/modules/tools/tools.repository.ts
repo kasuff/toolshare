@@ -87,6 +87,41 @@ export const toolsRepository = {
     });
   },
 
+  // Eigenblockaden des Eigentümers: Selbstbuchungen auf dem eigenen Werkzeug
+  // (userId === ownerId). Inklusive id, damit der Eigentümer sie wieder entfernen kann.
+  listOwnerBlocks(toolId: string, ownerId: string) {
+    return prisma.booking.findMany({
+      where: {
+        toolId,
+        userId: ownerId,
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true
+      },
+      orderBy: { startDate: "asc" }
+    });
+  },
+
+  // Entfernt eine Eigenblockade. Nur erlaubt, wenn die Buchung eine Selbstbuchung
+  // des Eigentümers auf dem eigenen Werkzeug ist.
+  async deleteOwnerBlock(bookingId: string, ownerId: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { tool: true }
+    });
+    if (!booking || !booking.toolId || !booking.tool) {
+      return "NOT_FOUND" as const;
+    }
+    if (booking.tool.ownerId !== ownerId || booking.userId !== ownerId) {
+      return "FORBIDDEN" as const;
+    }
+    await prisma.booking.delete({ where: { id: bookingId } });
+    return "OK" as const;
+  },
+
   create(input: {
     ownerId: string;
     name: string;

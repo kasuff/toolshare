@@ -9,6 +9,8 @@ vi.mock("../src/modules/tools/tools.repository", () => ({
     findActiveBooking: vi.fn(),
     findActiveBookingRanges: vi.fn(),
     listBlockingPeriods: vi.fn(),
+    listOwnerBlocks: vi.fn(),
+    deleteOwnerBlock: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn()
@@ -64,6 +66,56 @@ describe("toolsService", () => {
 
     await expect(toolsService.listBlockingPeriods("t1")).resolves.toHaveLength(1);
     expect(mockedToolsRepository.listBlockingPeriods).toHaveBeenCalledWith("t1");
+  });
+
+  it("lists owner blocks for the owner", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
+    mockedToolsRepository.listOwnerBlocks.mockResolvedValueOnce([
+      { id: "b1", startDate: new Date(), endDate: new Date() }
+    ] as any);
+
+    const result = await toolsService.listOwnerBlocks("t1", "owner-1");
+
+    expect(mockedToolsRepository.listOwnerBlocks).toHaveBeenCalledWith("t1", "owner-1");
+    expect(result).toHaveLength(1);
+  });
+
+  it("forbids listing owner blocks for non-owners", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
+
+    await expect(toolsService.listOwnerBlocks("t1", "other-user")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      status: 403
+    });
+    expect(mockedToolsRepository.listOwnerBlocks).not.toHaveBeenCalled();
+  });
+
+  it("deletes an owner block as owner", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
+    mockedToolsRepository.deleteOwnerBlock.mockResolvedValueOnce("OK" as any);
+
+    await expect(
+      toolsService.deleteOwnerBlock({ toolId: "t1", bookingId: "b1", actorId: "owner-1" })
+    ).resolves.toBeUndefined();
+    expect(mockedToolsRepository.deleteOwnerBlock).toHaveBeenCalledWith("b1", "owner-1");
+  });
+
+  it("forbids deleting blocks for non-owners", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
+
+    await expect(
+      toolsService.deleteOwnerBlock({ toolId: "t1", bookingId: "b1", actorId: "other-user" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+    expect(mockedToolsRepository.deleteOwnerBlock).not.toHaveBeenCalled();
+  });
+
+  it("throws when the block to delete is missing", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
+    mockedToolsRepository.deleteOwnerBlock.mockResolvedValueOnce("NOT_FOUND" as any);
+
+    await expect(
+      toolsService.deleteOwnerBlock({ toolId: "t1", bookingId: "missing", actorId: "owner-1" })
+    ).rejects.toMatchObject({ code: "BLOCK_NOT_FOUND", status: 404 });
   });
 
   it("creates tools", async () => {

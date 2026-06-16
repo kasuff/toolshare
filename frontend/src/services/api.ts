@@ -697,6 +697,26 @@ export const api = {
     }));
   },
 
+  async getToolOwnerBlocks(
+    toolId: string,
+    token: string
+  ): Promise<Array<{ id: string; startIso: string; endIso: string }>> {
+    const blocks = await request<Array<{ id: string; startDate: string; endDate: string }>>(
+      `/tools/${toolId}/owner-blocks`,
+      {},
+      token
+    );
+    return blocks.map((block) => ({
+      id: block.id,
+      startIso: block.startDate,
+      endIso: block.endDate
+    }));
+  },
+
+  async deleteToolOwnerBlock(toolId: string, bookingId: string, token: string) {
+    await request<void>(`/tools/${toolId}/owner-blocks/${bookingId}`, { method: "DELETE" }, token);
+  },
+
   async createToolOwnerBlock(
     input: { toolId: string; startIso: string; endIso: string },
     token: string

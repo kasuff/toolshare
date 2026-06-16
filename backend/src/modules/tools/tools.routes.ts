@@ -6,6 +6,7 @@ import {
   createToolSchema,
   listToolsSchema,
   toolIdParamSchema,
+  toolOwnerBlockParamSchema,
   updateToolSchema
 } from "./tools.schema";
 
@@ -16,6 +17,18 @@ toolsRouter.get(
   "/:id/blocking-periods",
   validate(toolIdParamSchema),
   toolsController.listBlockingPeriods
+);
+toolsRouter.get(
+  "/:id/owner-blocks",
+  requireAuth,
+  validate(toolIdParamSchema),
+  toolsController.listOwnerBlocks
+);
+toolsRouter.delete(
+  "/:id/owner-blocks/:bookingId",
+  requireAuth,
+  validate(toolOwnerBlockParamSchema),
+  toolsController.deleteOwnerBlock
 );
 toolsRouter.get("/:id", validate(toolIdParamSchema), toolsController.getById);
 
