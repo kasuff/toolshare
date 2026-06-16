@@ -170,7 +170,11 @@ describe("InboxPage", () => {
 
     expect(document.querySelector(".messenger-shell")).toHaveClass("messenger-shell--chat-open");
     expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Zurück zur Chatliste" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Nachrichten" })).not.toBeInTheDocument();
+    const backButton = screen.getByRole("button", { name: "Zurück zur Chatliste" });
+    expect(backButton).toBeInTheDocument();
+    expect(backButton.closest(".inbox-messenger-title-row")).toBeTruthy();
+    expect(backButton.closest(".messenger-chat-header")).toBeNull();
   });
 
   it("returns to the thread list on small screens when back is pressed", async () => {
@@ -192,6 +196,7 @@ describe("InboxPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Zurück zur Chatliste" }));
 
     expect(screen.queryByText("Ausleihanfrage")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nachrichten" })).toBeInTheDocument();
     expect(document.querySelector(".messenger-shell")).not.toHaveClass("messenger-shell--chat-open");
     expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
   });
