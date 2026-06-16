@@ -143,4 +143,4 @@ volumes:
 networks:
   toolshare-network:
     name: toolshare-network
-    driver: bridge
+    external: true
