@@ -79,6 +79,13 @@ button {
   font: inherit;
 }
 
+input[type="date"],
+input[type="datetime-local"],
+input[type="date"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit {
+  text-transform: lowercase;
+}
+
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
