@@ -317,7 +317,7 @@ export const api = {
     return loadDb().notifications.filter((n) => n.userId === userId);
   },
 
-  markNotificationAsRead(notificationId: string, token?: string): void {
+  markNotificationAsRead(notificationId: string, _token?: string): void {
     const db = loadDb();
     const n = db.notifications.find((it) => it.id === notificationId);
     if (n) {
