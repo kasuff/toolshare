@@ -33,22 +33,24 @@ services:
       - toolshare-network
 
   db:
+    # BACKUP DEAKTIVIERT: Standard-Postgres-Image, da kein S3-Bucket deployed ist.
     # Custom-Image (statt postgres:16-alpine): enthält das wal-g-Binary, das
     # archive_command für die kontinuierliche WAL-Archivierung benötigt.
-    build:
-      context: ./backup
+    # build:
+    #   context: ./backup
+    image: postgres:16-alpine
     # Eigene postgresql.conf aktiviert wal_level/archive_mode/archive_command.
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    # command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       POSTGRES_USER: toolshare
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: toolshare
     # S3-/WAL-G-Variablen: archive_command (= wal-g wal-push) erbt dieses Env.
-    env_file:
-      - .env.backup
+    # env_file:
+    #   - .env.backup
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backup/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      # - ./backup/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U toolshare"]
       interval: 5s
@@ -107,32 +109,33 @@ services:
   #  7) Rest hochfahren:
   #       docker compose -f docker-compose.prod.yml up -d
   # ═══════════════════════════════════════════════════════════════════════════
-  walg-backup:
-    build:
-      context: ./backup
-    # Standard-Entrypoint (Postgres) durch supercronic ersetzen → reiner Cron-Runner.
-    entrypoint: ["/usr/local/bin/supercronic", "/etc/supercronic/crontab"]
-    user: postgres
-    environment:
-      # Verbindung zur laufenden DB für pg_backup_start/stop.
-      PGHOST: db
-      PGPORT: "5432"
-      PGUSER: toolshare
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: toolshare
-    # S3-/WAL-G-Variablen (WALG_S3_PREFIX, AWS_*, Kompression, Delta-Steps).
-    env_file:
-      - .env.backup
-    volumes:
-      # backup-push liest nur das Datenverzeichnis → read-only genügt.
-      - pgdata:/var/lib/postgresql/data:ro
-      - ./backup/crontab:/etc/supercronic/crontab:ro
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - toolshare-network
+  # BACKUP DEAKTIVIERT: Kein S3-Bucket deployed → walg-backup-Runner auskommentiert.
+  # walg-backup:
+  #   build:
+  #     context: ./backup
+  #   # Standard-Entrypoint (Postgres) durch supercronic ersetzen → reiner Cron-Runner.
+  #   entrypoint: ["/usr/local/bin/supercronic", "/etc/supercronic/crontab"]
+  #   user: postgres
+  #   environment:
+  #     # Verbindung zur laufenden DB für pg_backup_start/stop.
+  #     PGHOST: db
+  #     PGPORT: "5432"
+  #     PGUSER: toolshare
+  #     PGPASSWORD: ${POSTGRES_PASSWORD}
+  #     PGDATABASE: toolshare
+  #   # S3-/WAL-G-Variablen (WALG_S3_PREFIX, AWS_*, Kompression, Delta-Steps).
+  #   env_file:
+  #     - .env.backup
+  #   volumes:
+  #     # backup-push liest nur das Datenverzeichnis → read-only genügt.
+  #     - pgdata:/var/lib/postgresql/data:ro
+  #     - ./backup/crontab:/etc/supercronic/crontab:ro
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - toolshare-network
 
 volumes:
   pgdata:
