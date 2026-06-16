@@ -144,7 +144,7 @@ function ReportActions({
       void runUpdate({
         status: "RESOLVED",
         decisionNote: note,
-        warnUserId: subjectId,
+        warnUserId: subjectId ?? undefined,
         warningReason: reason
       });
       return;
@@ -154,7 +154,7 @@ function ReportActions({
       void runUpdate({
         status: "RESOLVED",
         decisionNote: note,
-        requestSuspensionUserId: subjectId,
+        requestSuspensionUserId: subjectId ?? undefined,
         suspensionReason: reason
       });
       return;
