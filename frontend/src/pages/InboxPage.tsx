@@ -577,9 +577,25 @@ export function InboxPage({ currentUser, token }: Props) {
 
   return (
     <section className="stack inbox-messenger-page">
-      <header className="inbox-messenger-title-row">
-        <h1>Nachrichten</h1>
-        {isLoading && <span className="inbox-loading-hint">Laden…</span>}
+      <header
+        className={`inbox-messenger-title-row${isMobileInbox && selectedBooking ? " inbox-messenger-title-row--chat-open" : ""}`}
+      >
+        {isMobileInbox && selectedBooking && (
+          <button
+            type="button"
+            className="icon-button inbox-messenger-back-button"
+            aria-label="Zurück zur Chatliste"
+            onClick={() => setSelectedBookingId(null)}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              arrow_back
+            </span>
+          </button>
+        )}
+        {(!isMobileInbox || !selectedBooking) && <h1>Nachrichten</h1>}
+        {isLoading && (!isMobileInbox || !selectedBooking) && (
+          <span className="inbox-loading-hint">Laden…</span>
+        )}
       </header>
 
       {sortedRows.length === 0 ? (
@@ -638,18 +654,6 @@ export function InboxPage({ currentUser, token }: Props) {
           {selectedBooking && (
             <div className="messenger-chat">
               <header className="messenger-chat-header">
-                {isMobileInbox && (
-                  <button
-                    type="button"
-                    className="btn icon-button messenger-back-button"
-                    aria-label="Zurück zur Chatliste"
-                    onClick={() => setSelectedBookingId(null)}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      arrow_back
-                    </span>
-                  </button>
-                )}
                 <UserAvatar
                   name={counterparty(selectedBooking, currentUser.id).name}
                   imageUrl={null}

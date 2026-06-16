@@ -5397,8 +5397,35 @@ button .material-symbols-outlined {
 
 .inbox-messenger-title-row {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inbox-messenger-back-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-left: -0.35rem;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+}
+
+.inbox-messenger-back-button:hover,
+.inbox-messenger-back-button:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface-soft);
+}
+
+.inbox-messenger-back-button .material-symbols-outlined {
+  font-size: 1.35rem;
+}
+
+.inbox-messenger-title-row--chat-open {
+  min-height: 2.25rem;
+  margin-bottom: calc(-1 * var(--space-2));
 }
 
 .inbox-loading-hint {
@@ -5616,6 +5643,9 @@ button .material-symbols-outlined {
   font-weight: 700;
   font-size: 1.06rem;
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .messenger-chat-header-sub {
@@ -5814,11 +5844,6 @@ button .material-symbols-outlined {
     flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
-  }
-
-  .messenger-back-button {
-    flex-shrink: 0;
-    margin-right: 0.25rem;
   }
 }
 
