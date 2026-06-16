@@ -188,7 +188,11 @@ backend:test:
 
 frontend:build:
   stage: build
-  image: node:20-alpine
+  # Pinned off the floating node:20 tag: it drifted to v20.20.2, whose
+  # linux-x64 V8 build intermittently corrupts tsc and crashes it deep in
+  # its internals ("Cannot read properties of undefined (reading 'flags')").
+  # 20.19 is the last minor before that regression.
+  image: node:20.19-alpine
   extends: .frontend_cache
   script:
     - cd frontend
@@ -197,7 +201,9 @@ frontend:build:
 
 backend:build:
   stage: build
-  image: node:20
+  # See frontend:build: pinned off floating node:20 (v20.20.2) whose x64 V8
+  # build crashes tsc during emit ("Cannot read properties of undefined").
+  image: node:20.19
   extends: .backend_cache
   script:
     - cd backend
