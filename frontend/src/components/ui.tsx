@@ -123,19 +123,20 @@ export function ButtonLink(props: LinkProps) {
 
 export function ToastViewport() {
   const { toasts, removeToast } = useToast();
+  if (toasts.length === 0) return null;
+
   return (
-    <aside className="toast-viewport" aria-live="polite" aria-atomic="false">
+    <aside className="toast-backdrop" aria-live="polite" aria-atomic="false">
+      <div className="toast-viewport">
       {toasts.map((toast) => (
-        <article key={toast.id} className={`toast ${toast.tone}`} role={toast.tone === "error" ? "alert" : "status"}>
-          <span className="toast-icon material-symbols-outlined" aria-hidden="true">
-            {toast.tone === "success" ? "check_circle" : toast.tone === "error" ? "error" : "info"}
-          </span>
+        <article key={toast.id} className="toast-popup" role={toast.tone === "error" ? "alert" : "status"}>
           <p>{toast.text}</p>
           <button className="icon-button" onClick={() => removeToast(toast.id)} aria-label="Meldung schließen">
             <span className="material-symbols-outlined" aria-hidden="true">close</span>
           </button>
         </article>
       ))}
+      </div>
     </aside>
   );
 }
