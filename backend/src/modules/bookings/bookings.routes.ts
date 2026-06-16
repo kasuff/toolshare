@@ -6,6 +6,7 @@ import {
   createPickupProposalSchema,
   createTimeslotProposalSchema,
   createToolBookingSchema,
+  createToolOwnerBlockSchema,
   createWorkshopBookingSchema,
   respondPickupProposalSchema,
   respondTimeslotProposalSchema,
@@ -17,6 +18,7 @@ export const bookingsRouter = Router();
 bookingsRouter.use(requireAuth);
 bookingsRouter.get("/me", bookingsController.listMine);
 bookingsRouter.post("/tool", validate(createToolBookingSchema), bookingsController.createToolBooking);
+bookingsRouter.post("/tool-owner-block", validate(createToolOwnerBlockSchema), bookingsController.createToolOwnerBlock);
 bookingsRouter.post("/workshop", validate(createWorkshopBookingSchema), bookingsController.createWorkshopBooking);
 bookingsRouter.post(
   "/:id/pickup-proposals",

@@ -60,6 +60,20 @@ export const toolsRepository = {
     });
   },
 
+  listBlockingPeriods(toolId: string) {
+    return prisma.booking.findMany({
+      where: {
+        toolId,
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: {
+        startDate: true,
+        endDate: true
+      },
+      orderBy: { startDate: "asc" }
+    });
+  },
+
   create(input: {
     ownerId: string;
     name: string;
