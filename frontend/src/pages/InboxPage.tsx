@@ -16,6 +16,7 @@ import {
   requestMessageKey,
   saveReadMessageIds,
 } from "../utils/inboxMessageRead";
+import { canProviderCompleteBooking } from "../utils/bookingCompletion";
 
 type Props = {
   currentUser?: User;
@@ -873,7 +874,7 @@ export function InboxPage({ currentUser, token }: Props) {
                 </>
               )}
 
-              {selectedBooking.status === "BESTAETIGT" && (
+              {canProviderCompleteBooking(selectedBooking, currentUser.id) && (
                 <footer className="messenger-chat-footer messenger-chat-footer--completion">
                   <button type="button" onClick={() => void close(selectedBooking.id)}>
                     Als abgeschlossen markieren

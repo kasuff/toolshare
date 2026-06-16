@@ -65,7 +65,7 @@ describe("bookingsRepository", () => {
     );
   };
 
-  it("lists bookings for requester, owner and workshop manager context", async () => {
+  it("lists bookings for requester, tool owner and workshop manager context", async () => {
     mocks.bookingFindMany.mockResolvedValueOnce([{ id: "b1" }]);
 
     const result = await bookingsRepository.listForUserContext("user-1");
