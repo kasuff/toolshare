@@ -36,10 +36,28 @@
 body {
   margin: 0;
   color: var(--color-text);
+  overflow-x: clip;
 }
 
 a {
   color: inherit;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+main,
+section,
+article,
+aside,
+form,
+fieldset,
+div {
+  min-width: 0;
 }
 
 h1,
@@ -151,6 +169,18 @@ button:disabled {
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
+}
+
+.mobile-nav-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-border);
 }
 
 .nav a {
@@ -1154,6 +1184,81 @@ button.mini {
   min-width: 176px;
   padding-inline: var(--space-5);
   white-space: nowrap;
+}
+
+.my-offers-page {
+  font-family: "Inter", sans-serif;
+}
+
+.my-offers-strip {
+  gap: var(--space-4);
+}
+
+.my-offers-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.my-offers-section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.my-offers-section h2 {
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.my-offers-section-empty {
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  background: var(--color-surface);
+}
+
+.my-offers-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+}
+
+.my-offers-empty .empty-state {
+  width: 100%;
+}
+
+.confirm-dialog {
+  max-width: 520px;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.btn.danger {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.btn.danger:hover,
+.btn.danger:focus-visible {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.owner-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .search-page {
@@ -2650,7 +2755,41 @@ td {
 
 @media (max-width: 900px) {
   .topbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .mobile-nav-toggle {
+    display: inline-flex;
+    grid-column: 2;
+  }
+
+  .nav {
+    display: none;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .nav.nav-open {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  }
+
+  .nav a,
+  .nav-dropdown-toggle {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-md);
+  }
+
+  .topbar-right {
+    grid-column: 3;
+    justify-self: end;
   }
 
   .inbox-chat-layout {
@@ -2671,6 +2810,88 @@ td {
   }
 
   .address-grid:not(.address-grid-compact) {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar:has(.role-switcher) .topbar-right {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .topbar:has(.role-switcher) .nav {
+    grid-row: 3;
+  }
+
+  .role-switcher {
+    min-width: 0;
+  }
+
+  .role-switcher select {
+    max-width: min(12rem, 50vw);
+  }
+
+  .content {
+    padding: var(--space-4) var(--space-3) var(--space-6);
+  }
+
+  .surface,
+  .new-tool-form {
+    padding: var(--space-4);
+  }
+
+  .cards,
+  .workshop-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-form-backdrop {
+    align-items: start;
+    padding: var(--space-3);
+  }
+
+  .report-form-panel {
+    max-height: calc(100dvh - (2 * var(--space-3)));
+  }
+
+  .report-form-actions > .btn,
+  .report-form-actions > button,
+  .confirm-dialog-actions > .btn,
+  .confirm-dialog-actions > button,
+  .my-offers-actions > .btn,
+  .my-offers-actions > button,
+  .owner-detail-actions > .btn,
+  .owner-detail-actions > button,
+  .workshop-modal-footer > .btn,
+  .workshop-modal-footer > button {
+    width: 100%;
+  }
+
+  .confirm-dialog-actions,
+  .my-offers-actions,
+  .owner-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    padding-inline: var(--space-3);
+  }
+
+  .topbar-right {
+    gap: var(--space-2);
+  }
+
+  .content {
+    padding-inline: var(--space-2);
+  }
+
+  .nav.nav-open {
     grid-template-columns: 1fr;
   }
 }
@@ -3551,6 +3772,9 @@ td {
 
 .report-form-panel {
   width: min(100%, 28rem);
+  max-height: calc(100dvh - (2 * var(--space-4)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #fff;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);

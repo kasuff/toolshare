@@ -15,6 +15,7 @@ vi.mock("../../services/api", async () => {
       ...actual.api,
       getTools: vi.fn(),
       getRatingsForTool: vi.fn(),
+      getToolBlockingPeriods: vi.fn(),
       getWorkshops: vi.fn(),
       createWorkshopBooking: vi.fn()
     }
@@ -43,6 +44,7 @@ function renderWithRoutes(element: ReactElement, path: string) {
 describe("Guest protected actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(api.getToolBlockingPeriods).mockResolvedValue([]);
   });
 
   it("redirects guests to auth when requesting a tool", async () => {

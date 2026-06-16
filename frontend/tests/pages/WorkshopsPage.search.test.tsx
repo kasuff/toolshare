@@ -7,8 +7,11 @@ import { ToastViewport } from "../../src/components/ui";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 import type { Tool, Workshop, WorkshopSlot } from "../../src/types/domain";
 
-const { createWorkshopBooking, getWorkshops, getRatingsForWorkshop } = vi.hoisted(() => ({
+const { createWorkshopBooking, createWorkshopTimeslot, deleteWorkshop, getWorkshopById, getWorkshops, getRatingsForWorkshop } = vi.hoisted(() => ({
   createWorkshopBooking: vi.fn(),
+  createWorkshopTimeslot: vi.fn(),
+  deleteWorkshop: vi.fn(),
+  getWorkshopById: vi.fn(),
   getWorkshops: vi.fn(),
   getRatingsForWorkshop: vi.fn().mockResolvedValue([])
 }));
@@ -16,6 +19,9 @@ const { createWorkshopBooking, getWorkshops, getRatingsForWorkshop } = vi.hoiste
 vi.mock("../../src/services/api", () => ({
   api: {
     createWorkshopBooking,
+    createWorkshopTimeslot,
+    deleteWorkshop,
+    getWorkshopById,
     getWorkshops,
     getRatingsForWorkshop
   }
@@ -296,5 +302,85 @@ describe("WorkshopsPage search filters", () => {
 
     expect(await screen.findByText("Keine Bilder vorhanden.")).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: /Bilder von/i })).not.toBeInTheDocument();
+  });
+
+  it("shows owner blocking everywhere but management actions only in manage mode", async () => {
+    getWorkshops.mockResolvedValue([
+      {
+        workshop: workshop({ id: "own", ownerId: "requester-1", name: "Eigene Werkstatt" }),
+        slots: [
+          slot({
+            id: "slot-own",
+            workshopId: "own",
+            startIso: "2026-07-01T00:00:00.000Z",
+            endIso: "2026-08-01T00:00:00.000Z"
+          })
+        ],
+        tools: []
+      }
+    ]);
+    createWorkshopTimeslot.mockResolvedValueOnce(
+      slot({ id: "blocked-own", workshopId: "own", blockedByOwner: true })
+    );
+    getWorkshopById.mockResolvedValueOnce({
+      workshop: workshop({ id: "own", ownerId: "requester-1", name: "Eigene Werkstatt" }),
+      slots: [
+        slot({
+          id: "slot-before",
+          workshopId: "own",
+          startIso: "2026-07-01T00:00:00.000Z",
+          endIso: "2026-07-08T09:00:00.000Z"
+        }),
+        slot({
+          id: "blocked-own",
+          workshopId: "own",
+          startIso: "2026-07-08T09:00:00.000Z",
+          endIso: "2026-07-08T12:00:00.000Z",
+          blockedByOwner: true
+        }),
+        slot({
+          id: "slot-after",
+          workshopId: "own",
+          startIso: "2026-07-08T12:00:00.000Z",
+          endIso: "2026-08-01T00:00:00.000Z"
+        })
+      ],
+      tools: []
+    });
+    deleteWorkshop.mockResolvedValueOnce(undefined);
+
+    const { unmount } = renderPage("/workshops/own");
+    expect(await screen.findByText("Werkstatt für Eigenbedarf blockieren")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Werkstatt bearbeiten" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Startdatum Eigenbedarf"), { target: { value: "2026-07-08" } });
+    fireEvent.change(screen.getByLabelText("Startzeit Eigenbedarf"), { target: { value: "09:00" } });
+    fireEvent.change(screen.getByLabelText("Enddatum Eigenbedarf"), { target: { value: "2026-07-08" } });
+    fireEvent.change(screen.getByLabelText("Endzeit Eigenbedarf"), { target: { value: "12:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
+    await waitFor(() =>
+      expect(createWorkshopTimeslot).toHaveBeenCalledWith(
+        "own",
+        {
+          startIso: expect.any(String),
+          endIso: expect.any(String),
+          blockedByOwner: true
+        },
+        "token-123"
+      )
+    );
+    const julyCalendar = screen.getByLabelText(/Verf.gbare Tage im Juli 2026/i);
+    expect(within(julyCalendar).getByRole("button", { name: "7" })).toBeEnabled();
+    expect(within(julyCalendar).getByRole("button", { name: "8" })).toBeDisabled();
+    unmount();
+
+    renderPage("/workshops/own?manage=1");
+    expect(await screen.findByRole("link", { name: "Werkstatt bearbeiten" })).toHaveAttribute(
+      "href",
+      "/workshops/own/edit"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt löschen" }));
+    expect(screen.getByRole("dialog", { name: "Werkstatt endgültig löschen?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Werkstatt endgültig löschen" }));
+    await waitFor(() => expect(deleteWorkshop).toHaveBeenCalledWith("own", "token-123"));
   });
 });

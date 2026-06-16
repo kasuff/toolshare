@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   toolCreate: vi.fn(),
   toolUpdate: vi.fn(),
   toolDelete: vi.fn(),
-  bookingFindFirst: vi.fn()
+  bookingFindFirst: vi.fn(),
+  bookingFindMany: vi.fn()
 }));
 
 vi.mock("../src/config/prisma", () => ({
@@ -20,7 +21,8 @@ vi.mock("../src/config/prisma", () => ({
       delete: mocks.toolDelete
     },
     booking: {
-      findFirst: mocks.bookingFindFirst
+      findFirst: mocks.bookingFindFirst,
+      findMany: mocks.bookingFindMany
     }
   }
 }));
@@ -93,6 +95,29 @@ describe("toolsRepository", () => {
     });
     expect(tool).toEqual({ id: "t1" });
     expect(booking).toEqual({ id: "b1" });
+  });
+
+  it("lists pending and accepted blocking periods", async () => {
+    mocks.bookingFindMany.mockResolvedValueOnce([
+      {
+        startDate: new Date("2026-07-06T09:00:00.000Z"),
+        endDate: new Date("2026-07-06T12:00:00.000Z")
+      }
+    ]);
+
+    await toolsRepository.listBlockingPeriods("t1");
+
+    expect(mocks.bookingFindMany).toHaveBeenCalledWith({
+      where: {
+        toolId: "t1",
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: {
+        startDate: true,
+        endDate: true
+      },
+      orderBy: { startDate: "asc" }
+    });
   });
 
   it("creates, updates and removes tools", async () => {

@@ -11,7 +11,7 @@ import type {
   Workshop,
   WorkshopSlot
 } from "../types/domain";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE, normalizePlaceholderImage } from "../utils/categories";
 import { beginRequestActivity } from "./requestActivity";
 import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "./sessionEvents";
 
@@ -358,7 +358,7 @@ function mapTool(tool: BackendTool): Tool {
     description: tool.description,
     category: tool.category,
     status: toolStatusMap[tool.status],
-    imageUrl: tool.imageUrl ?? DEFAULT_PLACEHOLDER_IMAGE,
+    imageUrl: normalizePlaceholderImage(tool.imageUrl),
     pickupLocation: tool.pickupLocation ?? "",
     pickupLocationNote: tool.pickupLocationNote ?? undefined
   };
@@ -380,7 +380,10 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
       name: tool.name,
       category: tool.category
     })),
-    imageUrls: workshop.imageUrls && workshop.imageUrls.length > 0 ? workshop.imageUrls : [DEFAULT_PLACEHOLDER_IMAGE],
+    imageUrls:
+      workshop.imageUrls && workshop.imageUrls.length > 0
+        ? workshop.imageUrls.map(normalizePlaceholderImage)
+        : [DEFAULT_PLACEHOLDER_IMAGE],
     toolIds: []
   };
 }
@@ -657,6 +660,64 @@ export const api = {
     return mapTool(created);
   },
 
+  async updateTool(
+    toolId: string,
+    input: {
+      name: string;
+      description: string;
+      category: string;
+      imageUrl?: string;
+      pickupLocation: string;
+      pickupLocationNote?: string;
+    },
+    token: string
+  ): Promise<Tool> {
+    const updated = await request<BackendTool>(
+      `/tools/${toolId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      },
+      token
+    );
+    return mapTool(updated);
+  },
+
+  async deleteTool(toolId: string, token: string) {
+    await request<void>(`/tools/${toolId}`, { method: "DELETE" }, token);
+  },
+
+  async getToolBlockingPeriods(
+    toolId: string
+  ): Promise<Array<{ startIso: string; endIso: string }>> {
+    const periods = await request<Array<{ startDate: string; endDate: string }>>(
+      `/tools/${toolId}/blocking-periods`
+    );
+    return periods.map((period) => ({
+      startIso: period.startDate,
+      endIso: period.endDate
+    }));
+  },
+
+  async createToolOwnerBlock(
+    input: { toolId: string; startIso: string; endIso: string },
+    token: string
+  ): Promise<Booking> {
+    const created = await request<BackendBooking>(
+      "/bookings/tool-owner-block",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          toolId: input.toolId,
+          startDate: new Date(input.startIso).toISOString(),
+          endDate: new Date(input.endIso).toISOString()
+        })
+      },
+      token
+    );
+    return mapBooking(created);
+  },
+
   async createToolRequest(
     input: { toolId: string; startIso: string; endIso: string; pickupTimeIso: string },
     token: string
@@ -678,11 +739,12 @@ export const api = {
   },
 
   async getWorkshops(
-    filters: { q?: string },
+    filters: { q?: string; managerId?: string },
     token: string
   ): Promise<Array<{ workshop: Workshop; slots: WorkshopSlot[]; tools: Array<Tool & { selectable: boolean }> }>> {
     const params = new URLSearchParams();
     if (filters.q) params.set("search", filters.q);
+    if (filters.managerId) params.set("managerId", filters.managerId);
     const workshops = await request<BackendWorkshop[]>(`/workshops?${params.toString()}`, undefined, token);
     const withSlots = await Promise.all(
       workshops.map(async (workshop) => {
@@ -803,6 +865,10 @@ export const api = {
       token
     );
     return mapWorkshop(updated);
+  },
+
+  async deleteWorkshop(workshopId: string, token: string) {
+    await request<void>(`/workshops/${workshopId}`, { method: "DELETE" }, token);
   },
 
   async createWorkshopTimeslot(

@@ -1,5 +1,6 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
@@ -20,6 +21,11 @@ type CalendarDay = {
   available: boolean;
 };
 
+type BlockingPeriod = {
+  startIso: string;
+  endIso: string;
+};
+
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
 function toLocalDateKey(date: Date) {
@@ -37,7 +43,25 @@ function getDefaultDates() {
   return { startDate: toLocalDateKey(start), endDate: toLocalDateKey(end) };
 }
 
-function getCalendarDays(monthDate: Date, isAvailable: boolean): CalendarDay[] {
+function overlapsDay(period: BlockingPeriod, date: Date) {
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  return new Date(period.startIso) < dayEnd && new Date(period.endIso) > dayStart;
+}
+
+function periodsOverlap(startIso: string, endIso: string, periods: BlockingPeriod[]) {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  return periods.some(
+    (period) => new Date(period.startIso) < end && new Date(period.endIso) > start
+  );
+}
+
+function getCalendarDays(
+  monthDate: Date,
+  isAvailable: boolean,
+  blockingPeriods: BlockingPeriod[]
+): CalendarDay[] {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
@@ -55,7 +79,10 @@ function getCalendarDays(monthDate: Date, isAvailable: boolean): CalendarDay[] {
       key: dateKey,
       day,
       dateKey,
-      available: isAvailable && dateKey > today
+      available:
+        isAvailable &&
+        dateKey > today &&
+        !blockingPeriods.some((period) => overlapsDay(period, new Date(year, month, day)))
     });
   }
 
@@ -73,11 +100,13 @@ function getInitials(name: string) {
 
 export function ToolDetailPage({ token, currentUser }: Props) {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { pushToast } = useToast();
   const defaults = useMemo(getDefaultDates, []);
 
   const [tool, setTool] = useState<Tool | null>(null);
+  const [blockingPeriods, setBlockingPeriods] = useState<BlockingPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [startTime, setStartTime] = useState("10:00");
@@ -92,19 +121,23 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const [reportDetails, setReportDetails] = useState("");
   const [isReporting, setIsReporting] = useState(false);
   const [ratings, setRatings] = useState<PublicRating[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const loadTool = async () => {
       if (!id) return;
       setIsLoading(true);
       try {
-        const [tools, toolRatings] = await Promise.all([
+        const [tools, periods, toolRatings] = await Promise.all([
           api.getTools({}, token ?? ""),
+          api.getToolBlockingPeriods(id),
           api.getRatingsForTool(id)
         ]);
         const foundTool = tools.find((entry) => entry.id === id);
         if (foundTool) {
           setTool(foundTool);
+          setBlockingPeriods(periods);
           setRatings(toolRatings);
         } else {
           pushToast("Werkzeug nicht gefunden.", "error");
@@ -121,6 +154,9 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   }, [id, token, navigate, pushToast]);
 
   const isAvailable = tool?.status === "VERFUEGBAR";
+  const isOwnTool = Boolean(tool && currentUser?.id === tool.ownerId);
+  const isManageMode = isOwnTool && searchParams.get("manage") === "1";
+  const canChooseDates = isOwnTool || isAvailable;
   const toolImage = tool ? tool.imageUrl || getPlaceholderImageForCategory(tool.category) : "";
   const hasUploadedImage = Boolean(tool?.imageUrl && tool.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE);
   const categoryLabel = tool
@@ -137,10 +173,10 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       return {
         key: `${monthDate.getFullYear()}-${monthDate.getMonth()}`,
         label: new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(monthDate),
-        days: getCalendarDays(monthDate, isAvailable)
+        days: getCalendarDays(monthDate, canChooseDates, blockingPeriods)
       };
     });
-  }, [calendarMonthOffset, isAvailable]);
+  }, [blockingPeriods, calendarMonthOffset, canChooseDates]);
 
   const selectCalendarDate = (dateKey: string) => {
     if (!isSelectingRangeEnd || dateKey < startDate) {
@@ -198,6 +234,47 @@ export function ToolDetailPage({ token, currentUser }: Props) {
     }
   };
 
+  const blockToolForOwnUse = async () => {
+    if (!tool || !token) return;
+    if (!startDate || !startTime || !endDate || !endTime) {
+      pushToast("Bitte Beginn und Ende des Eigenbedarfs vollständig ausfüllen.", "error");
+      return;
+    }
+    const startIso = `${startDate}T${startTime}`;
+    const endIso = `${endDate}T${endTime}`;
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Das Ende muss nach dem Beginn liegen.", "error");
+      return;
+    }
+    if (periodsOverlap(startIso, endIso, blockingPeriods)) {
+      pushToast("Im gewählten Zeitraum ist bereits eine angenommene oder offene Buchung vorhanden.", "error");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.createToolOwnerBlock({ toolId: tool.id, startIso, endIso }, token);
+      setBlockingPeriods((current) => [...current, { startIso, endIso }]);
+      pushToast("Werkzeug wurde für deinen Eigenbedarf blockiert.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht blockiert werden.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const deleteTool = async () => {
+    if (!tool || !token) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteTool(tool.id, token);
+      pushToast("Werkzeug endgültig gelöscht.", "success");
+      navigate("/offers");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht gelöscht werden.", "error");
+      setIsDeleting(false);
+    }
+  };
+
   const closeReportForm = () => {
     setShowReportForm(false);
     setReportReason("");
@@ -246,12 +323,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
     return <section className="stack"><p>Werkzeug nicht gefunden.</p></section>;
   }
 
-  const isOwnTool = currentUser?.id === tool.ownerId;
   const providerName = tool.ownerName ?? "Unbekannt";
 
   return (
     <section className="tool-detail-page" aria-label={tool.name}>
-      <DetailTopBar onBack={() => navigate("/tools")}>
+      <DetailTopBar onBack={() => navigate(isManageMode ? "/offers" : "/tools")}>
         {!isOwnTool && (
           <button type="button" className="detail-report-trigger" onClick={openReportForm}>
             Werkzeug melden
@@ -336,7 +412,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               </div>
             </div>
             <p className="workshop-calendar-instruction">
-              {isAvailable
+              {canChooseDates
                 ? isSelectingRangeEnd
                   ? "Wähle jetzt den letzten Tag des Zeitraums."
                   : "Wähle den ersten Tag des gewünschten Zeitraums."
@@ -384,17 +460,20 @@ export function ToolDetailPage({ token, currentUser }: Props) {
           <RatingsSection ratings={ratings} token={token} canReport={!isOwnTool} />
         </div>
 
-        <aside className={`playtomic-booking-panel tool-detail-booking ${!isAvailable ? "unavailable" : ""}`.trim()}>
-          <h2>Werkzeug buchen</h2>
-          {isAvailable ? (
+        <aside className={`playtomic-booking-panel tool-detail-booking ${!canChooseDates ? "unavailable" : ""}`.trim()}>
+          <h2>{isOwnTool ? "Werkzeug für Eigenbedarf blockieren" : "Werkzeug buchen"}</h2>
+          {canChooseDates ? (
             <>
               <div className="booking-section">
-                <div className="booking-section-title"><span /><strong>Abholdaten</strong></div>
+                <div className="booking-section-title">
+                  <span />
+                  <strong>{isOwnTool ? "Beginn des Eigenbedarfs" : "Abholdaten"}</strong>
+                </div>
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
                     <input
-                      aria-label="Abholdatum"
+                      aria-label={isOwnTool ? "Startdatum Eigenbedarf" : "Abholdatum"}
                       type="date"
                       value={startDate}
                       min={defaults.startDate}
@@ -405,7 +484,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                   <label>
                     <span>Uhrzeit</span>
                     <input
-                      aria-label="Abholzeit"
+                      aria-label={isOwnTool ? "Startzeit Eigenbedarf" : "Abholzeit"}
                       type="time"
                       value={startTime}
                       onChange={(event) => setStartTime(event.target.value)}
@@ -418,12 +497,15 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               <div className="booking-divider" />
 
               <div className="booking-section">
-                <div className="booking-section-title"><span /><strong>Abgabedaten</strong></div>
+                <div className="booking-section-title">
+                  <span />
+                  <strong>{isOwnTool ? "Ende des Eigenbedarfs" : "Abgabedaten"}</strong>
+                </div>
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
                     <input
-                      aria-label="Abgabedatum"
+                      aria-label={isOwnTool ? "Enddatum Eigenbedarf" : "Abgabedatum"}
                       type="date"
                       value={endDate}
                       min={startDate}
@@ -434,7 +516,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                   <label>
                     <span>Uhrzeit</span>
                     <input
-                      aria-label="Abgabezeit"
+                      aria-label={isOwnTool ? "Endzeit Eigenbedarf" : "Abgabezeit"}
                       type="time"
                       value={endTime}
                       onChange={(event) => setEndTime(event.target.value)}
@@ -445,7 +527,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               </div>
 
               <div className="booking-actions">
-                {token ? (
+                {isOwnTool ? (
+                  <button className="booking-button" onClick={() => void blockToolForOwnUse()} disabled={isSubmitting}>
+                    {isSubmitting ? "Wird blockiert..." : "Zeitraum blockieren"}
+                  </button>
+                ) : token ? (
                   <button className="booking-button" onClick={() => void requestTool()} disabled={isSubmitting}>
                     {isSubmitting ? "Wird versendet..." : "Anfrage senden"}
                   </button>
@@ -458,7 +544,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                     Jetzt einloggen
                   </Link>
                 )}
-                <p className="booking-hint">Der Anbieter muss deine Anfrage noch bestätigen.</p>
+                <p className="booking-hint">
+                  {isOwnTool
+                    ? "Die Blockierung gilt sofort und erzeugt keine Nachricht."
+                    : "Der Anbieter muss deine Anfrage noch bestätigen."}
+                </p>
               </div>
             </>
           ) : (
@@ -469,6 +559,28 @@ export function ToolDetailPage({ token, currentUser }: Props) {
           )}
         </aside>
       </div>
+
+      {isManageMode && (
+        <div className="owner-detail-actions">
+          <Link className="btn secondary" to={`/tools/${tool.id}/edit`}>
+            Werkzeug bearbeiten
+          </Link>
+          <button type="button" className="btn danger" onClick={() => setShowDeleteDialog(true)}>
+            Werkzeug löschen
+          </button>
+        </div>
+      )}
+
+      {showDeleteDialog && (
+        <ConfirmDialog
+          title="Werkzeug endgültig löschen?"
+          text={`„${tool.name}“ und die zugehörigen Angebotsdaten werden dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`}
+          confirmLabel="Werkzeug endgültig löschen"
+          isBusy={isDeleting}
+          onCancel={() => setShowDeleteDialog(false)}
+          onConfirm={() => void deleteTool()}
+        />
+      )}
 
       {isImageOpen && (
         <div

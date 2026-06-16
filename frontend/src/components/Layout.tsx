@@ -20,6 +20,7 @@ type Props = {
 export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Props) {
   const profileMenuRef = useRef<HTMLDetailsElement>(null);
   const location = useLocation();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const closeProfileMenu = () => {
@@ -46,6 +47,21 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
       window.removeEventListener("scroll", handleScroll, true);
     };
   }, []);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMobileNavOpen(false);
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isMobileNavOpen]);
 
   const [unreadRequestBellCount, setUnreadRequestBellCount] = useState(0);
 
@@ -111,7 +127,19 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
         <Link to="/" className="logo">
           Tool<strong>Share</strong>
         </Link>
-        <nav className="nav">
+        <button
+          type="button"
+          className="mobile-nav-toggle"
+          aria-controls="primary-navigation"
+          aria-expanded={isMobileNavOpen}
+          aria-label={isMobileNavOpen ? "Navigation schließen" : "Navigation öffnen"}
+          onClick={() => setIsMobileNavOpen((isOpen) => !isOpen)}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            {isMobileNavOpen ? "close" : "menu"}
+          </span>
+        </button>
+        <nav id="primary-navigation" className={`nav ${isMobileNavOpen ? "nav-open" : ""}`}>
           <NavLink to="/">Entdecken</NavLink>
           
           {/* Werkzeuge link */}
@@ -153,6 +181,9 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
                 </summary>
                 <div className="profile-menu-panel">
                   <p className="profile-menu-meta">{currentUser.name}</p>
+                  <Link to="/offers" className="profile-menu-item">
+                    Meine Angebote
+                  </Link>
                   <Link to="/profile" className="profile-menu-item">
                     Einstellungen
                   </Link>

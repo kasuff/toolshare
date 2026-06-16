@@ -60,6 +60,10 @@ describe("Layout", () => {
     );
 
     fireEvent.click(screen.getByLabelText("Profil-Menü öffnen"));
+    const offersLink = screen.getByRole("link", { name: "Meine Angebote" });
+    const settingsLink = screen.getByRole("link", { name: "Einstellungen" });
+    expect(offersLink).toHaveAttribute("href", "/offers");
+    expect(offersLink.compareDocumentPosition(settingsLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Einstellungen")).toBeVisible();
 
     fireEvent.mouseDown(document.body);
@@ -132,5 +136,46 @@ describe("Layout", () => {
     expect(
       await screen.findByRole("link", { name: "Nachrichten und Benachrichtigungen, 1 ungelesene Konversationen" })
     ).toBeInTheDocument();
+  });
+
+  it("opens and closes the accessible mobile navigation", async () => {
+    getBookingsForUser.mockResolvedValueOnce([]);
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route
+            element={
+              <Layout
+                users={users.slice(0, 1)}
+                currentUser={users[0]}
+                token="tok-1"
+                onSwitchUser={vi.fn()}
+                onLogout={vi.fn()}
+              />
+            }
+          >
+            <Route index element={<div>Home</div>} />
+            <Route path="tools" element={<div>Tools</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const toggle = screen.getByRole("button", { name: "Navigation öffnen" });
+    expect(toggle).toHaveAttribute("aria-controls", "primary-navigation");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Navigation schließen" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("navigation")).toHaveClass("nav-open");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByRole("button", { name: "Navigation öffnen" })).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Navigation öffnen" }));
+    fireEvent.click(screen.getByRole("link", { name: "Werkzeuge" }));
+    expect(await screen.findByText("Tools")).toBeInTheDocument();
+    expect(screen.getByRole("navigation")).not.toHaveClass("nav-open");
   });
 });

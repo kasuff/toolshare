@@ -9,6 +9,7 @@ vi.mock("../src/modules/workshops/workshops.repository", () => ({
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
+    findActiveBooking: vi.fn(),
     findOverlappingTimeslot: vi.fn(),
     createTimeslot: vi.fn(),
     createBlockedTimeslotWithAvailabilitySplit: vi.fn(),
@@ -290,6 +291,36 @@ describe("workshopsService", () => {
       blockedByOwner: true
     });
     expect(result).toMatchObject({ id: "slot-1", blockedByOwner: true });
+  });
+
+  it("rejects blocking an available slot with an active booking", async () => {
+    mockedWorkshopsRepository.findTimeslotById.mockResolvedValueOnce({
+      id: "slot-1",
+      workshopId: "w1",
+      startTime: new Date("2026-05-10T08:00:00.000Z"),
+      endTime: new Date("2026-05-10T18:00:00.000Z"),
+      blockedByOwner: false,
+      workshop: { managerId: "owner-1" }
+    } as any);
+    mockedWorkshopsRepository.findActiveBookingForTimeslot.mockResolvedValueOnce({
+      id: "accepted-booking",
+      status: "ACCEPTED"
+    } as any);
+
+    await expect(
+      workshopsService.updateTimeslot({
+        workshopId: "w1",
+        timeslotId: "slot-1",
+        managerId: "owner-1",
+        actorRole: "USER",
+        blockedByOwner: true
+      })
+    ).rejects.toMatchObject({
+      code: "ACTIVE_BOOKING_EXISTS",
+      status: 409
+    });
+
+    expect(mockedWorkshopsRepository.updateTimeslot).not.toHaveBeenCalled();
   });
 
   it("rejects overlap when updated slot stays available", async () => {

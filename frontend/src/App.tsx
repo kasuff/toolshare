@@ -9,6 +9,7 @@ import { ToastProvider, useToast } from "./hooks/useToast";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ToolsPage } from "./pages/ToolsPage";
 import { ToolDetailPage } from "./pages/ToolDetailPage";
+import { EditToolPage } from "./pages/EditToolPage";
 import { NewToolPage } from "./pages/NewToolPage";
 import { WorkshopsPage } from "./pages/WorkshopsPage";
 import { NewWorkshopPage } from "./pages/NewWorkshopPage";
@@ -17,6 +18,7 @@ import { WorkshopAvailabilityPage } from "./pages/WorkshopAvailabilityPage";
 import { InboxPage } from "./pages/InboxPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ModerationPage } from "./pages/ModerationPage";
+import { MyOffersPage } from "./pages/MyOffersPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { api } from "./services/api";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./services/sessionEvents";
@@ -318,6 +320,14 @@ function AppWithProviders() {
         <Route path="tools" element={<ToolsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
         <Route
+          path="tools/:id/edit"
+          element={
+            <RequireAuth token={token}>
+              <EditToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="tools/new"
           element={
             <RequireAuth token={token}>
@@ -348,6 +358,14 @@ function AppWithProviders() {
           element={
             <RequireAuth token={token}>
               <WorkshopAvailabilityPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="offers"
+          element={
+            <RequireAuth token={token}>
+              <MyOffersPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
             </RequireAuth>
           }
         />
