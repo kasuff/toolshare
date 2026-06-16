@@ -11,7 +11,10 @@ version: "3.8"
 services:
   # ─── Grafana ────────────────────────────────────────────────────────────────
   grafana:
-    image: grafana/grafana:11.1.0
+    # Config (Provisioning + Dashboards) ins Image gebacken statt gemountet,
+    # damit der Deploy ohne Repo-Bind-Mounts auf dem Docker-Host funktioniert.
+    build:
+      context: ./grafana
     container_name: toolshare-grafana
     restart: unless-stopped
     ports:
@@ -68,8 +71,6 @@ services:
 
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       prometheus:
         condition: service_healthy
@@ -95,7 +96,9 @@ services:
 
   # ─── Prometheus ─────────────────────────────────────────────────────────────
   prometheus:
-    image: prom/prometheus:v2.53.0
+    # Config + Alert-Regeln ins Image gebacken statt gemountet (s. grafana).
+    build:
+      context: ./prometheus
     container_name: toolshare-prometheus
     restart: unless-stopped
     ports:
@@ -119,8 +122,6 @@ services:
       # Max. gleichzeitige HTTP-Verbindungen
       - "--web.max-connections=${PROMETHEUS_MAX_CONNECTIONS:-100}"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/alerts:/etc/prometheus/alerts
       - prometheus-data:/prometheus
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
@@ -141,14 +142,15 @@ services:
 
   # ─── Loki ───────────────────────────────────────────────────────────────────
   loki:
-    image: grafana/loki:2.9.8
+    # Config ins Image gebacken statt gemountet (s. grafana).
+    build:
+      context: ./loki
     container_name: toolshare-loki
     restart: unless-stopped
     ports:
       - "${LOKI_PORT:-3100}:3100"
     command: -config.file=/etc/loki/loki-config.yml
     volumes:
-      - ./loki/loki-config.yml:/etc/loki/loki-config.yml
       - loki-data:/loki
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
@@ -168,12 +170,14 @@ services:
 
   # ─── Promtail ───────────────────────────────────────────────────────────────
   promtail:
-    image: grafana/promtail:2.9.8
+    # Config ins Image gebacken statt gemountet (s. grafana). Die Host-Mounts
+    # darunter bleiben – das sind echte Host-Pfade.
+    build:
+      context: ./promtail
     container_name: toolshare-promtail
     restart: unless-stopped
     command: -config.file=/etc/promtail/promtail-config.yml
     volumes:
-      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log:ro

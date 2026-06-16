@@ -10,5 +10,5 @@ providers:
     updateIntervalSeconds: 30   # Prüft alle 30s auf Änderungen in den JSON-Dateien
     allowUiUpdates: true        # Erlaubt UI-Anpassungen (werden aber nicht persistiert)
     options:
-      path: /var/lib/grafana/dashboards
+      path: /etc/grafana/dashboards
       foldersFromFilesStructure: false

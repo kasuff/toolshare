@@ -108,8 +108,9 @@ $COMPOSE -f "$COMPOSE_FILE" up -d --build
 wait_for_containers "$COMPOSE_FILE"
 
 # Start monitoring stack (joins existing toolshare-network)
+# --build: Configs sind in die Images gebacken → bei Änderungen neu bauen.
 echo "Starting monitoring stack..."
-$COMPOSE -f "$MONITORING_COMPOSE_FILE" up -d
+$COMPOSE -f "$MONITORING_COMPOSE_FILE" up -d --build
 wait_for_containers "$MONITORING_COMPOSE_FILE"
 
 echo "Deployment finished successfully!"
