@@ -171,6 +171,9 @@ describe("InboxPage", () => {
     expect(document.querySelector(".messenger-shell")).toHaveClass("messenger-shell--chat-open");
     expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Nachrichten" })).not.toBeInTheDocument();
+    expect(document.querySelector(".messenger-chat-header-text strong")).toHaveTextContent("Max Mustermann");
+    expect(document.querySelector(".messenger-chat-header-sub")).toHaveTextContent("Ausleihe · Offen");
+    expect(screen.queryByText("Offen", { selector: ".status-pill" })).not.toBeInTheDocument();
     const backButton = screen.getByRole("button", { name: "Zurück zur Chatliste" });
     expect(backButton).toBeInTheDocument();
     expect(backButton.closest(".messenger-chat-header")).toBeTruthy();

@@ -642,7 +642,9 @@ export function InboxPage({ currentUser, token }: Props) {
 
           {selectedBooking && (
             <div className="messenger-chat">
-              <header className="messenger-chat-header">
+              <header
+                className={`messenger-chat-header${isMobileInbox ? " messenger-chat-header--compact" : ""}`}
+              >
                 {isMobileInbox && (
                   <button
                     type="button"
@@ -661,33 +663,33 @@ export function InboxPage({ currentUser, token }: Props) {
                   size="lg"
                 />
                 <div className="messenger-chat-header-text">
-                  <strong>{selectedBooking.type === "SYSTEM_WARNING" ? (selectedBooking.toolName ?? "System-Meldung") : (selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`)}</strong>
-                  <span className="messenger-chat-header-sub">{counterparty(selectedBooking, currentUser.id).name}</span>
+                  <strong>{getChatHeaderTitle(selectedBooking, currentUser.id, isMobileInbox)}</strong>
+                  <span className="messenger-chat-header-sub">
+                    {getChatHeaderSubtitle(selectedBooking, currentUser.id, isMobileInbox)}
+                  </span>
                 </div>
                 <div className="messenger-chat-header-actions">
-                  <StatusPill
-                    label={
-                      selectedBooking.type === "SYSTEM_WARNING"
-                        ? selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:")
-                          ? "Verwarnung"
-                          : selectedBooking.systemWarningText?.startsWith("SPERRUNG:")
-                            ? "Gesperrt"
-                            : "Info"
-                        : bookingStatusLabel[selectedBooking.status]
-                    }
-                    tone={
-                      selectedBooking.type === "SYSTEM_WARNING"
-                        ? selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ||
-                          selectedBooking.systemWarningText?.startsWith("SPERRUNG:")
-                          ? "danger"
-                          : "neutral"
-                        : selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
-                          ? "success"
-                          : selectedBooking.status === "ABGELEHNT"
+                  {!isMobileInbox && (
+                    <StatusPill
+                      label={
+                        selectedBooking.type === "SYSTEM_WARNING"
+                          ? getSystemWarningLabel(selectedBooking.systemWarningText)
+                          : bookingStatusLabel[selectedBooking.status]
+                      }
+                      tone={
+                        selectedBooking.type === "SYSTEM_WARNING"
+                          ? selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ||
+                            selectedBooking.systemWarningText?.startsWith("SPERRUNG:")
                             ? "danger"
                             : "neutral"
-                    }
-                  />
+                          : selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
+                            ? "success"
+                            : selectedBooking.status === "ABGELEHNT"
+                              ? "danger"
+                              : "neutral"
+                      }
+                    />
+                  )}
                   {selectedBooking.type !== "SYSTEM_WARNING" && (
                     <KebabMenu
                       ariaLabel="Konversationsaktionen"
@@ -1296,6 +1298,39 @@ function counterparty(booking: Booking, currentUserId: string): { name: string }
     return { name: booking.requesterName ?? "Anfragender" };
   }
   return { name: booking.providerName ?? "Anbieter" };
+}
+
+function getBookingContextLabel(type: BookingType): string {
+  if (type === "WORKSHOP") return "Werkstatt";
+  if (type === "TOOL") return "Ausleihe";
+  return bookingTypeLabel[type];
+}
+
+function getSystemWarningLabel(text?: string): string {
+  if (text?.startsWith("ERMAHNUNG:")) return "Verwarnung";
+  if (text?.startsWith("SPERRUNG:")) return "Gesperrt";
+  return "Info";
+}
+
+function getChatHeaderTitle(booking: Booking, currentUserId: string, compact: boolean): string {
+  if (compact) {
+    if (booking.type === "SYSTEM_WARNING") return "Moderation";
+    return counterparty(booking, currentUserId).name;
+  }
+  if (booking.type === "SYSTEM_WARNING") {
+    return booking.toolName ?? "System-Meldung";
+  }
+  return booking.toolName ?? `${bookingTypeLabel[booking.type]}-Anfrage`;
+}
+
+function getChatHeaderSubtitle(booking: Booking, currentUserId: string, compact: boolean): string {
+  if (compact) {
+    if (booking.type === "SYSTEM_WARNING") {
+      return getSystemWarningLabel(booking.systemWarningText);
+    }
+    return `${getBookingContextLabel(booking.type)} · ${bookingStatusLabel[booking.status]}`;
+  }
+  return counterparty(booking, currentUserId).name;
 }
 
 function getThreadPreview(row: BookingRow, currentUserId: string): string {
