@@ -42,7 +42,9 @@ vi.mock("../src/modules/ratings/ratings.service", () => ({
   ratingsService: {
     create: vi.fn(),
     listReceived: vi.fn(),
-    listGiven: vi.fn()
+    listGiven: vi.fn(),
+    listForTool: vi.fn(),
+    listForWorkshop: vi.fn()
   }
 }));
 
@@ -322,7 +324,6 @@ describe.skip("Controller route integration coverage", () => {
         .set("Authorization", `Bearer ${managerToken()}`)
         .send({
           bookingId: BOOKING_ID,
-          toUserId: TARGET_USER_ID,
           score: 5,
           comment: "Top"
         });
@@ -343,7 +344,6 @@ describe.skip("Controller route integration coverage", () => {
       expect(mockedRatingsService.create).toHaveBeenCalledWith({
         bookingId: BOOKING_ID,
         fromUserId: MANAGER_ID,
-        toUserId: TARGET_USER_ID,
         score: 5,
         comment: "Top"
       });

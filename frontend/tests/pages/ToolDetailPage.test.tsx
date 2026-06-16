@@ -6,17 +6,19 @@ import { ToolDetailPage } from "../../src/pages/ToolDetailPage";
 import { ToastViewport } from "../../src/components/ui";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 
-const { getTools, createToolRequest, createReport } = vi.hoisted(() => ({
+const { getTools, createToolRequest, createReport, getRatingsForTool } = vi.hoisted(() => ({
   getTools: vi.fn(),
   createToolRequest: vi.fn(),
-  createReport: vi.fn()
+  createReport: vi.fn(),
+  getRatingsForTool: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
     getTools,
     createToolRequest,
-    createReport
+    createReport,
+    getRatingsForTool
   }
 }));
 

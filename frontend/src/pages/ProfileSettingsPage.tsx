@@ -7,21 +7,38 @@ import {
   toAddressPayload,
   type AddressFormFields
 } from "../components/AddressInput";
-import { Field, Surface } from "../components/ui";
+import { StarRatingDisplay } from "../components/StarRatingInput";
+import { EmptyState, Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import type { User } from "../types/domain";
+import type { Rating, User } from "../types/domain";
 
 type Props = {
   currentUser?: User;
+  token?: string;
   onSave: (input: { name?: string; address?: string }) => Promise<User>;
 };
 
-export function ProfileSettingsPage({ currentUser, onSave }: Props) {
+export function ProfileSettingsPage({ currentUser, token, onSave }: Props) {
   const { pushToast } = useToast();
   const [name, setName] = useState(currentUser?.name ?? "");
   const [address, setAddress] = useState<AddressFormFields>(() => parseAddress(currentUser?.address));
   const [isSaving, setIsSaving] = useState(false);
+  const [receivedRatings, setReceivedRatings] = useState<Rating[]>([]);
+  const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+
+  useEffect(() => {
+    if (!token) {
+      setReceivedRatings([]);
+      return;
+    }
+    setIsLoadingRatings(true);
+    void api
+      .getRatingsReceived(token)
+      .then(setReceivedRatings)
+      .catch(() => setReceivedRatings([]))
+      .finally(() => setIsLoadingRatings(false));
+  }, [token]);
 
   useEffect(() => {
     setName(currentUser?.name ?? "");
@@ -123,6 +140,33 @@ export function ProfileSettingsPage({ currentUser, onSave }: Props) {
             {isSaving ? "Speichere..." : "Änderungen speichern"}
           </button>
         </form>
+      </Surface>
+
+      <Surface title="Erhaltene Bewertungen" className="profile-settings-card profile-ratings-card">
+        {isLoadingRatings ? (
+          <p className="hint">Laden…</p>
+        ) : receivedRatings.length === 0 ? (
+          <EmptyState title="Noch keine Bewertungen" text="Sobald Ausleiher dich bewerten, erscheinen die Bewertungen hier." />
+        ) : (
+          <ul className="profile-ratings-list">
+            {receivedRatings.map((rating) => (
+              <li key={rating.id} className="profile-ratings-item">
+                <div className="profile-ratings-head">
+                  <StarRatingDisplay score={rating.score} />
+                  <span className="profile-ratings-meta">
+                    {rating.fromUserName ?? "Nutzer"} · {new Date(rating.createdIso).toLocaleDateString("de-DE")}
+                  </span>
+                </div>
+                {rating.listingLabel && (
+                  <p className="hint profile-ratings-context">
+                    Zu {rating.listingType === "WORKSHOP" ? "Werkstatt" : "Werkzeug"}: {rating.listingLabel}
+                  </p>
+                )}
+                {rating.comment && <p className="profile-ratings-comment">{rating.comment}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
       </Surface>
     </section>
   );

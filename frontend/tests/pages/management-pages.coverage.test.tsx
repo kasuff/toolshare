@@ -18,7 +18,6 @@ const {
   updateUserSuspension,
   listReports,
   listClosedReports,
-  getRatingsReceived,
   updateReportStatus,
   listSuspensionRequests,
   decideSuspensionRequest,
@@ -34,7 +33,6 @@ const {
   updateUserSuspension: vi.fn(),
   listReports: vi.fn(),
   listClosedReports: vi.fn(),
-  getRatingsReceived: vi.fn(),
   updateReportStatus: vi.fn(),
   listSuspensionRequests: vi.fn(),
   decideSuspensionRequest: vi.fn(),
@@ -58,7 +56,6 @@ vi.mock("../../src/services/api", () => ({
     updateUserSuspension,
     listReports,
     listClosedReports,
-    getRatingsReceived,
     updateReportStatus,
     listSuspensionRequests,
     decideSuspensionRequest,
@@ -185,7 +182,7 @@ describe("management pages", () => {
     expect(updateUserSuspension).toHaveBeenCalledWith("u2", false, "token-123");
   });
 
-  it("loads reports and ratings and rejects a moderation item", async () => {
+  it("loads reports and rejects a moderation item", async () => {
     listClosedReports.mockResolvedValue([]);
     listReports.mockResolvedValueOnce([
       {
@@ -204,9 +201,6 @@ describe("management pages", () => {
         createdAt: "2026-05-05T10:00:00.000Z"
       }
     ]).mockResolvedValueOnce([]);
-    getRatingsReceived.mockResolvedValue([
-      { id: "rt1", score: 5, comment: "Top", createdAt: "2026-05-05T10:00:00.000Z", fromUser: { name: "Lea" } }
-    ]);
     updateReportStatus.mockResolvedValue(undefined);
 
     render(
@@ -216,7 +210,6 @@ describe("management pages", () => {
     );
 
     expect(await screen.findByText(/Gehäuse gebrochen/)).toBeInTheDocument();
-    expect(screen.getByText(/Score 5/)).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText(/Begründung beim Verwerfen/), {
       target: { value: "Kein Verstoss erkennbar" }
     });
@@ -232,7 +225,8 @@ describe("management pages", () => {
         "token-123"
       );
     });
-    expect(await screen.findByText(/Top/)).toBeInTheDocument();
+    expect(await screen.findByText("Keine offenen Meldungen")).toBeInTheDocument();
+    expect(pushToast).toHaveBeenCalledWith("Meldung bearbeitet.", "success");
   });
 
   it("requires login and submits a new tool with pickup data", async () => {

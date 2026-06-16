@@ -5,15 +5,17 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { WorkshopsPage } from "../../src/pages/WorkshopsPage";
 import type { User } from "../../src/types/domain";
 
-const { getWorkshops, createWorkshopBooking } = vi.hoisted(() => ({
+const { getWorkshops, createWorkshopBooking, getRatingsForWorkshop } = vi.hoisted(() => ({
   getWorkshops: vi.fn(),
-  createWorkshopBooking: vi.fn()
+  createWorkshopBooking: vi.fn(),
+  getRatingsForWorkshop: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
     getWorkshops,
-    createWorkshopBooking
+    createWorkshopBooking,
+    getRatingsForWorkshop
   }
 }));
 

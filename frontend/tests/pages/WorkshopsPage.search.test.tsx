@@ -7,15 +7,17 @@ import { ToastViewport } from "../../src/components/ui";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 import type { Tool, Workshop, WorkshopSlot } from "../../src/types/domain";
 
-const { createWorkshopBooking, getWorkshops } = vi.hoisted(() => ({
+const { createWorkshopBooking, getWorkshops, getRatingsForWorkshop } = vi.hoisted(() => ({
   createWorkshopBooking: vi.fn(),
-  getWorkshops: vi.fn()
+  getWorkshops: vi.fn(),
+  getRatingsForWorkshop: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
     createWorkshopBooking,
-    getWorkshops
+    getWorkshops,
+    getRatingsForWorkshop
   }
 }));
 

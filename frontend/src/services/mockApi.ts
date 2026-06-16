@@ -336,6 +336,7 @@ export const api = {
       score: input.score,
       comment: input.comment,
       status: "SICHTBAR",
+      createdIso: new Date().toISOString()
     });
     saveDb(db);
   },
@@ -348,7 +349,7 @@ export const api = {
     const db = loadDb();
     const r = db.ratings.find((it) => it.id === ratingId);
     if (!r) return;
-    r.status = "MODERIERT";
+    r.status = "AUSGEBLENDET";
     saveDb(db);
   },
 

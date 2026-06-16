@@ -8,8 +8,12 @@ vi.mock("../src/modules/ratings/ratings.repository", () => ({
     listReceived: vi.fn(),
     listGiven: vi.fn(),
     findBookingWithParticipants: vi.fn(),
-    findExisting: vi.fn(),
-    create: vi.fn()
+    findByBookingAndRequester: vi.fn(),
+    create: vi.fn(),
+    listForTool: vi.fn(),
+    listForWorkshop: vi.fn(),
+    hide: vi.fn(),
+    findById: vi.fn()
   }
 }));
 
@@ -43,31 +47,19 @@ describe("ratingsService", () => {
     expect(result).toEqual([{ id: "r2" }]);
   });
 
-  it("rejects self ratings", async () => {
-    await expect(
-      ratingsService.create({
-        bookingId: "b1",
-        fromUserId: "u1",
-        toUserId: "u1",
-        score: 5
-      })
-    ).rejects.toMatchObject({ code: "INVALID_RATING_TARGET", status: 400 });
-  });
-
   it("rejects missing bookings", async () => {
     mockedRatingsRepository.findBookingWithParticipants.mockResolvedValueOnce(null);
 
     await expect(
       ratingsService.create({
         bookingId: "missing",
-        fromUserId: "u1",
-        toUserId: "u2",
+        fromUserId: "requester",
         score: 4
       })
     ).rejects.toMatchObject({ code: "BOOKING_NOT_FOUND", status: 404 });
   });
 
-  it("rejects ratings from non-participants", async () => {
+  it("rejects ratings from non-requesters", async () => {
     mockedRatingsRepository.findBookingWithParticipants.mockResolvedValueOnce({
       id: "b1",
       userId: "requester",
@@ -80,8 +72,7 @@ describe("ratingsService", () => {
     await expect(
       ratingsService.create({
         bookingId: "b1",
-        fromUserId: "someone-else",
-        toUserId: "owner",
+        fromUserId: "owner",
         score: 4
       })
     ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
@@ -101,13 +92,12 @@ describe("ratingsService", () => {
       ratingsService.create({
         bookingId: "b1",
         fromUserId: "requester",
-        toUserId: "owner",
         score: 4
       })
     ).rejects.toMatchObject({ code: "RATING_NOT_ALLOWED", status: 409 });
   });
 
-  it("rejects duplicate ratings for same booking pair", async () => {
+  it("rejects duplicate ratings for the same booking", async () => {
     mockedRatingsRepository.findBookingWithParticipants.mockResolvedValueOnce({
       id: "b1",
       userId: "requester",
@@ -116,19 +106,18 @@ describe("ratingsService", () => {
       status: "RETURNED",
       endDate: new Date("2026-01-01T00:00:00.000Z")
     } as any);
-    mockedRatingsRepository.findExisting.mockResolvedValueOnce({ id: "existing-rating" } as any);
+    mockedRatingsRepository.findByBookingAndRequester.mockResolvedValueOnce({ id: "existing-rating" } as any);
 
     await expect(
       ratingsService.create({
         bookingId: "b1",
         fromUserId: "requester",
-        toUserId: "owner",
         score: 5
       })
     ).rejects.toMatchObject({ code: "RATING_ALREADY_EXISTS", status: 409 });
   });
 
-  it("creates rating and notifies receiver", async () => {
+  it("creates rating for provider and notifies receiver", async () => {
     mockedRatingsRepository.findBookingWithParticipants.mockResolvedValueOnce({
       id: "b1",
       userId: "requester",
@@ -137,13 +126,12 @@ describe("ratingsService", () => {
       status: "RETURNED",
       endDate: new Date("2026-01-01T00:00:00.000Z")
     } as any);
-    mockedRatingsRepository.findExisting.mockResolvedValueOnce(null);
+    mockedRatingsRepository.findByBookingAndRequester.mockResolvedValueOnce(null);
     mockedRatingsRepository.create.mockResolvedValueOnce({ id: "rating-1", score: 5 } as any);
 
     const result = await ratingsService.create({
       bookingId: "b1",
       fromUserId: "requester",
-      toUserId: "owner",
       score: 5,
       comment: "Top"
     });
@@ -157,5 +145,26 @@ describe("ratingsService", () => {
     });
     expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner", expect.stringContaining("Bewertung"));
     expect(result).toMatchObject({ id: "rating-1", score: 5 });
+  });
+
+  it("allows rating after booking period ended even if not returned", async () => {
+    mockedRatingsRepository.findBookingWithParticipants.mockResolvedValueOnce({
+      id: "b1",
+      userId: "requester",
+      tool: { ownerId: "owner" },
+      timeslot: null,
+      status: "ACCEPTED",
+      endDate: new Date("2020-01-01T00:00:00.000Z")
+    } as any);
+    mockedRatingsRepository.findByBookingAndRequester.mockResolvedValueOnce(null);
+    mockedRatingsRepository.create.mockResolvedValueOnce({ id: "rating-2", score: 4 } as any);
+
+    await ratingsService.create({
+      bookingId: "b1",
+      fromUserId: "requester",
+      score: 4
+    });
+
+    expect(mockedRatingsRepository.create).toHaveBeenCalled();
   });
 });

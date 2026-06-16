@@ -38,6 +38,12 @@ enum ReportTargetType {
   TOOL
   WORKSHOP
   USER
+  RATING
+}
+
+enum RatingStatus {
+  VISIBLE
+  HIDDEN
 }
 
 enum SuspensionRequestStatus {
@@ -191,19 +197,24 @@ model BookingTimeslotProposal {
 }
 
 model Rating {
-  id         String   @id @default(uuid())
-  bookingId  String
-  fromUserId String
-  toUserId   String
-  score      Int
-  comment    String?
-  createdAt  DateTime @default(now())
-  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  fromUser   User     @relation("RatingsGiven", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUser     User     @relation("RatingsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid())
+  bookingId    String
+  fromUserId   String
+  toUserId     String
+  score        Int
+  comment      String?
+  status       RatingStatus @default(VISIBLE)
+  moderatorId  String?
+  decisionNote String?
+  moderatedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  booking      Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromUser     User         @relation("RatingsGiven", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser       User         @relation("RatingsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId, fromUserId, toUserId])
   @@index([toUserId])
+  @@index([status])
 }
 
 model Notification {

@@ -1,11 +1,12 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
+import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "../utils/categories";
-import type { Tool, User } from "../types/domain";
+import type { PublicRating, Tool, User } from "../types/domain";
 
 type Props = {
   token?: string;
@@ -90,16 +91,21 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [isReporting, setIsReporting] = useState(false);
+  const [ratings, setRatings] = useState<PublicRating[]>([]);
 
   useEffect(() => {
     const loadTool = async () => {
       if (!id) return;
       setIsLoading(true);
       try {
-        const tools = await api.getTools({}, token ?? "");
+        const [tools, toolRatings] = await Promise.all([
+          api.getTools({}, token ?? ""),
+          api.getRatingsForTool(id)
+        ]);
         const foundTool = tools.find((entry) => entry.id === id);
         if (foundTool) {
           setTool(foundTool);
+          setRatings(toolRatings);
         } else {
           pushToast("Werkzeug nicht gefunden.", "error");
           navigate("/tools");
@@ -374,6 +380,8 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               <span><i className="unavailable" /> Nicht verfügbar</span>
             </div>
           </section>
+
+          <RatingsSection ratings={ratings} token={token} canReport={!isOwnTool} />
         </div>
 
         <aside className={`playtomic-booking-panel tool-detail-booking ${!isAvailable ? "unavailable" : ""}`.trim()}>

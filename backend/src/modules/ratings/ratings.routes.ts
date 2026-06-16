@@ -2,9 +2,21 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { ratingsController } from "./ratings.controller";
-import { createRatingSchema, ratingsForUserSchema } from "./ratings.schema";
+import {
+  createRatingSchema,
+  ratingsForToolSchema,
+  ratingsForUserSchema,
+  ratingsForWorkshopSchema
+} from "./ratings.schema";
 
 export const ratingsRouter = Router();
+
+ratingsRouter.get("/tools/:toolId", validate(ratingsForToolSchema), ratingsController.listForTool);
+ratingsRouter.get(
+  "/workshops/:workshopId",
+  validate(ratingsForWorkshopSchema),
+  ratingsController.listForWorkshop
+);
 
 ratingsRouter.use(requireAuth);
 

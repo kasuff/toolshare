@@ -5,12 +5,14 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport } = vi.hoisted(() => ({
+const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, getRatingsGiven, getRatingsReceived } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   decideBooking: vi.fn(),
   createPickupProposal: vi.fn(),
   createTimeslotProposal: vi.fn(),
   createReport: vi.fn(),
+  getRatingsGiven: vi.fn().mockResolvedValue([]),
+  getRatingsReceived: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("../../src/services/api", () => ({
@@ -20,6 +22,8 @@ vi.mock("../../src/services/api", () => ({
     createPickupProposal,
     createTimeslotProposal,
     createReport,
+    getRatingsGiven,
+    getRatingsReceived
   },
 }));
 
@@ -51,6 +55,8 @@ describe("InboxPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
+    getRatingsGiven.mockResolvedValue([]);
+    getRatingsReceived.mockResolvedValue([]);
   });
 
   it("shows messenger thread list, storybook request card and footer actions", async () => {

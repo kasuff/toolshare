@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
+import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
@@ -9,7 +10,7 @@ import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories"
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../utils/searchFilters";
-import type { Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import type { PublicRating, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
 
 type Props = {
   token?: string;
@@ -172,6 +173,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
   const [isSelectingRangeEnd, setIsSelectingRangeEnd] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
+  const [workshopRatings, setWorkshopRatings] = useState<PublicRating[]>([]);
 
   useEffect(() => {
     const run = async () => {
@@ -253,6 +255,15 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       navigate(`/workshops/${openWorkshopId}`, { replace: true });
     }
   }, [items, navigate, openWorkshopId, selectedWorkshopId]);
+
+  useEffect(() => {
+    const workshopId = selectedWorkshop?.workshop.id;
+    if (!workshopId) {
+      setWorkshopRatings([]);
+      return;
+    }
+    void api.getRatingsForWorkshop(workshopId).then(setWorkshopRatings).catch(() => setWorkshopRatings([]));
+  }, [selectedWorkshop?.workshop.id]);
 
   const hasActiveFilters = Boolean(
     q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== 10 || radiusKm !== 5
@@ -910,6 +921,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     </span>
                   </div>
                 </section>
+
+                <RatingsSection
+                  ratings={workshopRatings}
+                  token={token}
+                  canReport={currentUser?.id !== selectedWorkshop.workshop.ownerId}
+                />
               </div>
 
               {currentUser?.id !== selectedWorkshop.workshop.ownerId && (

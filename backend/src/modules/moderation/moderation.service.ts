@@ -1,21 +1,30 @@
 import { AppError } from "../../utils/app-error";
 import { notificationsService } from "../notifications/notifications.service";
+import { ratingsService } from "../ratings/ratings.service";
 import { suspensionRepository } from "../users/suspension.repository";
 import { moderationRepository } from "./moderation.repository";
 
 type ReportRow = Awaited<ReturnType<typeof moderationRepository.listOpenReports>>[number];
+type RatingRow = Awaited<ReturnType<typeof moderationRepository.findRatingsByIds>>[number];
 
 function enrichReport(
   report: ReportRow,
   tools: Awaited<ReturnType<typeof moderationRepository.findToolsByIds>>,
   workshops: Awaited<ReturnType<typeof moderationRepository.findWorkshopsByIds>>,
   users: Awaited<ReturnType<typeof moderationRepository.findUsersByIds>>,
+  ratings: RatingRow[],
   moderators: Awaited<ReturnType<typeof moderationRepository.findUsersByIds>>
 ) {
   let targetLabel = report.targetId;
   let targetHref: string | null = null;
   let subjectUserId: string | null = null;
   let subjectUserName: string | null = null;
+  let ratingPreview: {
+    score: number;
+    comment: string | null;
+    fromUserName: string;
+    listingLabel: string | null;
+  } | null = null;
 
   if (report.targetType === "TOOL") {
     const tool = tools.find((t) => t.id === report.targetId);
@@ -32,6 +41,20 @@ function enrichReport(
       targetHref = `/workshops?open=${workshop.id}`;
       subjectUserId = workshop.managerId;
       subjectUserName = workshop.manager.name;
+    }
+  } else if (report.targetType === "RATING") {
+    const rating = ratings.find((entry) => entry.id === report.targetId);
+    if (rating) {
+      const listingLabel = rating.booking.tool?.name ?? rating.booking.timeslot?.workshop?.name ?? null;
+      targetLabel = `Bewertung (${rating.score} Sterne)`;
+      subjectUserId = rating.fromUserId;
+      subjectUserName = rating.fromUser.name;
+      ratingPreview = {
+        score: rating.score,
+        comment: rating.comment,
+        fromUserName: rating.fromUser.name,
+        listingLabel
+      };
     }
   } else {
     const user = users.find((u) => u.id === report.targetId);
@@ -57,6 +80,7 @@ function enrichReport(
     targetHref,
     subjectUserId,
     subjectUserName,
+    ratingPreview,
     bookingId: report.bookingId,
     reason: report.reason,
     details: report.details,
@@ -74,24 +98,26 @@ async function enrichReports(reports: ReportRow[]) {
   const toolIds = reports.filter((r) => r.targetType === "TOOL").map((r) => r.targetId);
   const workshopIds = reports.filter((r) => r.targetType === "WORKSHOP").map((r) => r.targetId);
   const userIds = reports.filter((r) => r.targetType === "USER").map((r) => r.targetId);
+  const ratingIds = reports.filter((r) => r.targetType === "RATING").map((r) => r.targetId);
   const moderatorIds = [
     ...new Set(reports.map((r) => r.moderatorId).filter((id): id is string => Boolean(id)))
   ];
 
-  const [tools, workshops, users, moderators] = await Promise.all([
+  const [tools, workshops, users, ratings, moderators] = await Promise.all([
     moderationRepository.findToolsByIds(toolIds),
     moderationRepository.findWorkshopsByIds(workshopIds),
     moderationRepository.findUsersByIds(userIds),
+    moderationRepository.findRatingsByIds(ratingIds),
     moderationRepository.findUsersByIds(moderatorIds)
   ]);
 
-  return reports.map((report) => enrichReport(report, tools, workshops, users, moderators));
+  return reports.map((report) => enrichReport(report, tools, workshops, users, ratings, moderators));
 }
 
 export const moderationService = {
   createReport(input: {
     reporterId: string;
-    targetType: "TOOL" | "WORKSHOP" | "USER";
+    targetType: "TOOL" | "WORKSHOP" | "USER" | "RATING";
     targetId: string;
     bookingId?: string;
     reason: string;
@@ -170,6 +196,14 @@ export const moderationService = {
       input.moderatorId,
       input.decisionNote?.trim()
     );
+
+    if (input.status === "RESOLVED" && report.targetType === "RATING") {
+      await ratingsService.hideFromModeration(
+        report.targetId,
+        input.moderatorId,
+        input.decisionNote?.trim()
+      );
+    }
 
     if (input.warnUserId && input.warningReason) {
       await notificationsService.createWarning(input.warnUserId, input.warningReason);

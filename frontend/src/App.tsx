@@ -355,7 +355,7 @@ function AppWithProviders() {
           path="profile"
           element={
             <RequireAuth token={token}>
-              <ProfileSettingsPage currentUser={currentUser ?? undefined} onSave={updateProfile} />
+              <ProfileSettingsPage currentUser={currentUser ?? undefined} token={token ?? undefined} onSave={updateProfile} />
             </RequireAuth>
           }
         />

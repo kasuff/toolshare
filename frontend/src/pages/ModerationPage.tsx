@@ -13,7 +13,8 @@ type DialogMode = "warn" | "suspend" | null;
 const targetTypeLabel: Record<ModerationReport["targetType"], string> = {
   TOOL: "Werkzeug",
   WORKSHOP: "Werkstatt",
-  USER: "Nutzer"
+  USER: "Nutzer",
+  RATING: "Bewertung"
 };
 
 const statusPresentation: Record<
@@ -64,6 +65,17 @@ function ReportSummary({ report, showDecision }: { report: ModerationReport; sho
         <strong>Meldegrund:</strong> {report.reason}
       </p>
       {report.details && <p>{report.details}</p>}
+
+      {report.ratingPreview && (
+        <div className="moderation-rating-preview">
+          <p>
+            <strong>{report.ratingPreview.fromUserName}</strong> · {report.ratingPreview.score} von 5 Sternen
+            {report.ratingPreview.listingLabel ? ` · ${report.ratingPreview.listingLabel}` : ""}
+          </p>
+          {report.ratingPreview.comment && <p className="moderation-rating-preview-comment">„{report.ratingPreview.comment}“</p>}
+          <p className="hint">Bei Bestätigung wird die Bewertung ausgeblendet.</p>
+        </div>
+      )}
 
       {showDecision && (
         <div className="moderation-decision-box">
@@ -252,21 +264,16 @@ export function ModerationPage({ token }: Props) {
   const { pushToast } = useToast();
   const [reports, setReports] = useState<ModerationReport[]>([]);
   const [closedReports, setClosedReports] = useState<ModerationReport[]>([]);
-  const [ratings, setRatings] = useState<
-    Array<{ id: string; score: number; comment?: string; createdAt: string; fromUser?: { name?: string } }>
-  >([]);
 
   const loadData = async () => {
     if (!token) return;
     try {
-      const [nextReports, nextClosedReports, nextRatings] = await Promise.all([
+      const [nextReports, nextClosedReports] = await Promise.all([
         api.listReports(token),
-        api.listClosedReports(token),
-        api.getRatingsReceived(token)
+        api.listClosedReports(token)
       ]);
       setReports(nextReports);
       setClosedReports(nextClosedReports);
-      setRatings(nextRatings);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Moderationsdaten konnten nicht geladen werden.", "error");
     }
@@ -338,22 +345,6 @@ export function ModerationPage({ token }: Props) {
             </ul>
           )}
         </details>
-      </Surface>
-
-      <Surface title="Bewertungen (eingehend)">
-        {ratings.length === 0 ? (
-          <EmptyState title="Keine Bewertungen" text="Es sind derzeit keine eingehenden Bewertungen vorhanden." />
-        ) : (
-          <ul className="meta-list">
-            {ratings.map((rating) => (
-              <li key={rating.id}>
-                {new Date(rating.createdAt).toLocaleString()} | Score {rating.score} | von{" "}
-                {rating.fromUser?.name ?? "Unbekannt"}
-                {rating.comment ? ` | "${rating.comment}"` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
       </Surface>
     </section>
   );
