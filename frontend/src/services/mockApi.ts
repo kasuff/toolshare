@@ -56,12 +56,19 @@ export const api = {
     saveDb(db);
   },
 
-  getTools(filters: { q?: string; category?: string } = {}): Tool[] {
+  getTools(filters: { q?: string; category?: string; ownerId?: string } = {}): Tool[] {
     const db = loadDb();
     const q = (filters.q || "").trim().toLowerCase();
     const category = (filters.category || "").trim().toLowerCase();
     return db.tools
       .filter((t) => {
+        const owner = db.users.find((user) => user.id === t.ownerId);
+        if (!filters.ownerId && owner?.isSuspended) {
+          return false;
+        }
+        if (filters.ownerId && t.ownerId !== filters.ownerId) {
+          return false;
+        }
         const qMatch =
           !q ||
           t.name.toLowerCase().includes(q) ||
@@ -93,6 +100,10 @@ export const api = {
     const toolFilter = (filters.toolFilter || "").trim().toLowerCase();
     return db.workshops
       .filter((w) => {
+        const owner = db.users.find((user) => user.id === w.ownerId);
+        if (owner?.isSuspended) {
+          return false;
+        }
         const baseMatch =
           !q ||
           w.name.toLowerCase().includes(q) ||

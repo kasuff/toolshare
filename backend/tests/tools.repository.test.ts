@@ -50,6 +50,7 @@ describe("toolsRepository", () => {
       where: {
         ownerId: "owner-1",
         status: "AVAILABLE",
+        owner: undefined,
         category: { contains: "elektro", mode: "insensitive" },
         OR: [
           { name: { contains: "bohr", mode: "insensitive" } },
@@ -63,13 +64,28 @@ describe("toolsRepository", () => {
           select: {
             id: true,
             name: true,
-            role: true
+            role: true,
+            isSuspended: true
           }
         }
       },
       orderBy: { createdAt: "desc" }
     });
     expect(result).toEqual([{ id: "t1" }]);
+  });
+
+  it("excludes tools from suspended owners when requested", async () => {
+    mocks.toolFindMany.mockResolvedValueOnce([]);
+
+    await toolsRepository.list({ excludeSuspendedOwners: true });
+
+    expect(mocks.toolFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          owner: { isSuspended: false }
+        })
+      })
+    );
   });
 
   it("finds tool by id and active bookings", async () => {
@@ -86,7 +102,8 @@ describe("toolsRepository", () => {
           select: {
             id: true,
             name: true,
-            role: true
+            role: true,
+            isSuspended: true
           }
         }
       }

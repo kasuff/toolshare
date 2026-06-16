@@ -6,11 +6,13 @@ export const toolsRepository = {
     status?: "AVAILABLE" | "REQUESTED" | "BORROWED";
     ownerId?: string;
     search?: string;
+    excludeSuspendedOwners?: boolean;
   }) {
     return prisma.tool.findMany({
       where: {
         ownerId: filters.ownerId,
         status: filters.status,
+        owner: filters.excludeSuspendedOwners ? { isSuspended: false } : undefined,
         category: filters.category
           ? { contains: filters.category, mode: "insensitive" }
           : undefined,
@@ -28,7 +30,8 @@ export const toolsRepository = {
           select: {
             id: true,
             name: true,
-            role: true
+            role: true,
+            isSuspended: true
           }
         }
       },
@@ -44,7 +47,8 @@ export const toolsRepository = {
           select: {
             id: true,
             name: true,
-            role: true
+            role: true,
+            isSuspended: true
           }
         }
       }

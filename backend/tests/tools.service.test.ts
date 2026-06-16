@@ -29,12 +29,16 @@ describe("toolsService", () => {
 
     const result = await toolsService.list({ search: "bohr", category: "elektro" });
 
-    expect(mockedToolsRepository.list).toHaveBeenCalledWith({ search: "bohr", category: "elektro" });
+    expect(mockedToolsRepository.list).toHaveBeenCalledWith({
+      search: "bohr",
+      category: "elektro",
+      excludeSuspendedOwners: true
+    });
     expect(result).toEqual([{ id: "t1" }]);
   });
 
   it("returns tool by id with merged active booking ranges", async () => {
-    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1" } as any);
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", owner: { isSuspended: false } } as any);
     mockedToolsRepository.findActiveBookingRanges.mockResolvedValueOnce([
       { id: "b1", startDate: new Date(), endDate: new Date(), status: "ACCEPTED" }
     ] as any);
@@ -44,6 +48,15 @@ describe("toolsService", () => {
     expect(mockedToolsRepository.findActiveBookingRanges).toHaveBeenCalledWith("t1");
     expect(result).toMatchObject({ id: "t1" });
     expect((result as any).bookings).toHaveLength(1);
+  });
+
+  it("hides tools from suspended owners", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", owner: { isSuspended: true } } as any);
+
+    await expect(toolsService.getById("t1")).rejects.toMatchObject({
+      code: "TOOL_NOT_FOUND",
+      status: 404
+    });
   });
 
   it("throws for unknown tool id", async () => {
@@ -56,7 +69,7 @@ describe("toolsService", () => {
   });
 
   it("returns blocking periods for an existing tool", async () => {
-    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1" } as any);
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", owner: { isSuspended: false } } as any);
     mockedToolsRepository.listBlockingPeriods.mockResolvedValueOnce([
       {
         startDate: new Date("2026-07-06T09:00:00.000Z"),
