@@ -173,8 +173,8 @@ describe("InboxPage", () => {
     expect(screen.queryByRole("heading", { name: "Nachrichten" })).not.toBeInTheDocument();
     const backButton = screen.getByRole("button", { name: "Zurück zur Chatliste" });
     expect(backButton).toBeInTheDocument();
-    expect(backButton.closest(".inbox-messenger-title-row")).toBeTruthy();
-    expect(backButton.closest(".messenger-chat-header")).toBeNull();
+    expect(backButton.closest(".messenger-chat-header")).toBeTruthy();
+    expect(backButton.closest(".inbox-messenger-title-row")).toBeNull();
   });
 
   it("returns to the thread list on small screens when back is pressed", async () => {

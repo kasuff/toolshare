@@ -5525,31 +5525,26 @@ button .material-symbols-outlined {
   gap: var(--space-2);
 }
 
-.inbox-messenger-back-button {
+.messenger-back-button {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  margin-left: -0.35rem;
+  width: 2rem;
+  height: 2rem;
+  margin-right: -0.15rem;
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
 }
 
-.inbox-messenger-back-button:hover,
-.inbox-messenger-back-button:focus-visible {
+.messenger-back-button:hover,
+.messenger-back-button:focus-visible {
   color: var(--color-text);
   background: var(--color-surface-soft);
 }
 
-.inbox-messenger-back-button .material-symbols-outlined {
+.messenger-back-button .material-symbols-outlined {
   font-size: 1.35rem;
-}
-
-.inbox-messenger-title-row--chat-open {
-  min-height: 2.25rem;
-  margin-bottom: calc(-1 * var(--space-2));
 }
 
 .inbox-loading-hint {
@@ -6377,7 +6372,9 @@ button .material-symbols-outlined {
   }
 
   .messenger-chat-header {
-    align-items: flex-start;
+    align-items: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
   }
 
   .messenger-chat-header-actions {
