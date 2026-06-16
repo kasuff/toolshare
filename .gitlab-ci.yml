@@ -93,7 +93,7 @@ workflow:
 
 frontend:lint:
   stage: lint
-  image: node:20-alpine
+  image: node:20.19-alpine   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
   extends: .frontend_cache
   cache:
     policy: pull-push   # lint runs first -> it seeds the shared npm cache
@@ -109,7 +109,10 @@ frontend:lint:
 
 frontend:test:
   stage: test
-  image: node:20-slim   # glibc (debian) -> avoids intermittent musl/jsdom fork crashes
+  # glibc (debian) -> avoids intermittent musl/jsdom fork crashes; pinned to
+  # 20.19 because node:20 drifted to v20.20.2, whose x64 V8 JIT miscompiles and
+  # core-dumps workers ("Illegal instruction" in Runtime_CompileOptimized).
+  image: node:20.19-slim
   extends: .frontend_cache
   timeout: 15m
   variables:
@@ -135,7 +138,7 @@ frontend:test:
 
 backend:lint:
   stage: lint
-  image: node:20
+  image: node:20.19   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
   extends: .backend_cache
   cache:
     policy: pull-push   # lint runs first -> it seeds the shared npm cache
@@ -151,7 +154,7 @@ backend:lint:
 
 backend:test:
   stage: test
-  image: node:20
+  image: node:20.19   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
   services:
     - postgres:15
   variables:
@@ -726,7 +729,7 @@ pages:
 
 security:audit:
   stage: test
-  image: node:20
+  image: node:20.19   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
   allow_failure: true
   script:
     - (cd backend && npm audit --audit-level=moderate)
