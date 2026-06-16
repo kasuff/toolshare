@@ -9,6 +9,7 @@ import { api } from "../services/api";
 import { TOOL_CATEGORIES } from "../utils/categories";
 import { distanceBetweenLocations, isWithinRadius } from "../utils/searchFilters";
 import { formatOfferDistance } from "../utils/offerFormatting";
+import { pluralize } from "../utils/pluralize";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -103,7 +104,7 @@ export function ToolsPage({ token, currentUser }: Props) {
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
           <p className="result-summary">
-            {isLoading ? "Suche läuft..." : `${filteredTools.length} Ergebnis${filteredTools.length === 1 ? "" : "se"}`}
+            {isLoading ? "Suche läuft..." : pluralize(filteredTools.length, "Ergebnis", "Ergebnisse")}
           </p>
           {hasActiveFilters && (
             <button className="btn secondary" type="button" onClick={resetFilters}>

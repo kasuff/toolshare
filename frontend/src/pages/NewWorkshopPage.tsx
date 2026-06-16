@@ -13,6 +13,7 @@ import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
+import { pluralize } from "../utils/pluralize";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -374,7 +375,7 @@ export function NewWorkshopPage({ token }: Props) {
 
           <div className="workshop-slot-list-heading">
             <strong>Geplante Zeitfenster</strong>
-            <span>{slots.length === 0 ? "Noch keine Einträge" : `${slots.length} Einträge`}</span>
+            <span>{slots.length === 0 ? "Noch keine Einträge" : pluralize(slots.length, "Eintrag", "Einträge")}</span>
           </div>
           <div className={`time-slots-list ${showFieldError("slots") ? "input-invalid" : ""}`}>
             {slots.length > 0 ? (

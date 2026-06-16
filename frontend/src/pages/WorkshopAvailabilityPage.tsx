@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
+import { pluralize } from "../utils/pluralize";
 import type { User, Workshop, WorkshopSlot } from "../types/domain";
 
 type Props = {
@@ -286,7 +287,7 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
               <div className="workshop-card-content">
                   <h3>{workshop.workshop.name}</h3>
                   <p>{workshop.workshop.location}</p>
-                  <span className="workshop-slots-count">{workshop.slots.length} Zeitfenster</span>
+                  <span className="workshop-slots-count">{pluralize(workshop.slots.length, "Zeitfenster", "Zeitfenster")}</span>
               </div>
             </button>
           ))}
