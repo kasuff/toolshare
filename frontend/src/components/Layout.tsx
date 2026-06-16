@@ -85,7 +85,12 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
         let count = countUnreadInboxThreads(bookings, userId, readIds);
         
         const unreadNotifications = notifications.filter(
-          (n) => !n.read && (n.message.startsWith("ERMAHNUNG:") || n.message.includes("wurde storniert") || n.message.includes("wurde gelöscht"))
+          (n) =>
+            !n.read &&
+            (n.message.startsWith("ERMAHNUNG:") ||
+              n.message.startsWith("SPERRUNG:") ||
+              n.message.includes("wurde storniert") ||
+              n.message.includes("wurde gelöscht"))
         );
         count += unreadNotifications.length;
 

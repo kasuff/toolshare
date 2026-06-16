@@ -54,6 +54,7 @@ describe("workshopsRepository", () => {
     expect(mocks.workshopFindMany).toHaveBeenCalledWith({
       where: {
         managerId: "manager-1",
+        manager: undefined,
         location: { contains: "muenchen", mode: "insensitive" },
         OR: [
           { name: { contains: "holz", mode: "insensitive" } },
@@ -65,7 +66,8 @@ describe("workshopsRepository", () => {
         manager: {
           select: {
             id: true,
-            name: true
+            name: true,
+            isSuspended: true
           }
         },
         workshopTools: {
@@ -81,6 +83,20 @@ describe("workshopsRepository", () => {
     expect(result).toEqual([{ id: "w1" }]);
   });
 
+  it("excludes workshops from suspended managers when requested", async () => {
+    mocks.workshopFindMany.mockResolvedValueOnce([]);
+
+    await workshopsRepository.list({ excludeSuspendedManagers: true });
+
+    expect(mocks.workshopFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          manager: { isSuspended: false }
+        })
+      })
+    );
+  });
+
   it("loads workshop details by id", async () => {
     mocks.workshopFindUnique.mockResolvedValueOnce({ id: "w1" });
 
@@ -92,7 +108,8 @@ describe("workshopsRepository", () => {
         manager: {
           select: {
             id: true,
-            name: true
+            name: true,
+            isSuspended: true
           }
         },
         workshopTools: {

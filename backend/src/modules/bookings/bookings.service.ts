@@ -2,6 +2,8 @@ import { AppError } from "../../utils/app-error";
 import { prisma } from "../../config/prisma";
 import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
+import { toolsService } from "../tools/tools.service";
+import { workshopsService } from "../workshops/workshops.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 import { assertBookingCanBeCompleted } from "./bookings.completion";
 
@@ -44,6 +46,8 @@ export const bookingsService = {
     ) {
       throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
+
+    await toolsService.getById(input.toolId);
 
     const result = await bookingsRepository.createToolBookingTransaction({
       userId: input.requesterId,
@@ -110,6 +114,8 @@ export const bookingsService = {
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate >= endDate) {
       throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
+
+    await workshopsService.getById(input.workshopId);
 
     const result = await bookingsRepository.createWorkshopBookingTransaction({
       userId: input.requesterId,

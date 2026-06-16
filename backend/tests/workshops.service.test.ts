@@ -32,16 +32,28 @@ describe("workshopsService", () => {
 
     const result = await workshopsService.list({ search: "holz" });
 
-    expect(mockedWorkshopsRepository.list).toHaveBeenCalledWith({ search: "holz" });
+    expect(mockedWorkshopsRepository.list).toHaveBeenCalledWith({
+      search: "holz",
+      excludeSuspendedManagers: true
+    });
     expect(result).toEqual([{ id: "w1" }]);
   });
 
   it("returns workshop by id", async () => {
-    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1" } as any);
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", manager: { isSuspended: false } } as any);
 
     const result = await workshopsService.getById("w1");
 
     expect(result).toMatchObject({ id: "w1" });
+  });
+
+  it("hides workshops from suspended managers", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", manager: { isSuspended: true } } as any);
+
+    await expect(workshopsService.getById("w1")).rejects.toMatchObject({
+      code: "WORKSHOP_NOT_FOUND",
+      status: 404
+    });
   });
 
   it("throws when workshop is missing", async () => {

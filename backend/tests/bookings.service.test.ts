@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
 import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
+import { toolsService } from "../src/modules/tools/tools.service";
+import { workshopsService } from "../src/modules/workshops/workshops.service";
 import { bookingsService } from "../src/modules/bookings/bookings.service";
 
 const { prismaMock } = vi.hoisted(() => ({
@@ -45,12 +47,28 @@ vi.mock("../src/modules/notifications/notifications.repository", () => ({
   }
 }));
 
+vi.mock("../src/modules/tools/tools.service", () => ({
+  toolsService: {
+    getById: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/workshops/workshops.service", () => ({
+  workshopsService: {
+    getById: vi.fn()
+  }
+}));
+
 const mockedBookingsRepository = vi.mocked(bookingsRepository);
 const mockedNotificationsRepository = vi.mocked(notificationsRepository);
+const mockedToolsService = vi.mocked(toolsService);
+const mockedWorkshopsService = vi.mocked(workshopsService);
 
 describe("bookingsService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedToolsService.getById.mockResolvedValue({ id: "t1", owner: { isSuspended: false } } as any);
+    mockedWorkshopsService.getById.mockResolvedValue({ id: "w1", manager: { isSuspended: false } } as any);
   });
 
   it("creates a tool counter proposal with pickup and return times", async () => {
@@ -183,7 +201,7 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking when tool does not exist", async () => {
-    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce(null as any);
+    mockedToolsService.getById.mockRejectedValueOnce({ code: "TOOL_NOT_FOUND", status: 404 });
 
     await expect(
       bookingsService.createToolBooking({
@@ -194,6 +212,7 @@ describe("bookingsService", () => {
         pickupTime: "2026-06-01T09:00:00.000Z"
       })
     ).rejects.toMatchObject({ code: "TOOL_NOT_FOUND", status: 404 });
+    expect(mockedBookingsRepository.createToolBookingTransaction).not.toHaveBeenCalled();
   });
 
   it("rejects tool booking with invalid time range", async () => {
@@ -236,6 +255,7 @@ describe("bookingsService", () => {
       pickupTime: "2026-06-01T09:00:00.000Z"
     });
 
+    expect(mockedToolsService.getById).toHaveBeenCalledWith("t1");
     expect(mockedBookingsRepository.createToolBookingTransaction).toHaveBeenCalled();
     expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner-1", expect.stringContaining("Ausleihanfrage"));
     expect(result).toMatchObject({ id: "b1" });
@@ -255,6 +275,7 @@ describe("bookingsService", () => {
       workshopToolIds: ["wt-1"]
     });
 
+    expect(mockedWorkshopsService.getById).toHaveBeenCalledWith("workshop-1");
     expect(mockedBookingsRepository.createWorkshopBookingTransaction).toHaveBeenCalledWith({
       userId: "user-1",
       workshopId: "workshop-1",

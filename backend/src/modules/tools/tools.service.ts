@@ -12,12 +12,18 @@ export const toolsService = {
     ownerId?: string;
     search?: string;
   }) {
-    return toolsRepository.list(filters);
+    return toolsRepository.list({
+      ...filters,
+      excludeSuspendedOwners: !filters.ownerId
+    });
   },
 
   async getById(id: string) {
     const tool = await toolsRepository.findById(id);
     if (!tool) {
+      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
+    }
+    if (tool.owner.isSuspended) {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
     return tool;

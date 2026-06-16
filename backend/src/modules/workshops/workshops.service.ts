@@ -3,12 +3,18 @@ import { workshopsRepository } from "./workshops.repository";
 
 export const workshopsService = {
   list(filters: { managerId?: string; location?: string; search?: string }) {
-    return workshopsRepository.list(filters);
+    return workshopsRepository.list({
+      ...filters,
+      excludeSuspendedManagers: !filters.managerId
+    });
   },
 
   async getById(id: string) {
     const workshop = await workshopsRepository.findById(id);
     if (!workshop) {
+      throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
+    }
+    if (workshop.manager.isSuspended) {
       throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
     }
     return workshop;

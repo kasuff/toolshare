@@ -35,6 +35,27 @@ interface ParsedWarning {
   hint: string;
 }
 
+function parseSuspensionMessage(message: string): { reason: string } {
+  if (!message.startsWith("SPERRUNG:")) {
+    return { reason: message };
+  }
+
+  const content = message.replace("SPERRUNG:", "").trim();
+  const reasonLine = content.split("\n").find((line) => line.trim().startsWith("Grund:"));
+  return {
+    reason: reasonLine ? reasonLine.replace("Grund:", "").trim() : content
+  };
+}
+
+function isInboxSystemNotification(message: string): boolean {
+  return (
+    message.startsWith("ERMAHNUNG:") ||
+    message.startsWith("SPERRUNG:") ||
+    message.includes("wurde storniert") ||
+    message.includes("wurde gelöscht")
+  );
+}
+
 function parseWarningMessage(message: string): ParsedWarning {
   if (!message.startsWith("ERMAHNUNG:")) {
     return { reason: message, moderator: "Moderator", hint: "" };
@@ -162,13 +183,15 @@ export function InboxPage({ currentUser, token }: Props) {
         timeslotProposals: booking.timeslotProposals ?? []
       })),
       ...notifications
-        .filter((n) => {
-          const m = n.message;
-          return m.startsWith("ERMAHNUNG:") || m.includes("wurde storniert") || m.includes("wurde gelöscht");
-        })
+        .filter((n) => isInboxSystemNotification(n.message))
         .map((n) => {
           const isWarning = n.message.startsWith("ERMAHNUNG:");
-          const parsed = isWarning ? parseWarningMessage(n.message) : { reason: n.message, moderator: "System", hint: "" };
+          const isSuspension = n.message.startsWith("SPERRUNG:");
+          const parsed = isWarning
+            ? parseWarningMessage(n.message)
+            : isSuspension
+              ? { reason: parseSuspensionMessage(n.message).reason, moderator: "Administration", hint: "" }
+              : { reason: n.message, moderator: "System", hint: "" };
           return {
             id: n.id,
             type: "SYSTEM_WARNING" as BookingType,
@@ -178,7 +201,7 @@ export function InboxPage({ currentUser, token }: Props) {
             createdIso: n.createdIso,
             providerName: parsed.moderator,
             requesterName: currentUser?.name ?? "Du",
-            toolName: isWarning ? "Ermahnung der Moderation" : "System-Benachrichtigung",
+            toolName: isWarning ? "Ermahnung der Moderation" : isSuspension ? "Kontosperrung" : "System-Benachrichtigung",
             pickupProposals: [],
             timeslotProposals: [],
             selectedWorkshopTools: [],
@@ -594,10 +617,21 @@ export function InboxPage({ currentUser, token }: Props) {
                 </div>
                 <div className="messenger-chat-header-actions">
                   <StatusPill
-                    label={selectedBooking.type === "SYSTEM_WARNING" ? (selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ? "Verwarnung" : "Info") : bookingStatusLabel[selectedBooking.status]}
+                    label={
+                      selectedBooking.type === "SYSTEM_WARNING"
+                        ? selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:")
+                          ? "Verwarnung"
+                          : selectedBooking.systemWarningText?.startsWith("SPERRUNG:")
+                            ? "Gesperrt"
+                            : "Info"
+                        : bookingStatusLabel[selectedBooking.status]
+                    }
                     tone={
                       selectedBooking.type === "SYSTEM_WARNING"
-                        ? (selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ? "danger" : "neutral")
+                        ? selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ||
+                          selectedBooking.systemWarningText?.startsWith("SPERRUNG:")
+                          ? "danger"
+                          : "neutral"
                         : selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
                           ? "success"
                           : selectedBooking.status === "ABGELEHNT"
@@ -664,6 +698,22 @@ export function InboxPage({ currentUser, token }: Props) {
                           </div>
                         );
                       })()}
+                    </RequestMessageCard>
+                    ) : selectedBooking.systemWarningText?.startsWith("SPERRUNG:") ? (
+                    <RequestMessageCard
+                      label="Kontosperrung"
+                      title="Dein Konto wurde gesperrt"
+                      icon="block"
+                    >
+                      <div className="warning-card-body" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>Grund der Sperrung:</p>
+                        <blockquote style={{ margin: 0, padding: '8px 12px', borderLeft: '4px solid #dc2626', background: 'rgba(220, 38, 38, 0.08)', fontStyle: 'italic', borderRadius: '0 4px 4px 0' }}>
+                          {parseSuspensionMessage(selectedBooking.systemWarningText ?? "").reason}
+                        </blockquote>
+                        <p style={{ margin: 0, fontSize: '0.9em', color: '#6b7280' }}>
+                          Deine Angebote sind vorübergehend ausgeblendet. Nach einer Entsperrung sind sie wieder sichtbar.
+                        </p>
+                      </div>
                     </RequestMessageCard>
                     ) : (
                     <RequestMessageCard
@@ -1205,6 +1255,9 @@ function counterparty(booking: Booking, currentUserId: string): { name: string }
 
 function getThreadPreview(row: BookingRow, currentUserId: string): string {
   if (row.type === "SYSTEM_WARNING") {
+    if (row.systemWarningText?.startsWith("SPERRUNG:")) {
+      return parseSuspensionMessage(row.systemWarningText).reason;
+    }
     const parsed = parseWarningMessage(row.systemWarningText ?? "");
     return parsed.reason;
   }
