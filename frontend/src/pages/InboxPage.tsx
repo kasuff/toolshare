@@ -594,7 +594,7 @@ export function InboxPage({ currentUser, token }: Props) {
         >
           <aside className="messenger-thread-list" aria-label="Konversationen">
             {sortedRows.map((booking) => {
-              const active = selectedBookingId === booking.id;
+              const active = selectedBooking?.id === booking.id;
               const cp = counterparty(booking, currentUser.id);
               const preview = getThreadPreview(booking, currentUser.id);
               const lastAt = getLastActivityMs(booking);
