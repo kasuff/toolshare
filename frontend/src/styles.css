@@ -5643,6 +5643,12 @@ button .material-symbols-outlined {
   white-space: nowrap;
 }
 
+.messenger-chat-header--compact .messenger-chat-header-text strong {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .messenger-chat-header-sub {
   font-size: 0.85rem;
   color: var(--color-text-muted);
@@ -6245,6 +6251,10 @@ button .material-symbols-outlined {
   .messenger-chat-header-text strong,
   .request-message-card-heading h3 {
     font-size: 20px;
+  }
+
+  .messenger-chat-header--compact .messenger-chat-header-text strong {
+    font-size: 1.05rem;
   }
 
   .messenger-chat-header {
