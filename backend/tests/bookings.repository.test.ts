@@ -75,13 +75,15 @@ describe("bookingsRepository", () => {
         OR: [
           { userId: "user-1" },
           { tool: { ownerId: "user-1" } },
+          { workshop: { managerId: "user-1" } },
           { timeslot: { workshop: { managerId: "user-1" } } }
         ]
       },
       include: {
         user: true,
         tool: { include: { owner: true } },
-        timeslot: { include: { workshop: { include: { manager: true } } } },
+        workshop: { include: { manager: { select: { id: true, name: true } } } },
+        timeslot: { include: { workshop: { include: { manager: { select: { id: true, name: true } } } } } },
         selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
           orderBy: { createdAt: "asc" },
@@ -109,6 +111,7 @@ describe("bookingsRepository", () => {
       where: { id: "booking-1" },
       include: {
         tool: true,
+        workshop: true,
         timeslot: { include: { workshop: true } },
         selectedTools: { include: { workshopTool: true } }
       }

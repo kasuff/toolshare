@@ -18,6 +18,8 @@ RUN npm ci
 COPY . .
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_GRAFANA_URL=/grafana
+ENV VITE_GRAFANA_URL=$VITE_GRAFANA_URL
 RUN npm run build
 
 FROM nginx:1.27-alpine AS prod

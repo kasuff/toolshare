@@ -27,3 +27,12 @@ export const refreshSchema = z.object({
   params: z.object({}),
   query: z.object({})
 });
+
+export const changePasswordSchema = z.object({
+  body: z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8)
+  }),
+  params: z.object({}),
+  query: z.object({})
+});

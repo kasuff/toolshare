@@ -11,7 +11,10 @@ export const workshopsService = {
     if (!workshop) {
       throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
     }
-    return workshop;
+    // Belegte Zeiträume separat laden, damit auch Altbuchungen via timeslotId
+    // (nicht nur direkter workshopId-FK) im Kalender als belegt erscheinen.
+    const bookings = await workshopsRepository.findActiveBookingRanges(id);
+    return { ...workshop, bookings };
   },
 
   create(input: {

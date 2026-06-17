@@ -2,18 +2,74 @@ import { AppError } from "../../utils/app-error";
 import { prisma } from "../../config/prisma";
 import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
+import { systemRulesService } from "../system-rules/system-rules.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 import { assertBookingCanBeCompleted } from "./bookings.completion";
 
 const BLOCKING_BOOKING_STATUSES: Array<"PENDING" | "ACCEPTED"> = ["PENDING", "ACCEPTED"];
 
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+// Erzwingt die buchungsbezogenen Systemregeln (Vorlauf, Vorausbuchungszeit und
+// – nur bei Werkzeugen – die maximale Ausleihdauer). Die Werte stammen live aus
+// den Admin-Systemeinstellungen, Änderungen wirken also sofort.
+async function assertBookingRules(
+  startDate: Date,
+  endDate: Date,
+  options: { checkLoanDuration: boolean }
+): Promise<void> {
+  const values = await systemRulesService.getValues();
+  const now = Date.now();
+
+  const leadMs = values.minBookingLeadTimeHours * HOUR_MS;
+  if (startDate.getTime() - now < leadMs) {
+    throw new AppError(
+      "BOOKING_LEAD_TIME",
+      `Buchungen müssen mindestens ${values.minBookingLeadTimeHours} Stunden im Voraus erfolgen.`,
+      400
+    );
+  }
+
+  const advanceMs = values.maxAdvanceBookingDays * DAY_MS;
+  if (startDate.getTime() - now > advanceMs) {
+    throw new AppError(
+      "BOOKING_TOO_FAR_AHEAD",
+      `Buchungen sind höchstens ${values.maxAdvanceBookingDays} Tage im Voraus möglich.`,
+      400
+    );
+  }
+
+  if (options.checkLoanDuration) {
+    const maxDurationMs = values.maxLoanDurationDays * DAY_MS;
+    if (endDate.getTime() - startDate.getTime() > maxDurationMs) {
+      throw new AppError(
+        "BOOKING_TOO_LONG",
+        `Die maximale Ausleihdauer beträgt ${values.maxLoanDurationDays} Tage.`,
+        400
+      );
+    }
+  }
+}
+
 function getProviderId(booking: {
   tool?: { ownerId: string } | null;
+  workshop?: { managerId: string } | null;
   timeslot?: { workshop?: { managerId: string } | null } | null;
 }): string | null {
   if (booking.tool?.ownerId) return booking.tool.ownerId;
+  if (booking.workshop?.managerId) return booking.workshop.managerId;
   if (booking.timeslot?.workshop?.managerId) return booking.timeslot.workshop.managerId;
   return null;
+}
+
+/** Werkstatt-ID einer Buchung – bevorzugt die direkte Relation, fällt auf Altdaten (Zeitslot) zurück. */
+function getWorkshopId(booking: {
+  workshopId?: string | null;
+  workshop?: { id: string } | null;
+  timeslot?: { workshopId: string } | null;
+}): string | null {
+  return booking.workshopId ?? booking.workshop?.id ?? booking.timeslot?.workshopId ?? null;
 }
 
 export const bookingsService = {
@@ -44,6 +100,8 @@ export const bookingsService = {
     ) {
       throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
+
+    await assertBookingRules(startDate, endDate, { checkLoanDuration: true });
 
     const result = await bookingsRepository.createToolBookingTransaction({
       userId: input.requesterId,
@@ -111,6 +169,8 @@ export const bookingsService = {
       throw new AppError("INVALID_TIME_RANGE", "Invalid booking time range", 400);
     }
 
+    await assertBookingRules(startDate, endDate, { checkLoanDuration: false });
+
     const result = await bookingsRepository.createWorkshopBookingTransaction({
       userId: input.requesterId,
       workshopId: input.workshopId,
@@ -129,18 +189,8 @@ export const bookingsService = {
         409
       );
     }
-    if (result === "OUTSIDE_AVAILABILITY") {
-      throw new AppError(
-        "WORKSHOP_TIMESLOT_INVALID",
-        "Requested workshop range must be fully inside an available workshop slot",
-        409
-      );
-    }
     if (result === "BLOCKED") {
       throw new AppError("TIMESLOT_BLOCKED", "Timeslot is blocked by workshop owner", 409);
-    }
-    if (result === "TOOLS_REQUIRED") {
-      throw new AppError("WORKSHOP_TOOLS_REQUIRED", "At least one required tool must be selected", 400);
     }
     if (result === "TOOLS_INVALID") {
       throw new AppError(
@@ -152,7 +202,7 @@ export const bookingsService = {
     if (result === null) {
       throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
     }
-    const providerId = result.timeslot?.workshop?.managerId ?? null;
+    const providerId = result.workshop?.managerId ?? result.timeslot?.workshop?.managerId ?? null;
     if (providerId && providerId !== input.requesterId) {
       await notificationsRepository.create(providerId, "Neue Buchungsanfrage für deine Werkstatt.");
     }
@@ -399,8 +449,9 @@ export const bookingsService = {
     if (booking.status !== "PENDING") {
       throw new AppError("INVALID_STATE", "Booking is not open for negotiation", 400);
     }
-    if (!booking.timeslot) {
-      throw new AppError("TIMESLOT_NOT_FOUND", "Timeslot not found", 404);
+    const workshopId = getWorkshopId(booking);
+    if (!workshopId) {
+      throw new AppError("TIMESLOT_NOT_FOUND", "Workshop not found", 404);
     }
 
     const proposedStartDate = new Date(input.startDate);
@@ -427,7 +478,7 @@ export const bookingsService = {
     await ensureWorkshopProposalCanUseRange(
       booking.id,
       booking.selectedTools,
-      booking.timeslot.workshopId,
+      workshopId,
       proposedStartDate,
       proposedEndDate
     );
@@ -468,6 +519,7 @@ export const bookingsService = {
         booking: {
           include: {
             tool: true,
+            workshop: true,
             selectedTools: { include: { workshopTool: true } },
             timeslot: { include: { workshop: true } }
           }
@@ -486,8 +538,9 @@ export const bookingsService = {
     }
 
     const booking = proposalRow.booking;
-    if (!booking.timeslot) {
-      throw new AppError("TIMESLOT_NOT_FOUND", "Timeslot not found", 404);
+    const workshopId = getWorkshopId(booking);
+    if (!workshopId) {
+      throw new AppError("TIMESLOT_NOT_FOUND", "Workshop not found", 404);
     }
     const providerId = getProviderId(booking);
     if (!providerId) {
@@ -515,10 +568,10 @@ export const bookingsService = {
       });
     }
 
-    const { availabilitySlotId } = await ensureWorkshopProposalCanUseRange(
+    await ensureWorkshopProposalCanUseRange(
       booking.id,
       booking.selectedTools,
-      booking.timeslot.workshopId,
+      workshopId,
       proposalRow.proposedStartDate,
       proposalRow.proposedEndDate
     );
@@ -540,7 +593,7 @@ export const bookingsService = {
         where: { id: input.bookingId },
         data: {
           status: "ACCEPTED",
-          timeslotId: availabilitySlotId,
+          workshopId,
           startDate: proposalRow.proposedStartDate,
           endDate: proposalRow.proposedEndDate
         }
@@ -566,6 +619,7 @@ async function ensureWorkshopProposalCanUseRange(
   startDate: Date,
   endDate: Date
 ) {
+  // Eine Werkstatt ist standardmäßig verfügbar. Nur vom Anbieter blockierte Zeiten sperren den Zeitraum.
   const overlappingBlockedSlot = await prisma.timeSlot.findFirst({
     where: {
       workshopId,
@@ -578,27 +632,10 @@ async function ensureWorkshopProposalCanUseRange(
     throw new AppError("TIMESLOT_BLOCKED", "Timeslot is blocked by workshop owner", 409);
   }
 
-  const availabilitySlot = await prisma.timeSlot.findFirst({
-    where: {
-      workshopId,
-      blockedByOwner: false,
-      startTime: { lte: startDate },
-      endTime: { gte: endDate }
-    },
-    orderBy: { startTime: "asc" }
-  });
-  if (!availabilitySlot) {
-    throw new AppError(
-      "WORKSHOP_TIMESLOT_INVALID",
-      "Alternative workshop range must be fully inside an available workshop slot",
-      409
-    );
-  }
-
   const existingBooking = await prisma.booking.findFirst({
     where: {
       id: { not: bookingId },
-      timeslot: { workshopId },
+      OR: [{ workshopId }, { timeslot: { workshopId } }],
       status: { in: BLOCKING_BOOKING_STATUSES },
       startDate: { lt: endDate },
       endDate: { gt: startDate }
@@ -614,6 +651,4 @@ async function ensureWorkshopProposalCanUseRange(
   if (!allBelongToWorkshop) {
     throw new AppError("WORKSHOP_TOOLS_INVALID", "Selected tools are invalid for this workshop booking", 400);
   }
-
-  return { availabilitySlotId: availabilitySlot.id };
 }

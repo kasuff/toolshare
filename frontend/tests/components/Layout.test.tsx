@@ -165,7 +165,7 @@ describe("Layout", () => {
 
     fireEvent.click(toggle);
     expect(screen.getByRole("button", { name: "Navigation schließen" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("navigation")).toHaveClass("nav-open");
+    expect(screen.getAllByRole("navigation")[0]).toHaveClass("nav-open");
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByRole("button", { name: "Navigation öffnen" })).toHaveAttribute("aria-expanded", "false");
@@ -173,6 +173,6 @@ describe("Layout", () => {
     fireEvent.click(screen.getByRole("button", { name: "Navigation öffnen" }));
     fireEvent.click(screen.getByRole("link", { name: "Werkzeuge" }));
     expect(await screen.findByText("Tools")).toBeInTheDocument();
-    expect(screen.getByRole("navigation")).not.toHaveClass("nav-open");
+    expect(screen.getAllByRole("navigation")[0]).not.toHaveClass("nav-open");
   });
 });

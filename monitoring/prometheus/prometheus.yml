@@ -1,0 +1,63 @@
+global:
+  scrape_interval: 15s        # Wie oft Metriken abgerufen werden
+  evaluation_interval: 15s    # Wie oft Alert-Regeln ausgewertet werden
+  scrape_timeout: 10s
+
+  external_labels:
+    environment: "toolshare"
+    cluster: "local"
+
+# Alert-Regeln laden
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+# Alertmanager (optional, für spätere Alert-Weiterleitung per E-Mail/Slack)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+scrape_configs:
+
+  # ── Prometheus selbst ──────────────────────────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+    relabel_configs:
+      - target_label: service
+        replacement: prometheus
+
+  # ── Node Exporter (Server-Metriken: CPU, RAM, Disk, Network) ──────────────
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          service: "node-exporter"
+          instance: "toolshare-host"
+
+  # ── Toolshare Backend (/metrics Endpunkt) ─────────────────────────────────
+  - job_name: "toolshare-backend"
+    static_configs:
+      - targets: ["backend:4000"]
+        labels:
+          service: "backend"
+          app: "toolshare"
+    metrics_path: /metrics
+    # Scrape alle 10s für feinere Auflösung bei App-Metriken
+    scrape_interval: 10s
+
+  # ── Loki (interne Metriken) ────────────────────────────────────────────────
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+        labels:
+          service: "loki"
+    metrics_path: /metrics
+
+  # ── Grafana (interne Metriken) ─────────────────────────────────────────────
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+        labels:
+          service: "grafana"
+    metrics_path: /metrics

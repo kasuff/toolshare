@@ -54,6 +54,8 @@ export interface Tool {
   pickupLocation?: string;
   pickupLocationNote?: string;
   status: ToolStatus;
+  /** Belegte Zeiträume (aktive Buchungen) – für die Kalenderansicht. */
+  bookedRanges?: WorkshopBookedRange[];
 }
 
 export interface WorkshopSlot {
@@ -62,6 +64,12 @@ export interface WorkshopSlot {
   startIso: string;
   endIso: string;
   blockedByOwner: boolean;
+}
+
+/** Belegter Zeitraum einer Werkstatt (aktive Buchung) – für die Kalenderansicht. */
+export interface WorkshopBookedRange {
+  startIso: string;
+  endIso: string;
 }
 
 export interface WorkshopToolItem {

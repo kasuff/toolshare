@@ -146,11 +146,19 @@ export function InboxPage({ currentUser, token }: Props) {
     }
   }, [location.state, sortedRows, selectedBookingId]);
 
+  const prevSelectedBookingIdRef = useRef<string | null>(null);
   useEffect(() => {
-    setShowUserReportForm(false);
-    setReportReason("");
-    setReportDetails("");
-    setCounterFormBookingId(null);
+    // Nur bei einem echten Threadwechsel die offenen Formulare leeren. Das erste
+    // Festlegen (null -> erste ID) passiert asynchron nach dem ersten Render via
+    // Auto-Auswahl; würde es hier zurücksetzen, könnte es ein gerade per Klick
+    // geöffnetes Formular sofort wieder schließen (Race Auto-Auswahl vs. Klick).
+    if (prevSelectedBookingIdRef.current !== null && prevSelectedBookingIdRef.current !== selectedBookingId) {
+      setShowUserReportForm(false);
+      setReportReason("");
+      setReportDetails("");
+      setCounterFormBookingId(null);
+    }
+    prevSelectedBookingIdRef.current = selectedBookingId;
   }, [selectedBookingId]);
 
   const selectedBooking =

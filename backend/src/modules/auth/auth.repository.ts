@@ -16,6 +16,20 @@ export const authRepository = {
     });
   },
 
+  findCredentialsById(id: string) {
+    return prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        passwordHash: true
+      }
+    });
+  },
+
+  updatePassword(id: string, passwordHash: string) {
+    return prisma.user.update({ where: { id }, data: { passwordHash } });
+  },
+
   createUser(input: {
     email: string;
     passwordHash: string;

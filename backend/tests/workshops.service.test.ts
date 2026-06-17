@@ -6,6 +6,7 @@ vi.mock("../src/modules/workshops/workshops.repository", () => ({
   workshopsRepository: {
     list: vi.fn(),
     findById: vi.fn(),
+    findActiveBookingRanges: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
@@ -36,12 +37,17 @@ describe("workshopsService", () => {
     expect(result).toEqual([{ id: "w1" }]);
   });
 
-  it("returns workshop by id", async () => {
+  it("returns workshop by id with merged active booking ranges", async () => {
     mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1" } as any);
+    mockedWorkshopsRepository.findActiveBookingRanges.mockResolvedValueOnce([
+      { id: "b1", startDate: new Date(), endDate: new Date(), status: "ACCEPTED" }
+    ] as any);
 
     const result = await workshopsService.getById("w1");
 
+    expect(mockedWorkshopsRepository.findActiveBookingRanges).toHaveBeenCalledWith("w1");
     expect(result).toMatchObject({ id: "w1" });
+    expect((result as any).bookings).toHaveLength(1);
   });
 
   it("throws when workshop is missing", async () => {

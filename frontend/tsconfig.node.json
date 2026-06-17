@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "outDir": ".tsbuild",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "skipLibCheck": true

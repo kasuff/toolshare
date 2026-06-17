@@ -26,6 +26,26 @@ type BlockingPeriod = {
   endIso: string;
 };
 
+type OwnerBlock = {
+  id: string;
+  startIso: string;
+  endIso: string;
+};
+
+const BLOCK_RANGE_FORMAT = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit"
+});
+
+function formatBlockRange(block: OwnerBlock) {
+  return `${BLOCK_RANGE_FORMAT.format(new Date(block.startIso))} – ${BLOCK_RANGE_FORMAT.format(
+    new Date(block.endIso)
+  )}`;
+}
+
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
 function toLocalDateKey(date: Date) {
@@ -107,6 +127,8 @@ export function ToolDetailPage({ token, currentUser }: Props) {
 
   const [tool, setTool] = useState<Tool | null>(null);
   const [blockingPeriods, setBlockingPeriods] = useState<BlockingPeriod[]>([]);
+  const [ownerBlocks, setOwnerBlocks] = useState<OwnerBlock[]>([]);
+  const [deletingBlockId, setDeletingBlockId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [startTime, setStartTime] = useState("10:00");
@@ -136,6 +158,17 @@ export function ToolDetailPage({ token, currentUser }: Props) {
         if (foundTool) {
           setTool(foundTool);
           setBlockingPeriods(periods);
+          // Für den Eigentümer zusätzlich die eigenen Blockaden (mit id) laden, damit
+          // er sie wieder entfernen kann.
+          if (token && currentUser?.id === foundTool.ownerId) {
+            try {
+              setOwnerBlocks(await api.getToolOwnerBlocks(id, token));
+            } catch {
+              setOwnerBlocks([]);
+            }
+          } else {
+            setOwnerBlocks([]);
+          }
         } else {
           pushToast("Werkzeug nicht gefunden.", "error");
           navigate("/tools");
@@ -148,7 +181,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       }
     };
     void loadTool();
-  }, [id, token, navigate, pushToast]);
+  }, [id, token, navigate, pushToast, currentUser?.id]);
 
   const isAvailable = tool?.status === "VERFUEGBAR";
   const isOwnTool = Boolean(tool && currentUser?.id === tool.ownerId);
@@ -249,11 +282,37 @@ export function ToolDetailPage({ token, currentUser }: Props) {
     try {
       await api.createToolOwnerBlock({ toolId: tool.id, startIso, endIso }, token);
       setBlockingPeriods((current) => [...current, { startIso, endIso }]);
+      // Liste der eigenen Blockaden aktualisieren, damit die neue Blockade entfernbar ist.
+      try {
+        setOwnerBlocks(await api.getToolOwnerBlocks(tool.id, token));
+      } catch {
+        /* Liste bleibt unverändert, falls das Nachladen fehlschlägt */
+      }
       pushToast("Werkzeug wurde für deinen Eigenbedarf blockiert.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht blockiert werden.", "error");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const removeOwnerBlock = async (block: OwnerBlock) => {
+    if (!tool || !token) return;
+    setDeletingBlockId(block.id);
+    try {
+      await api.deleteToolOwnerBlock(tool.id, block.id, token);
+      setOwnerBlocks((current) => current.filter((entry) => entry.id !== block.id));
+      // Kalender-Sperrzeiten frisch laden, damit der freigegebene Zeitraum wieder buchbar ist.
+      try {
+        setBlockingPeriods(await api.getToolBlockingPeriods(tool.id));
+      } catch {
+        /* Sperrzeiten bleiben unverändert, falls das Nachladen fehlschlägt */
+      }
+      pushToast("Blockierung wurde aufgehoben.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Blockierung konnte nicht aufgehoben werden.", "error");
+    } finally {
+      setDeletingBlockId(null);
     }
   };
 
@@ -540,6 +599,31 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                     : "Der Anbieter muss deine Anfrage noch bestätigen."}
                 </p>
               </div>
+
+              {isOwnTool && ownerBlocks.length > 0 && (
+                <div className="booking-section owner-blocks">
+                  <div className="booking-section-title">
+                    <span />
+                    <strong>Deine blockierten Zeiträume</strong>
+                  </div>
+                  <ul className="owner-blocks-list">
+                    {ownerBlocks.map((block) => (
+                      <li key={block.id} className="owner-blocks-item">
+                        <span className="owner-blocks-range">{formatBlockRange(block)}</span>
+                        <button
+                          type="button"
+                          className="owner-blocks-remove"
+                          onClick={() => void removeOwnerBlock(block)}
+                          disabled={deletingBlockId === block.id}
+                          aria-label="Blockierung aufheben"
+                        >
+                          {deletingBlockId === block.id ? "Wird entfernt..." : "Entfernen"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </>
           ) : (
             <>

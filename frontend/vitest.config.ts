@@ -12,9 +12,16 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     pool: 'forks',
-    // A single long-lived fork accumulates enough jsdom and V8 coverage data
-    // to be killed by the memory-constrained GitLab runner near the end.
-    maxWorkers: process.env.CI ? 2 : undefined,
+    maxWorkers: process.env.CI ? 1 : undefined,
+    poolOptions: {
+      forks: {
+        // In CI, run all test files in one long-lived fork instead of
+        // spawning/tearing down a process per file. That removes the
+        // process churn that intermittently triggers
+        // "Worker exited unexpectedly" on the memory-constrained runner.
+        singleFork: !!process.env.CI,
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],
