@@ -110,7 +110,6 @@ function ReportActions({
     try {
       await api.updateReportStatus(report.id, payload, token);
       await onDone();
-      pushToast("Meldung bearbeitet.", "success");
       setDialogMode(null);
       setActionReason("");
       setDecisionNote("");
@@ -124,7 +123,6 @@ function ReportActions({
   const reject = () => {
     const note = decisionNote.trim();
     if (note.length < 3) {
-      pushToast("Bitte eine Begründung für die Ablehnung eintragen (min. 3 Zeichen).", "error");
       return;
     }
     void runUpdate({ status: "REJECTED", decisionNote: note });
@@ -134,7 +132,6 @@ function ReportActions({
     event.preventDefault();
     const reason = actionReason.trim();
     if (reason.length < 3) {
-      pushToast("Bitte einen Grund angeben (min. 3 Zeichen).", "error");
       return;
     }
     if (!subjectId) {

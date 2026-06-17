@@ -98,7 +98,6 @@ export function NewWorkshopPage({ token }: Props) {
 
   const addSlot = () => {
     if (!slot.startDate || !slot.startTime || !slot.endDate || !slot.endTime) {
-      pushToast("Bitte gib Start und Ende für das Zeitfenster an.", "error");
       return;
     }
     const startIso = `${slot.startDate}T${slot.startTime}`;
@@ -121,9 +120,7 @@ export function NewWorkshopPage({ token }: Props) {
     event.preventDefault();
     setSubmitAttempted(true);
 
-    const firstError = Object.values(formErrors).find((error) => error !== null);
-    if (firstError) {
-      pushToast(firstError, "error");
+    if (Object.values(formErrors).some((error) => error !== null)) {
       return;
     }
 

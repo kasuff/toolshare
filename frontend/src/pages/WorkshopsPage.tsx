@@ -376,15 +376,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     const selectedToolIds = selectedToolIdsByWorkshop[workshopId] ?? [];
     const workshopItem = items.find((item) => item.workshop.id === workshopId);
     if (workshopItem && workshopItem.tools.length > 0 && selectedToolIds.length === 0) {
-      pushToast("Bitte mindestens ein Werkzeug aus der Ausstattung auswählen.", "error");
       return;
     }
 
     const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
     const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
-    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) {
-      pushToast("Bitte einen gültigen Zeitraum mit Start- und Endzeit angeben.", "error");
+    if (!startIso || !endIso) {
+      return;
+    }
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Das Ende muss nach dem Start liegen.", "error");
       return;
     }
 
@@ -413,8 +415,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
     const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
-    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) {
-      pushToast("Bitte einen gültigen Zeitraum mit Beginn und Ende angeben.", "error");
+    if (!startIso || !endIso) {
+      return;
+    }
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Das Ende muss nach dem Beginn liegen.", "error");
       return;
     }
     try {
@@ -465,7 +470,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
   const reportWorkshop = async (workshopId: string) => {
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     setIsReporting(true);

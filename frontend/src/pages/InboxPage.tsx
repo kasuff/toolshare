@@ -250,7 +250,6 @@ export function InboxPage({ currentUser, token }: Props) {
     try {
       await api.decideBooking(bookingId, accept ? "BESTAETIGT" : "ABGELEHNT", token);
       await loadData();
-      pushToast(`Anfrage ${accept ? "bestätigt" : "abgelehnt"}.`, "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Status konnte nicht gesetzt werden.", "error");
     }
@@ -266,7 +265,6 @@ export function InboxPage({ currentUser, token }: Props) {
     const pickupIso = combineLocalDateTimeToIso(draft?.pickupDate ?? "", draft?.pickupTime ?? "");
     const returnIso = combineLocalDateTimeToIso(draft?.returnDate ?? "", draft?.returnTime ?? "");
     if (!pickupIso || !returnIso) {
-      pushToast("Bitte Abholung und Rückgabe jeweils mit Datum und Uhrzeit wählen.", "error");
       return;
     }
     if (new Date(returnIso).getTime() <= new Date(pickupIso).getTime()) {
@@ -285,7 +283,6 @@ export function InboxPage({ currentUser, token }: Props) {
         [booking.id]: toToolRangeDraft(booking),
       }));
       setCounterFormBookingId(null);
-      pushToast("Alternativvorschlag gesendet.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Alternativvorschlag konnte nicht gesendet werden.", "error");
     }
@@ -301,7 +298,6 @@ export function InboxPage({ currentUser, token }: Props) {
     const startIso = combineLocalDateTimeToIso(draft?.startDate ?? "", draft?.startTime ?? "");
     const endIso = combineLocalDateTimeToIso(draft?.endDate ?? "", draft?.endTime ?? "");
     if (!startIso || !endIso) {
-      pushToast("Bitte Start- und Enddatum jeweils mit Uhrzeit wählen.", "error");
       return;
     }
     if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
@@ -317,7 +313,6 @@ export function InboxPage({ currentUser, token }: Props) {
       await loadData();
       setDraftWorkshopRangeByBooking((prev) => ({ ...prev, [booking.id]: toWorkshopDraft(booking) }));
       setCounterFormBookingId(null);
-      pushToast("Alternativzeitraum gesendet.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Alternativzeitraum konnte nicht gesendet werden.", "error");
     }
@@ -395,7 +390,6 @@ export function InboxPage({ currentUser, token }: Props) {
   const reportCurrentCounterparty = async () => {
     if (!token || !currentUser || !selectedBooking) return;
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     const counterpartId = selectedBooking.providerId === currentUser.id ? selectedBooking.requesterId : selectedBooking.providerId;

@@ -100,7 +100,6 @@ export function EditToolPage({ currentUser, token }: Props) {
       (!addressWasChanged && originalPickupLocation.trim().length >= 5);
 
     if (!name.trim() || description.trim().length < 5 || !category || !hasValidPickupLocation) {
-      pushToast("Bitte fülle alle Pflichtfelder vollständig aus.", "error");
       return;
     }
 

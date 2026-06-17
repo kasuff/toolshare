@@ -197,7 +197,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const requestTool = async () => {
     if (!tool) return;
     if (!startDate || !startTime || !endDate || !endTime) {
-      pushToast("Bitte Abhol- und Abgabedaten vollständig ausfüllen.", "error");
       return;
     }
     if (!token) {
@@ -234,7 +233,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const blockToolForOwnUse = async () => {
     if (!tool || !token) return;
     if (!startDate || !startTime || !endDate || !endTime) {
-      pushToast("Bitte Beginn und Ende des Eigenbedarfs vollständig ausfüllen.", "error");
       return;
     }
     const startIso = `${startDate}T${startTime}`;
@@ -289,7 +287,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const reportTool = async () => {
     if (!tool) return;
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     setIsReporting(true);

@@ -70,7 +70,6 @@ export function NewToolPage({ token }: Props) {
     e.preventDefault();
     setSubmitAttempted(true);
     if (Object.values(formErrors).some((error) => error !== null)) {
-      pushToast(formErrors.pickupLocation ?? "Bitte fülle alle Pflichtfelder aus.", "error");
       return;
     }
 

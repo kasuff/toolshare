@@ -317,9 +317,8 @@ describe("management pages", () => {
     );
 
     fireEvent.submit(screen.getByRole("button", { name: "Werkstatt einstellen" }).closest("form")!);
-    await waitFor(() => {
-      expect(pushToast).toHaveBeenCalledWith("Bitte gib einen Namen für die Werkstatt ein.", "error");
-    });
+    expect(await screen.findByText("Bitte gib einen Namen für die Werkstatt ein.")).toBeInTheDocument();
+    expect(pushToast).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByPlaceholderText("z.B. Garagen-Werkstatt"), { target: { value: "Maker Space" } });
     fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {
@@ -344,7 +343,8 @@ describe("management pages", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
-    expect(pushToast).toHaveBeenCalledWith("Bitte füge mindestens ein Zeitfenster hinzu.", "error");
+    expect(await screen.findByText("Bitte füge mindestens ein Zeitfenster hinzu.")).toBeInTheDocument();
+    expect(pushToast).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText("Startdatum"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "09:00" } });

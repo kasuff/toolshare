@@ -75,11 +75,9 @@ function AuthScreen({
           throw new Error("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.");
         }
         await onRegister({ email, password, name, address: payloadAddress });
-        pushToast("Konto erstellt und eingeloggt.", "success");
         return;
       }
       await onLogin(email, password);
-      pushToast("Erfolgreich eingeloggt.", "success");
     } catch (submitError) {
       pushToast(submitError instanceof Error ? submitError.message : "Authentifizierung fehlgeschlagen.", "error");
     } finally {
@@ -299,7 +297,6 @@ function AppWithProviders() {
 
   const handleLogout = () => {
     logout();
-    pushToast("Erfolgreich ausgeloggt.", "success");
   };
 
   return (
