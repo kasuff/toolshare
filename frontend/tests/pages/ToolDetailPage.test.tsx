@@ -57,9 +57,11 @@ describe("ToolDetailPage", () => {
     expect(title.parentElement).toHaveTextContent("Akkuschrauber BoschElektrowerkzeuge");
     expect(screen.getByRole("button", { name: "Akkuschrauber Bosch vergrößern" }).querySelector(".status-badge")).toBeNull();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Abholdatum")).toHaveAttribute("type", "date");
+    expect(screen.getByLabelText("Abholdatum")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Abholdatum")).toHaveAttribute("placeholder", "tt.mm.jjjj");
     expect(screen.getByLabelText("Abholzeit")).toHaveAttribute("type", "time");
-    expect(screen.getByLabelText("Abgabedatum")).toHaveAttribute("type", "date");
+    expect(screen.getByLabelText("Abgabedatum")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Abgabedatum")).toHaveAttribute("placeholder", "tt.mm.jjjj");
     expect(screen.getByLabelText("Abgabezeit")).toHaveAttribute("type", "time");
     expect(screen.getByRole("button", { name: "Nächste Monate" })).toBeInTheDocument();
 

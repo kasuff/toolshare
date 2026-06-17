@@ -114,11 +114,9 @@ export function ProfileSettingsPage({ currentUser, token, onSave }: Props) {
     const nextAddress = toAddressPayload(address);
 
     if (nextName.length < 2) {
-      pushToast("Name muss mindestens 2 Zeichen haben.", "error");
       return;
     }
     if (!isAddressComplete(address)) {
-      pushToast("Bitte Straße, Hausnummer, PLZ und Ort vollständig ausfüllen.", "error");
       return;
     }
 

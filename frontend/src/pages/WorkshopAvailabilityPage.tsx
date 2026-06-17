@@ -148,7 +148,6 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
   const validateSlot = (candidate: SlotDraft) => {
     if (!candidate.startIso || !candidate.endIso) {
-      pushToast("Bitte Start und Ende für das Zeitfenster angeben.", "error");
       return false;
     }
     if (new Date(candidate.startIso) >= new Date(candidate.endIso)) {
@@ -160,7 +159,6 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
   const addSlot = async () => {
     if (!selectedWorkshop || !token) {
-      pushToast("Bitte wählen Sie eine Werkstatt aus.", "error");
       return;
     }
     if (!validateSlot(draft)) return;

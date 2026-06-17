@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AddressInput } from "../components/AddressInput";
+import { DateInput } from "../components/DateInput";
 import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "../utils/address";
 import { Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
@@ -9,6 +10,7 @@ import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/Wo
 import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
+import { pluralize } from "../utils/pluralize";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -95,7 +97,6 @@ export function NewWorkshopPage({ token }: Props) {
 
   const addSlot = () => {
     if (!slot.startDate || !slot.startTime || !slot.endDate || !slot.endTime) {
-      pushToast("Bitte gib Start und Ende für das Zeitfenster an.", "error");
       return;
     }
     const startIso = `${slot.startDate}T${slot.startTime}`;
@@ -118,9 +119,7 @@ export function NewWorkshopPage({ token }: Props) {
     event.preventDefault();
     setSubmitAttempted(true);
 
-    const firstError = Object.values(formErrors).find((error) => error !== null);
-    if (firstError) {
-      pushToast(firstError, "error");
+    if (Object.values(formErrors).some((error) => error !== null)) {
       return;
     }
 
@@ -306,12 +305,11 @@ export function NewWorkshopPage({ token }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label="Startdatum"
-                      type="date"
                       className="booking-input"
                       value={slot.startDate}
-                      onChange={(event) => setSlot((current) => ({ ...current, startDate: event.target.value }))}
+                      onChange={(value) => setSlot((current) => ({ ...current, startDate: value }))}
                     />
                   </label>
                   <label>
@@ -331,13 +329,12 @@ export function NewWorkshopPage({ token }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label="Enddatum"
-                      type="date"
                       className="booking-input"
                       value={slot.endDate}
                       min={slot.startDate}
-                      onChange={(event) => setSlot((current) => ({ ...current, endDate: event.target.value }))}
+                      onChange={(value) => setSlot((current) => ({ ...current, endDate: value }))}
                     />
                   </label>
                   <label>
@@ -364,7 +361,7 @@ export function NewWorkshopPage({ token }: Props) {
 
           <div className="workshop-slot-list-heading">
             <strong>Blockierte Zeiten</strong>
-            <span>{slots.length === 0 ? "Noch keine Einträge" : `${slots.length} Einträge`}</span>
+            <span>{slots.length === 0 ? "Noch keine Einträge" : pluralize(slots.length, "Eintrag", "Einträge")}</span>
           </div>
           <div className={`time-slots-list ${showFieldError("slots") ? "input-invalid" : ""}`}>
             {slots.length > 0 ? (

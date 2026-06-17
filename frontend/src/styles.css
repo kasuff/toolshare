@@ -36,10 +36,13 @@
 html,
 body,
 #root {
+  width: 100%;
+  max-width: 100%;
   height: 100%;
   margin: 0;
   color: var(--color-text);
-  overflow-x: clip;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 a {
@@ -80,6 +83,67 @@ textarea,
 select,
 button {
   font: inherit;
+}
+
+input[type="date"],
+input[type="datetime-local"],
+input[type="date"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit {
+  text-transform: lowercase;
+}
+
+.date-input-control {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.date-input-control > input:not(.date-input-picker-native) {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.date-input-picker-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 44px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-brand);
+  cursor: pointer;
+}
+
+.date-input-picker-button:hover,
+.date-input-picker-button:focus-visible {
+  background: transparent;
+  color: var(--color-brand-strong);
+}
+
+.date-input-calendar-icon {
+  font-size: 20px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.date-input-picker-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.date-input-control.is-disabled .date-input-picker-button {
+  cursor: not-allowed;
 }
 
 button:disabled {
@@ -798,6 +862,7 @@ button.mini {
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
+  padding: 0;
 }
 
 .new-workshop-form .capacity-display {
@@ -2499,79 +2564,71 @@ summary {
   height: 20px;
 }
 
-.toast-viewport {
+.toast-backdrop {
   position: fixed;
-  left: var(--space-4);
-  bottom: var(--space-4);
-  z-index: 60;
+  inset: 0;
+  z-index: 140;
   display: grid;
-  gap: var(--space-2);
-  width: min(420px, calc(100% - 2rem));
+  place-items: center;
+  padding: var(--space-4);
+  background: rgba(17, 24, 39, 0.36);
+  backdrop-filter: blur(2px);
 }
 
-.toast {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: #fff;
-  box-shadow: var(--shadow-md);
-  padding: var(--space-3) var(--space-4);
+.toast-viewport {
+  width: min(100%, 30rem);
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 32px;
+  gap: var(--space-2);
+}
+
+.toast-popup {
+  position: relative;
+  width: 100%;
+  min-height: 8rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, #fff);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 244, 237, 0.42), rgba(255, 255, 255, 0) 42%),
+    var(--color-surface);
+  box-shadow: 0 24px 60px -32px rgba(17, 24, 39, 0.58), var(--shadow-soft);
+  padding: var(--space-6) calc(var(--space-6) + 36px) var(--space-6) var(--space-6);
+  display: grid;
   align-items: center;
   gap: var(--space-3);
   animation: toast-enter 180ms ease-out;
 }
 
-.toast p {
+.toast-popup p {
   margin: 0;
   color: var(--color-text);
-  font-size: 14px;
-  line-height: 21px;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
-.toast-icon {
-  font-size: 22px;
-}
-
-.toast.success {
-  border-color: #86efac;
-}
-
-.toast.success .toast-icon {
-  color: var(--color-success);
-}
-
-.toast.error {
-  border-color: #fca5a5;
-}
-
-.toast.error .toast-icon {
-  color: var(--color-danger);
-}
-
-.toast.info {
-  border-color: var(--color-brand);
-}
-
-.toast.info .toast-icon {
-  color: var(--color-brand);
-}
-
-.toast .icon-button {
-  width: 32px;
-  height: 32px;
+.toast-popup .icon-button {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: 9999px;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
-.toast .icon-button:hover {
+.toast-popup .icon-button:hover,
+.toast-popup .icon-button:focus-visible {
   color: var(--color-brand-strong);
   background: var(--color-brand-soft);
+  box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.12);
+  outline: none;
 }
 
-.toast .icon-button .material-symbols-outlined {
+.toast-popup .icon-button .material-symbols-outlined {
   font-size: 20px;
 }
 
@@ -2624,17 +2681,17 @@ summary {
 @keyframes toast-enter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .global-progress-bar,
-  .toast {
+  .toast-popup {
     animation: none;
   }
 }
@@ -5118,13 +5175,16 @@ button.danger:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+  align-items: start;
 }
 
 .workshop-calendar-month {
   display: grid;
   gap: var(--space-2);
+  align-content: start;
 }
 
+.workshop-calendar-month h3,
 .workshop-calendar-month h4 {
   margin: 0;
   font-size: 14px;
@@ -5136,14 +5196,18 @@ button.danger:hover {
 .workshop-calendar {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 28px;
   gap: 3px;
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: #fff;
+  align-content: start;
 }
 
 .workshop-calendar-weekday {
+  display: grid;
+  align-items: center;
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 700;

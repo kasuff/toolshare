@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DateInput } from "../components/DateInput";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { api } from "../services/api";
@@ -229,7 +230,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const requestTool = async () => {
     if (!tool) return;
     if (!startDate || !startTime || !endDate || !endTime) {
-      pushToast("Bitte Abhol- und Abgabedaten vollständig ausfüllen.", "error");
       return;
     }
     if (!token) {
@@ -266,7 +266,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const blockToolForOwnUse = async () => {
     if (!tool || !token) return;
     if (!startDate || !startTime || !endDate || !endTime) {
-      pushToast("Bitte Beginn und Ende des Eigenbedarfs vollständig ausfüllen.", "error");
       return;
     }
     const startIso = `${startDate}T${startTime}`;
@@ -347,7 +346,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const reportTool = async () => {
     if (!tool) return;
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     setIsReporting(true);
@@ -525,12 +523,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label={isOwnTool ? "Startdatum Eigenbedarf" : "Abholdatum"}
-                      type="date"
                       value={startDate}
                       min={defaults.startDate}
-                      onChange={(event) => setStartDate(event.target.value)}
+                      onChange={setStartDate}
                       className="booking-input"
                     />
                   </label>
@@ -557,12 +554,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label={isOwnTool ? "Enddatum Eigenbedarf" : "Abgabedatum"}
-                      type="date"
                       value={endDate}
                       min={startDate}
-                      onChange={(event) => setEndDate(event.target.value)}
+                      onChange={setEndDate}
                       className="booking-input"
                     />
                   </label>

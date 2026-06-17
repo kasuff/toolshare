@@ -31,5 +31,10 @@ describe("ToastProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "Meldung auslösen" }));
 
     expect(screen.getAllByText("Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.")).toHaveLength(1);
+    expect(screen.getByText("Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.").closest(".toast-popup")).toBeInTheDocument();
+    expect(screen.queryByText("error")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Meldung schlie/i }));
+    expect(screen.queryByText("Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.")).not.toBeInTheDocument();
   });
 });

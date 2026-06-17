@@ -321,9 +321,8 @@ describe("management pages", () => {
     );
 
     fireEvent.submit(screen.getByRole("button", { name: "Werkstatt einstellen" }).closest("form")!);
-    await waitFor(() => {
-      expect(pushToast).toHaveBeenCalledWith("Bitte gib einen Namen für die Werkstatt ein.", "error");
-    });
+    expect(await screen.findByText("Bitte gib einen Namen für die Werkstatt ein.")).toBeInTheDocument();
+    expect(pushToast).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByPlaceholderText("z.B. Garagen-Werkstatt"), { target: { value: "Maker Space" } });
     fireEvent.change(screen.getByPlaceholderText(/helle Werkstatt/i), {

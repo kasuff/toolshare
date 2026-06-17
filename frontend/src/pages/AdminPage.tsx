@@ -115,7 +115,6 @@ export function AdminPage({ currentUser, token }: Props) {
     try {
       await api.updateUserSuspension(userId, nextIsSuspended, token);
       await loadData(appliedSearch);
-      pushToast(nextIsSuspended ? "Nutzer wurde gesperrt." : "Nutzer wurde entsperrt.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Sperrstatus konnte nicht aktualisiert werden.", "error");
     } finally {

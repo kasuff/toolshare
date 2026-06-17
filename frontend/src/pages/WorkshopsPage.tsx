@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
@@ -13,6 +14,7 @@ import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../utils/searchFilters";
 import { formatOfferDistance } from "../utils/offerFormatting";
+import { pluralize } from "../utils/pluralize";
 import type { Tool, User, Workshop, WorkshopBookedRange, WorkshopSlot } from "../types/domain";
 
 type Props = {
@@ -385,15 +387,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     const selectedToolIds = selectedToolIdsByWorkshop[workshopId] ?? [];
     const workshopItem = items.find((item) => item.workshop.id === workshopId);
     if (workshopItem && workshopItem.tools.length > 0 && selectedToolIds.length === 0) {
-      pushToast("Bitte mindestens ein Werkzeug aus der Ausstattung auswählen.", "error");
       return;
     }
 
     const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
     const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
-    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) {
-      pushToast("Bitte einen gültigen Zeitraum mit Start- und Endzeit angeben.", "error");
+    if (!startIso || !endIso) {
+      return;
+    }
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Das Ende muss nach dem Start liegen.", "error");
       return;
     }
 
@@ -427,8 +431,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
     const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
-    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) {
-      pushToast("Bitte einen gültigen Zeitraum mit Beginn und Ende angeben.", "error");
+    if (!startIso || !endIso) {
+      return;
+    }
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Das Ende muss nach dem Beginn liegen.", "error");
       return;
     }
     try {
@@ -479,7 +486,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
   const reportWorkshop = async (workshopId: string) => {
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     setIsReporting(true);
@@ -619,7 +625,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="workshop-card-content">
                       <div className="workshop-card-heading">
                         <h3>{item.workshop.name}</h3>
-                        <span className="workshop-card-rating">{item.slots.length} Slots</span>
+                        <span className="workshop-card-rating">{pluralize(item.slots.length, "Slot", "Slots")}</span>
                       </div>
                       <p>
                         {item.workshop.location} · {item.workshop.maxCapacity} Plätze
@@ -660,7 +666,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
           <p className="result-summary">
-            {isLoading ? "Suche läuft..." : `${publicWorkshops.length} Ergebnis${publicWorkshops.length === 1 ? "" : "se"}`}
+            {isLoading ? "Suche läuft..." : pluralize(publicWorkshops.length, "Ergebnis", "Ergebnisse")}
           </p>
           {hasActiveFilters && (
             <button type="button" className="btn secondary" onClick={resetFilters}>
@@ -689,10 +695,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
             <div className="advanced-filter-fields">
               <div className="grid grid-2">
                 <Field label="Ausleihe von">
-                  <input type="date" value={borrowFrom} onChange={(e) => setBorrowFrom(e.target.value)} />
+                  <DateInput value={borrowFrom} onChange={setBorrowFrom} />
                 </Field>
                 <Field label="Ausleihe bis">
-                  <input type="date" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} />
+                  <DateInput value={borrowUntil} onChange={setBorrowUntil} />
                 </Field>
               </div>
               <div className="slider-row">
@@ -743,7 +749,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
               name={item.workshop.name}
               description={item.workshop.description}
               imageUrl={cardImage}
-              badgeLabel={`${availableSlotCount} ${availableSlotCount === 1 ? "Slot" : "Slots"}`}
+              badgeLabel={pluralize(availableSlotCount, "Slot", "Slots")}
               badgeUnavailable={availableSlotCount === 0}
               meta={formatOfferDistance(distance)}
               ownerName={ownerName}
@@ -825,6 +831,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                   <h2>{selectedWorkshop.workshop.name}</h2>
                   <div className="workshop-modal-meta">
                     <span className="status-pill neutral">{selectedWorkshop.workshop.maxCapacity} Plätze</span>
+                    <span className="status-pill neutral">{pluralize(selectedWorkshop.slots.length, "Zeitfenster", "Zeitfenster")}</span>
                     {currentUser && selectedWorkshop.workshop.ownerId === currentUser.id && (
                       <span className="status-pill warning">Eigene Werkstatt</span>
                     )}
@@ -882,7 +889,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <span className="ds-workshop-card-avatar">{getInitials(selectedWorkshop.workshop.ownerName ?? "Unbekannt")}</span>
                     <div>
                       <strong>{selectedWorkshop.workshop.ownerName ?? "Unbekannt"}</strong>
-                      <span>{selectedWorkshopOwnerOfferCount} Angebote</span>
+                      <span>{pluralize(selectedWorkshopOwnerOfferCount, "Angebot", "Angebote")}</span>
                     </div>
                   </div>
                 </section>
@@ -976,18 +983,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="booking-fields-row">
                       <label>
                         <span>Datum</span>
-                        <input
+                        <DateInput
                           id="workshop-booking-start-date"
                           aria-label={selectedWorkshopIsOwn ? "Startdatum Eigenbedarf" : "Abholdatum"}
-                          type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.startDate ?? ""}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setBookingDraftsByWorkshop((prev) => ({
                               ...prev,
                               [selectedWorkshop.workshop.id]: {
                                 ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                startDate: event.target.value
+                                startDate: value
                               }
                             }))
                           }
@@ -1024,18 +1030,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="booking-fields-row">
                       <label>
                         <span>Datum</span>
-                        <input
+                        <DateInput
                           aria-label={selectedWorkshopIsOwn ? "Enddatum Eigenbedarf" : "Abgabedatum"}
-                          type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.endDate ?? ""}
                           min={selectedWorkshopDraft?.startDate}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setBookingDraftsByWorkshop((prev) => ({
                               ...prev,
                               [selectedWorkshop.workshop.id]: {
                                 ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                endDate: event.target.value
+                                endDate: value
                               }
                             }))
                           }
@@ -1129,7 +1134,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                 </aside>
               )}
             </div>
-
 
             {selectedWorkshopManageMode && (
               <div className="workshop-modal-footer owner-detail-actions">
