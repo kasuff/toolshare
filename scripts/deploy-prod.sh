@@ -4,6 +4,7 @@ set -e
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 COMPOSE_FILE="$REPO_ROOT/docker-compose.prod.yml"
+MONITORING_COMPOSE_FILE="$REPO_ROOT/monitoring/docker-compose.yml"
 HEALTHCHECK_TIMEOUT_SECONDS="${HEALTHCHECK_TIMEOUT_SECONDS:-180}"
 HEALTHCHECK_INTERVAL_SECONDS="${HEALTHCHECK_INTERVAL_SECONDS:-5}"
 
@@ -25,16 +26,17 @@ compose_cmd() {
 }
 
 wait_for_containers() {
-	echo "Waiting for containers to become healthy/running..."
+	local file="$1"
+	echo "Waiting for containers to become healthy/running ($file)..."
 
 	local elapsed=0
 	local container_ids
 	local compose
 	compose="$(compose_cmd)"
-	container_ids="$($compose -f "$COMPOSE_FILE" ps -q)"
+	container_ids="$($compose -f "$file" ps -q)"
 
 	if [ -z "$container_ids" ]; then
-		echo "No containers found for compose file: $COMPOSE_FILE"
+		echo "No containers found for compose file: $file"
 		return 1
 	fi
 
@@ -84,22 +86,31 @@ wait_for_containers() {
 	done
 
 	echo "Timed out waiting for container health checks"
-	$compose -f "$COMPOSE_FILE" ps
+	$(compose_cmd) -f "$file" ps
 	return 1
 }
 
 echo "Starting production deployment..."
 
-echo "Stopping existing containers..."
 COMPOSE="$(compose_cmd)"
+
+# Stop monitoring first — it depends on toolshare-network which the app stack owns
+echo "Stopping monitoring stack..."
+$COMPOSE -f "$MONITORING_COMPOSE_FILE" down || true
+
+# Stop app stack and recreate network
+echo "Stopping app stack..."
 $COMPOSE -f "$COMPOSE_FILE" down --remove-orphans
 
-# Use Docker Compose to build and restart services
-# The -d flag runs the containers in the background
-# --no-deps prevents docker-compose from recreating dependencies (like the database)
-# --build forces a rebuild of the images
-COMPOSE="$(compose_cmd)"
+# Start app stack first (creates toolshare-network)
+echo "Starting app stack..."
 $COMPOSE -f "$COMPOSE_FILE" up -d --build
-wait_for_containers
+wait_for_containers "$COMPOSE_FILE"
+
+# Start monitoring stack (joins existing toolshare-network)
+# --build: Configs sind in die Images gebacken → bei Änderungen neu bauen.
+echo "Starting monitoring stack..."
+$COMPOSE -f "$MONITORING_COMPOSE_FILE" up -d --build
+wait_for_containers "$MONITORING_COMPOSE_FILE"
 
 echo "Deployment finished successfully!"

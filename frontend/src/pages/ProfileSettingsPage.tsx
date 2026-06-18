@@ -1,17 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { AddressInput } from "../components/AddressInput";
 import {
-  AddressInput,
   isAddressComplete,
   parseAddress,
   toAddressPayload,
   type AddressFormFields
-} from "../components/AddressInput";
-import { StarRatingDisplay } from "../components/StarRatingInput";
-import { EmptyState, Field, Surface } from "../components/ui";
+} from "../utils/address";
+import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import type { Rating, User } from "../types/domain";
+import type { User } from "../types/domain";
 
 type Props = {
   currentUser?: User;
@@ -24,21 +23,55 @@ export function ProfileSettingsPage({ currentUser, token, onSave }: Props) {
   const [name, setName] = useState(currentUser?.name ?? "");
   const [address, setAddress] = useState<AddressFormFields>(() => parseAddress(currentUser?.address));
   const [isSaving, setIsSaving] = useState(false);
-  const [receivedRatings, setReceivedRatings] = useState<Rating[]>([]);
-  const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+  const [isPasswordFormOpen, setIsPasswordFormOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  useEffect(() => {
-    if (!token) {
-      setReceivedRatings([]);
+  const resetPasswordForm = () => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const closePasswordForm = () => {
+    setIsPasswordFormOpen(false);
+    resetPasswordForm();
+  };
+
+  const onChangePassword = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!token) return;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      pushToast("Bitte alle Passwortfelder ausfüllen.", "error");
       return;
     }
-    setIsLoadingRatings(true);
-    void api
-      .getRatingsReceived(token)
-      .then(setReceivedRatings)
-      .catch(() => setReceivedRatings([]))
-      .finally(() => setIsLoadingRatings(false));
-  }, [token]);
+    if (newPassword.length < 8) {
+      pushToast("Das neue Passwort muss mindestens 8 Zeichen haben.", "error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      pushToast("Die beiden neuen Passwörter stimmen nicht überein.", "error");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      pushToast("Das neue Passwort muss sich vom aktuellen unterscheiden.", "error");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await api.changePassword(currentPassword, newPassword, token);
+      pushToast("Passwort wurde geändert.", "success");
+      closePasswordForm();
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Passwort konnte nicht geändert werden.", "error");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   useEffect(() => {
     setName(currentUser?.name ?? "");
@@ -81,11 +114,9 @@ export function ProfileSettingsPage({ currentUser, token, onSave }: Props) {
     const nextAddress = toAddressPayload(address);
 
     if (nextName.length < 2) {
-      pushToast("Name muss mindestens 2 Zeichen haben.", "error");
       return;
     }
     if (!isAddressComplete(address)) {
-      pushToast("Bitte Straße, Hausnummer, PLZ und Ort vollständig ausfüllen.", "error");
       return;
     }
 
@@ -114,13 +145,58 @@ export function ProfileSettingsPage({ currentUser, token, onSave }: Props) {
           <span>E-Mail</span>
           <a href={`mailto:${currentUser.email}`}>{currentUser.email}</a>
         </div>
-        <button
-          type="button"
-          className="btn profile-password-button"
-          onClick={() => pushToast("Die Passwortänderung ist derzeit noch nicht verfügbar.", "info")}
-        >
-          Passwort ändern
-        </button>
+        {!isPasswordFormOpen ? (
+          <button
+            type="button"
+            className="btn profile-password-button"
+            onClick={() => setIsPasswordFormOpen(true)}
+          >
+            Passwort ändern
+          </button>
+        ) : (
+          <form className="profile-password-form" onSubmit={onChangePassword}>
+            <Field label="Aktuelles Passwort">
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                autoComplete="current-password"
+                placeholder="Aktuelles Passwort"
+              />
+            </Field>
+            <Field label="Neues Passwort">
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                autoComplete="new-password"
+                placeholder="Mindestens 8 Zeichen"
+              />
+            </Field>
+            <Field label="Neues Passwort wiederholen">
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                placeholder="Neues Passwort erneut eingeben"
+              />
+            </Field>
+            <div className="row">
+              <button type="submit" className="btn" disabled={isChangingPassword}>
+                {isChangingPassword ? "Speichere..." : "Passwort ändern"}
+              </button>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={closePasswordForm}
+                disabled={isChangingPassword}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
       </Surface>
 
       <Surface title="Persönliche Daten" className="profile-settings-card">
@@ -140,33 +216,6 @@ export function ProfileSettingsPage({ currentUser, token, onSave }: Props) {
             {isSaving ? "Speichere..." : "Änderungen speichern"}
           </button>
         </form>
-      </Surface>
-
-      <Surface title="Erhaltene Bewertungen" className="profile-settings-card profile-ratings-card">
-        {isLoadingRatings ? (
-          <p className="hint">Laden…</p>
-        ) : receivedRatings.length === 0 ? (
-          <EmptyState title="Noch keine Bewertungen" text="Sobald Ausleiher dich bewerten, erscheinen die Bewertungen hier." />
-        ) : (
-          <ul className="profile-ratings-list">
-            {receivedRatings.map((rating) => (
-              <li key={rating.id} className="profile-ratings-item">
-                <div className="profile-ratings-head">
-                  <StarRatingDisplay score={rating.score} />
-                  <span className="profile-ratings-meta">
-                    {rating.fromUserName ?? "Nutzer"} · {new Date(rating.createdIso).toLocaleDateString("de-DE")}
-                  </span>
-                </div>
-                {rating.listingLabel && (
-                  <p className="hint profile-ratings-context">
-                    Zu {rating.listingType === "WORKSHOP" ? "Werkstatt" : "Werkzeug"}: {rating.listingLabel}
-                  </p>
-                )}
-                {rating.comment && <p className="profile-ratings-comment">{rating.comment}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
       </Surface>
     </section>
   );

@@ -5,8 +5,6 @@ import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 
 const fetchMock = vi.fn();
 
-vi.stubGlobal("fetch", fetchMock);
-
 function responseJson(body: unknown, init?: ResponseInit) {
   return {
     ok: (init?.status ?? 200) >= 200 && (init?.status ?? 200) < 300,
@@ -17,6 +15,7 @@ function responseJson(body: unknown, init?: ResponseInit) {
 
 beforeEach(() => {
   fetchMock.mockReset();
+  vi.stubGlobal("fetch", fetchMock);
 });
 
 describe("api service", () => {

@@ -12,7 +12,10 @@ export const toolsService = {
     ownerId?: string;
     search?: string;
   }) {
-    return toolsRepository.list(filters);
+    return toolsRepository.list({
+      ...filters,
+      excludeSuspendedOwners: !filters.ownerId
+    });
   },
 
   async getById(id: string) {
@@ -20,7 +23,12 @@ export const toolsService = {
     if (!tool) {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
-    return tool;
+    if (tool.owner.isSuspended) {
+      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
+    }
+    // Belegte Zeiträume mitliefern, damit der Kalender gebuchte Tage durchstreichen kann.
+    const bookings = await toolsRepository.findActiveBookingRanges(id);
+    return { ...tool, bookings };
   },
 
   async listBlockingPeriods(id: string) {
@@ -29,6 +37,34 @@ export const toolsService = {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
     return toolsRepository.listBlockingPeriods(id);
+  },
+
+  async listOwnerBlocks(id: string, requesterId: string) {
+    const tool = await toolsRepository.findById(id);
+    if (!tool) {
+      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
+    }
+    if (tool.ownerId !== requesterId) {
+      throw new AppError("FORBIDDEN", "Only the tool owner can view its blocks", 403);
+    }
+    return toolsRepository.listOwnerBlocks(id, requesterId);
+  },
+
+  async deleteOwnerBlock(input: { toolId: string; bookingId: string; actorId: string }) {
+    const tool = await toolsRepository.findById(input.toolId);
+    if (!tool) {
+      throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
+    }
+    if (tool.ownerId !== input.actorId) {
+      throw new AppError("FORBIDDEN", "Only the tool owner can delete its blocks", 403);
+    }
+    const result = await toolsRepository.deleteOwnerBlock(input.bookingId, input.actorId);
+    if (result === "NOT_FOUND") {
+      throw new AppError("BLOCK_NOT_FOUND", "Block not found", 404);
+    }
+    if (result === "FORBIDDEN") {
+      throw new AppError("FORBIDDEN", "Only the tool owner can delete its blocks", 403);
+    }
   },
 
   create(input: {

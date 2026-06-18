@@ -107,6 +107,7 @@ model Workshop {
   manager     User       @relation(fields: [managerId], references: [id], onDelete: Cascade)
   workshopTools WorkshopTool[]
   timeslots   TimeSlot[]
+  bookings    Booking[]
 }
 
 model WorkshopTool {
@@ -136,6 +137,7 @@ model Booking {
   userId     String
   toolId     String?
   timeslotId String?
+  workshopId String?
   status     BookingStatus @default(PENDING)
     startDate  DateTime
     endDate    DateTime
@@ -144,6 +146,7 @@ model Booking {
   user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   tool       Tool?         @relation(fields: [toolId], references: [id], onDelete: SetNull)
   timeslot   TimeSlot?     @relation(fields: [timeslotId], references: [id], onDelete: SetNull)
+  workshop   Workshop?     @relation(fields: [workshopId], references: [id], onDelete: SetNull)
   reports    Report[]
   ratings    Rating[]
   selectedTools BookingSelectedTool[]
@@ -152,6 +155,7 @@ model Booking {
 
   @@index([toolId, startDate, endDate])
   @@index([timeslotId])
+  @@index([workshopId, startDate, endDate])
 }
 
 model BookingSelectedTool {
@@ -265,4 +269,10 @@ model SuspensionRequest {
 
   @@index([status])
   @@index([userId])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Int
+  updatedAt DateTime @updatedAt
 }

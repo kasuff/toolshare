@@ -6,7 +6,7 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, createRating, getRatingsGiven, getRatingsReceived } = vi.hoisted(() => ({
+const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, createRating, getRatingsGiven, getRatingsReceived, getNotifications, markNotificationAsRead } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   decideBooking: vi.fn(),
   createPickupProposal: vi.fn(),
@@ -14,7 +14,9 @@ const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotP
   createReport: vi.fn(),
   createRating: vi.fn(),
   getRatingsGiven: vi.fn().mockResolvedValue([]),
-  getRatingsReceived: vi.fn().mockResolvedValue([])
+  getRatingsReceived: vi.fn().mockResolvedValue([]),
+  getNotifications: vi.fn().mockResolvedValue([]),
+  markNotificationAsRead: vi.fn().mockResolvedValue(undefined)
 }));
 
 vi.mock("../../src/services/api", () => ({
@@ -26,7 +28,9 @@ vi.mock("../../src/services/api", () => ({
     createReport,
     createRating,
     getRatingsGiven,
-    getRatingsReceived
+    getRatingsReceived,
+    getNotifications,
+    markNotificationAsRead,
   },
 }));
 
@@ -37,6 +41,20 @@ const currentUser = {
   role: "NUTZER" as const,
   isSuspended: false,
 };
+
+function mockMatchMedia(matches: boolean) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
 const baseOpenBooking = {
   id: "b1",
@@ -61,6 +79,9 @@ describe("InboxPage", () => {
     vi.clearAllMocks();
     getRatingsGiven.mockResolvedValue([]);
     getRatingsReceived.mockResolvedValue([]);
+    mockMatchMedia(false);
+    getNotifications.mockResolvedValue([]);
+    markNotificationAsRead.mockResolvedValue(undefined);
   });
 
   it("shows messenger thread list, storybook request card and footer actions", async () => {
@@ -134,6 +155,61 @@ describe("InboxPage", () => {
     expect(document.querySelector(".messenger-chat-header-text strong")).toHaveTextContent(
       "Gezielt geöffnete Anfrage"
     );
+  });
+
+  it("shows only the thread list on small screens until a chat is opened", async () => {
+    mockMatchMedia(true);
+    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadList = await screen.findByLabelText("Konversationen");
+    expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
+    expect(screen.queryByText("Ausleihanfrage")).not.toBeInTheDocument();
+    expect(document.querySelector(".messenger-shell")).not.toHaveClass("messenger-shell--chat-open");
+
+    fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
+
+    expect(document.querySelector(".messenger-shell")).toHaveClass("messenger-shell--chat-open");
+    expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Nachrichten" })).not.toBeInTheDocument();
+    expect(document.querySelector(".messenger-chat-header-text strong")).toHaveTextContent("Max Mustermann");
+    expect(document.querySelector(".messenger-chat-header-sub")).toHaveTextContent("Ausleihe · Offen");
+    expect(screen.queryByText("Offen", { selector: ".status-pill" })).not.toBeInTheDocument();
+    const backButton = screen.getByRole("button", { name: "Zurück zur Chatliste" });
+    expect(backButton).toBeInTheDocument();
+    expect(backButton.closest(".messenger-chat-header")).toBeTruthy();
+    expect(backButton.closest(".inbox-messenger-title-row")).toBeNull();
+  });
+
+  it("returns to the thread list on small screens when back is pressed", async () => {
+    mockMatchMedia(true);
+    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadList = await screen.findByLabelText("Konversationen");
+    fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
+    expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zur Chatliste" }));
+
+    expect(screen.queryByText("Ausleihanfrage")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nachrichten" })).toBeInTheDocument();
+    expect(document.querySelector(".messenger-shell")).not.toHaveClass("messenger-shell--chat-open");
+    expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
   });
 
   it("shows unread chats with a small count badge instead of a colored thread", async () => {
@@ -260,7 +336,7 @@ describe("InboxPage", () => {
       </ToastProvider>
     );
 
-    await screen.findByRole("heading", { name: "Nachrichten" });
+    await screen.findByRole("button", { name: /Test-Bohrer/, current: true }, { timeout: 5_000 });
     fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
     fireEvent.change(await screen.findByLabelText("Alternatives Abholdatum", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-06" },
@@ -331,7 +407,8 @@ describe("InboxPage", () => {
       </ToastProvider>
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Alternativvorschlag senden" }));
+    await screen.findByRole("button", { name: /Maker Space/, current: true }, { timeout: 5_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Alternativvorschlag senden" }));
     fireEvent.change(await screen.findByLabelText("Alternativdatum für Werkstattvorschlag", {}, { timeout: 5_000 }), {
       target: { value: "2026-05-08" }
     });

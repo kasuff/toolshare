@@ -1,7 +1,7 @@
 export type Role = "NUTZER" | "MODERATOR" | "ADMIN";
 export type ToolStatus = "VERFUEGBAR" | "AUSGELIEHEN";
 export type BookingStatus = "OFFEN" | "BESTAETIGT" | "ABGELEHNT" | "ABGESCHLOSSEN";
-export type BookingType = "TOOL" | "WORKSHOP";
+export type BookingType = "TOOL" | "WORKSHOP" | "SYSTEM_WARNING";
 
 export type PickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
 export type TimeslotProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
@@ -54,6 +54,8 @@ export interface Tool {
   pickupLocation?: string;
   pickupLocationNote?: string;
   status: ToolStatus;
+  /** Belegte Zeiträume (aktive Buchungen) – für die Kalenderansicht. */
+  bookedRanges?: WorkshopBookedRange[];
 }
 
 export interface WorkshopSlot {
@@ -62,6 +64,12 @@ export interface WorkshopSlot {
   startIso: string;
   endIso: string;
   blockedByOwner: boolean;
+}
+
+/** Belegter Zeitraum einer Werkstatt (aktive Buchung) – für die Kalenderansicht. */
+export interface WorkshopBookedRange {
+  startIso: string;
+  endIso: string;
 }
 
 export interface WorkshopToolItem {
@@ -109,6 +117,8 @@ export interface Booking {
   pickupProposals?: PickupProposal[];
   timeslotProposals?: TimeslotProposal[];
   selectedWorkshopTools?: BookingSelectedTool[];
+  systemWarningText?: string;
+  isNotificationRead?: boolean;
 }
 
 export interface Notification {

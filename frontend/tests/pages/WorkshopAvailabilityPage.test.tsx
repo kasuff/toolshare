@@ -37,7 +37,7 @@ describe("WorkshopAvailabilityPage", () => {
     expect(screen.getByRole("link", { name: "Einloggen" })).toHaveAttribute("href", "/auth");
   });
 
-  it("creates, updates, toggles and deletes timeslots for owned workshops", async () => {
+  it("creates, edits and frees blocked times for owned workshops", async () => {
     getWorkshops.mockResolvedValue([
       {
         workshop: {
@@ -57,7 +57,7 @@ describe("WorkshopAvailabilityPage", () => {
             id: "s1",
             startIso: "2026-05-08T08:00",
             endIso: "2026-05-08T10:00",
-            blockedByOwner: false
+            blockedByOwner: true
           }
         ]
       }
@@ -92,30 +92,22 @@ describe("WorkshopAvailabilityPage", () => {
 
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "2026-06-01T10:00" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "2026-06-01T12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
 
     await waitFor(() => expect(createWorkshopTimeslot).toHaveBeenCalledWith(
       "w1",
-      { startIso: "2026-06-01T10:00", endIso: "2026-06-01T12:00", blockedByOwner: false },
+      { startIso: "2026-06-01T10:00", endIso: "2026-06-01T12:00", blockedByOwner: true },
       "token-123"
     ));
 
     fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
     fireEvent.change(screen.getAllByLabelText("Startzeit")[1], { target: { value: "2026-05-08T09:00" } });
     fireEvent.change(screen.getAllByLabelText("Endzeit")[1], { target: { value: "2026-05-08T11:00" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Änderungen speichern" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Änderungen speichern" }));
 
     await waitFor(() => expect(updateWorkshopTimeslot).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Freigeben" }));
-    await waitFor(() => expect(updateWorkshopTimeslot).toHaveBeenCalledWith(
-      "w1",
-      "s1",
-      { blockedByOwner: false },
-      "token-123"
-    ));
-
-    fireEvent.click(screen.getByRole("button", { name: "Entfernen" }));
     await waitFor(() => expect(deleteWorkshopTimeslot).toHaveBeenCalledWith("w1", "s1", "token-123"));
   });
 

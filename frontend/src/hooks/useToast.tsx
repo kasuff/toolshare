@@ -40,9 +40,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       activeToastKeys.current.add(key);
       toastKeysById.current.set(id, key);
       setToasts((prev) => [...prev, message]);
-      window.setTimeout(() => removeToast(id), 3500);
     },
-    [removeToast]
+    []
   );
 
   const value = useMemo(() => ({ toasts, pushToast, removeToast }), [toasts, pushToast, removeToast]);

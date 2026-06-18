@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AddressInput, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./components/AddressInput";
+import { AddressInput } from "./components/AddressInput";
+import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./utils/address";
 import { Layout } from "./components/Layout";
 import { GlobalProgressBar } from "./components/GlobalProgressBar";
 import { ToastViewport } from "./components/ui";
@@ -22,6 +23,8 @@ import { MyOffersPage } from "./pages/MyOffersPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { api } from "./services/api";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./services/sessionEvents";
+import { ImpressumPage } from "./pages/ImpressumPage";
+import { DatenschutzPage } from "./pages/DatenschutzPage";
 
 function AuthScreen({
   onLogin,
@@ -75,11 +78,9 @@ function AuthScreen({
           throw new Error("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.");
         }
         await onRegister({ email, password, name, address: payloadAddress });
-        pushToast("Konto erstellt und eingeloggt.", "success");
         return;
       }
       await onLogin(email, password);
-      pushToast("Erfolgreich eingeloggt.", "success");
     } catch (submitError) {
       pushToast(submitError instanceof Error ? submitError.message : "Authentifizierung fehlgeschlagen.", "error");
     } finally {
@@ -299,7 +300,6 @@ function AppWithProviders() {
 
   const handleLogout = () => {
     logout();
-    pushToast("Erfolgreich ausgeloggt.", "success");
   };
 
   return (
@@ -401,6 +401,8 @@ function AppWithProviders() {
             )
           }
         />
+        <Route path="impressum" element={<ImpressumPage />} />
+        <Route path="datenschutz" element={<DatenschutzPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

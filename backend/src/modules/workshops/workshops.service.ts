@@ -3,7 +3,10 @@ import { workshopsRepository } from "./workshops.repository";
 
 export const workshopsService = {
   list(filters: { managerId?: string; location?: string; search?: string }) {
-    return workshopsRepository.list(filters);
+    return workshopsRepository.list({
+      ...filters,
+      excludeSuspendedManagers: !filters.managerId
+    });
   },
 
   async getById(id: string) {
@@ -11,7 +14,13 @@ export const workshopsService = {
     if (!workshop) {
       throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
     }
-    return workshop;
+    if (workshop.manager.isSuspended) {
+      throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
+    }
+    // Belegte Zeiträume separat laden, damit auch Altbuchungen via timeslotId
+    // (nicht nur direkter workshopId-FK) im Kalender als belegt erscheinen.
+    const bookings = await workshopsRepository.findActiveBookingRanges(id);
+    return { ...workshop, bookings };
   },
 
   create(input: {
@@ -69,9 +78,9 @@ export const workshopsService = {
       throw new AppError("WORKSHOP_NOT_FOUND", "Workshop not found", 404);
     }
     const isOwner = workshop.managerId === input.managerId;
-    const isManagerRole = input.actorRole === "MANAGER";
-    if (!isOwner && !isManagerRole) {
-      throw new AppError("FORBIDDEN", "Only the workshop manager can delete this workshop", 403);
+    const isManagerOrModerator = input.actorRole === "MANAGER" || input.actorRole === "MODERATOR";
+    if (!isOwner && !isManagerOrModerator) {
+      throw new AppError("FORBIDDEN", "Only the workshop manager or moderation roles can delete this workshop", 403);
     }
 
     const activeBooking = await workshopsRepository.findActiveBooking(input.workshopId);

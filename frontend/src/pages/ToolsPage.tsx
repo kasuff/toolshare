@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
@@ -8,6 +9,7 @@ import { api } from "../services/api";
 import { TOOL_CATEGORIES } from "../utils/categories";
 import { distanceBetweenLocations, isWithinRadius } from "../utils/searchFilters";
 import { formatOfferDistance } from "../utils/offerFormatting";
+import { pluralize } from "../utils/pluralize";
 import type { User } from "../types/domain";
 
 type Props = {
@@ -102,7 +104,7 @@ export function ToolsPage({ token, currentUser }: Props) {
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
           <p className="result-summary">
-            {isLoading ? "Suche läuft..." : `${filteredTools.length} Ergebnis${filteredTools.length === 1 ? "" : "se"}`}
+            {isLoading ? "Suche läuft..." : pluralize(filteredTools.length, "Ergebnis", "Ergebnisse")}
           </p>
           {hasActiveFilters && (
             <button className="btn secondary" type="button" onClick={resetFilters}>
@@ -131,10 +133,10 @@ export function ToolsPage({ token, currentUser }: Props) {
             <div className="advanced-filter-fields">
               <div className="grid grid-2">
                 <Field label="Ausleihe von">
-                  <input type="date" value={borrowFrom} onChange={(e) => setBorrowFrom(e.target.value)} />
+                  <DateInput value={borrowFrom} onChange={setBorrowFrom} />
                 </Field>
                 <Field label="Ausleihe bis">
-                  <input type="date" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} />
+                  <DateInput value={borrowUntil} onChange={setBorrowUntil} />
                 </Field>
               </div>
             </div>

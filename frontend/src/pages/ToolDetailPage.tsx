@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DateInput } from "../components/DateInput";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
@@ -25,6 +26,26 @@ type BlockingPeriod = {
   startIso: string;
   endIso: string;
 };
+
+type OwnerBlock = {
+  id: string;
+  startIso: string;
+  endIso: string;
+};
+
+const BLOCK_RANGE_FORMAT = new Intl.DateTimeFormat("de-DE", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit"
+});
+
+function formatBlockRange(block: OwnerBlock) {
+  return `${BLOCK_RANGE_FORMAT.format(new Date(block.startIso))} – ${BLOCK_RANGE_FORMAT.format(
+    new Date(block.endIso)
+  )}`;
+}
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
@@ -107,6 +128,8 @@ export function ToolDetailPage({ token, currentUser }: Props) {
 
   const [tool, setTool] = useState<Tool | null>(null);
   const [blockingPeriods, setBlockingPeriods] = useState<BlockingPeriod[]>([]);
+  const [ownerBlocks, setOwnerBlocks] = useState<OwnerBlock[]>([]);
+  const [deletingBlockId, setDeletingBlockId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [startTime, setStartTime] = useState("10:00");
@@ -139,6 +162,15 @@ export function ToolDetailPage({ token, currentUser }: Props) {
           setTool(foundTool);
           setBlockingPeriods(periods);
           setRatings(toolRatings);
+          if (token && currentUser?.id === foundTool.ownerId) {
+            try {
+              setOwnerBlocks(await api.getToolOwnerBlocks(id, token));
+            } catch {
+              setOwnerBlocks([]);
+            }
+          } else {
+            setOwnerBlocks([]);
+          }
         } else {
           pushToast("Werkzeug nicht gefunden.", "error");
           navigate("/tools");
@@ -151,7 +183,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       }
     };
     void loadTool();
-  }, [id, token, navigate, pushToast]);
+  }, [id, token, navigate, pushToast, currentUser?.id]);
 
   const isAvailable = tool?.status === "VERFUEGBAR";
   const isOwnTool = Boolean(tool && currentUser?.id === tool.ownerId);
@@ -200,7 +232,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const requestTool = async () => {
     if (!tool) return;
     if (!startDate || !startTime || !endDate || !endTime) {
-      pushToast("Bitte Abhol- und Abgabedaten vollständig ausfüllen.", "error");
       return;
     }
     if (!token) {
@@ -237,7 +268,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const blockToolForOwnUse = async () => {
     if (!tool || !token) return;
     if (!startDate || !startTime || !endDate || !endTime) {
-      pushToast("Bitte Beginn und Ende des Eigenbedarfs vollständig ausfüllen.", "error");
       return;
     }
     const startIso = `${startDate}T${startTime}`;
@@ -254,11 +284,37 @@ export function ToolDetailPage({ token, currentUser }: Props) {
     try {
       await api.createToolOwnerBlock({ toolId: tool.id, startIso, endIso }, token);
       setBlockingPeriods((current) => [...current, { startIso, endIso }]);
+      // Liste der eigenen Blockaden aktualisieren, damit die neue Blockade entfernbar ist.
+      try {
+        setOwnerBlocks(await api.getToolOwnerBlocks(tool.id, token));
+      } catch {
+        /* Liste bleibt unverändert, falls das Nachladen fehlschlägt */
+      }
       pushToast("Werkzeug wurde für deinen Eigenbedarf blockiert.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht blockiert werden.", "error");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const removeOwnerBlock = async (block: OwnerBlock) => {
+    if (!tool || !token) return;
+    setDeletingBlockId(block.id);
+    try {
+      await api.deleteToolOwnerBlock(tool.id, block.id, token);
+      setOwnerBlocks((current) => current.filter((entry) => entry.id !== block.id));
+      // Kalender-Sperrzeiten frisch laden, damit der freigegebene Zeitraum wieder buchbar ist.
+      try {
+        setBlockingPeriods(await api.getToolBlockingPeriods(tool.id));
+      } catch {
+        /* Sperrzeiten bleiben unverändert, falls das Nachladen fehlschlägt */
+      }
+      pushToast("Blockierung wurde aufgehoben.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Blockierung konnte nicht aufgehoben werden.", "error");
+    } finally {
+      setDeletingBlockId(null);
     }
   };
 
@@ -292,7 +348,6 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const reportTool = async () => {
     if (!tool) return;
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     setIsReporting(true);
@@ -328,14 +383,12 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   return (
     <section className="tool-detail-page" aria-label={tool.name}>
       <DetailTopBar onBack={() => navigate(isManageMode ? "/offers" : "/tools")}>
-        {!isOwnTool && (
-          <button type="button" className="detail-report-trigger" onClick={openReportForm}>
-            Werkzeug melden
-          </button>
-        )}
+        <button type="button" className="detail-report-trigger" onClick={openReportForm}>
+          Werkzeug melden
+        </button>
       </DetailTopBar>
 
-      {showReportForm && !isOwnTool && (
+      {showReportForm && (
         <ReportFormPanel
           title="Werkzeug melden"
           hint="Melde unangemessene Inhalte an die Moderation."
@@ -472,12 +525,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label={isOwnTool ? "Startdatum Eigenbedarf" : "Abholdatum"}
-                      type="date"
                       value={startDate}
                       min={defaults.startDate}
-                      onChange={(event) => setStartDate(event.target.value)}
+                      onChange={setStartDate}
                       className="booking-input"
                     />
                   </label>
@@ -504,12 +556,11 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                 <div className="booking-fields-row">
                   <label>
                     <span>Datum</span>
-                    <input
+                    <DateInput
                       aria-label={isOwnTool ? "Enddatum Eigenbedarf" : "Abgabedatum"}
-                      type="date"
                       value={endDate}
                       min={startDate}
-                      onChange={(event) => setEndDate(event.target.value)}
+                      onChange={setEndDate}
                       className="booking-input"
                     />
                   </label>
@@ -550,6 +601,31 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                     : "Der Anbieter muss deine Anfrage noch bestätigen."}
                 </p>
               </div>
+
+              {isOwnTool && ownerBlocks.length > 0 && (
+                <div className="booking-section owner-blocks">
+                  <div className="booking-section-title">
+                    <span />
+                    <strong>Deine blockierten Zeiträume</strong>
+                  </div>
+                  <ul className="owner-blocks-list">
+                    {ownerBlocks.map((block) => (
+                      <li key={block.id} className="owner-blocks-item">
+                        <span className="owner-blocks-range">{formatBlockRange(block)}</span>
+                        <button
+                          type="button"
+                          className="owner-blocks-remove"
+                          onClick={() => void removeOwnerBlock(block)}
+                          disabled={deletingBlockId === block.id}
+                          aria-label="Blockierung aufheben"
+                        >
+                          {deletingBlockId === block.id ? "Wird entfernt..." : "Entfernen"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </>
           ) : (
             <>

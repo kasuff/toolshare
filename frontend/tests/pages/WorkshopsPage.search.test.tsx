@@ -23,7 +23,8 @@ vi.mock("../../src/services/api", () => ({
     deleteWorkshop,
     getWorkshopById,
     getWorkshops,
-    getRatingsForWorkshop
+    getRatingsForWorkshop,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 

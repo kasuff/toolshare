@@ -4,15 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { ProfileSettingsPage } from "../../src/pages/ProfileSettingsPage";
 
-const { validateAddress, suggestAddresses } = vi.hoisted(() => ({
+const { validateAddress, suggestAddresses, changePassword } = vi.hoisted(() => ({
   validateAddress: vi.fn(),
-  suggestAddresses: vi.fn()
+  suggestAddresses: vi.fn(),
+  changePassword: vi.fn()
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
     validateAddress,
-    suggestAddresses
+    suggestAddresses,
+    changePassword
   }
 }));
 
@@ -127,5 +129,59 @@ describe("ProfileSettingsPage", () => {
 
     await waitFor(() => expect(onSave).not.toHaveBeenCalled());
     expect(validateAddress).not.toHaveBeenCalled();
+  });
+
+  const renderWithUser = () =>
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <ProfileSettingsPage
+            currentUser={{
+              id: "u1",
+              name: "Lea",
+              email: "lea@example.com",
+              role: "NUTZER",
+              isSuspended: false
+            }}
+            token="tok-123"
+            onSave={vi.fn()}
+          />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+  it("does not submit when the two new passwords do not match", async () => {
+    renderWithUser();
+
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+    fireEvent.change(screen.getByPlaceholderText("Aktuelles Passwort"), { target: { value: "Current123" } });
+    fireEvent.change(screen.getByPlaceholderText("Mindestens 8 Zeichen"), { target: { value: "NewPass1234" } });
+    fireEvent.change(screen.getByPlaceholderText("Neues Passwort erneut eingeben"), {
+      target: { value: "Different999" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+
+    await waitFor(() => expect(changePassword).not.toHaveBeenCalled());
+  });
+
+  it("changes the password and closes the form on success", async () => {
+    changePassword.mockResolvedValue(undefined);
+    renderWithUser();
+
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+    fireEvent.change(screen.getByPlaceholderText("Aktuelles Passwort"), { target: { value: "Current123" } });
+    fireEvent.change(screen.getByPlaceholderText("Mindestens 8 Zeichen"), { target: { value: "NewPass1234" } });
+    fireEvent.change(screen.getByPlaceholderText("Neues Passwort erneut eingeben"), {
+      target: { value: "NewPass1234" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+
+    await waitFor(() =>
+      expect(changePassword).toHaveBeenCalledWith("Current123", "NewPass1234", "tok-123")
+    );
+    // Formular schließt → Passwortfelder verschwinden wieder.
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Aktuelles Passwort")).not.toBeInTheDocument()
+    );
   });
 });

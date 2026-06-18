@@ -5,6 +5,10 @@ import { suspensionRepository } from "../src/modules/users/suspension.repository
 import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
 import { notificationsService } from "../src/modules/notifications/notifications.service";
 import { addressService } from "../src/modules/address/address.service";
+import { toolsService } from "../src/modules/tools/tools.service";
+import { workshopsService } from "../src/modules/workshops/workshops.service";
+import { ratingsService } from "../src/modules/ratings/ratings.service";
+import { prisma } from "../src/config/prisma";
 
 vi.mock("../src/modules/moderation/moderation.repository", () => ({
   moderationRepository: {
@@ -35,9 +39,42 @@ vi.mock("../src/modules/notifications/notifications.repository", () => ({
   }
 }));
 
+vi.mock("../src/modules/tools/tools.service", () => ({
+  toolsService: {
+    getById: vi.fn(),
+    remove: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/workshops/workshops.service", () => ({
+  workshopsService: {
+    getById: vi.fn(),
+    remove: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/ratings/ratings.service", () => ({
+  ratingsService: {
+    hideFromModeration: vi.fn()
+  }
+}));
+
+vi.mock("../src/config/prisma", () => ({
+  prisma: {
+    booking: {
+      findMany: vi.fn(),
+      update: vi.fn()
+    }
+  }
+}));
+
 const mockedModerationRepository = vi.mocked(moderationRepository);
 const mockedNotificationsRepository = vi.mocked(notificationsRepository);
 const mockedSuspensionRepository = vi.mocked(suspensionRepository);
+const mockedToolsService = vi.mocked(toolsService);
+const mockedWorkshopsService = vi.mocked(workshopsService);
+const mockedRatingsService = vi.mocked(ratingsService);
+const mockedPrisma = vi.mocked(prisma);
 
 describe("moderationService", () => {
   beforeEach(() => {
@@ -114,6 +151,30 @@ describe("moderationService", () => {
     expect(result).toMatchObject({ id: "r1", status: "RESOLVED" });
   });
 
+  it("hides rating when a RATING report is resolved", async () => {
+    mockedModerationRepository.findById.mockResolvedValueOnce({
+      id: "r-rating",
+      targetType: "RATING",
+      targetId: "rating-1"
+    } as any);
+    mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r-rating", status: "RESOLVED" } as any);
+    mockedRatingsService.hideFromModeration.mockResolvedValueOnce({ id: "rating-1", status: "HIDDEN" } as any);
+
+    const result = await moderationService.updateReportStatus({
+      reportId: "r-rating",
+      status: "RESOLVED",
+      moderatorId: "mod-1",
+      decisionNote: "Bewertung ausgeblendet"
+    });
+
+    expect(mockedRatingsService.hideFromModeration).toHaveBeenCalledWith(
+      "rating-1",
+      "mod-1",
+      "Bewertung ausgeblendet"
+    );
+    expect(result).toMatchObject({ id: "r-rating", status: "RESOLVED" });
+  });
+
   it("sends warning notification when moderation warns user", async () => {
     mockedModerationRepository.findById.mockResolvedValueOnce({ id: "r1" } as any);
     mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
@@ -130,6 +191,76 @@ describe("moderationService", () => {
     expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
       "user-2",
       expect.stringContaining("Unangemessene Sprache")
+    );
+  });
+
+  it("deletes a tool and warns owner when deleteTool is true", async () => {
+    mockedModerationRepository.findById.mockResolvedValueOnce({ id: "r1", targetId: "tool-1", targetType: "TOOL" } as any);
+    mockedToolsService.getById.mockResolvedValueOnce({ id: "tool-1", name: "Bohrer X", ownerId: "user-owner" } as any);
+    mockedPrisma.booking.findMany.mockResolvedValueOnce([
+      { id: "booking-1", userId: "user-requester" }
+    ] as any);
+    mockedPrisma.booking.update.mockResolvedValueOnce({} as any);
+    mockedToolsService.remove.mockResolvedValueOnce(undefined as any);
+    mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
+    mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);
+
+    await moderationService.updateReportStatus({
+      reportId: "r1",
+      status: "RESOLVED",
+      moderatorId: "mod-1",
+      deleteTool: true,
+      warningReason: "Illegales Werkzeug"
+    });
+
+    expect(mockedToolsService.getById).toHaveBeenCalledWith("tool-1");
+    expect(mockedToolsService.remove).toHaveBeenCalledWith({
+      toolId: "tool-1",
+      actorId: "mod-1",
+      actorRole: "MODERATOR"
+    });
+    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
+      "user-requester",
+      expect.stringContaining('Deine Buchung für das Werkzeug "Bohrer X" wurde storniert')
+    );
+    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
+      "user-owner",
+      expect.stringContaining('Dein Angebot "Bohrer X" wurde gelöscht. Grund: Illegales Werkzeug')
+    );
+  });
+
+  it("deletes a workshop and warns manager when deleteWorkshop is true", async () => {
+    mockedModerationRepository.findById.mockResolvedValueOnce({ id: "r1", targetId: "ws-1", targetType: "WORKSHOP" } as any);
+    mockedWorkshopsService.getById.mockResolvedValueOnce({ id: "ws-1", name: "Maiks Werkstatt", managerId: "user-manager" } as any);
+    mockedPrisma.booking.findMany.mockResolvedValueOnce([
+      { id: "booking-2", userId: "user-requester-ws" }
+    ] as any);
+    mockedPrisma.booking.update.mockResolvedValueOnce({} as any);
+    mockedWorkshopsService.remove.mockResolvedValueOnce(undefined as any);
+    mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
+    mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);
+
+    await moderationService.updateReportStatus({
+      reportId: "r1",
+      status: "RESOLVED",
+      moderatorId: "mod-1",
+      deleteWorkshop: true,
+      warningReason: "Unordnung"
+    });
+
+    expect(mockedWorkshopsService.getById).toHaveBeenCalledWith("ws-1");
+    expect(mockedWorkshopsService.remove).toHaveBeenCalledWith({
+      workshopId: "ws-1",
+      managerId: "user-manager",
+      actorRole: "MODERATOR"
+    });
+    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
+      "user-requester-ws",
+      expect.stringContaining('Deine Buchung für die Werkstatt "Maiks Werkstatt" wurde storniert')
+    );
+    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
+      "user-manager",
+      expect.stringContaining('Deine Werkstatt "Maiks Werkstatt" wurde gelöscht. Grund: Unordnung')
     );
   });
 });

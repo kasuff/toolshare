@@ -173,4 +173,24 @@ describe("ratingsRepository", () => {
     });
     expect(result).toEqual([{ id: "r-tool" }]);
   });
+
+  it("lists ratings for a workshop", async () => {
+    mocks.ratingFindMany.mockResolvedValueOnce([{ id: "r-workshop" }]);
+
+    const result = await ratingsRepository.listForWorkshop("workshop-1");
+
+    expect(mocks.ratingFindMany).toHaveBeenCalledWith({
+      where: {
+        status: "VISIBLE",
+        booking: {
+          timeslot: {
+            workshopId: "workshop-1"
+          }
+        }
+      },
+      include: ratingInclude,
+      orderBy: { createdAt: "desc" }
+    });
+    expect(result).toEqual([{ id: "r-workshop" }]);
+  });
 });

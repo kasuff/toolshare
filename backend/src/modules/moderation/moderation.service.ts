@@ -3,6 +3,10 @@ import { notificationsService } from "../notifications/notifications.service";
 import { ratingsService } from "../ratings/ratings.service";
 import { suspensionRepository } from "../users/suspension.repository";
 import { moderationRepository } from "./moderation.repository";
+import { toolsService } from "../tools/tools.service";
+import { workshopsService } from "../workshops/workshops.service";
+import { prisma } from "../../config/prisma";
+import { notificationsRepository } from "../notifications/notifications.repository";
 
 type ReportRow = Awaited<ReturnType<typeof moderationRepository.listOpenReports>>[number];
 type RatingRow = Awaited<ReturnType<typeof moderationRepository.findRatingsByIds>>[number];
@@ -144,6 +148,8 @@ export const moderationService = {
     warningReason?: string;
     requestSuspensionUserId?: string;
     suspensionReason?: string;
+    deleteTool?: boolean;
+    deleteWorkshop?: boolean;
   }) {
     const report = await moderationRepository.findById(input.reportId);
     if (!report) {
@@ -154,7 +160,7 @@ export const moderationService = {
       throw new AppError("REPORT_ALREADY_CLOSED", "Report is already closed", 409);
     }
 
-    if ((input.warnUserId && !input.warningReason) || (!input.warnUserId && input.warningReason)) {
+    if ((input.warnUserId && !input.warningReason) || (!input.warnUserId && input.warningReason && !input.deleteTool && !input.deleteWorkshop)) {
       throw new AppError(
         "INVALID_WARNING_INPUT",
         "warnUserId and warningReason must be provided together",
@@ -173,6 +179,24 @@ export const moderationService = {
       );
     }
 
+    if (input.deleteTool) {
+      if (report.targetType !== "TOOL") {
+        throw new AppError("INVALID_TARGET_TYPE", "Cannot delete tool: report target is not a tool", 400);
+      }
+      if (!input.warningReason?.trim()) {
+        throw new AppError("WARNING_REASON_REQUIRED", "warningReason is required when deleting a tool", 400);
+      }
+    }
+
+    if (input.deleteWorkshop) {
+      if (report.targetType !== "WORKSHOP") {
+        throw new AppError("INVALID_TARGET_TYPE", "Cannot delete workshop: report target is not a workshop", 400);
+      }
+      if (!input.warningReason?.trim()) {
+        throw new AppError("WARNING_REASON_REQUIRED", "warningReason is required when deleting a workshop", 400);
+      }
+    }
+
     if (input.status === "REJECTED" && !input.decisionNote?.trim()) {
       throw new AppError("DECISION_NOTE_REQUIRED", "decisionNote is required when rejecting a report", 400);
     }
@@ -181,13 +205,80 @@ export const moderationService = {
       input.status === "RESOLVED" &&
       !input.warnUserId &&
       !input.requestSuspensionUserId &&
+      !input.deleteTool &&
+      !input.deleteWorkshop &&
       !input.decisionNote?.trim()
     ) {
       throw new AppError(
         "DECISION_NOTE_REQUIRED",
-        "decisionNote is required when resolving without warning or suspension request",
+        "decisionNote is required when resolving without warning, suspension request, or deletion",
         400
       );
+    }
+
+    let targetOwnerId: string | null = null;
+    let customWarningMsg: string | null = null;
+
+    if (input.deleteTool) {
+      const tool = await toolsService.getById(report.targetId);
+      targetOwnerId = tool.ownerId;
+      customWarningMsg = `Dein Angebot "${tool.name}" wurde gelöscht. Grund: ${input.warningReason}`;
+
+      // Cancel and notify active bookings first
+      const activeToolBookings = await prisma.booking.findMany({
+        where: {
+          toolId: report.targetId,
+          status: { in: ["PENDING", "ACCEPTED"] }
+        }
+      });
+      for (const booking of activeToolBookings) {
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: { status: "REJECTED" }
+        });
+        await notificationsRepository.create(
+          booking.userId,
+          `Deine Buchung für das Werkzeug "${tool.name}" wurde storniert, da das Angebot gelöscht wurde.`
+        );
+      }
+
+      await toolsService.remove({
+        toolId: report.targetId,
+        actorId: input.moderatorId,
+        actorRole: "MODERATOR",
+      });
+    }
+
+    if (input.deleteWorkshop) {
+      const workshop = await workshopsService.getById(report.targetId);
+      targetOwnerId = workshop.managerId;
+      customWarningMsg = `Deine Werkstatt "${workshop.name}" wurde gelöscht. Grund: ${input.warningReason}`;
+
+      // Cancel and notify active bookings first
+      const activeWorkshopBookings = await prisma.booking.findMany({
+        where: {
+          timeslot: {
+            workshopId: report.targetId
+          },
+          status: { in: ["PENDING", "ACCEPTED"] }
+        }
+      });
+      for (const booking of activeWorkshopBookings) {
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: { status: "REJECTED" }
+        });
+        await notificationsRepository.create(
+          booking.userId,
+          `Deine Buchung für die Werkstatt "${workshop.name}" wurde storniert, da die Werkstatt gelöscht wurde.`
+        );
+      }
+
+      await workshopsService.remove({
+        workshopId: report.targetId,
+        managerId: targetOwnerId,
+        actorRole: "MODERATOR",
+      });
     }
 
     const updated = await moderationRepository.updateStatus(
@@ -206,7 +297,15 @@ export const moderationService = {
     }
 
     if (input.warnUserId && input.warningReason) {
-      await notificationsService.createWarning(input.warnUserId, input.warningReason);
+      const moderators = await moderationRepository.findUsersByIds([input.moderatorId]);
+      const moderatorName = (moderators && moderators[0]?.name) || "Moderator";
+      await notificationsService.createWarning(input.warnUserId, input.warningReason, moderatorName);
+    }
+
+    if (customWarningMsg && targetOwnerId) {
+      const moderators = await moderationRepository.findUsersByIds([input.moderatorId]);
+      const moderatorName = (moderators && moderators[0]?.name) || "Moderator";
+      await notificationsService.createWarning(targetOwnerId, customWarningMsg, moderatorName);
     }
 
     if (input.requestSuspensionUserId && input.suspensionReason) {

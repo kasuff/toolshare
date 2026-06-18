@@ -1,4 +1,5 @@
 import { AppError } from "../../utils/app-error";
+import { notificationsService } from "../notifications/notifications.service";
 import { usersRepository } from "./users.repository";
 
 export const usersService = {
@@ -69,7 +70,16 @@ export const usersService = {
       );
     }
 
-    return usersRepository.updateSuspension(input.targetUserId, input.isSuspended);
+    const updated = await usersRepository.updateSuspension(input.targetUserId, input.isSuspended);
+
+    if (input.isSuspended && !existing.isSuspended) {
+      await notificationsService.createSuspensionNotice(
+        input.targetUserId,
+        "Dein Konto wurde von der Administration gesperrt."
+      );
+    }
+
+    return updated;
   },
 
   async getAdminMetrics() {

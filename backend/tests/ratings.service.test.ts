@@ -167,4 +167,23 @@ describe("ratingsService", () => {
 
     expect(mockedRatingsRepository.create).toHaveBeenCalled();
   });
+
+  it("hides a rating from moderation", async () => {
+    mockedRatingsRepository.findById.mockResolvedValueOnce({ id: "rating-1", status: "VISIBLE" } as any);
+    mockedRatingsRepository.hide.mockResolvedValueOnce({ id: "rating-1", status: "HIDDEN" } as any);
+
+    const result = await ratingsService.hideFromModeration("rating-1", "mod-1", "Unangemessen");
+
+    expect(mockedRatingsRepository.hide).toHaveBeenCalledWith("rating-1", "mod-1", "Unangemessen");
+    expect(result).toMatchObject({ id: "rating-1", status: "HIDDEN" });
+  });
+
+  it("skips hide when rating is already hidden", async () => {
+    mockedRatingsRepository.findById.mockResolvedValueOnce({ id: "rating-1", status: "HIDDEN" } as any);
+
+    const result = await ratingsService.hideFromModeration("rating-1", "mod-1");
+
+    expect(mockedRatingsRepository.hide).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: "rating-1", status: "HIDDEN" });
+  });
 });

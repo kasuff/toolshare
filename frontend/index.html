@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ToolShare MVP</title>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <title>ToolShare</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block" rel="stylesheet" />
     <style>
       .material-symbols-outlined {
         font-family: 'Material Symbols Outlined';
@@ -12,6 +12,14 @@
         font-style: normal;
         font-size: 24px;
         display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        /* Breite fest auf ein Glyph fixieren: verhindert, dass vor dem Laden der
+           Icon-Schrift der Ligatur-Text (z.B. "expand_more") als breiter Text
+           gerendert wird und Buttons/Boxen ihre Größe ändern. */
+        width: 1em;
+        min-width: 1em;
+        overflow: hidden;
         line-height: 1;
         text-transform: none;
         letter-spacing: normal;

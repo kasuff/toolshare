@@ -2,10 +2,12 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
+import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
 import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories";
@@ -13,7 +15,8 @@ import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
 import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../utils/searchFilters";
 import { formatOfferDistance } from "../utils/offerFormatting";
-import type { PublicRating, Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import { pluralize } from "../utils/pluralize";
+import type { PublicRating, Tool, User, Workshop, WorkshopBookedRange, WorkshopSlot } from "../types/domain";
 
 type Props = {
   token?: string;
@@ -23,6 +26,7 @@ type Props = {
 type WorkshopListItem = {
   workshop: Workshop;
   slots: WorkshopSlot[];
+  bookedRanges: WorkshopBookedRange[];
   tools: Array<Tool & { selectable: boolean }>;
 };
 
@@ -102,26 +106,27 @@ function toLocalDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function slotOverlapsDay(slot: WorkshopSlot, day: Date) {
+function rangeOverlapsDay(startIso: string, endIso: string, day: Date) {
   const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
   const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0);
-  return new Date(slot.startIso) < dayEnd && new Date(slot.endIso) > dayStart;
+  return new Date(startIso) < dayEnd && new Date(endIso) > dayStart;
 }
 
-function isWorkshopDayAvailable(slots: WorkshopSlot[], day: Date) {
-  const matchingSlots = slots.filter((slot) => slotOverlapsDay(slot, day));
-  return (
-    matchingSlots.some((slot) => !slot.blockedByOwner) &&
-    !matchingSlots.some((slot) => slot.blockedByOwner)
-  );
+// Eine Werkstatt ist standardmäßig verfügbar. Ein Tag ist nur dann nicht verfügbar (und wird
+// im Kalender durchgestrichen), wenn ihn der Anbieter blockiert hat oder er bereits gebucht ist.
+function isDayUnavailable(day: Date, slots: WorkshopSlot[], bookedRanges: WorkshopBookedRange[]) {
+  const blocked = slots.some((slot) => slot.blockedByOwner && rangeOverlapsDay(slot.startIso, slot.endIso, day));
+  const booked = bookedRanges.some((range) => rangeOverlapsDay(range.startIso, range.endIso, day));
+  return blocked || booked;
 }
 
-function getWorkshopCalendarDays(monthDate: Date, slots: WorkshopSlot[]) {
+function getWorkshopCalendarDays(monthDate: Date, slots: WorkshopSlot[], bookedRanges: WorkshopBookedRange[]) {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const firstDay = new Date(year, month, 1);
   const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayKey = toLocalDateKey(new Date());
   const days: Array<{ key: string; day: number | null; dateKey?: string; available?: boolean }> = [];
 
   for (let index = 0; index < leadingEmptyDays; index += 1) {
@@ -130,25 +135,32 @@ function getWorkshopCalendarDays(monthDate: Date, slots: WorkshopSlot[]) {
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     const date = new Date(year, month, day);
+    const dateKey = toLocalDateKey(date);
+    const isPast = dateKey < todayKey;
     days.push({
-      key: toLocalDateKey(date),
+      key: dateKey,
       day,
-      dateKey: toLocalDateKey(date),
-      available: isWorkshopDayAvailable(slots, date)
+      dateKey,
+      available: !isPast && !isDayUnavailable(date, slots, bookedRanges)
     });
   }
 
   return days;
 }
 
-function isDateRangeAvailable(startDate: string, endDate: string, slots: WorkshopSlot[]) {
+function isDateRangeAvailable(
+  startDate: string,
+  endDate: string,
+  slots: WorkshopSlot[],
+  bookedRanges: WorkshopBookedRange[]
+) {
   const start = new Date(`${startDate}T12:00:00`);
   const end = new Date(`${endDate}T12:00:00`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return false;
 
   const current = new Date(start);
   while (current <= end) {
-    if (!isWorkshopDayAvailable(slots, current)) return false;
+    if (isDayUnavailable(current, slots, bookedRanges)) return false;
     current.setDate(current.getDate() + 1);
   }
   return true;
@@ -188,9 +200,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       setIsLoading(true);
       try {
         const workshops = await api.getWorkshops({ q }, token ?? "");
-        const mapped = workshops.map(({ workshop, slots, tools }) => ({
+        const mapped = workshops.map(({ workshop, slots, bookedRanges, tools }) => ({
           workshop,
           slots,
+          bookedRanges: bookedRanges ?? [],
           tools:
             tools ??
             workshop.equipmentItems.map((item) => ({
@@ -360,8 +373,8 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       return;
     }
 
-    if (!isDateRangeAvailable(draft.startDate, dateKey, selectedWorkshop.slots)) {
-      pushToast("Der gewählte Zeitraum enthält nicht verfügbare Tage.", "error");
+    if (!isDateRangeAvailable(draft.startDate, dateKey, selectedWorkshop.slots, selectedWorkshop.bookedRanges)) {
+      pushToast("Der gewählte Zeitraum enthält blockierte oder bereits gebuchte Tage.", "error");
       return;
     }
 
@@ -385,15 +398,22 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     const selectedToolIds = selectedToolIdsByWorkshop[workshopId] ?? [];
     const workshopItem = items.find((item) => item.workshop.id === workshopId);
     if (workshopItem && workshopItem.tools.length > 0 && selectedToolIds.length === 0) {
-      pushToast("Bitte mindestens ein Werkzeug aus der Ausstattung auswählen.", "error");
       return;
     }
 
     const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
     const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
-    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) {
-      pushToast("Bitte einen gültigen Zeitraum mit Start- und Endzeit angeben.", "error");
+    if (!startIso || !endIso) {
+      return;
+    }
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Das Ende muss nach dem Start liegen.", "error");
+      return;
+    }
+
+    if (workshopItem && !isDateRangeAvailable(draft.startDate, draft.endDate, workshopItem.slots, workshopItem.bookedRanges)) {
+      pushToast("Der gewählte Zeitraum ist blockiert oder bereits gebucht.", "error");
       return;
     }
 
@@ -422,8 +442,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
     const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
-    if (!startIso || !endIso || new Date(endIso) <= new Date(startIso)) {
-      pushToast("Bitte einen gültigen Zeitraum mit Beginn und Ende angeben.", "error");
+    if (!startIso || !endIso) {
+      return;
+    }
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Das Ende muss nach dem Beginn liegen.", "error");
       return;
     }
     try {
@@ -474,7 +497,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
   const reportWorkshop = async (workshopId: string) => {
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     setIsReporting(true);
@@ -502,9 +524,15 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const selectedWorkshopDraft = selectedWorkshop
     ? bookingDraftsByWorkshop[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()
     : null;
-  const selectedWorkshopHasAvailableSlots = selectedWorkshop
-    ? selectedWorkshop.slots.some((slot) => !slot.blockedByOwner)
-    : false;
+  const selectedWorkshopDraftAvailable =
+    selectedWorkshop && selectedWorkshopDraft
+      ? isDateRangeAvailable(
+          selectedWorkshopDraft.startDate,
+          selectedWorkshopDraft.endDate,
+          selectedWorkshop.slots,
+          selectedWorkshop.bookedRanges
+        )
+      : false;
   const selectedWorkshopIsOwn = Boolean(
     selectedWorkshop && currentUser?.id === selectedWorkshop.workshop.ownerId
   );
@@ -525,7 +553,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
         return {
           key: `${monthDate.getFullYear()}-${monthDate.getMonth()}`,
           label: new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" }).format(monthDate),
-          days: getWorkshopCalendarDays(monthDate, selectedWorkshop.slots)
+          days: getWorkshopCalendarDays(monthDate, selectedWorkshop.slots, selectedWorkshop.bookedRanges)
         };
       })
     : [];
@@ -608,7 +636,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="workshop-card-content">
                       <div className="workshop-card-heading">
                         <h3>{item.workshop.name}</h3>
-                        <span className="workshop-card-rating">{item.slots.length} Slots</span>
+                        <span className="workshop-card-rating">{pluralize(item.slots.length, "Slot", "Slots")}</span>
                       </div>
                       <p>
                         {item.workshop.location} · {item.workshop.maxCapacity} Plätze
@@ -649,7 +677,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
           <p className="result-summary">
-            {isLoading ? "Suche läuft..." : `${publicWorkshops.length} Ergebnis${publicWorkshops.length === 1 ? "" : "se"}`}
+            {isLoading ? "Suche läuft..." : pluralize(publicWorkshops.length, "Ergebnis", "Ergebnisse")}
           </p>
           {hasActiveFilters && (
             <button type="button" className="btn secondary" onClick={resetFilters}>
@@ -678,10 +706,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
             <div className="advanced-filter-fields">
               <div className="grid grid-2">
                 <Field label="Ausleihe von">
-                  <input type="date" value={borrowFrom} onChange={(e) => setBorrowFrom(e.target.value)} />
+                  <DateInput value={borrowFrom} onChange={setBorrowFrom} />
                 </Field>
                 <Field label="Ausleihe bis">
-                  <input type="date" value={borrowUntil} onChange={(e) => setBorrowUntil(e.target.value)} />
+                  <DateInput value={borrowUntil} onChange={setBorrowUntil} />
                 </Field>
               </div>
               <div className="slider-row">
@@ -732,7 +760,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
               name={item.workshop.name}
               description={item.workshop.description}
               imageUrl={cardImage}
-              badgeLabel={`${availableSlotCount} ${availableSlotCount === 1 ? "Slot" : "Slots"}`}
+              badgeLabel={pluralize(availableSlotCount, "Slot", "Slots")}
               badgeUnavailable={availableSlotCount === 0}
               meta={formatOfferDistance(distance)}
               ownerName={ownerName}
@@ -749,15 +777,13 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           <div className="workshop-detail-page-content">
             <div className="workshop-modal-toolbar">
               <DetailTopBar onBack={closeWorkshop}>
-                {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
-                  <button type="button" className="detail-report-trigger" onClick={openReportForm}>
-                    Werkstatt melden
-                  </button>
-                )}
+                <button type="button" className="detail-report-trigger" onClick={openReportForm}>
+                  Werkstatt melden
+                </button>
               </DetailTopBar>
             </div>
 
-            {showReportForm && currentUser?.id !== selectedWorkshop.workshop.ownerId && (
+            {showReportForm && (
               <ReportFormPanel
                 title="Werkstatt melden"
                 hint="Wenn Regeln verletzt werden, melde diese Werkstatt der Moderation."
@@ -814,7 +840,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                   <h2>{selectedWorkshop.workshop.name}</h2>
                   <div className="workshop-modal-meta">
                     <span className="status-pill neutral">{selectedWorkshop.workshop.maxCapacity} Plätze</span>
-                    <span className="status-pill neutral">{selectedWorkshop.slots.length} Zeitfenster</span>
+                    <span className="status-pill neutral">{pluralize(selectedWorkshop.slots.length, "Zeitfenster", "Zeitfenster")}</span>
                     {currentUser && selectedWorkshop.workshop.ownerId === currentUser.id && (
                       <span className="status-pill warning">Eigene Werkstatt</span>
                     )}
@@ -872,7 +898,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <span className="ds-workshop-card-avatar">{getInitials(selectedWorkshop.workshop.ownerName ?? "Unbekannt")}</span>
                     <div>
                       <strong>{selectedWorkshop.workshop.ownerName ?? "Unbekannt"}</strong>
-                      <span>{selectedWorkshopOwnerOfferCount} Angebote</span>
+                      <span>{pluralize(selectedWorkshopOwnerOfferCount, "Angebot", "Angebote")}</span>
                     </div>
                   </div>
                 </section>
@@ -948,7 +974,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                       <i className="available" /> Verfügbar
                     </span>
                     <span>
-                      <i className="unavailable" /> Nicht verfügbar
+                      <i className="unavailable" /> Blockiert / gebucht
                     </span>
                   </div>
                 </section>
@@ -972,18 +998,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="booking-fields-row">
                       <label>
                         <span>Datum</span>
-                        <input
+                        <DateInput
                           id="workshop-booking-start-date"
                           aria-label={selectedWorkshopIsOwn ? "Startdatum Eigenbedarf" : "Abholdatum"}
-                          type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.startDate ?? ""}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setBookingDraftsByWorkshop((prev) => ({
                               ...prev,
                               [selectedWorkshop.workshop.id]: {
                                 ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                startDate: event.target.value
+                                startDate: value
                               }
                             }))
                           }
@@ -1020,18 +1045,17 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     <div className="booking-fields-row">
                       <label>
                         <span>Datum</span>
-                        <input
+                        <DateInput
                           aria-label={selectedWorkshopIsOwn ? "Enddatum Eigenbedarf" : "Abgabedatum"}
-                          type="date"
                           className="booking-input"
                           value={selectedWorkshopDraft?.endDate ?? ""}
                           min={selectedWorkshopDraft?.startDate}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             setBookingDraftsByWorkshop((prev) => ({
                               ...prev,
                               [selectedWorkshop.workshop.id]: {
                                 ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                endDate: event.target.value
+                                endDate: value
                               }
                             }))
                           }
@@ -1108,282 +1132,23 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                           ? blockWorkshopForOwnUse(selectedWorkshop.workshop.id)
                           : bookWorkshop(selectedWorkshop.workshop.id))
                       }
-                      disabled={!selectedWorkshopIsOwn && !selectedWorkshopHasAvailableSlots}
+                      disabled={!selectedWorkshopIsOwn && Boolean(token) && !selectedWorkshopDraftAvailable}
                     >
                       {selectedWorkshopIsOwn ? "Zeitraum blockieren" : token ? "Anfrage senden" : "Jetzt einloggen"}
                     </button>
                     <p className="booking-hint">
                       {selectedWorkshopIsOwn
                         ? "Die Blockierung gilt sofort und erzeugt keine Nachricht."
-                        : selectedWorkshopHasAvailableSlots
+                        : !token || selectedWorkshopDraftAvailable
                         ? "Der Anbieter muss deine Anfrage noch bestätigen."
-                        : "Aktuell ist kein verfügbares Zeitfenster hinterlegt."}
+                        : "Der gewählte Zeitraum ist blockiert oder bereits gebucht."}
                     </p>
                   </div>
+
+                  {token && <SystemRulesInfo token={token} />}
                 </aside>
               )}
             </div>
-
-            {/*
-            <div className="workshop-modal-header">
-              <div>
-                <p className="eyebrow">Werkstattdetails</p>
-                <h2>{selectedWorkshop.workshop.name}</h2>
-                <p className="subtitle">{selectedWorkshop.workshop.location}</p>
-              </div>
-            </div>
-
-            <div className="workshop-modal-body">
-              {!isAutoGeneratedWorkshopDescription(selectedWorkshop.workshop) && <p>{selectedWorkshop.workshop.description}</p>}
-              <div className="workshop-modal-meta">
-                <span className="status-pill neutral">{selectedWorkshop.workshop.maxCapacity} Plätze</span>
-                <span className="status-pill neutral">{selectedWorkshop.slots.length} Zeitfenster</span>
-                {currentUser && selectedWorkshop.workshop.ownerId === currentUser.id && (
-                  <span className="status-pill success">Eigene Werkstatt</span>
-                )}
-              </div>
-
-              {selectedWorkshop.tools.length > 0 && (
-                <>
-                  <p className="hint">
-                    <strong>Werkzeuge in dieser Werkstatt</strong>
-                  </p>
-                  <div className="workshop-equipment-list">
-                    {selectedWorkshop.tools.map((tool) => {
-                      const category = toolCategoryByValue.get(tool.category);
-                      return (
-                        <span
-                          key={tool.id}
-                          className={`workshop-equipment-chip ${tool.selectable ? "" : "disabled"}`.trim()}
-                          aria-disabled={!tool.selectable}
-                        >
-                          <span className="material-symbols-outlined">{toolCategoryIcons[tool.category] ?? "construction"}</span>
-                          <span>{tool.name}</span>
-                          <small>{tool.selectable ? (category?.label ?? tool.category) : "Ausgeliehen"}</small>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {getWorkshopExtras(selectedWorkshop.workshop).length > 0 && (
-                <>
-                  <p className="hint">
-                    <strong>Extras</strong>
-                  </p>
-                  <div className="workshop-equipment-list">
-                    {getWorkshopExtras(selectedWorkshop.workshop).map((extraValue) => {
-                      const extra = extrasByValue.get(extraValue);
-                      return (
-                        <span key={extraValue} className="workshop-equipment-chip">
-                          <span className="material-symbols-outlined">{extra?.icon ?? "construction"}</span>
-                          <span>{extra?.label ?? extraValue}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              <div className="time-slots-display">
-                {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
-                  <div className="playtomic-booking-panel">
-                    <h3>Werkstatt buchen</h3>
-
-                    <div className="booking-section">
-                      <label className="booking-label" htmlFor="workshop-booking-start-date">
-                        Von wann?
-                      </label>
-                      <input
-                        id="workshop-booking-start-date"
-                        type="date"
-                        className="booking-input"
-                        value={selectedWorkshopDraft?.startDate ?? ""}
-                        onChange={(event) =>
-                          setBookingDraftsByWorkshop((prev) => ({
-                            ...prev,
-                            [selectedWorkshop.workshop.id]: {
-                              ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                              startDate: event.target.value
-                            }
-                          }))
-                        }
-                      />
-                      <input
-                        type="time"
-                        className="booking-input"
-                        style={{ marginTop: "8px" }}
-                        value={selectedWorkshopDraft?.startTime ?? ""}
-                        onChange={(event) =>
-                          setBookingDraftsByWorkshop((prev) => ({
-                            ...prev,
-                            [selectedWorkshop.workshop.id]: {
-                              ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                              startTime: event.target.value
-                            }
-                          }))
-                        }
-                      />
-                    </div>
-
-                    <div className="booking-section">
-                      <label className="booking-label">Wie lange?</label>
-                      <div className="duration-picker">
-                        <button
-                          type="button"
-                          className="duration-btn"
-                          onClick={() =>
-                            setBookingDraftsByWorkshop((prev) => ({
-                              ...prev,
-                              [selectedWorkshop.workshop.id]: {
-                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                durationDays: Math.max(
-                                  1,
-                                  (prev[selectedWorkshop.workshop.id]?.durationDays ?? getDefaultBookingDraft().durationDays) - 1
-                                )
-                              }
-                            }))
-                          }
-                        >
-                          −
-                        </button>
-                        <div className="duration-display">
-                          <strong>{selectedWorkshopDraft?.durationDays ?? 1}</strong>
-                          <span className="duration-label">
-                            {(selectedWorkshopDraft?.durationDays ?? 1) === 1 ? "Tag" : "Tage"}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="duration-btn"
-                          onClick={() =>
-                            setBookingDraftsByWorkshop((prev) => ({
-                              ...prev,
-                              [selectedWorkshop.workshop.id]: {
-                                ...(prev[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()),
-                                durationDays: Math.min(
-                                  30,
-                                  (prev[selectedWorkshop.workshop.id]?.durationDays ?? getDefaultBookingDraft().durationDays) + 1
-                                )
-                              }
-                            }))
-                          }
-                        >
-                          +
-                        </button>
-                      </div>
-                      {selectedWorkshopEndIso && (
-                        <p className="booking-end-date">
-                          Ende: <strong>{formatWorkshopDate(selectedWorkshopEndIso)}</strong>
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="booking-section">
-                      <p className="hint">
-                        <strong>Benötigte Werkzeuge (mindestens eins)</strong>
-                      </p>
-                      {selectedWorkshop.tools.length > 0 ? (
-                        <>
-                          <div className="row" style={{ marginBottom: "0.5rem" }}>
-                            <button
-                              type="button"
-                              className="btn secondary"
-                              onClick={() =>
-                                setSelectedToolIdsByWorkshop((prev) => ({
-                                  ...prev,
-                                  [selectedWorkshop.workshop.id]: selectedWorkshop.tools
-                                    .filter((tool) => tool.selectable)
-                                    .map((tool) => tool.id)
-                                }))
-                              }
-                            >
-                              Alle auswählen
-                            </button>
-                            <button
-                              type="button"
-                              className="btn ghost"
-                              onClick={() =>
-                                setSelectedToolIdsByWorkshop((prev) => ({
-                                  ...prev,
-                                  [selectedWorkshop.workshop.id]: []
-                                }))
-                              }
-                            >
-                              Auswahl löschen
-                            </button>
-                          </div>
-                          <div className="workshop-booking-tools">
-                            {selectedWorkshop.tools.map((tool) => {
-                              const selectedToolIds = selectedToolIdsByWorkshop[selectedWorkshop.workshop.id] ?? [];
-                              const checked = selectedToolIds.includes(tool.id);
-                              return (
-                                <label key={tool.id} className="workshop-booking-tool-option">
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    disabled={!token || !tool.selectable}
-                                    onChange={(event) =>
-                                      setSelectedToolIdsByWorkshop((prev) => {
-                                        const current = prev[selectedWorkshop.workshop.id] ?? [];
-                                        const next = event.target.checked
-                                          ? Array.from(new Set([...current, tool.id]))
-                                          : current.filter((id) => id !== tool.id);
-                                        return {
-                                          ...prev,
-                                          [selectedWorkshop.workshop.id]: next
-                                        };
-                                      })
-                                    }
-                                  />
-                                  <span>{tool.name}</span>
-                                  <small>{toolCategoryByValue.get(tool.category)?.label ?? tool.category}</small>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </>
-                      ) : (
-                        <p className="hint">Für diese Werkstatt wurde noch keine Ausstattung hinterlegt.</p>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      className="booking-button"
-                      onClick={() => void bookWorkshop(selectedWorkshop.workshop.id)}
-                      disabled={!selectedWorkshopHasAvailableSlots}
-                    >
-                      {token ? "Buchen" : "Login"}
-                    </button>
-                    <p className="booking-hint">
-                      {selectedWorkshopHasAvailableSlots
-                        ? "Der Anbieter muss deine Anfrage noch bestätigen."
-                        : "Aktuell ist kein verfügbares Zeitfenster hinterlegt."}
-                    </p>
-                  </div>
-                )}
-
-                {selectedWorkshop.slots.length > 0 ? (
-                  <ul className="meta-list">
-                    {selectedWorkshop.slots.map((slot) => (
-                      <li key={slot.id} className="slot-item">
-                        <div>
-                          <strong>{formatWorkshopDate(slot.startIso)}</strong>
-                          <span> bis </span>
-                          <strong>{formatWorkshopDate(slot.endIso)}</strong>
-                          {slot.blockedByOwner && <span className="slot-badge">blockiert</span>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="hint">Keine Zeitfenster hinterlegt.</p>
-                )}
-              </div>
-            </div>
-            */}
 
             {selectedWorkshopManageMode && (
               <div className="workshop-modal-footer owner-detail-actions">

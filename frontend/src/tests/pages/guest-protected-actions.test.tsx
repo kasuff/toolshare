@@ -15,6 +15,7 @@ vi.mock("../../services/api", async () => {
       ...actual.api,
       getTools: vi.fn(),
       getRatingsForTool: vi.fn(),
+      getToolById: vi.fn(),
       getToolBlockingPeriods: vi.fn(),
       getWorkshops: vi.fn(),
       createWorkshopBooking: vi.fn()
@@ -99,6 +100,7 @@ describe("Guest protected actions", () => {
             blockedByOwner: false
           }
         ],
+        bookedRanges: [],
         tools: []
       }
     ]);
@@ -129,6 +131,7 @@ describe("Guest protected actions", () => {
           toolIds: []
         },
         slots: [],
+        bookedRanges: [],
         tools: [
           {
             id: "tool-available",

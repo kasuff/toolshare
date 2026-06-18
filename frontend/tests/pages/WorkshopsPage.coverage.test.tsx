@@ -15,7 +15,8 @@ vi.mock("../../src/services/api", () => ({
   api: {
     getWorkshops,
     createWorkshopBooking,
-    getRatingsForWorkshop
+    getRatingsForWorkshop,
+    getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
 
@@ -74,7 +75,19 @@ describe("WorkshopsPage coverage", () => {
     renderWorkshopsPage();
 
     expect(await screen.findByText("Maker Space")).toBeInTheDocument();
+    getRatingsForWorkshop.mockResolvedValueOnce([
+      {
+        id: "rating-w1",
+        score: 4,
+        comment: "Gute Ausstattung",
+        fromUserName: "Tom",
+        createdIso: "2026-05-02T12:00:00.000Z"
+      }
+    ]);
     fireEvent.click(screen.getByText("Maker Space").closest("article")!);
+    expect(await screen.findByRole("heading", { name: "Bewertungen" })).toBeInTheDocument();
+    expect(screen.getByText("Gute Ausstattung")).toBeInTheDocument();
+    expect(getRatingsForWorkshop).toHaveBeenCalledWith("w1");
     expect(await screen.findByRole("region", { name: "Maker Space" })).toBeInTheDocument();
     expect(screen.getByText("Eigene Werkstatt")).toBeInTheDocument();
     expect(screen.getByText("Bohrmaschine")).toBeInTheDocument();

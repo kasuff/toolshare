@@ -76,9 +76,10 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
 
     const loadUnreadRequestsForBell = async () => {
       try {
-        const [bookings, ratingsReceived] = await Promise.all([
+        const [bookings, ratingsReceived, notifications] = await Promise.all([
           api.getBookingsForUser(token),
-          api.getRatingsReceived(token)
+          api.getRatingsReceived(token),
+          api.getNotifications(token)
         ]);
         if (cancelled) return;
         const ratingsByBookingId = new Map(
@@ -88,7 +89,17 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
           ])
         );
         const readIds = loadReadMessageIds(userId);
-        const count = countUnreadInboxThreads(bookings, userId, readIds, ratingsByBookingId);
+        let count = countUnreadInboxThreads(bookings, userId, readIds, ratingsByBookingId);
+
+        const unreadNotifications = notifications.filter(
+          (n) =>
+            !n.read &&
+            (n.message.startsWith("ERMAHNUNG:") ||
+              n.message.startsWith("SPERRUNG:") ||
+              n.message.includes("wurde storniert") ||
+              n.message.includes("wurde gelöscht"))
+        );
+        count += unreadNotifications.length;
         setUnreadRequestBellCount(count);
       } catch {
         if (!cancelled) setUnreadRequestBellCount(0);
@@ -204,6 +215,18 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
       <main className="content">
         <Outlet />
       </main>
+
+      <footer className="site-footer">
+        <div className="site-footer-inner">
+          <span className="site-footer-brand">
+            Tool<strong>Share</strong>
+          </span>
+          <nav className="site-footer-nav" aria-label="Rechtliche Informationen">
+            <Link to="/impressum">Impressum</Link>
+            <Link to="/datenschutz">Datenschutzerklärung</Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

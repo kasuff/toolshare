@@ -1,13 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { AddressInput } from "../components/AddressInput";
 import {
-  AddressInput,
   EMPTY_ADDRESS,
   isAddressComplete,
   parseAddress,
   toAddressPayload,
   type AddressFormFields
-} from "../components/AddressInput";
+} from "../utils/address";
 import { CategorySelect } from "../components/CategorySelect";
 import { ImageUpload } from "../components/ImageUpload";
 import { Surface } from "../components/ui";
@@ -100,7 +100,6 @@ export function EditToolPage({ currentUser, token }: Props) {
       (!addressWasChanged && originalPickupLocation.trim().length >= 5);
 
     if (!name.trim() || description.trim().length < 5 || !category || !hasValidPickupLocation) {
-      pushToast("Bitte fülle alle Pflichtfelder vollständig aus.", "error");
       return;
     }
 

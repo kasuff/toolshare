@@ -26,7 +26,7 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
   const [workshops, setWorkshops] = useState<WorkshopWithSlots[]>([]);
   const [selectedWorkshop, setSelectedWorkshop] = useState<WorkshopWithSlots | null>(null);
   const [slots, setSlots] = useState<WorkshopSlot[]>([]);
-  const [draft, setDraft] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: false });
+  const [draft, setDraft] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: true });
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: false });
   const [loading, setLoading] = useState(true);
@@ -148,7 +148,6 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
   const validateSlot = (candidate: SlotDraft) => {
     if (!candidate.startIso || !candidate.endIso) {
-      pushToast("Bitte Start und Ende für das Zeitfenster angeben.", "error");
       return false;
     }
     if (new Date(candidate.startIso) >= new Date(candidate.endIso)) {
@@ -160,7 +159,6 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
   const addSlot = async () => {
     if (!selectedWorkshop || !token) {
-      pushToast("Bitte wählen Sie eine Werkstatt aus.", "error");
       return;
     }
     if (!validateSlot(draft)) return;
@@ -171,15 +169,15 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
         {
           startIso: draft.startIso,
           endIso: draft.endIso,
-          blockedByOwner: draft.blockedByOwner
+          blockedByOwner: true
         },
         token
       );
       await refreshWorkshopState(selectedWorkshop.workshop.id);
-      setDraft({ startIso: "", endIso: "", blockedByOwner: false });
-      pushToast("Zeitfenster gespeichert.", "success");
+      setDraft({ startIso: "", endIso: "", blockedByOwner: true });
+      pushToast("Zeitraum blockiert.", "success");
     } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht gespeichert werden.", "error");
+      pushToast(error instanceof Error ? error.message : "Zeitraum konnte nicht blockiert werden.", "error");
     }
   };
 
@@ -253,26 +251,15 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
     }
   };
 
-  const toggleBlocked = async (slot: WorkshopSlot) => {
-    if (!selectedWorkshop || !token) return;
-    try {
-      const updated = await api.updateWorkshopTimeslot(
-        selectedWorkshop.workshop.id,
-        slot.id,
-        { blockedByOwner: !slot.blockedByOwner },
-        token
-      );
-      applySlotsUpdate(slots.map((item) => (item.id === slot.id ? updated : item)));
-      pushToast(updated.blockedByOwner ? "Zeitfenster blockiert." : "Zeitfenster freigegeben.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Status konnte nicht geändert werden.", "error");
-    }
-  };
+  const blockedSlots = slots.filter((slot) => slot.blockedByOwner);
 
   return (
     <section className="stack">
-      <h1>Verfügbarkeit & Zeitfenster</h1>
-      <p className="subtitle">Verwalte die Buchungen und blockiere Zeiten für Wartungsarbeiten.</p>
+      <h1>Zeiten blockieren</h1>
+      <p className="subtitle">
+        Deine Werkstatt ist standardmäßig immer buchbar. Hier blockierst du Zeiträume, in denen sie nicht gebucht werden
+        kann – z.&nbsp;B. für Wartung oder Eigennutzung.
+      </p>
 
       <Surface title="Werkstatt wählen" subtitle="Wähle eine deiner Werkstätten aus">
         <div className="workshop-selector">
@@ -286,7 +273,9 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
               <div className="workshop-card-content">
                   <h3>{workshop.workshop.name}</h3>
                   <p>{workshop.workshop.location}</p>
-                  <span className="workshop-slots-count">{workshop.slots.length} Zeitfenster</span>
+                  <span className="workshop-slots-count">
+                    {workshop.slots.filter((slot) => slot.blockedByOwner).length} blockierte Zeiten
+                  </span>
               </div>
             </button>
           ))}
@@ -295,8 +284,8 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
 
       {selectedWorkshop && (
         <>
-          <Surface title="Neues Zeitfenster hinzufügen" subtitle="Lege zusätzliche verfügbare Zeiten oder Blockierungen an">
-            <div className="grid grid-3">
+          <Surface title="Zeitraum blockieren" subtitle="Lege einen Zeitraum fest, in dem die Werkstatt nicht buchbar ist">
+            <div className="grid grid-2">
               <Field label="Startzeit">
                 <input
                   type="datetime-local"
@@ -311,33 +300,25 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
                   onChange={(e) => setDraft((prev) => ({ ...prev, endIso: e.target.value }))}
                 />
               </Field>
-              <label className="field" style={{ paddingTop: "1.5rem" }}>
-                <span>Als blockiert markieren</span>
-                <input
-                  type="checkbox"
-                  checked={draft.blockedByOwner}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, blockedByOwner: e.target.checked }))}
-                />
-              </label>
             </div>
             <div className="row">
               <button type="button" className="btn secondary" onClick={() => void addSlot()}>
-                Änderungen speichern
+                Zeitraum blockieren
               </button>
             </div>
           </Surface>
 
-          <Surface title="Bestehende Zeitfenster" subtitle="Zeiten bearbeiten, blockieren/freigeben oder entfernen">
-            {slots.length > 0 ? (
+          <Surface title="Blockierte Zeiten" subtitle="Blockierte Zeiträume bearbeiten oder wieder freigeben">
+            {blockedSlots.length > 0 ? (
               <div className="time-slots-display">
                 <ul className="meta-list">
-                  {slots.map((slot) => {
+                  {blockedSlots.map((slot) => {
                     const isEditing = editingSlotId === slot.id;
                     return (
                       <li key={slot.id} className={`slot-item ${isEditing ? "slot-item-editing" : ""}`}>
                         {isEditing ? (
                           <div className="slot-edit-form">
-                            <div className="grid grid-3">
+                            <div className="grid grid-2">
                               <Field label="Startzeit">
                                 <input
                                   type="datetime-local"
@@ -352,14 +333,6 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
                                   onChange={(e) => setEditingDraft((prev) => ({ ...prev, endIso: e.target.value }))}
                                 />
                               </Field>
-                              <label className="field" style={{ paddingTop: "1.5rem" }}>
-                                <span>Blockiert</span>
-                                <input
-                                  type="checkbox"
-                                  checked={editingDraft.blockedByOwner}
-                                  onChange={(e) => setEditingDraft((prev) => ({ ...prev, blockedByOwner: e.target.checked }))}
-                                />
-                              </label>
                             </div>
                             <div className="row slot-edit-actions">
                               <button type="button" onClick={() => void saveEditedSlot()}>
@@ -376,17 +349,14 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
                               <strong>{new Date(slot.startIso).toLocaleString("de-DE")}</strong>
                               {" – "}
                               <strong>{new Date(slot.endIso).toLocaleString("de-DE")}</strong>
-                              {slot.blockedByOwner && <span className="slot-badge">blockiert</span>}
+                              <span className="slot-badge">blockiert</span>
                             </div>
                             <div className="row slot-actions">
                               <button type="button" className="btn secondary" onClick={() => startEditing(slot)}>
                                 Bearbeiten
                               </button>
-                              <button type="button" className="btn secondary" onClick={() => void toggleBlocked(slot)}>
-                                {slot.blockedByOwner ? "Freigeben" : "Blockieren"}
-                              </button>
                               <button type="button" className="btn ghost danger" onClick={() => void removeSlot(slot.id)}>
-                                Entfernen
+                                Freigeben
                               </button>
                             </div>
                           </>
@@ -398,7 +368,7 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
               </div>
             ) : (
               <p style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>
-                Keine Zeitfenster konfiguriert
+                Keine blockierten Zeiten – die Werkstatt ist durchgehend buchbar.
               </p>
             )}
           </Surface>

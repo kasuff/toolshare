@@ -21,6 +21,15 @@ export const toolIdParamSchema = z.object({
   query: z.object({})
 });
 
+export const toolOwnerBlockParamSchema = z.object({
+  body: z.object({}),
+  params: z.object({
+    id: z.string().uuid(),
+    bookingId: z.string().uuid()
+  }),
+  query: z.object({})
+});
+
 export const createToolSchema = z.object({
   body: z.object({
     name: z.string().min(2),

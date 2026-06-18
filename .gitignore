@@ -8,6 +8,7 @@ dist/
 build/
 public/
 *.tsbuildinfo
+.tsbuild/
 junit.xml
 
 # Environment
@@ -37,3 +38,6 @@ coverage/
 # Prisma
 backend/prisma/*.db
 backend/prisma/migrations/**/migration_lock.toml
+
+# Mobile
+mobile/

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { DateInput } from "../components/DateInput";
 import { KebabMenu } from "../components/KebabMenu";
 import { RatingFormPanel } from "../components/RatingFormPanel";
 import { ReportFormPanel } from "../components/ReportFormPanel";
@@ -11,6 +12,7 @@ import type {
   Booking,
   BookingStatus,
   BookingType,
+  Notification,
   PickupProposal,
   Rating,
   TimeslotProposal,
@@ -37,7 +39,62 @@ type Props = {
 const bookingTypeLabel: Record<BookingType, string> = {
   TOOL: "Werkzeug",
   WORKSHOP: "Werkstatt",
+  SYSTEM_WARNING: "System-Meldung"
 };
+
+interface ParsedWarning {
+  reason: string;
+  moderator: string;
+  hint: string;
+}
+
+function parseSuspensionMessage(message: string): { reason: string } {
+  if (!message.startsWith("SPERRUNG:")) {
+    return { reason: message };
+  }
+
+  const content = message.replace("SPERRUNG:", "").trim();
+  const reasonLine = content.split("\n").find((line) => line.trim().startsWith("Grund:"));
+  return {
+    reason: reasonLine ? reasonLine.replace("Grund:", "").trim() : content
+  };
+}
+
+function isInboxSystemNotification(message: string): boolean {
+  return (
+    message.startsWith("ERMAHNUNG:") ||
+    message.startsWith("SPERRUNG:") ||
+    message.includes("wurde storniert") ||
+    message.includes("wurde gelöscht")
+  );
+}
+
+function parseWarningMessage(message: string): ParsedWarning {
+  if (!message.startsWith("ERMAHNUNG:")) {
+    return { reason: message, moderator: "Moderator", hint: "" };
+  }
+  
+  const content = message.replace("ERMAHNUNG:", "").trim();
+  const lines = content.split("\n");
+  
+  let reason = "";
+  let moderator = "Moderator";
+  let hint = "";
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("Moderator:")) {
+      moderator = trimmed.replace("Moderator:", "").trim();
+    } else if (trimmed.startsWith("Hinweis:")) {
+      hint = trimmed;
+    } else if (trimmed) {
+      if (reason) reason += "\n" + trimmed;
+      else reason = trimmed;
+    }
+  }
+  
+  return { reason, moderator, hint };
+}
 
 const bookingStatusLabel: Record<BookingStatus, string> = {
   OFFEN: "Offen",
@@ -64,10 +121,29 @@ type BookingRow = Booking & {
   timeslotProposals: TimeslotProposal[];
 };
 
+const MOBILE_INBOX_MEDIA_QUERY = "(max-width: 900px)";
+
+function useMobileInboxLayout() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(MOBILE_INBOX_MEDIA_QUERY).matches
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(MOBILE_INBOX_MEDIA_QUERY);
+    const onChange = () => setIsMobile(mediaQuery.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
+
+  return isMobile;
+}
+
 export function InboxPage({ currentUser, token }: Props) {
   const location = useLocation();
+  const isMobileInbox = useMobileInboxLayout();
   const { pushToast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftToolRangeParts>>({});
   const [draftWorkshopRangeByBooking, setDraftWorkshopRangeByBooking] = useState<
@@ -93,14 +169,16 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!token) return;
     setIsLoading(true);
     try {
-      const [nextBookings, nextGivenRatings, nextReceivedRatings] = await Promise.all([
+      const [nextBookings, nextGivenRatings, nextReceivedRatings, fetchedNotifications] = await Promise.all([
         api.getBookingsForUser(token),
         api.getRatingsGiven(token),
-        api.getRatingsReceived(token)
+        api.getRatingsReceived(token),
+        api.getNotifications(token)
       ]);
       setBookings(nextBookings);
       setRatingsGiven(nextGivenRatings);
       setRatingsReceived(nextReceivedRatings);
+      setNotifications(fetchedNotifications);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
     } finally {
@@ -142,13 +220,41 @@ export function InboxPage({ currentUser, token }: Props) {
   }, [currentUser?.id, bookings, ratingsGiven, ratingsReceived]);
 
   const bookingRows: BookingRow[] = useMemo(
-    () =>
-      bookings.map((booking) => ({
+    () => [
+      ...bookings.map((booking) => ({
         ...booking,
         pickupProposals: booking.pickupProposals ?? [],
         timeslotProposals: booking.timeslotProposals ?? []
       })),
-    [bookings]
+      ...notifications
+        .filter((n) => isInboxSystemNotification(n.message))
+        .map((n) => {
+          const isWarning = n.message.startsWith("ERMAHNUNG:");
+          const isSuspension = n.message.startsWith("SPERRUNG:");
+          const parsed = isWarning
+            ? parseWarningMessage(n.message)
+            : isSuspension
+              ? { reason: parseSuspensionMessage(n.message).reason, moderator: "Administration", hint: "" }
+              : { reason: n.message, moderator: "System", hint: "" };
+          return {
+            id: n.id,
+            type: "SYSTEM_WARNING" as BookingType,
+            requesterId: currentUser?.id ?? "",
+            providerId: "system",
+            status: "BESTAETIGT" as BookingStatus,
+            createdIso: n.createdIso,
+            providerName: parsed.moderator,
+            requesterName: currentUser?.name ?? "Du",
+            toolName: isWarning ? "Ermahnung der Moderation" : isSuspension ? "Kontosperrung" : "System-Benachrichtigung",
+            pickupProposals: [],
+            timeslotProposals: [],
+            selectedWorkshopTools: [],
+            systemWarningText: n.message,
+            isNotificationRead: n.read
+          };
+        })
+    ],
+    [bookings, notifications, currentUser]
   );
 
   const ratingsByBookingId = useMemo(() => {
@@ -180,19 +286,39 @@ export function InboxPage({ currentUser, token }: Props) {
       const requestedBooking = requestedBookingId
         ? sortedRows.find((booking) => booking.id === requestedBookingId)
         : null;
-      setSelectedBookingId(requestedBooking?.id ?? sortedRows[0].id);
+      if (requestedBooking) {
+        setSelectedBookingId(requestedBooking.id);
+        return;
+      }
+      if (isMobileInbox) {
+        setSelectedBookingId(null);
+        return;
+      }
+      setSelectedBookingId(sortedRows[0].id);
     }
-  }, [location.state, sortedRows, selectedBookingId]);
+  }, [isMobileInbox, location.state, sortedRows, selectedBookingId]);
 
+  const prevSelectedBookingIdRef = useRef<string | null>(null);
   useEffect(() => {
-    setShowUserReportForm(false);
-    setReportReason("");
-    setReportDetails("");
-    setCounterFormBookingId(null);
+    // Nur bei einem echten Threadwechsel die offenen Formulare leeren. Das erste
+    // Festlegen (null -> erste ID) passiert asynchron nach dem ersten Render via
+    // Auto-Auswahl; würde es hier zurücksetzen, könnte es ein gerade per Klick
+    // geöffnetes Formular sofort wieder schließen (Race Auto-Auswahl vs. Klick).
+    if (prevSelectedBookingIdRef.current !== null && prevSelectedBookingIdRef.current !== selectedBookingId) {
+      setShowUserReportForm(false);
+      setReportReason("");
+      setReportDetails("");
+      setCounterFormBookingId(null);
+    }
+    prevSelectedBookingIdRef.current = selectedBookingId;
   }, [selectedBookingId]);
 
   const selectedBooking =
-    sortedRows.find((booking) => booking.id === selectedBookingId) ?? (sortedRows.length > 0 ? sortedRows[0] : null);
+    selectedBookingId != null
+      ? sortedRows.find((booking) => booking.id === selectedBookingId) ?? null
+      : isMobileInbox
+        ? null
+        : sortedRows[0] ?? null;
 
   const selectedReqIncoming = Boolean(
     selectedBooking && currentUser && selectedBooking.requesterId !== currentUser.id
@@ -204,6 +330,12 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!selectedBookingId) return;
     const row = sortedRows.find((b) => b.id === selectedBookingId);
     if (!row) return;
+    if (row.type === "SYSTEM_WARNING") {
+      if (!row.isNotificationRead) {
+        void markNotificationRead(row.id);
+      }
+      return;
+    }
     if (draftSeededForThreadRef.current.has(selectedBookingId)) return;
     draftSeededForThreadRef.current.add(selectedBookingId);
     setDraftPickupByBooking((prev) => ({
@@ -296,12 +428,24 @@ export function InboxPage({ currentUser, token }: Props) {
     });
   };
 
+  const markNotificationRead = async (notificationId: string) => {
+    if (!token) return;
+    try {
+      await api.markNotificationAsRead(notificationId, token);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+      );
+      window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
+    } catch (error) {
+      console.error("Fehler beim Markieren der Benachrichtigung als gelesen:", error);
+    }
+  };
+
   const decide = async (bookingId: string, accept: boolean) => {
     if (!token) return;
     try {
       await api.decideBooking(bookingId, accept ? "BESTAETIGT" : "ABGELEHNT", token);
       await loadData();
-      pushToast(`Anfrage ${accept ? "bestätigt" : "abgelehnt"}.`, "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Status konnte nicht gesetzt werden.", "error");
     }
@@ -317,7 +461,6 @@ export function InboxPage({ currentUser, token }: Props) {
     const pickupIso = combineLocalDateTimeToIso(draft?.pickupDate ?? "", draft?.pickupTime ?? "");
     const returnIso = combineLocalDateTimeToIso(draft?.returnDate ?? "", draft?.returnTime ?? "");
     if (!pickupIso || !returnIso) {
-      pushToast("Bitte Abholung und Rückgabe jeweils mit Datum und Uhrzeit wählen.", "error");
       return;
     }
     if (new Date(returnIso).getTime() <= new Date(pickupIso).getTime()) {
@@ -336,7 +479,6 @@ export function InboxPage({ currentUser, token }: Props) {
         [booking.id]: toToolRangeDraft(booking),
       }));
       setCounterFormBookingId(null);
-      pushToast("Alternativvorschlag gesendet.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Alternativvorschlag konnte nicht gesendet werden.", "error");
     }
@@ -352,7 +494,6 @@ export function InboxPage({ currentUser, token }: Props) {
     const startIso = combineLocalDateTimeToIso(draft?.startDate ?? "", draft?.startTime ?? "");
     const endIso = combineLocalDateTimeToIso(draft?.endDate ?? "", draft?.endTime ?? "");
     if (!startIso || !endIso) {
-      pushToast("Bitte Start- und Enddatum jeweils mit Uhrzeit wählen.", "error");
       return;
     }
     if (new Date(endIso).getTime() <= new Date(startIso).getTime()) {
@@ -368,7 +509,6 @@ export function InboxPage({ currentUser, token }: Props) {
       await loadData();
       setDraftWorkshopRangeByBooking((prev) => ({ ...prev, [booking.id]: toWorkshopDraft(booking) }));
       setCounterFormBookingId(null);
-      pushToast("Alternativzeitraum gesendet.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Alternativzeitraum konnte nicht gesendet werden.", "error");
     }
@@ -474,7 +614,6 @@ export function InboxPage({ currentUser, token }: Props) {
   const reportCurrentCounterparty = async () => {
     if (!token || !currentUser || !selectedBooking) return;
     if (reportReason.trim().length < 5) {
-      pushToast("Bitte gib einen Grund mit mindestens 5 Zeichen an.", "error");
       return;
     }
     const counterpartId = selectedBooking.providerId === currentUser.id ? selectedBooking.requesterId : selectedBooking.providerId;
@@ -523,17 +662,21 @@ export function InboxPage({ currentUser, token }: Props) {
 
   return (
     <section className="stack inbox-messenger-page">
-      <header className="inbox-messenger-title-row">
-        <h1>Nachrichten</h1>
-        {isLoading && <span className="inbox-loading-hint">Laden…</span>}
-      </header>
+      {(!isMobileInbox || !selectedBooking) && (
+        <header className="inbox-messenger-title-row">
+          <h1>Nachrichten</h1>
+          {isLoading && <span className="inbox-loading-hint">Laden…</span>}
+        </header>
+      )}
 
       {sortedRows.length === 0 ? (
         <Surface title="Keine Konversationen">
           <EmptyState title="Noch nichts hier" text="Sobald jemand eine Ausleihe anfragt oder du eine sendest, erscheint die Unterhaltung hier." />
         </Surface>
       ) : (
-        <div className="messenger-shell">
+        <div
+          className={`messenger-shell${isMobileInbox && selectedBooking ? " messenger-shell--chat-open" : ""}`}
+        >
           <aside className="messenger-thread-list" aria-label="Konversationen">
             {sortedRows.map((booking) => {
               const active = selectedBooking?.id === booking.id;
@@ -554,7 +697,9 @@ export function InboxPage({ currentUser, token }: Props) {
                   aria-current={active ? "true" : undefined}
                   onClick={() => {
                     setSelectedBookingId(booking.id);
-                    markThreadRead(booking);
+                    if (booking.type !== "SYSTEM_WARNING") {
+                      markThreadRead(booking);
+                    }
                   }}
                 >
                   <span className="messenger-thread-avatar-wrap">
@@ -584,37 +729,66 @@ export function InboxPage({ currentUser, token }: Props) {
 
           {selectedBooking && (
             <div className="messenger-chat">
-              <header className="messenger-chat-header">
+              <header
+                className={`messenger-chat-header${isMobileInbox ? " messenger-chat-header--compact" : ""}`}
+              >
+                {isMobileInbox && (
+                  <button
+                    type="button"
+                    className="icon-button messenger-back-button"
+                    aria-label="Zurück zur Chatliste"
+                    onClick={() => setSelectedBookingId(null)}
+                  >
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      arrow_back
+                    </span>
+                  </button>
+                )}
                 <UserAvatar
                   name={counterparty(selectedBooking, currentUser.id).name}
                   imageUrl={null}
                   size="lg"
                 />
                 <div className="messenger-chat-header-text">
-                  <strong>{selectedBooking.toolName ?? `${bookingTypeLabel[selectedBooking.type]}-Anfrage`}</strong>
-                  <span className="messenger-chat-header-sub">{counterparty(selectedBooking, currentUser.id).name}</span>
+                  <strong>{getChatHeaderTitle(selectedBooking, currentUser.id, isMobileInbox)}</strong>
+                  <span className="messenger-chat-header-sub">
+                    {getChatHeaderSubtitle(selectedBooking, currentUser.id, isMobileInbox)}
+                  </span>
                 </div>
                 <div className="messenger-chat-header-actions">
-                  <StatusPill
-                    label={bookingStatusLabel[selectedBooking.status]}
-                    tone={
-                      selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
-                        ? "success"
-                        : selectedBooking.status === "ABGELEHNT"
-                          ? "danger"
-                          : "neutral"
-                    }
-                  />
-                  <KebabMenu
-                    ariaLabel="Konversationsaktionen"
-                    items={[
-                      {
-                        id: "report-user",
-                        label: "Nutzer melden",
-                        onSelect: () => setShowUserReportForm(true)
+                  {!isMobileInbox && (
+                    <StatusPill
+                      label={
+                        selectedBooking.type === "SYSTEM_WARNING"
+                          ? getSystemWarningLabel(selectedBooking.systemWarningText)
+                          : bookingStatusLabel[selectedBooking.status]
                       }
-                    ]}
-                  />
+                      tone={
+                        selectedBooking.type === "SYSTEM_WARNING"
+                          ? selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ||
+                            selectedBooking.systemWarningText?.startsWith("SPERRUNG:")
+                            ? "danger"
+                            : "neutral"
+                          : selectedBooking.status === "BESTAETIGT" || selectedBooking.status === "ABGESCHLOSSEN"
+                            ? "success"
+                            : selectedBooking.status === "ABGELEHNT"
+                              ? "danger"
+                              : "neutral"
+                      }
+                    />
+                  )}
+                  {selectedBooking.type !== "SYSTEM_WARNING" && (
+                    <KebabMenu
+                      ariaLabel="Konversationsaktionen"
+                      items={[
+                        {
+                          id: "report-user",
+                          label: "Nutzer melden",
+                          onSelect: () => setShowUserReportForm(true)
+                        }
+                      ]}
+                    />
+                  )}
                 </div>
               </header>
 
@@ -649,6 +823,65 @@ export function InboxPage({ currentUser, token }: Props) {
               )}
 
               <div className="messenger-chat-scroll" ref={chatScrollRef}>
+                {selectedBooking.type === "SYSTEM_WARNING" ? (
+                  <MessengerRow
+                    variant="incoming"
+                    avatar={<UserAvatar name={selectedBooking.providerName ?? "System"} imageUrl={null} size="sm" />}
+                  >
+                    {selectedBooking.systemWarningText?.startsWith("ERMAHNUNG:") ? (
+                    <RequestMessageCard
+                      label="Sicherheitsmeldung"
+                      title="Ermahnung der Moderation"
+                      icon="gavel"
+                    >
+                      {(() => {
+                        const parsed = parseWarningMessage(selectedBooking.systemWarningText ?? "");
+                        return (
+                          <div className="warning-card-body" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <p style={{ margin: 0, fontWeight: 'bold' }}>Grund der Ermahnung:</p>
+                            <blockquote style={{ margin: '0 0 12px 0', padding: '8px 12px', borderLeft: '4px solid var(--color-warning)', background: 'rgba(217, 119, 6, 0.08)', fontStyle: 'italic', borderRadius: '0 4px 4px 0' }}>
+                              {parsed.reason}
+                            </blockquote>
+                            {parsed.hint && (
+                              <p style={{ margin: 0, fontSize: '0.9em', color: '#dc2626', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '1.2em' }}>warning</span>
+                                {parsed.hint}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </RequestMessageCard>
+                    ) : selectedBooking.systemWarningText?.startsWith("SPERRUNG:") ? (
+                    <RequestMessageCard
+                      label="Kontosperrung"
+                      title="Dein Konto wurde gesperrt"
+                      icon="block"
+                    >
+                      <div className="warning-card-body" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>Grund der Sperrung:</p>
+                        <blockquote style={{ margin: 0, padding: '8px 12px', borderLeft: '4px solid #dc2626', background: 'rgba(220, 38, 38, 0.08)', fontStyle: 'italic', borderRadius: '0 4px 4px 0' }}>
+                          {parseSuspensionMessage(selectedBooking.systemWarningText ?? "").reason}
+                        </blockquote>
+                        <p style={{ margin: 0, fontSize: '0.9em', color: '#6b7280' }}>
+                          Deine Angebote sind vorübergehend ausgeblendet. Nach einer Entsperrung sind sie wieder sichtbar.
+                        </p>
+                      </div>
+                    </RequestMessageCard>
+                    ) : (
+                    <RequestMessageCard
+                      label="Benachrichtigung"
+                      title="System-Benachrichtigung"
+                      icon="info"
+                    >
+                      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <p style={{ margin: 0 }}>{selectedBooking.systemWarningText}</p>
+                      </div>
+                    </RequestMessageCard>
+                    )}
+                  </MessengerRow>
+                ) : (
+                  <>
                 <MessengerRow
                   variant={selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}
                   avatar={<UserAvatar name={selectedBooking.requesterName ?? currentUser.name} imageUrl={null} size="sm" />}
@@ -810,16 +1043,15 @@ export function InboxPage({ currentUser, token }: Props) {
                         <div className="request-card-form-grid request-card-form-grid--workshop">
                           <label>
                             <span>Abholdatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternatives Abholdatum"
-                              type="date"
                               value={counterDraft?.pickupDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftPickupByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
-                                    pickupDate: event.target.value
+                                    pickupDate: value
                                   }
                                 }))
                               }
@@ -844,16 +1076,15 @@ export function InboxPage({ currentUser, token }: Props) {
                           </label>
                           <label>
                             <span>Rückgabedatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternatives Rückgabedatum"
-                              type="date"
                               value={counterDraft?.returnDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftPickupByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toToolRangeDraft(selectedBooking)),
-                                    returnDate: event.target.value
+                                    returnDate: value
                                   }
                                 }))
                               }
@@ -881,16 +1112,15 @@ export function InboxPage({ currentUser, token }: Props) {
                         <div className="request-card-form-grid request-card-form-grid--workshop">
                           <label>
                             <span>Startdatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternativdatum für Werkstattvorschlag"
-                              type="date"
                               value={workshopRangeDraft?.startDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftWorkshopRangeByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
-                                    startDate: event.target.value
+                                    startDate: value
                                   }
                                 }))
                               }
@@ -915,16 +1145,15 @@ export function InboxPage({ currentUser, token }: Props) {
                           </label>
                           <label>
                             <span>Enddatum</span>
-                            <input
+                            <DateInput
                               aria-label="Alternativ-Enddatum für Werkstattvorschlag"
-                              type="date"
                               value={workshopRangeDraft?.endDate ?? ""}
-                              onChange={(event) =>
+                              onChange={(value) =>
                                 setDraftWorkshopRangeByBooking((prev) => ({
                                   ...prev,
                                   [selectedBooking.id]: {
                                     ...(prev[selectedBooking.id] ?? toWorkshopDraft(selectedBooking)),
-                                    endDate: event.target.value
+                                    endDate: value
                                   }
                                 }))
                               }
@@ -968,6 +1197,8 @@ export function InboxPage({ currentUser, token }: Props) {
                       </div>
                     </RequestMessageCard>
                   </MessengerRow>
+                )}
+                  </>
                 )}
               </div>
 
@@ -1206,11 +1437,17 @@ function threadHasUnread(
   readIds: Set<string>,
   rating?: Rating | null
 ): boolean {
+  if (booking.type === "SYSTEM_WARNING") {
+    return !booking.isNotificationRead;
+  }
   return bookingHasUnreadForUser(booking, currentUserId, readIds, rating);
 }
 
 function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string, rating?: Rating | null): string[] {
   const keys: string[] = [];
+  if (booking.type === "SYSTEM_WARNING") {
+    return keys;
+  }
   if (booking.requesterId !== currentUserId) {
     keys.push(requestMessageKey(booking.id));
   }
@@ -1231,13 +1468,56 @@ function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string, 
 }
 
 function counterparty(booking: Booking, currentUserId: string): { name: string } {
+  if (booking.type === "SYSTEM_WARNING") {
+    return { name: booking.providerName ?? "System" };
+  }
   if (booking.providerId === currentUserId) {
     return { name: booking.requesterName ?? "Anfragender" };
   }
   return { name: booking.providerName ?? "Anbieter" };
 }
 
+function getBookingContextLabel(type: BookingType): string {
+  if (type === "WORKSHOP") return "Werkstatt";
+  if (type === "TOOL") return "Ausleihe";
+  return bookingTypeLabel[type];
+}
+
+function getSystemWarningLabel(text?: string): string {
+  if (text?.startsWith("ERMAHNUNG:")) return "Verwarnung";
+  if (text?.startsWith("SPERRUNG:")) return "Gesperrt";
+  return "Info";
+}
+
+function getChatHeaderTitle(booking: Booking, currentUserId: string, compact: boolean): string {
+  if (compact) {
+    if (booking.type === "SYSTEM_WARNING") return "Moderation";
+    return counterparty(booking, currentUserId).name;
+  }
+  if (booking.type === "SYSTEM_WARNING") {
+    return booking.toolName ?? "System-Meldung";
+  }
+  return booking.toolName ?? `${bookingTypeLabel[booking.type]}-Anfrage`;
+}
+
+function getChatHeaderSubtitle(booking: Booking, currentUserId: string, compact: boolean): string {
+  if (compact) {
+    if (booking.type === "SYSTEM_WARNING") {
+      return getSystemWarningLabel(booking.systemWarningText);
+    }
+    return `${getBookingContextLabel(booking.type)} · ${bookingStatusLabel[booking.status]}`;
+  }
+  return counterparty(booking, currentUserId).name;
+}
+
 function getThreadPreview(row: BookingRow, currentUserId: string, rating?: Rating | null): string {
+  if (row.type === "SYSTEM_WARNING") {
+    if (row.systemWarningText?.startsWith("SPERRUNG:")) {
+      return parseSuspensionMessage(row.systemWarningText).reason;
+    }
+    const parsed = parseWarningMessage(row.systemWarningText ?? "");
+    return parsed.reason;
+  }
   const latestPickup =
     row.pickupProposals.length > 0 ? row.pickupProposals[row.pickupProposals.length - 1] : null;
   const latestTimeslot =

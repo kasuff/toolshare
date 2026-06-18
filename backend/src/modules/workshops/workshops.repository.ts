@@ -2,10 +2,16 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 
 export const workshopsRepository = {
-  list(filters: { managerId?: string; location?: string; search?: string }) {
+  list(filters: {
+    managerId?: string;
+    location?: string;
+    search?: string;
+    excludeSuspendedManagers?: boolean;
+  }) {
     return prisma.workshop.findMany({
       where: {
         managerId: filters.managerId,
+        manager: filters.excludeSuspendedManagers ? { isSuspended: false } : undefined,
         location: filters.location
           ? { contains: filters.location, mode: "insensitive" }
           : undefined,
@@ -21,7 +27,8 @@ export const workshopsRepository = {
         manager: {
           select: {
             id: true,
-            name: true
+            name: true,
+            isSuspended: true
           }
         },
         workshopTools: {
@@ -43,7 +50,8 @@ export const workshopsRepository = {
         manager: {
           select: {
             id: true,
-            name: true
+            name: true,
+            isSuspended: true
           }
         },
         workshopTools: {
@@ -57,6 +65,21 @@ export const workshopsRepository = {
           orderBy: { startTime: "asc" }
         }
       }
+    });
+  },
+
+  // Liefert die belegten Zeiträume einer Werkstatt für die Kalenderansicht
+  // (durchgestrichen). Erfasst sowohl neue Buchungen mit direktem workshopId-FK
+  // als auch Altbuchungen, die noch über einen TimeSlot (timeslotId) verknüpft sind.
+  // Bewusst ohne Nutzeridentität.
+  findActiveBookingRanges(workshopId: string) {
+    return prisma.booking.findMany({
+      where: {
+        status: { in: ["PENDING", "ACCEPTED"] },
+        OR: [{ workshopId }, { timeslot: { workshopId } }]
+      },
+      select: { id: true, startDate: true, endDate: true, status: true },
+      orderBy: { startDate: "asc" }
     });
   },
 

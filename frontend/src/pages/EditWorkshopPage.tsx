@@ -1,13 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { AddressInput } from "../components/AddressInput";
 import {
-  AddressInput,
   EMPTY_ADDRESS,
   isAddressComplete,
   parseAddress,
   toAddressPayload,
   type AddressFormFields
-} from "../components/AddressInput";
+} from "../utils/address";
 import { Field, Surface } from "../components/ui";
 import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
@@ -153,15 +153,12 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
       (!addressWasChanged && originalLocation.trim().length >= 5);
 
     if (!name.trim()) {
-      pushToast("Bitte geben Sie einen Werkstatt-Namen ein.", "error");
       return;
     }
     if (description.trim().length < 5) {
-      pushToast("Bitte gib eine Beschreibung mit mindestens 5 Zeichen ein.", "error");
       return;
     }
     if (!hasValidLocation) {
-      pushToast("Bitte geben Sie eine vollständige Werkstattadresse an.", "error");
       return;
     }
     if (maxCapacity < 1) {
@@ -169,11 +166,9 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
       return;
     }
     if (photos.length === 0) {
-      pushToast("Bitte laden Sie mindestens ein Foto hoch.", "error");
       return;
     }
     if (slots.length === 0) {
-      pushToast("Bitte füge mindestens ein Zeitfenster hinzu.", "error");
       return;
     }
 
@@ -214,8 +209,11 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
   };
 
   const addSlot = async () => {
-    if (!id || !slotStart || !slotEnd || new Date(slotStart) >= new Date(slotEnd)) {
-      pushToast("Bitte einen gültigen Zeitraum für das Zeitfenster angeben.", "error");
+    if (!id || !slotStart || !slotEnd) {
+      return;
+    }
+    if (new Date(slotStart) >= new Date(slotEnd)) {
+      pushToast("Die Endzeit muss nach der Startzeit liegen.", "error");
       return;
     }
     try {

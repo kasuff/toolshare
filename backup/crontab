@@ -1,0 +1,11 @@
+# supercronic-Crontab für den walg-backup-Service.
+# Format: Minute Stunde Tag-im-Monat Monat Wochentag  Befehl
+# Zeitzone = Container-TZ (UTC, sofern nicht via TZ-Env überschrieben).
+#
+# Wochentage: 0 = Sonntag, 1 = Montag, ... 6 = Samstag
+
+# Wöchentlich, Sonntag 02:00 → vollständiges Basis-Backup (FULL)
+0 2 * * 0   /usr/local/bin/backup.sh full
+
+# Täglich Mo–Sa 02:00 → Differenz-Backup seit letztem Full (DELTA)
+0 2 * * 1-6 /usr/local/bin/backup.sh delta

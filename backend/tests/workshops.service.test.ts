@@ -6,6 +6,7 @@ vi.mock("../src/modules/workshops/workshops.repository", () => ({
   workshopsRepository: {
     list: vi.fn(),
     findById: vi.fn(),
+    findActiveBookingRanges: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
@@ -32,16 +33,33 @@ describe("workshopsService", () => {
 
     const result = await workshopsService.list({ search: "holz" });
 
-    expect(mockedWorkshopsRepository.list).toHaveBeenCalledWith({ search: "holz" });
+    expect(mockedWorkshopsRepository.list).toHaveBeenCalledWith({
+      search: "holz",
+      excludeSuspendedManagers: true
+    });
     expect(result).toEqual([{ id: "w1" }]);
   });
 
-  it("returns workshop by id", async () => {
-    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1" } as any);
+  it("returns workshop by id with merged active booking ranges", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", manager: { isSuspended: false } } as any);
+    mockedWorkshopsRepository.findActiveBookingRanges.mockResolvedValueOnce([
+      { id: "b1", startDate: new Date(), endDate: new Date(), status: "ACCEPTED" }
+    ] as any);
 
     const result = await workshopsService.getById("w1");
 
+    expect(mockedWorkshopsRepository.findActiveBookingRanges).toHaveBeenCalledWith("w1");
     expect(result).toMatchObject({ id: "w1" });
+    expect((result as any).bookings).toHaveLength(1);
+  });
+
+  it("hides workshops from suspended managers", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", manager: { isSuspended: true } } as any);
+
+    await expect(workshopsService.getById("w1")).rejects.toMatchObject({
+      code: "WORKSHOP_NOT_FOUND",
+      status: 404
+    });
   });
 
   it("throws when workshop is missing", async () => {

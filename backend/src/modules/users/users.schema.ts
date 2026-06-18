@@ -19,11 +19,20 @@ export const userIdParamSchema = z.object({
   query: z.object({})
 });
 
+const hasHouseNumber = (val: string) => {
+  const streetPart = val.split(",")[0]?.trim() ?? "";
+  const tokens = streetPart.split(/\s+/).filter(Boolean);
+  const lastToken = tokens.length > 1 ? tokens.pop() : "";
+  return Boolean(lastToken && /\d/.test(lastToken));
+};
+
 export const updateMyProfileSchema = z.object({
   body: z
     .object({
       name: z.string().min(2).optional(),
-      address: z.string().min(5).optional()
+      address: z.string().min(5).refine(hasHouseNumber, {
+        message: "Die Adresse muss eine Hausnummer enthalten."
+      }).optional()
     })
     .refine((value) => value.name !== undefined || value.address !== undefined, {
       message: "Mindestens ein Feld muss angegeben werden."

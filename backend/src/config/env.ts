@@ -47,7 +47,12 @@ export const env = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "7d",
   managerEmailAllowlist: parseEmailAllowlist(process.env.MANAGER_EMAIL_ALLOWLIST),
   corsOrigin: parseCorsOrigins(process.env.CORS_ORIGIN),
-  rateLimitWindowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 10 * 60 * 1000),
-  rateLimitMax: parsePositiveInt(process.env.RATE_LIMIT_MAX, 600),
-  rateLimitAuthMax: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, 100)
+  // Fenster von 1 Minute. Das allgemeine API-Limit greift pro authentifiziertem
+  // Nutzer (Fallback: pro IP), damit ~150 aktive Nutzer hinter geteilten IPs
+  // (NAT/WLAN) sich nicht gegenseitig drosseln.
+  rateLimitWindowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60 * 1000),
+  rateLimitMax: parsePositiveInt(process.env.RATE_LIMIT_MAX, 300),
+  rateLimitAuthMax: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, 50),
+  prometheusUrl: process.env.PROMETHEUS_URL ?? "http://prometheus:9090",
+  lokiUrl: process.env.LOKI_URL ?? "http://loki:3100"
 };

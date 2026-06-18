@@ -74,6 +74,29 @@ export const authService = {
     return buildAuthPayload(user);
   },
 
+  async changePassword(input: { userId: string; currentPassword: string; newPassword: string }) {
+    const user = await authRepository.findCredentialsById(input.userId);
+    if (!user) {
+      throw new AppError("UNAUTHORIZED", "User not found", 401);
+    }
+
+    const isValid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new AppError("INVALID_CURRENT_PASSWORD", "Aktuelles Passwort ist falsch.", 400);
+    }
+
+    if (input.currentPassword === input.newPassword) {
+      throw new AppError(
+        "PASSWORD_UNCHANGED",
+        "Das neue Passwort muss sich vom aktuellen unterscheiden.",
+        400
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
+    await authRepository.updatePassword(input.userId, passwordHash);
+  },
+
   async refresh(refreshToken: string) {
     try {
       const payload = jwt.verify(refreshToken, env.jwtSecret) as TokenPayload;
