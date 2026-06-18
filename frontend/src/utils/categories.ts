@@ -32,7 +32,7 @@ function createPlaceholderImage(color: string) {
 
 const LEGACY_PLACEHOLDER_IMAGE = createPlaceholderImage("#1f925a");
 
-export const DEFAULT_PLACEHOLDER_IMAGE = createPlaceholderImage("#FF6600");
+export const DEFAULT_PLACEHOLDER_IMAGE = createPlaceholderImage("#D14700");
 
 export function normalizePlaceholderImage(imageUrl?: string | null): string {
   return !imageUrl || imageUrl === LEGACY_PLACEHOLDER_IMAGE ? DEFAULT_PLACEHOLDER_IMAGE : imageUrl;
