@@ -15,7 +15,8 @@ vi.mock("../src/modules/moderation/moderation.repository", () => ({
     updateStatus: vi.fn(),
     findToolsByIds: vi.fn(),
     findWorkshopsByIds: vi.fn(),
-    findUsersByIds: vi.fn()
+    findUsersByIds: vi.fn(),
+    findRatingsByIds: vi.fn()
   }
 }));
 
@@ -62,6 +63,7 @@ describe("moderationService", () => {
     ] as any);
     mockedModerationRepository.findWorkshopsByIds.mockResolvedValueOnce([]);
     mockedModerationRepository.findUsersByIds.mockResolvedValueOnce([]);
+    mockedModerationRepository.findRatingsByIds.mockResolvedValueOnce([]);
 
     const created = await moderationService.createReport({
       reporterId: "u1",
