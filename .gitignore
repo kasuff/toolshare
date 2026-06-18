@@ -37,3 +37,6 @@ coverage/
 # Prisma
 backend/prisma/*.db
 backend/prisma/migrations/**/migration_lock.toml
+
+# Mobile
+mobile/
