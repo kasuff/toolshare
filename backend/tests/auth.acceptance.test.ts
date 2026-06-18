@@ -180,6 +180,19 @@ describe.skip("US-13 Authentication acceptance criteria", () => {
     expect(response.body.error?.details?.fieldErrors?.body?.[0]).toContain("at least 8 character");
   });
 
+  it("rejects registration when address misses a house number", async () => {
+    const response = await request(app).post("/api/auth/register").send({
+      email: `no-house-${seed}@example.com`,
+      password: "ValidPass123!",
+      name: "No House",
+      address: "Musterstraße"
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error?.code).toBe("VALIDATION_ERROR");
+    expect(response.body.error?.details?.fieldErrors?.body?.address?.[0]).toContain("Hausnummer");
+  });
+
   it("always creates newly registered users with USER role", async () => {
     const email = `role-check-${seed}@example.com`;
     const response = await request(app).post("/api/auth/register").send({

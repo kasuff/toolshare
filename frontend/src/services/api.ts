@@ -1067,6 +1067,10 @@ export const api = {
     return notifications.map((n) => ({ ...n, createdIso: n.createdAt }));
   },
 
+  async markNotificationAsRead(notificationId: string, token: string) {
+    await request(`/notifications/${notificationId}/read`, { method: "PATCH" }, token);
+  },
+
   async listReports(token: string) {
     return request<ModerationReport[]>("/moderation/reports", undefined, token);
   },
@@ -1105,6 +1109,8 @@ export const api = {
       warningReason?: string;
       requestSuspensionUserId?: string;
       suspensionReason?: string;
+      deleteTool?: boolean;
+      deleteWorkshop?: boolean;
     },
     token: string
   ) {

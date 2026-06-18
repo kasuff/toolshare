@@ -2,10 +2,16 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 
 export const workshopsRepository = {
-  list(filters: { managerId?: string; location?: string; search?: string }) {
+  list(filters: {
+    managerId?: string;
+    location?: string;
+    search?: string;
+    excludeSuspendedManagers?: boolean;
+  }) {
     return prisma.workshop.findMany({
       where: {
         managerId: filters.managerId,
+        manager: filters.excludeSuspendedManagers ? { isSuspended: false } : undefined,
         location: filters.location
           ? { contains: filters.location, mode: "insensitive" }
           : undefined,
@@ -21,7 +27,8 @@ export const workshopsRepository = {
         manager: {
           select: {
             id: true,
-            name: true
+            name: true,
+            isSuspended: true
           }
         },
         workshopTools: {
@@ -43,7 +50,8 @@ export const workshopsRepository = {
         manager: {
           select: {
             id: true,
-            name: true
+            name: true,
+            isSuspended: true
           }
         },
         workshopTools: {

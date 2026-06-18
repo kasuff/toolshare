@@ -766,15 +766,13 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           <div className="workshop-detail-page-content">
             <div className="workshop-modal-toolbar">
               <DetailTopBar onBack={closeWorkshop}>
-                {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
-                  <button type="button" className="detail-report-trigger" onClick={openReportForm}>
-                    Werkstatt melden
-                  </button>
-                )}
+                <button type="button" className="detail-report-trigger" onClick={openReportForm}>
+                  Werkstatt melden
+                </button>
               </DetailTopBar>
             </div>
 
-            {showReportForm && currentUser?.id !== selectedWorkshop.workshop.ownerId && (
+            {showReportForm && (
               <ReportFormPanel
                 title="Werkstatt melden"
                 hint="Wenn Regeln verletzt werden, melde diese Werkstatt der Moderation."
