@@ -5983,6 +5983,20 @@ button .material-symbols-outlined {
     min-height: 20rem;
   }
 
+  body:has(.messenger-shell--chat-open) .site-footer {
+    display: none;
+  }
+
+  body:has(.messenger-shell--chat-open) .content {
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+  }
+
+  .messenger-shell.messenger-shell--chat-open {
+    height: calc(100dvh - 5rem);
+    max-height: calc(100dvh - 5rem);
+  }
+
   .messenger-thread-list {
     border-right: none;
     border-bottom: none;

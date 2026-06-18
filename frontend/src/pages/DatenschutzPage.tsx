@@ -31,11 +31,11 @@ export function DatenschutzPage() {
 
       <h2 id="m3">Verantwortlicher</h2>
       <p>
-        [Name des Verantwortlichen]<br />
-        [Straße und Hausnummer]<br />
-        [PLZ und Ort]
+        Maik Unglert<br />
+        Rudhartstraße 9<br />
+        80999 München
       </p>
-      <p>E-Mail-Adresse: [E-Mail-Adresse]</p>
+      <p>E-Mail-Adresse: unglertmaik@gmail.com</p>
 
       <h2 id="mOverview">Übersicht der Verarbeitungen</h2>
       <p>

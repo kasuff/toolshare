@@ -5,14 +5,13 @@ export function ImpressumPage() {
 
       <h2 id="m46">Diensteanbieter</h2>
       <p>
-        [Name des Diensteanbieters]<br />
-        [Straße und Hausnummer]<br />
-        [PLZ und Ort]
+        Maik Unglert<br />
+        Rudhartstraße 9<br />
+        80999 München
       </p>
 
       <h2 id="m56">Kontaktmöglichkeiten</h2>
-      <p>E-Mail-Adresse: [E-Mail-Adresse]</p>
-      <p>Telefon: [Telefonnummer]</p>
+      <p>E-Mail-Adresse: unglertmaik@gmail.com</p>
 
       <h2 id="m65">Haftungs- und Schutzrechtshinweise</h2>
       <p>
