@@ -28,6 +28,7 @@ const userFriendlyMessageByCode: Record<string, string> = {
   INVALID_RATING_TARGET: "Sie können sich nicht selbst bewerten.",
   RATING_ALREADY_EXISTS: "Für diese Buchung wurde bereits eine Bewertung abgegeben.",
   RATING_NOT_ALLOWED: "Eine Bewertung ist erst nach Abschluss der Buchung möglich.",
+  RATING_NOT_FOUND: "Die Bewertung wurde nicht gefunden.",
   NOTIFICATION_NOT_FOUND: "Die Benachrichtigung wurde nicht gefunden.",
   ACCOUNT_SUSPENDED: "Ihr Konto ist gesperrt.",
   ACCOUNT_BLOCKED: "Dieses Konto ist gesperrt.",

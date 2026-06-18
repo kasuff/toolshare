@@ -177,7 +177,7 @@ describe("mockApi", () => {
       status: "SICHTBAR"
     });
     api.moderateRating(rating.id);
-    expect(api.getRatings()[0].status).toBe("MODERIERT");
+    expect(api.getRatings()[0].status).toBe("AUSGEBLENDET");
 
     expect(api.getMetrics()).toMatchObject({
       users: 5,

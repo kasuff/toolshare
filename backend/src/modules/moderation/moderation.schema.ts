@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createReportSchema = z.object({
   body: z.object({
-    targetType: z.enum(["TOOL", "WORKSHOP", "USER"]),
+    targetType: z.enum(["TOOL", "WORKSHOP", "USER", "RATING"]),
     targetId: z.string().uuid(),
     bookingId: z.string().uuid().optional(),
     reason: z.string().min(5),

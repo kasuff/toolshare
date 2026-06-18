@@ -7,7 +7,7 @@ const reportWithReporterInclude = {
 export const moderationRepository = {
   createReport(input: {
     reporterId: string;
-    targetType: "TOOL" | "WORKSHOP" | "USER";
+    targetType: "TOOL" | "WORKSHOP" | "USER" | "RATING";
     targetId: string;
     bookingId?: string;
     reason: string;
@@ -64,6 +64,29 @@ export const moderationRepository = {
     return prisma.user.findMany({
       where: { id: { in: ids } },
       select: { id: true, name: true, email: true }
+    });
+  },
+
+  findRatingsByIds(ids: string[]) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return prisma.rating.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        score: true,
+        comment: true,
+        status: true,
+        fromUserId: true,
+        toUserId: true,
+        fromUser: { select: { id: true, name: true } },
+        toUser: { select: { id: true, name: true } },
+        booking: {
+          select: {
+            tool: { select: { id: true, name: true } },
+            timeslot: { select: { workshop: { select: { id: true, name: true } } } }
+          }
+        }
+      }
     });
   },
 

@@ -2,11 +2,22 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { Link, useLocation } from "react-router-dom";
 import { DateInput } from "../components/DateInput";
 import { KebabMenu } from "../components/KebabMenu";
+import { RatingFormPanel } from "../components/RatingFormPanel";
 import { ReportFormPanel } from "../components/ReportFormPanel";
+import { StarRatingDisplay } from "../components/StarRatingInput";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "../services/api";
-import type { Booking, BookingStatus, BookingType, PickupProposal, TimeslotProposal, User, Notification } from "../types/domain";
+import type {
+  Booking,
+  BookingStatus,
+  BookingType,
+  Notification,
+  PickupProposal,
+  Rating,
+  TimeslotProposal,
+  User
+} from "../types/domain";
 import {
   bookingHasUnreadForUser,
   collectAllMessageKeys,
@@ -14,6 +25,7 @@ import {
   INBOX_READ_CHANGED_EVENT,
   loadReadMessageIds,
   proposalMessageKey,
+  ratingMessageKey,
   requestMessageKey,
   saveReadMessageIds,
 } from "../utils/inboxMessageRead";
@@ -143,6 +155,12 @@ export function InboxPage({ currentUser, token }: Props) {
   const [reportDetails, setReportDetails] = useState("");
   const [isReportingUser, setIsReportingUser] = useState(false);
   const [counterFormBookingId, setCounterFormBookingId] = useState<string | null>(null);
+  const [ratingsGiven, setRatingsGiven] = useState<Rating[]>([]);
+  const [ratingsReceived, setRatingsReceived] = useState<Rating[]>([]);
+  const [showRatingForm, setShowRatingForm] = useState(false);
+  const [ratingScore, setRatingScore] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const draftSeededForThreadRef = useRef<Set<string>>(new Set());
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const [readMessageIds, setReadMessageIds] = useState<Set<string>>(new Set());
@@ -151,11 +169,15 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!token) return;
     setIsLoading(true);
     try {
-      const [fetchedBookings, fetchedNotifications] = await Promise.all([
+      const [nextBookings, nextGivenRatings, nextReceivedRatings, fetchedNotifications] = await Promise.all([
         api.getBookingsForUser(token),
+        api.getRatingsGiven(token),
+        api.getRatingsReceived(token),
         api.getNotifications(token)
       ]);
-      setBookings(fetchedBookings);
+      setBookings(nextBookings);
+      setRatingsGiven(nextGivenRatings);
+      setRatingsReceived(nextReceivedRatings);
       setNotifications(fetchedNotifications);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
@@ -186,13 +208,16 @@ export function InboxPage({ currentUser, token }: Props) {
     if (!currentUser?.id || bookings.length === 0) return;
     if (localStorage.getItem(inboxReadSeedKey(currentUser.id))) return;
     const keys = collectAllMessageKeys(bookings);
+    for (const rating of [...ratingsGiven, ...ratingsReceived]) {
+      keys.push(ratingMessageKey(rating.bookingId, rating.id));
+    }
     const merged = new Set(loadReadMessageIds(currentUser.id));
     for (const k of keys) merged.add(k);
     saveReadMessageIds(currentUser.id, merged);
     localStorage.setItem(inboxReadSeedKey(currentUser.id), "1");
     setReadMessageIds(merged);
     window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
-  }, [currentUser?.id, bookings]);
+  }, [currentUser?.id, bookings, ratingsGiven, ratingsReceived]);
 
   const bookingRows: BookingRow[] = useMemo(
     () => [
@@ -232,9 +257,21 @@ export function InboxPage({ currentUser, token }: Props) {
     [bookings, notifications, currentUser]
   );
 
+  const ratingsByBookingId = useMemo(() => {
+    const map = new Map<string, Rating>();
+    for (const rating of [...ratingsGiven, ...ratingsReceived]) {
+      map.set(rating.bookingId, rating);
+    }
+    return map;
+  }, [ratingsGiven, ratingsReceived]);
+
   const sortedRows = useMemo(() => {
-    return [...bookingRows].sort((a, b) => getLastActivityMs(b) - getLastActivityMs(a));
-  }, [bookingRows]);
+    return [...bookingRows].sort((a, b) => {
+      const ratingA = ratingsByBookingId.get(a.id);
+      const ratingB = ratingsByBookingId.get(b.id);
+      return getLastActivityMs(b, ratingB) - getLastActivityMs(a, ratingA);
+    });
+  }, [bookingRows, ratingsByBookingId]);
 
   useEffect(() => {
     if (sortedRows.length === 0) {
@@ -317,6 +354,14 @@ export function InboxPage({ currentUser, token }: Props) {
     selectedBooking?.type === "TOOL" ? getPendingPickupProposal(selectedBooking) : null;
   const pendingTimeslotProposal =
     selectedBooking?.type === "WORKSHOP" ? getPendingTimeslotProposal(selectedBooking) : null;
+  const selectedBookingRating = selectedBooking ? ratingsByBookingId.get(selectedBooking.id) ?? null : null;
+  const showRatingFooter = Boolean(
+    currentUser &&
+      selectedBooking &&
+      selectedBooking.requesterId === currentUser.id &&
+      isBookingRateable(selectedBooking) &&
+      !selectedBookingRating
+  );
 
   const canRespondToPickupCounter =
     Boolean(selectedBooking && pendingPickupProposal && currentUser && pendingPickupProposal.proposedById !== currentUser.id);
@@ -342,7 +387,8 @@ export function InboxPage({ currentUser, token }: Props) {
     selectedBooking?.status,
     selectedBooking?.pickupProposals.length,
     selectedBooking?.timeslotProposals.length,
-    counterFormBookingId
+    counterFormBookingId,
+    selectedBookingRating?.id
   ]);
 
   const markIncomingRead = (messageKey: string) => {
@@ -359,7 +405,11 @@ export function InboxPage({ currentUser, token }: Props) {
 
   const markThreadRead = (booking: BookingRow) => {
     if (!currentUser?.id) return;
-    const incomingKeys = collectIncomingMessageKeys(booking, currentUser.id);
+    const incomingKeys = collectIncomingMessageKeys(
+      booking,
+      currentUser.id,
+      ratingsByBookingId.get(booking.id)
+    );
     if (incomingKeys.length === 0) return;
 
     setReadMessageIds((prev) => {
@@ -527,6 +577,34 @@ export function InboxPage({ currentUser, token }: Props) {
     }
   };
 
+  const closeRatingForm = () => {
+    setShowRatingForm(false);
+    setRatingScore(0);
+    setRatingComment("");
+  };
+
+  const submitRating = async () => {
+    if (!token || !selectedBooking || ratingScore < 1) return;
+    setIsSubmittingRating(true);
+    try {
+      await api.createRating(
+        {
+          bookingId: selectedBooking.id,
+          score: ratingScore,
+          comment: ratingComment.trim() || undefined
+        },
+        token
+      );
+      closeRatingForm();
+      await loadData();
+      pushToast("Bewertung gespeichert.", "success");
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "Bewertung konnte nicht gespeichert werden.", "error");
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
   const closeUserReportForm = () => {
     setShowUserReportForm(false);
     setReportReason("");
@@ -539,7 +617,11 @@ export function InboxPage({ currentUser, token }: Props) {
       return;
     }
     const counterpartId = selectedBooking.providerId === currentUser.id ? selectedBooking.requesterId : selectedBooking.providerId;
-    const conversationContext = buildConversationContext(selectedBooking, currentUser.id);
+    const conversationContext = buildConversationContext(
+      selectedBooking,
+      currentUser.id,
+      ratingsByBookingId.get(selectedBooking.id)
+    );
 
     setIsReportingUser(true);
     try {
@@ -599,9 +681,14 @@ export function InboxPage({ currentUser, token }: Props) {
             {sortedRows.map((booking) => {
               const active = selectedBooking?.id === booking.id;
               const cp = counterparty(booking, currentUser.id);
-              const preview = getThreadPreview(booking, currentUser.id);
-              const lastAt = getLastActivityMs(booking);
-              const threadUnread = threadHasUnread(booking, currentUser.id, readMessageIds);
+              const preview = getThreadPreview(booking, currentUser.id, ratingsByBookingId.get(booking.id));
+              const lastAt = getLastActivityMs(booking, ratingsByBookingId.get(booking.id));
+              const threadUnread = threadHasUnread(
+                booking,
+                currentUser.id,
+                readMessageIds,
+                ratingsByBookingId.get(booking.id)
+              );
               return (
                 <button
                   key={booking.id}
@@ -717,6 +804,21 @@ export function InboxPage({ currentUser, token }: Props) {
                   onDetailsChange={setReportDetails}
                   onSubmit={() => void reportCurrentCounterparty()}
                   onCancel={closeUserReportForm}
+                />
+              )}
+
+              {showRatingForm && selectedBooking && (
+                <RatingFormPanel
+                  title="Bewertung abgeben"
+                  hint="Deine Bewertung hilft anderen Nutzern bei der Entscheidung."
+                  targetLabel={selectedBooking.toolName ?? bookingTypeLabel[selectedBooking.type]}
+                  score={ratingScore}
+                  comment={ratingComment}
+                  isSubmitting={isSubmittingRating}
+                  onScoreChange={setRatingScore}
+                  onCommentChange={setRatingComment}
+                  onSubmit={() => void submitRating()}
+                  onCancel={closeRatingForm}
                 />
               )}
 
@@ -885,6 +987,45 @@ export function InboxPage({ currentUser, token }: Props) {
                       secondLabel="Bis"
                       secondValue={formatDateTime(selectedBooking.endIso)}
                     />
+                  </MessengerRow>
+                )}
+
+                {selectedBookingRating && selectedBookingRating.status === "SICHTBAR" && (
+                  <MessengerRow
+                    variant={selectedBookingRating.fromUserId === currentUser.id ? "outgoing" : "incoming"}
+                    avatar={
+                      <UserAvatar
+                        name={
+                          selectedBookingRating.fromUserId === currentUser.id
+                            ? currentUser.name
+                            : (selectedBookingRating.fromUserName ?? counterparty(selectedBooking, currentUser.id).name)
+                        }
+                        imageUrl={null}
+                        size="sm"
+                      />
+                    }
+                  >
+                    <RequestMessageCard
+                      label="Bewertung"
+                      title={`${selectedBookingRating.score} von 5 Sternen`}
+                      icon="star"
+                      unread={
+                        selectedBookingRating.toUserId === currentUser.id &&
+                        !readMessageIds.has(ratingMessageKey(selectedBooking.id, selectedBookingRating.id))
+                      }
+                      onClick={
+                        selectedBookingRating.toUserId === currentUser.id
+                          ? () => markIncomingRead(ratingMessageKey(selectedBooking.id, selectedBookingRating.id))
+                          : undefined
+                      }
+                    >
+                      <div className="inbox-rating-message">
+                        <StarRatingDisplay score={selectedBookingRating.score} />
+                        {selectedBookingRating.comment && (
+                          <p className="inbox-rating-message-comment">{selectedBookingRating.comment}</p>
+                        )}
+                      </div>
+                    </RequestMessageCard>
                   </MessengerRow>
                 )}
 
@@ -1114,6 +1255,15 @@ export function InboxPage({ currentUser, token }: Props) {
                   </button>
                 </footer>
               )}
+
+              {showRatingFooter && (
+                <footer className="messenger-chat-footer messenger-chat-footer--rating">
+                  <p className="inbox-rating-hint">Wie war deine Erfahrung? Du kannst jederzeit bewerten.</p>
+                  <button type="button" className="btn" onClick={() => setShowRatingForm(true)}>
+                    Bewertung abgeben
+                  </button>
+                </footer>
+              )}
             </div>
           )}
         </div>
@@ -1122,7 +1272,20 @@ export function InboxPage({ currentUser, token }: Props) {
   );
 }
 
-function buildConversationContext(booking: Booking, currentUserId: string): string {
+function isBookingRateable(booking: Booking) {
+  if (booking.status === "ABGELEHNT" || booking.status === "OFFEN") {
+    return false;
+  }
+  if (booking.status === "ABGESCHLOSSEN") {
+    return true;
+  }
+  if (!booking.endIso) {
+    return false;
+  }
+  return new Date(booking.endIso) <= new Date();
+}
+
+function buildConversationContext(booking: Booking, currentUserId: string, rating?: Rating | null): string {
   const lines: string[] = [];
   lines.push(`Booking ${booking.id} (${booking.type})`);
   lines.push(`Anfrage von ${booking.requesterName ?? booking.requesterId} an ${booking.providerName ?? booking.providerId}`);
@@ -1139,6 +1302,12 @@ function buildConversationContext(booking: Booking, currentUserId: string): stri
     const sender = proposal.proposedById === currentUserId ? "Du" : proposal.proposedById;
     lines.push(
       `Alternativvorschlag (${sender}) ${formatDateTime(proposal.createdIso)}: ${formatDateTime(proposal.proposedPickupIso)} [${proposal.status}]`
+    );
+  }
+  if (rating && rating.status === "SICHTBAR") {
+    const sender = rating.fromUserId === currentUserId ? "Du" : (rating.fromUserName ?? rating.fromUserId);
+    lines.push(
+      `Bewertung (${sender}) ${formatDateTime(rating.createdIso)}: ${rating.score} von 5 Sternen${rating.comment ? ` – ${rating.comment}` : ""}`
     );
   }
   return lines.join("\n");
@@ -1262,14 +1431,19 @@ function proposalStatusLabel(status: PickupProposal["status"] | TimeslotProposal
   return "Warte auf Antwort";
 }
 
-function threadHasUnread(booking: BookingRow, currentUserId: string, readIds: Set<string>): boolean {
+function threadHasUnread(
+  booking: BookingRow,
+  currentUserId: string,
+  readIds: Set<string>,
+  rating?: Rating | null
+): boolean {
   if (booking.type === "SYSTEM_WARNING") {
     return !booking.isNotificationRead;
   }
-  return bookingHasUnreadForUser(booking, currentUserId, readIds);
+  return bookingHasUnreadForUser(booking, currentUserId, readIds, rating);
 }
 
-function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string): string[] {
+function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string, rating?: Rating | null): string[] {
   const keys: string[] = [];
   if (booking.type === "SYSTEM_WARNING") {
     return keys;
@@ -1286,6 +1460,9 @@ function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string):
     if (proposal.status === "PENDING" && proposal.proposedById !== currentUserId) {
       keys.push(proposalMessageKey(booking.id, proposal.id));
     }
+  }
+  if (rating && rating.toUserId === currentUserId && rating.status === "SICHTBAR") {
+    keys.push(ratingMessageKey(booking.id, rating.id));
   }
   return keys;
 }
@@ -1333,7 +1510,7 @@ function getChatHeaderSubtitle(booking: Booking, currentUserId: string, compact:
   return counterparty(booking, currentUserId).name;
 }
 
-function getThreadPreview(row: BookingRow, currentUserId: string): string {
+function getThreadPreview(row: BookingRow, currentUserId: string, rating?: Rating | null): string {
   if (row.type === "SYSTEM_WARNING") {
     if (row.systemWarningText?.startsWith("SPERRUNG:")) {
       return parseSuspensionMessage(row.systemWarningText).reason;
@@ -1348,6 +1525,16 @@ function getThreadPreview(row: BookingRow, currentUserId: string): string {
 
   const latestPickupMs = latestPickup ? new Date(latestPickup.createdIso).getTime() : 0;
   const latestTimeslotMs = latestTimeslot ? new Date(latestTimeslot.createdIso).getTime() : 0;
+  const ratingMs =
+    rating && rating.status === "SICHTBAR" && rating.createdIso ? new Date(rating.createdIso).getTime() : 0;
+  const latestActivityMs = Math.max(latestPickupMs, latestTimeslotMs, ratingMs);
+
+  if (rating && rating.status === "SICHTBAR" && ratingMs >= latestActivityMs) {
+    if (rating.fromUserId === currentUserId) {
+      return `Du: ${rating.score} von 5 Sternen`;
+    }
+    return `Bewertung · ${rating.score} von 5 Sternen`;
+  }
 
   if (latestPickup && latestPickupMs >= latestTimeslotMs) {
     const short = formatShortDateTime(latestPickup.proposedPickupIso);
@@ -1373,7 +1560,7 @@ function getThreadPreview(row: BookingRow, currentUserId: string): string {
     : `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "dein Angebot"}“ ausleihen`;
 }
 
-function getLastActivityMs(booking: BookingRow): number {
+function getLastActivityMs(booking: BookingRow, rating?: Rating | null): number {
   const createdMs = booking.createdIso ? new Date(booking.createdIso).getTime() : 0;
   let t = Number.isNaN(createdMs) ? 0 : createdMs;
   for (const p of booking.pickupProposals) {
@@ -1382,6 +1569,10 @@ function getLastActivityMs(booking: BookingRow): number {
   }
   for (const p of booking.timeslotProposals) {
     const ms = new Date(p.createdIso).getTime();
+    if (!Number.isNaN(ms)) t = Math.max(t, ms);
+  }
+  if (rating?.createdIso && rating.status === "SICHTBAR") {
+    const ms = new Date(rating.createdIso).getTime();
     if (!Number.isNaN(ms)) t = Math.max(t, ms);
   }
   return t;

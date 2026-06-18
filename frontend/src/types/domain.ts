@@ -146,8 +146,20 @@ export interface Rating {
   fromUserId: string;
   toUserId: string;
   score: number;
-  comment: string;
-  status: "SICHTBAR" | "MODERIERT";
+  comment?: string;
+  status: "SICHTBAR" | "AUSGEBLENDET";
+  createdIso: string;
+  fromUserName?: string;
+  listingLabel?: string;
+  listingType?: "TOOL" | "WORKSHOP";
+}
+
+export interface PublicRating {
+  id: string;
+  score: number;
+  comment?: string;
+  createdIso: string;
+  fromUserName?: string;
 }
 
 export interface SystemRule {

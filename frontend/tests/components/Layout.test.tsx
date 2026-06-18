@@ -6,17 +6,20 @@ import type { User } from "../../src/types/domain";
 import {
   INBOX_READ_CHANGED_EVENT,
   requestMessageKey,
+  ratingMessageKey,
   saveReadMessageIds
 } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, getNotifications } = vi.hoisted(() => ({
+const { getBookingsForUser, getRatingsReceived, getNotifications } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
-  getNotifications: vi.fn()
+  getRatingsReceived: vi.fn().mockResolvedValue([]),
+  getNotifications: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("../../src/services/api", () => ({
   api: {
     getBookingsForUser,
+    getRatingsReceived,
     getNotifications
   }
 }));
@@ -30,6 +33,7 @@ describe("Layout", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
+    getRatingsReceived.mockResolvedValue([]);
     getNotifications.mockResolvedValue([]);
   });
 
@@ -135,6 +139,63 @@ describe("Layout", () => {
 
     expect(
       await screen.findByRole("link", { name: "Nachrichten und Benachrichtigungen, 1 ungelesene Konversationen" })
+    ).toBeInTheDocument();
+  });
+
+  it("includes unread ratings in the bell count when booking messages are already read", async () => {
+    const bookings = [
+      {
+        id: "b-rating",
+        type: "TOOL" as const,
+        requesterId: "requester-1",
+        providerId: "u1",
+        requesterName: "Max",
+        providerName: "Lea",
+        toolName: "Bohrer",
+        startIso: "2026-05-06T10:00:00.000Z",
+        endIso: "2026-05-07T10:00:00.000Z",
+        status: "ABGESCHLOSSEN" as const,
+        createdIso: "2026-05-05T08:00:00.000Z",
+        pickupProposals: [],
+        timeslotProposals: []
+      }
+    ];
+    getBookingsForUser.mockResolvedValue(bookings);
+    getRatingsReceived.mockResolvedValue([
+      {
+        id: "rating-1",
+        bookingId: "b-rating",
+        toUserId: "u1",
+        status: "SICHTBAR" as const,
+        score: 5,
+        createdIso: "2026-05-08T10:00:00.000Z"
+      }
+    ]);
+    saveReadMessageIds(users[0].id, new Set([requestMessageKey("b-rating")]));
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route
+            element={
+              <Layout users={users} currentUser={users[0]} token="tok-1" onSwitchUser={vi.fn()} onLogout={vi.fn()} />
+            }
+          >
+            <Route index element={<div>Home</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Nachrichten und Benachrichtigungen, 1 ungelesene Konversationen" })
+    ).toBeInTheDocument();
+
+    saveReadMessageIds(users[0].id, new Set([requestMessageKey("b-rating"), ratingMessageKey("b-rating", "rating-1")]));
+    window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
+
+    expect(
+      await screen.findByRole("link", { name: "Nachrichten und Benachrichtigungen" })
     ).toBeInTheDocument();
   });
 

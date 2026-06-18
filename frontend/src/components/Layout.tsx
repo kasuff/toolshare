@@ -76,14 +76,21 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
 
     const loadUnreadRequestsForBell = async () => {
       try {
-        const [bookings, notifications] = await Promise.all([
+        const [bookings, ratingsReceived, notifications] = await Promise.all([
           api.getBookingsForUser(token),
+          api.getRatingsReceived(token),
           api.getNotifications(token)
         ]);
         if (cancelled) return;
+        const ratingsByBookingId = new Map(
+          ratingsReceived.map((rating) => [
+            rating.bookingId,
+            { id: rating.id, bookingId: rating.bookingId, toUserId: rating.toUserId, status: rating.status }
+          ])
+        );
         const readIds = loadReadMessageIds(userId);
-        let count = countUnreadInboxThreads(bookings, userId, readIds);
-        
+        let count = countUnreadInboxThreads(bookings, userId, readIds, ratingsByBookingId);
+
         const unreadNotifications = notifications.filter(
           (n) =>
             !n.read &&
@@ -93,7 +100,6 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
               n.message.includes("wurde gelöscht"))
         );
         count += unreadNotifications.length;
-
         setUnreadRequestBellCount(count);
       } catch {
         if (!cancelled) setUnreadRequestBellCount(0);

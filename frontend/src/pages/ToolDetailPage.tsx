@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DateInput } from "../components/DateInput";
 import { DetailTopBar } from "../components/DetailTopBar";
+import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { api } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "../utils/categories";
-import type { Tool, User } from "../types/domain";
+import type { PublicRating, Tool, User } from "../types/domain";
 
 type Props = {
   token?: string;
@@ -142,6 +143,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [isReporting, setIsReporting] = useState(false);
+  const [ratings, setRatings] = useState<PublicRating[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -150,16 +152,16 @@ export function ToolDetailPage({ token, currentUser }: Props) {
       if (!id) return;
       setIsLoading(true);
       try {
-        const [tools, periods] = await Promise.all([
+        const [tools, periods, toolRatings] = await Promise.all([
           api.getTools({}, token ?? ""),
-          api.getToolBlockingPeriods(id)
+          api.getToolBlockingPeriods(id),
+          api.getRatingsForTool(id)
         ]);
         const foundTool = tools.find((entry) => entry.id === id);
         if (foundTool) {
           setTool(foundTool);
           setBlockingPeriods(periods);
-          // Für den Eigentümer zusätzlich die eigenen Blockaden (mit id) laden, damit
-          // er sie wieder entfernen kann.
+          setRatings(toolRatings);
           if (token && currentUser?.id === foundTool.ownerId) {
             try {
               setOwnerBlocks(await api.getToolOwnerBlocks(id, token));
@@ -507,6 +509,8 @@ export function ToolDetailPage({ token, currentUser }: Props) {
               <span><i className="unavailable" /> Nicht verfügbar</span>
             </div>
           </section>
+
+          <RatingsSection ratings={ratings} token={token} canReport={!isOwnTool} />
         </div>
 
         <aside className={`playtomic-booking-panel tool-detail-booking ${!canChooseDates ? "unavailable" : ""}`.trim()}>

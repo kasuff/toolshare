@@ -7,6 +7,7 @@ import { notificationsService } from "../src/modules/notifications/notifications
 import { addressService } from "../src/modules/address/address.service";
 import { toolsService } from "../src/modules/tools/tools.service";
 import { workshopsService } from "../src/modules/workshops/workshops.service";
+import { ratingsService } from "../src/modules/ratings/ratings.service";
 import { prisma } from "../src/config/prisma";
 
 vi.mock("../src/modules/moderation/moderation.repository", () => ({
@@ -18,7 +19,8 @@ vi.mock("../src/modules/moderation/moderation.repository", () => ({
     updateStatus: vi.fn(),
     findToolsByIds: vi.fn(),
     findWorkshopsByIds: vi.fn(),
-    findUsersByIds: vi.fn()
+    findUsersByIds: vi.fn(),
+    findRatingsByIds: vi.fn()
   }
 }));
 
@@ -51,6 +53,12 @@ vi.mock("../src/modules/workshops/workshops.service", () => ({
   }
 }));
 
+vi.mock("../src/modules/ratings/ratings.service", () => ({
+  ratingsService: {
+    hideFromModeration: vi.fn()
+  }
+}));
+
 vi.mock("../src/config/prisma", () => ({
   prisma: {
     booking: {
@@ -65,6 +73,7 @@ const mockedNotificationsRepository = vi.mocked(notificationsRepository);
 const mockedSuspensionRepository = vi.mocked(suspensionRepository);
 const mockedToolsService = vi.mocked(toolsService);
 const mockedWorkshopsService = vi.mocked(workshopsService);
+const mockedRatingsService = vi.mocked(ratingsService);
 const mockedPrisma = vi.mocked(prisma);
 
 describe("moderationService", () => {
@@ -91,6 +100,7 @@ describe("moderationService", () => {
     ] as any);
     mockedModerationRepository.findWorkshopsByIds.mockResolvedValueOnce([]);
     mockedModerationRepository.findUsersByIds.mockResolvedValueOnce([]);
+    mockedModerationRepository.findRatingsByIds.mockResolvedValueOnce([]);
 
     const created = await moderationService.createReport({
       reporterId: "u1",
@@ -139,6 +149,30 @@ describe("moderationService", () => {
       "Keine weiteren Massnahmen noetig"
     );
     expect(result).toMatchObject({ id: "r1", status: "RESOLVED" });
+  });
+
+  it("hides rating when a RATING report is resolved", async () => {
+    mockedModerationRepository.findById.mockResolvedValueOnce({
+      id: "r-rating",
+      targetType: "RATING",
+      targetId: "rating-1"
+    } as any);
+    mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r-rating", status: "RESOLVED" } as any);
+    mockedRatingsService.hideFromModeration.mockResolvedValueOnce({ id: "rating-1", status: "HIDDEN" } as any);
+
+    const result = await moderationService.updateReportStatus({
+      reportId: "r-rating",
+      status: "RESOLVED",
+      moderatorId: "mod-1",
+      decisionNote: "Bewertung ausgeblendet"
+    });
+
+    expect(mockedRatingsService.hideFromModeration).toHaveBeenCalledWith(
+      "rating-1",
+      "mod-1",
+      "Bewertung ausgeblendet"
+    );
+    expect(result).toMatchObject({ id: "r-rating", status: "RESOLVED" });
   });
 
   it("sends warning notification when moderation warns user", async () => {
