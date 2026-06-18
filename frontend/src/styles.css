@@ -5844,11 +5844,11 @@ button .material-symbols-outlined {
 }
 
 .messenger-msg-row.incoming {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .messenger-msg-row.outgoing {
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .messenger-msg-avatar-col {
@@ -5860,7 +5860,7 @@ button .material-symbols-outlined {
   max-width: min(100%, 26rem);
 }
 
-.messenger-msg-row.incoming .messenger-msg-bubble-col {
+.messenger-msg-row.outgoing .messenger-msg-bubble-col {
   margin-left: auto;
 }
 
@@ -6162,7 +6162,7 @@ button .material-symbols-outlined {
   margin-bottom: var(--space-4);
 }
 
-.messenger-msg-row.incoming {
+.messenger-msg-row.outgoing {
   margin-left: auto;
 }
 
