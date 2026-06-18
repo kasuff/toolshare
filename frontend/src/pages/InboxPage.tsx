@@ -1183,9 +1183,9 @@ function MessengerRow({
 }) {
   return (
     <div className={`messenger-msg-row ${variant}`}>
-      {variant === "incoming" && avatar && <div className="messenger-msg-avatar-col">{avatar}</div>}
-      <div className="messenger-msg-bubble-col">{children}</div>
       {variant === "outgoing" && avatar && <div className="messenger-msg-avatar-col">{avatar}</div>}
+      <div className="messenger-msg-bubble-col">{children}</div>
+      {variant === "incoming" && avatar && <div className="messenger-msg-avatar-col">{avatar}</div>}
     </div>
   );
 }
