@@ -8,12 +8,17 @@ const { getTools } = vi.hoisted(() => ({
   getTools: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getTools,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getTools,
     createToolRequest: vi.fn()
-  }
-}));
+    }
+  };
+});
 
 describe("ToolsPage", () => {
   it("renders tool cards as detail links and no longer shows inline booking controls", async () => {

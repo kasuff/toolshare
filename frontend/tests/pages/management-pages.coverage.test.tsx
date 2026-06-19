@@ -5,7 +5,7 @@ import { AdminPage } from "../../src/pages/AdminPage";
 import { ModerationPage } from "../../src/pages/ModerationPage";
 import { NewToolPage } from "../../src/pages/NewToolPage";
 import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const {
   pushToast,
@@ -23,7 +23,8 @@ const {
   decideSuspensionRequest,
   createWorkshop,
   getSystemSettings,
-  updateSystemSetting
+  updateSystemSetting,
+  getRatingsReceived
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
@@ -40,7 +41,8 @@ const {
   decideSuspensionRequest: vi.fn(),
   createWorkshop: vi.fn(),
   getSystemSettings: vi.fn(),
-  updateSystemSetting: vi.fn()
+  updateSystemSetting: vi.fn(),
+  getRatingsReceived: vi.fn()
 }));
 
 vi.mock("../../src/hooks/useToast", () => ({
@@ -49,9 +51,13 @@ vi.mock("../../src/hooks/useToast", () => ({
   })
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getCurrentUser,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getCurrentUser,
     createTool,
     validateAddress,
     listUsers,
@@ -62,12 +68,14 @@ vi.mock("../../src/services/api", () => ({
     listClosedReports,
     updateReportStatus,
     listSuspensionRequests,
-    decideSuspensionRequest,
-    createWorkshop,
-    getSystemSettings,
-    updateSystemSetting
-  }
-}));
+      decideSuspensionRequest,
+      createWorkshop,
+      getSystemSettings,
+      updateSystemSetting,
+      getRatingsReceived
+    }
+  };
+});
 
 const { getMonitoringOverview, getMonitoringLogs } = vi.hoisted(() => ({
   getMonitoringOverview: vi.fn(),

@@ -3,16 +3,23 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { MyOffersPage } from "../../src/pages/MyOffersPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const { getTools, getWorkshops } = vi.hoisted(() => ({
   getTools: vi.fn(),
   getWorkshops: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: { getTools, getWorkshops }
-}));
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getTools, getWorkshops
+    }
+  };
+});
 
 const currentUser: User = {
   id: "owner-1",

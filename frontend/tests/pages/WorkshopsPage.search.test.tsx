@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { WorkshopsPage } from "../../src/pages/WorkshopsPage";
 import { ToastViewport } from "../../src/components/ui";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
-import type { Tool, Workshop, WorkshopSlot } from "../../src/types/domain";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
+import type { Tool, Workshop, WorkshopSlot } from "@toolshare/shared";
 
 const { createWorkshopBooking, createWorkshopTimeslot, deleteWorkshop, getWorkshopById, getWorkshops, getRatingsForWorkshop } = vi.hoisted(() => ({
   createWorkshopBooking: vi.fn(),
@@ -16,17 +16,22 @@ const { createWorkshopBooking, createWorkshopTimeslot, deleteWorkshop, getWorksh
   getRatingsForWorkshop: vi.fn().mockResolvedValue([])
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    createWorkshopBooking,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      createWorkshopBooking,
     createWorkshopTimeslot,
     deleteWorkshop,
     getWorkshopById,
     getWorkshops,
     getRatingsForWorkshop,
     getSystemSettings: vi.fn().mockResolvedValue([])
-  }
-}));
+    }
+  };
+});
 
 function LocationProbe() {
   const location = useLocation();
@@ -99,8 +104,8 @@ function slot(overrides: Partial<WorkshopSlot>): WorkshopSlot {
   return {
     id: "slot-1",
     workshopId: "workshop-1",
-    startIso: "2026-06-03T10:00",
-    endIso: "2026-06-03T12:00",
+    startIso: "2026-07-03T10:00",
+    endIso: "2026-07-03T12:00",
     blockedByOwner: false,
     ...overrides
   };
@@ -173,7 +178,7 @@ describe("WorkshopsPage search filters", () => {
     getWorkshops.mockResolvedValueOnce([
       {
         workshop: workshop({ id: "matching", name: "Holzwerkstatt", maxCapacity: 4 }),
-        slots: [slot({ workshopId: "matching", startIso: "2026-06-03T10:00", endIso: "2026-06-03T12:00" })],
+        slots: [slot({ workshopId: "matching", startIso: "2026-07-03T10:00", endIso: "2026-07-03T12:00" })],
         tools: [
           tool({ id: "saw", name: "Bandsäge", selectable: true }),
           tool({ id: "borrowed", name: "Schleifer", selectable: false, status: "AUSGELIEHEN" })
@@ -181,12 +186,12 @@ describe("WorkshopsPage search filters", () => {
       },
       {
         workshop: workshop({ id: "large", name: "Große Werkstatt", maxCapacity: 8 }),
-        slots: [slot({ workshopId: "large", startIso: "2026-06-03T10:00", endIso: "2026-06-03T12:00" })],
+        slots: [slot({ workshopId: "large", startIso: "2026-07-03T10:00", endIso: "2026-07-03T12:00" })],
         tools: [tool({ id: "drill", name: "Bohrmaschine", selectable: true })]
       },
       {
         workshop: workshop({ id: "wrong-date", name: "Terminfreie Werkstatt", maxCapacity: 3 }),
-        slots: [slot({ workshopId: "wrong-date", startIso: "2026-06-10T10:00", endIso: "2026-06-10T12:00" })],
+        slots: [slot({ workshopId: "wrong-date", startIso: "2026-07-10T10:00", endIso: "2026-07-10T12:00" })],
         tools: [tool({ id: "saw-late", name: "Bandsäge", selectable: true })]
       }
     ]);
@@ -201,8 +206,8 @@ describe("WorkshopsPage search filters", () => {
     fireEvent.change(toolFilter, { target: { value: "saw" } });
 
     fireEvent.click(screen.getByText(/Erweiterte Filter anzeigen/i));
-    fireEvent.change(screen.getByLabelText(/Ausleihe von/i), { target: { value: "2026-06-03" } });
-    fireEvent.change(screen.getByLabelText(/Ausleihe bis/i), { target: { value: "2026-06-03" } });
+    fireEvent.change(screen.getByLabelText(/Ausleihe von/i), { target: { value: "2026-07-03" } });
+    fireEvent.change(screen.getByLabelText(/Ausleihe bis/i), { target: { value: "2026-07-03" } });
     fireEvent.change(screen.getByLabelText(/Maximale Kapazität/i), { target: { value: "4" } });
 
     await waitFor(() => {
