@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../src/modules/users/users.repository", () => ({
   usersRepository: {
     findByIdPublic: vi.fn(),
+    updateProfile: vi.fn(),
+    listPublic: vi.fn(),
     updateRole: vi.fn(),
     updateSuspension: vi.fn(),
     getSystemMetrics: vi.fn()
@@ -20,6 +22,56 @@ vi.mock("../src/modules/notifications/notifications.service", () => ({
 
 const mockedUsersRepository = vi.mocked(usersRepository);
 const mockedNotificationsService = vi.mocked(notificationsService);
+
+const sampleUser = {
+  id: "user-1",
+  email: "user@example.com",
+  name: "User",
+  address: "Street 1",
+  role: "USER" as const,
+  isSuspended: false,
+  createdAt: new Date()
+};
+
+describe("usersService profile endpoints", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("lists users with filters", async () => {
+    mockedUsersRepository.listPublic.mockResolvedValueOnce([sampleUser] as any);
+
+    const result = await usersService.listUsers({ role: "USER", search: "lea" });
+
+    expect(mockedUsersRepository.listPublic).toHaveBeenCalledWith({ role: "USER", search: "lea" });
+    expect(result).toEqual([sampleUser]);
+  });
+
+  it("returns profile and rejects missing users", async () => {
+    mockedUsersRepository.findByIdPublic.mockResolvedValueOnce(sampleUser as any);
+    await expect(usersService.getMyProfile("user-1")).resolves.toEqual(sampleUser);
+
+    mockedUsersRepository.findByIdPublic.mockResolvedValueOnce(null);
+    await expect(usersService.getById("missing")).rejects.toMatchObject({ code: "USER_NOT_FOUND", status: 404 });
+  });
+
+  it("updates profile when user exists", async () => {
+    mockedUsersRepository.findByIdPublic.mockResolvedValueOnce(sampleUser as any);
+    mockedUsersRepository.updateProfile.mockResolvedValueOnce({ ...sampleUser, name: "Lea Neu" } as any);
+
+    const result = await usersService.updateMyProfile({
+      userId: "user-1",
+      name: "Lea Neu",
+      address: "Neue Straße 1"
+    });
+
+    expect(mockedUsersRepository.updateProfile).toHaveBeenCalledWith("user-1", {
+      name: "Lea Neu",
+      address: "Neue Straße 1"
+    });
+    expect(result.name).toBe("Lea Neu");
+  });
+});
 
 describe("usersService.updateRole", () => {
   beforeEach(() => {

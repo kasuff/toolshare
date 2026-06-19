@@ -193,4 +193,53 @@ describe("ratingsRepository", () => {
     });
     expect(result).toEqual([{ id: "r-workshop" }]);
   });
+
+  it("finds rating by id and hides it", async () => {
+    mocks.ratingFindUnique.mockResolvedValueOnce({ id: "rating-1", status: "VISIBLE" });
+    mocks.ratingUpdate.mockResolvedValueOnce({ id: "rating-1", status: "HIDDEN" });
+
+    const found = await ratingsRepository.findById("rating-1");
+    const hidden = await ratingsRepository.hide("rating-1", "mod-1", "Unangemessen");
+
+    expect(mocks.ratingFindUnique).toHaveBeenCalledWith({
+      where: { id: "rating-1" },
+      include: ratingInclude
+    });
+    expect(mocks.ratingUpdate).toHaveBeenCalledWith({
+      where: { id: "rating-1" },
+      data: {
+        status: "HIDDEN",
+        moderatorId: "mod-1",
+        decisionNote: "Unangemessen",
+        moderatedAt: expect.any(Date)
+      },
+      include: ratingInclude
+    });
+    expect(found).toEqual({ id: "rating-1", status: "VISIBLE" });
+    expect(hidden).toEqual({ id: "rating-1", status: "HIDDEN" });
+  });
+
+  it("finds rating by booking and requester", async () => {
+    mocks.ratingFindFirst.mockResolvedValueOnce({ id: "rating-1" });
+
+    const result = await ratingsRepository.findByBookingAndRequester("booking-1", "requester-1");
+
+    expect(mocks.ratingFindFirst).toHaveBeenCalledWith({
+      where: { bookingId: "booking-1", fromUserId: "requester-1" }
+    });
+    expect(result).toEqual({ id: "rating-1" });
+  });
+
+  it("lists given ratings", async () => {
+    mocks.ratingFindMany.mockResolvedValueOnce([{ id: "rating-given" }]);
+
+    const result = await ratingsRepository.listGiven("user-1");
+
+    expect(mocks.ratingFindMany).toHaveBeenCalledWith({
+      where: { fromUserId: "user-1" },
+      include: ratingInclude,
+      orderBy: { createdAt: "desc" }
+    });
+    expect(result).toEqual([{ id: "rating-given" }]);
+  });
 });

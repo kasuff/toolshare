@@ -743,4 +743,75 @@ describe("InboxPage", () => {
     expect((await screen.findAllByText(/Best.tigt/)).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Als abgeschlossen markieren" })).not.toBeInTheDocument();
   });
+
+  it("shows system warning notifications in the thread list", async () => {
+    getBookingsForUser.mockResolvedValueOnce([]);
+    getNotifications.mockResolvedValueOnce([
+      {
+        id: "n-warning",
+        userId: "provider-1",
+        message: "ERMAHNUNG:\nUnhöflicher Umgang\nModerator: Tobias\nHinweis: Bitte respektvoll bleiben",
+        read: false,
+        createdIso: "2026-05-05T10:00:00.000Z"
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadButton = await screen.findByRole("button", { name: /Ermahnung der Moderation/i });
+    fireEvent.click(threadButton);
+    expect(await screen.findByText("Grund der Ermahnung:")).toBeInTheDocument();
+    expect(screen.getByText("Hinweis: Bitte respektvoll bleiben")).toBeInTheDocument();
+    expect(within(threadButton).getByText("Tobias")).toBeInTheDocument();
+  });
+
+  it("reports the counterparty from the conversation menu", async () => {
+    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+    createReport.mockResolvedValueOnce({ id: "report-1" });
+
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    await screen.findByRole("heading", { name: "Nachrichten" });
+    const threadList = screen.getByLabelText("Konversationen");
+    fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Konversationsaktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Nutzer melden" }));
+
+    const reportDialog = screen.getByRole("dialog");
+    fireEvent.change(within(reportDialog).getByPlaceholderText("z. B. unpassende Inhalte oder Verhalten"), {
+      target: { value: "Unhöfliche Nachrichten" }
+    });
+    fireEvent.change(within(reportDialog).getByPlaceholderText("Weitere Hinweise für die Moderation"), {
+      target: { value: "Mehrfach beleidigend" }
+    });
+    fireEvent.click(within(reportDialog).getByRole("button", { name: "Nutzer melden" }));
+
+    await waitFor(() =>
+      expect(createReport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetType: "USER",
+          targetId: "requester-1",
+          bookingId: "b1",
+          reason: "Unhöfliche Nachrichten",
+          details: "Mehrfach beleidigend"
+        }),
+        "token-123"
+      )
+    );
+    expect(await screen.findByText("Nutzer wurde gemeldet. Der Chatverlauf wurde als Kontext übermittelt.")).toBeInTheDocument();
+  });
 });

@@ -22,7 +22,8 @@ const {
   listSuspensionRequests,
   decideSuspensionRequest,
   createWorkshop,
-  getSystemSettings
+  getSystemSettings,
+  updateSystemSetting
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
@@ -38,7 +39,8 @@ const {
   listSuspensionRequests: vi.fn(),
   decideSuspensionRequest: vi.fn(),
   createWorkshop: vi.fn(),
-  getSystemSettings: vi.fn()
+  getSystemSettings: vi.fn(),
+  updateSystemSetting: vi.fn()
 }));
 
 vi.mock("../../src/hooks/useToast", () => ({
@@ -62,9 +64,29 @@ vi.mock("../../src/services/api", () => ({
     listSuspensionRequests,
     decideSuspensionRequest,
     createWorkshop,
-    getSystemSettings
+    getSystemSettings,
+    updateSystemSetting
   }
 }));
+
+const { getMonitoringOverview, getMonitoringLogs } = vi.hoisted(() => ({
+  getMonitoringOverview: vi.fn(),
+  getMonitoringLogs: vi.fn()
+}));
+
+vi.mock("../../src/services/monitoringApi", async () => {
+  const actual = await vi.importActual<typeof import("../../src/services/monitoringApi")>(
+    "../../src/services/monitoringApi"
+  );
+  return {
+    ...actual,
+    monitoringApi: {
+      getOverview: getMonitoringOverview,
+      getLogs: getMonitoringLogs,
+      downloadExport: vi.fn()
+    }
+  };
+});
 
 class FileReaderMock {
   public onload: ((event: { target: { result: string } }) => void) | null = null;
@@ -175,6 +197,10 @@ describe("management pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sperrung annehmen" }));
     await waitFor(() => {
       expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: true }, "token-123");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ablehnen" }));
+    await waitFor(() => {
+      expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: false }, "token-123");
     });
     fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
 
@@ -587,5 +613,130 @@ describe("management pages", () => {
       );
     });
     expect(await screen.findByText("Workshops Home")).toBeInTheDocument();
+  });
+
+  it("shows login required on the new tool page without token", () => {
+    render(
+      <MemoryRouter>
+        <NewToolPage token={undefined} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("link", { name: "Einloggen" })).toHaveAttribute("href", "/auth");
+  });
+
+  it("blocks tool creation when address validation fails", async () => {
+    validateAddress.mockResolvedValueOnce({
+      isValid: false,
+      normalizedAddress: null,
+      normalizedParts: null
+    });
+
+    render(
+      <MemoryRouter>
+        <NewToolPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("z.B. Akku-Bohrmaschine"), {
+      target: { value: "Akkuschrauber" }
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, 1x Ladegerät. Besonderheiten: sehr leise, eingebaute LED"
+      ),
+      { target: { value: "Sehr gut erhalten" } }
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
+    fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
+    fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "München" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Werkzeug einstellen" }));
+
+    await waitFor(() => {
+      expect(validateAddress).toHaveBeenCalled();
+      expect(createTool).not.toHaveBeenCalled();
+      expect(pushToast).toHaveBeenCalledWith(
+        "Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.",
+        "error"
+      );
+    });
+  });
+
+  it("switches admin tabs and saves system rules", async () => {
+    getMetrics.mockResolvedValue({
+      users: 1,
+      tools: 2,
+      workshops: 1,
+      openBookings: 0,
+      openReports: 0,
+      openSuspensionRequests: 0
+    });
+    listUsers.mockResolvedValue([]);
+    listSuspensionRequests.mockResolvedValue([]);
+    getSystemSettings.mockResolvedValue([
+      {
+        key: "maxLoanDurationDays",
+        label: "Maximale Ausleihdauer",
+        value: 14,
+        min: 1,
+        max: 90,
+        unit: "Tage",
+        enforced: true
+      }
+    ]);
+    updateSystemSetting.mockResolvedValue({
+      key: "maxLoanDurationDays",
+      label: "Maximale Ausleihdauer",
+      value: 21,
+      min: 1,
+      max: 90,
+      unit: "Tage",
+      enforced: true
+    });
+    getMonitoringOverview.mockResolvedValue({
+      collectedAt: "2026-06-01T12:00:00.000Z",
+      system: { cpuPercent: 10, ramPercent: 20, diskPercent: 30 },
+      http: { requestsPerSec: 1, errorRatePercent: 0, p95LatencySeconds: 0.1 },
+      business: {
+        activeUsers: 1,
+        registrationsTotal: 2,
+        bookingsTotal: 3,
+        loginsSuccess: 4,
+        loginsFailed: 0
+      }
+    });
+    getMonitoringLogs.mockResolvedValue({ logs: [], count: 0, query: "" });
+
+    render(
+      <MemoryRouter>
+        <AdminPage currentUser={adminUser} token="token-123" />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Nutzer: 1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Systemregeln" }));
+    const settingInput = await screen.findByLabelText("Maximale Ausleihdauer");
+    fireEvent.change(settingInput, { target: { value: "abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(pushToast).toHaveBeenCalledWith("Bitte eine ganze Zahl eingeben.", "error");
+
+    fireEvent.change(settingInput, { target: { value: "200" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(pushToast).toHaveBeenCalledWith("Wert muss zwischen 1 und 90 liegen.", "error");
+
+    fireEvent.change(settingInput, { target: { value: "21" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() =>
+      expect(updateSystemSetting).toHaveBeenCalledWith("maxLoanDurationDays", 21, "token-123")
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
+    expect(await screen.findByRole("button", { name: "Übersicht" })).toBeInTheDocument();
+    expect(getMonitoringOverview).toHaveBeenCalledWith("token-123");
   });
 });

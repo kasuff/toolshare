@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Express } from "express";
@@ -32,7 +33,7 @@ type MockUser = {
   isSuspended: boolean;
   createdAt: Date;
 };
-describe.skip("US-13 Authentication acceptance criteria", () => {
+describe("US-13 Authentication acceptance criteria", () => {
   const seed = Date.now();
   const validEmail = `us13-valid-${seed}@example.com`;
   const validPassword = "Test1234!";
@@ -167,6 +168,29 @@ describe.skip("US-13 Authentication acceptance criteria", () => {
     expect(response.body.error?.code).toBe("ACCOUNT_SUSPENDED");
   });
 
+  it("rejects protected requests for suspended accounts with a valid token", async () => {
+    mockedAuthRepository.findById.mockResolvedValueOnce({
+      id: "11111111-1111-1111-1111-111111111111",
+      role: "USER",
+      isSuspended: true
+    });
+
+    const token = jwt.sign(
+      {
+        userId: "11111111-1111-1111-1111-111111111111",
+        role: "USER"
+      },
+      process.env.JWT_SECRET as string
+    );
+
+    const response = await request(app)
+      .get("/api/bookings/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error?.code).toBe("ACCOUNT_SUSPENDED");
+  });
+
   it("validates minimum password length on registration", async () => {
     const response = await request(app).post("/api/auth/register").send({
       email: `short-pass-${seed}@example.com`,
@@ -190,7 +214,7 @@ describe.skip("US-13 Authentication acceptance criteria", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error?.code).toBe("VALIDATION_ERROR");
-    expect(response.body.error?.details?.fieldErrors?.body?.address?.[0]).toContain("Hausnummer");
+    expect(response.body.error?.details?.fieldErrors?.body?.[0]).toContain("Hausnummer");
   });
 
   it("always creates newly registered users with USER role", async () => {
