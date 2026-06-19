@@ -144,7 +144,7 @@ backend:lint:
     policy: pull-push   # lint runs first -> it seeds the shared npm cache
   script:
     - cd backend
-    - npm ci --prefer-offline --cache .npm
+    - npm ci --workspaces=false --prefer-offline --cache .npm
     - npm run lint -- -f html -o ../backend-lint-report.html || true
     - npm run lint
   artifacts:
@@ -167,7 +167,7 @@ backend:test:
   timeout: 15m
   script:
     - cd backend
-    - npm ci --prefer-offline --cache .npm
+    - npm ci --workspaces=false --prefer-offline --cache .npm
     - !reference [.pg_wait, script]
     - |
       for attempt in 1 2 3; do
@@ -208,9 +208,22 @@ backend:build:
   # build crashes tsc during emit ("Cannot read properties of undefined").
   image: node:20.19
   extends: .backend_cache
+  needs:
+    - backend:test
   script:
     - cd backend
-    - npm ci --prefer-offline --cache .npm
+    # npm ci has intermittently segfaulted on shared runners; retry before failing.
+    - |
+      ok=0
+      for attempt in 1 2 3; do
+        if npm ci --workspaces=false --prefer-offline --cache .npm; then
+          ok=1
+          break
+        fi
+        echo "npm ci failed (attempt $attempt) -- retrying in 3s"
+        sleep 3
+      done
+      [ "$ok" -eq 1 ]
     - npm run build
 
 # === DEPLOY JOB ===
