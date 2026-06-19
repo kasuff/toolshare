@@ -5,7 +5,7 @@ import { EmptyState, GuestBanner, SkeletonCards } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import {  api  } from "@toolshare/shared";
 import type {  Tool, User, Workshop, WorkshopSlot  } from "@toolshare/shared";
-import { distanceBetweenLocations } from "../utils/searchFilters";
+import { distanceBetweenLocations } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
 
 type Props = {
