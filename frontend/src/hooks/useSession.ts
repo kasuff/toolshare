@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../services/api";
-import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../services/sessionEvents";
-import type { User } from "../types/domain";
+import {  api  } from "@toolshare/shared";
+import { onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
+import type {  User  } from "@toolshare/shared";
 
 const TOKEN_STORAGE_KEY = "toolshare_access_token";
 
@@ -20,8 +20,7 @@ export function useSession() {
       setIsLoading(false);
     };
 
-    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return onSessionExpired(handleSessionExpired);
   }, []);
 
   useEffect(() => {

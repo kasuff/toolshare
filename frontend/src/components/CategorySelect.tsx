@@ -1,4 +1,4 @@
-import { TOOL_CATEGORIES } from "../utils/categories";
+import {  TOOL_CATEGORIES  } from "@toolshare/shared";
 
 interface CategorySelectProps {
   value: string;

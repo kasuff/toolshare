@@ -21,8 +21,8 @@ import { AdminPage } from "./pages/AdminPage";
 import { ModerationPage } from "./pages/ModerationPage";
 import { MyOffersPage } from "./pages/MyOffersPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
-import { api } from "./services/api";
-import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./services/sessionEvents";
+import { api } from "@toolshare/shared";
+import { SESSION_EXPIRED_MESSAGE, onSessionExpired } from "@toolshare/shared";
 import { ImpressumPage } from "./pages/ImpressumPage";
 import { DatenschutzPage } from "./pages/DatenschutzPage";
 
@@ -292,8 +292,7 @@ function AppWithProviders() {
       pushToast(SESSION_EXPIRED_MESSAGE, "error");
     };
 
-    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return onSessionExpired(handleSessionExpired);
   }, [pushToast]);
 
   if (isLoading) return <p>Lade Session...</p>;

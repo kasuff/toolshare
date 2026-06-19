@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type AddressSuggestion } from "../services/api";
+import { api, type AddressSuggestion } from "@toolshare/shared";
 import { isAddressComplete, type AddressFormFields } from "../utils/address";
 
 type Props = {

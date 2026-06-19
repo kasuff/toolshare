@@ -103,6 +103,26 @@ Im Verzeichnis `k8s/` liegen die Basismanifeste für ein self-hosted Deployment 
 
 ---
 
+## Mobile App (Android/iOS)
+
+Das Projekt beinhaltet eine React Native / Expo App im Ordner `mobile`.
+
+### Testen mit Expo Go (Schnellstart)
+
+1. Lade dir die App **"Expo Go"** aus dem Google Play Store oder Apple App Store auf dein Smartphone herunter.
+2. Wechsle im Terminal in den Mobile-Ordner und starte den Server:
+   ```bash
+   cd mobile
+   npm install
+   npm start
+   ```
+3. Scanne den im Terminal (oder Browser) angezeigten QR-Code mit der Kamera-App deines Smartphones (iOS) oder direkt in der Expo Go App (Android).
+4. Die App verbindet sich automatisch mit dem Backend. In der `mobile/.env` Datei kann dafür die URL über `EXPO_PUBLIC_API_URL` konfiguriert werden.
+
+Für Details zur nativen Installation (als eigene `.apk` Datei) siehe die Datei [ANDROID_DEPLOYMENT.md](mobile/ANDROID_DEPLOYMENT.md) im `mobile` Verzeichnis.
+
+---
+
 ## Dokumentation
 
 Die vollständige Projektdokumentation (Architektur, ADRs, Scrum, etc.) befindet sich im separaten Repository:

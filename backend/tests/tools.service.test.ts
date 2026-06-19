@@ -59,6 +59,15 @@ describe("toolsService", () => {
     });
   });
 
+  it("hides tools from suspended owners", async () => {
+    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", owner: { isSuspended: true } } as any);
+
+    await expect(toolsService.getById("t1")).rejects.toMatchObject({
+      code: "TOOL_NOT_FOUND",
+      status: 404
+    });
+  });
+
   it("throws for unknown tool id", async () => {
     mockedToolsRepository.findById.mockResolvedValueOnce(null);
 

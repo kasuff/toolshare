@@ -1,0 +1,9 @@
+{
+  "name": "toolshare-root",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "mobile",
+    "shared"
+  ]
+}

@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { OfferCard } from "../components/OfferCard";
 import { EmptyState, GuestBanner, SkeletonCards } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import type { Tool, User, Workshop, WorkshopSlot } from "../types/domain";
+import {  api  } from "@toolshare/shared";
+import type {  Tool, User, Workshop, WorkshopSlot  } from "@toolshare/shared";
 import { distanceBetweenLocations } from "../utils/searchFilters";
 import { formatOfferDistance } from "../utils/offerFormatting";
 

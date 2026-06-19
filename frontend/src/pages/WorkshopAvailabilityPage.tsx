@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import type { User, Workshop, WorkshopSlot } from "../types/domain";
+import { api } from "@toolshare/shared";
+import type { User, Workshop, WorkshopSlot } from "@toolshare/shared";
 
 type Props = {
   currentUser?: User;

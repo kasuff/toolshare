@@ -9,8 +9,8 @@ import {
 } from "../utils/address";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import type { User } from "../types/domain";
+import {  api  } from "@toolshare/shared";
+import type {  User  } from "@toolshare/shared";
 
 type Props = {
   currentUser?: User;
