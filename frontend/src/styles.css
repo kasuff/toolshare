@@ -215,14 +215,20 @@ button:disabled {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--color-border);
+}
+
+.topbar-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
 }
 
 .logo {
@@ -630,7 +636,8 @@ button.mini {
   max-width: 1180px;
   margin: 0 auto;
   padding: var(--space-5) var(--space-4) 2.5rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 
@@ -7135,6 +7142,7 @@ button.active {
 /* ── Legal pages (Impressum / Datenschutz) ── */
 .legal-page {
   max-width: 780px;
+  margin: 0 auto;
   padding-bottom: var(--space-6);
 }
 

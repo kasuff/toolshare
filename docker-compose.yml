@@ -11,15 +11,15 @@ services:
       - VITE_API_URL=http://localhost:4000/api
     depends_on:
       - backend
-    develop:
-      watch:
-        - action: sync
-          path: ./frontend/src
-          target: /app/src
-        - action: rebuild
-          path: ./frontend/package.json
-        - action: rebuild
-          path: ./frontend/package-lock.json
+#    develop:
+#      watch:
+#        - action: sync
+#          path: ./frontend/src
+#          target: /app/src
+#        - action: rebuild
+#          path: ./frontend/package.json
+#        - action: rebuild
+#          path: ./frontend/package-lock.json
     networks:
       - toolshare-network
 
