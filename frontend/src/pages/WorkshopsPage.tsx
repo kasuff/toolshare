@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DateInput } from "../components/DateInput";
@@ -16,6 +16,7 @@ import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../ut
 import { formatOfferDistance } from "../utils/offerFormatting";
 import { pluralize } from "../utils/pluralize";
 import type { Tool, User, Workshop, WorkshopBookedRange, WorkshopSlot } from "../types/domain";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 type Props = {
   token?: string;
@@ -192,6 +193,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
   const [isSelectingRangeEnd, setIsSelectingRangeEnd] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
+  const imageViewerRef = useRef<HTMLDivElement>(null);
+  const imageViewerCloseRef = useRef<HTMLButtonElement>(null);
+  const closeImageViewer = useCallback(() => setActiveImageIndex(null), []);
+  useModalFocus(imageViewerRef, closeImageViewer, imageViewerCloseRef, activeImageIndex !== null);
 
   useEffect(() => {
     const run = async () => {
@@ -608,15 +613,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                   <article
                     key={item.workshop.id}
                     className={`workshop-card ${selectedWorkshop?.workshop.id === item.workshop.id ? "selected" : ""}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openWorkshop(item)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openWorkshop(item);
-                      }
-                    }}
                   >
                     <div className="workshop-card-media">
                       <img src={item.workshop.imageUrls[0] ?? DEFAULT_PLACEHOLDER_IMAGE} alt={item.workshop.name} />
@@ -631,23 +627,20 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                         {item.workshop.location} · {item.workshop.maxCapacity} Plätze
                       </p>
                       <div className="workshop-card-footer">
+                        <button type="button" className="btn" onClick={() => openWorkshop(item)}>
+                          Details anzeigen
+                        </button>
                         <button
                           type="button"
                           className="btn secondary"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            navigate(`/workshops/${item.workshop.id}/edit`);
-                          }}
+                          onClick={() => navigate(`/workshops/${item.workshop.id}/edit`)}
                         >
                           Werkstatt bearbeiten
                         </button>
                         <button
                           type="button"
                           className="btn secondary"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            navigate("/workshops/availability");
-                          }}
+                          onClick={() => navigate("/workshops/availability")}
                         >
                           Verfügbarkeit verwalten
                         </button>
@@ -981,7 +974,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                       <strong>{selectedWorkshopIsOwn ? "Beginn des Eigenbedarfs" : "Abholdaten"}</strong>
                     </div>
                     <div className="booking-fields-row">
-                      <label>
+                      <div className="booking-field">
                         <span>Datum</span>
                         <DateInput
                           id="workshop-booking-start-date"
@@ -998,7 +991,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                             }))
                           }
                         />
-                      </label>
+                      </div>
                       <label>
                         <span>Uhrzeit</span>
                         <input
@@ -1028,7 +1021,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                       <strong>{selectedWorkshopIsOwn ? "Ende des Eigenbedarfs" : "Abgabedaten"}</strong>
                     </div>
                     <div className="booking-fields-row">
-                      <label>
+                      <div className="booking-field">
                         <span>Datum</span>
                         <DateInput
                           aria-label={selectedWorkshopIsOwn ? "Enddatum Eigenbedarf" : "Abgabedatum"}
@@ -1045,7 +1038,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                             }))
                           }
                         />
-                      </label>
+                      </div>
                       <label>
                         <span>Uhrzeit</span>
                         <input
@@ -1160,18 +1153,20 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
           {activeImageIndex !== null && (
             <div
+              ref={imageViewerRef}
               className="workshop-image-viewer"
               role="dialog"
               aria-modal="true"
               aria-label={`Bilder von ${selectedWorkshop.workshop.name}`}
-              onClick={() => setActiveImageIndex(null)}
+              tabIndex={-1}
             >
               <button
+                ref={imageViewerCloseRef}
                 type="button"
                 className="workshop-image-viewer-close"
                 aria-label="Bildansicht schließen"
                 title="Schließen"
-                onClick={() => setActiveImageIndex(null)}
+                onClick={closeImageViewer}
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -1189,7 +1184,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
               )}
-              <div className="workshop-image-viewer-content" onClick={(event) => event.stopPropagation()}>
+              <div className="workshop-image-viewer-content">
                 <img
                   src={selectedWorkshopImages[activeImageIndex]}
                   alt={`${selectedWorkshop.workshop.name}, Bild ${activeImageIndex + 1}`}

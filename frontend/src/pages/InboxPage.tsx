@@ -668,7 +668,7 @@ export function InboxPage({ currentUser, token }: Props) {
                     >
                       {selectedBooking.type === "TOOL" ? (
                         <div className="request-card-form-grid request-card-form-grid--workshop">
-                          <label>
+                          <div className="booking-field">
                             <span>Abholdatum</span>
                             <DateInput
                               aria-label="Alternatives Abholdatum"
@@ -683,7 +683,7 @@ export function InboxPage({ currentUser, token }: Props) {
                                 }))
                               }
                             />
-                          </label>
+                          </div>
                           <label>
                             <span>Abholzeit</span>
                             <input
@@ -701,7 +701,7 @@ export function InboxPage({ currentUser, token }: Props) {
                               }
                             />
                           </label>
-                          <label>
+                          <div className="booking-field">
                             <span>Rückgabedatum</span>
                             <DateInput
                               aria-label="Alternatives Rückgabedatum"
@@ -716,7 +716,7 @@ export function InboxPage({ currentUser, token }: Props) {
                                 }))
                               }
                             />
-                          </label>
+                          </div>
                           <label>
                             <span>Rückgabezeit</span>
                             <input
@@ -737,7 +737,7 @@ export function InboxPage({ currentUser, token }: Props) {
                         </div>
                       ) : (
                         <div className="request-card-form-grid request-card-form-grid--workshop">
-                          <label>
+                          <div className="booking-field">
                             <span>Startdatum</span>
                             <DateInput
                               aria-label="Alternativdatum für Werkstattvorschlag"
@@ -752,7 +752,7 @@ export function InboxPage({ currentUser, token }: Props) {
                                 }))
                               }
                             />
-                          </label>
+                          </div>
                           <label>
                             <span>Uhrzeit</span>
                             <input
@@ -770,7 +770,7 @@ export function InboxPage({ currentUser, token }: Props) {
                               }
                             />
                           </label>
-                          <label>
+                          <div className="booking-field">
                             <span>Enddatum</span>
                             <DateInput
                               aria-label="Alternativ-Enddatum für Werkstattvorschlag"
@@ -785,7 +785,7 @@ export function InboxPage({ currentUser, token }: Props) {
                                 }))
                               }
                             />
-                          </label>
+                          </div>
                           <label>
                             <span>Uhrzeit</span>
                             <input
@@ -980,22 +980,7 @@ function RequestMessageCard({
   children?: ReactNode;
 }) {
   return (
-    <article
-      className={`request-message-card${unread ? " request-message-card--unread" : ""}`}
-      onClick={onClick}
-      onKeyDown={
-        onClick
-          ? (event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-    >
+    <article className={`request-message-card${unread ? " request-message-card--unread" : ""}`}>
       <div className="request-message-card-head">
         <span className="request-message-card-icon" aria-hidden="true">
           <span className="material-symbols-outlined">{icon}</span>
@@ -1004,6 +989,11 @@ function RequestMessageCard({
           <span>{label}</span>
           <h3>{title}</h3>
         </div>
+        {onClick && (
+          <button type="button" className="icon-button request-message-read-button" onClick={onClick} aria-label="Nachricht als gelesen markieren">
+            <span className="material-symbols-outlined" aria-hidden="true">done</span>
+          </button>
+        )}
       </div>
       {firstLabel && firstValue && secondLabel && secondValue && (
         <div className="request-message-card-metadata">

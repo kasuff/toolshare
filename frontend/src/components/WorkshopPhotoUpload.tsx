@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 interface WorkshopPhotoUploadProps {
   photos: string[];
@@ -6,11 +6,15 @@ interface WorkshopPhotoUploadProps {
   label: string;
   hint?: string;
   maxPhotos?: number;
+  describedBy?: string;
 }
 
-export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPhotos = 3 }: WorkshopPhotoUploadProps) {
+export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPhotos = 3, describedBy }: WorkshopPhotoUploadProps) {
   const [error, setError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const internalErrorId = `${inputId}-error`;
+  const descriptionIds = [describedBy, error ? internalErrorId : null].filter(Boolean).join(" ") || undefined;
 
   const openFileDialog = () => {
     fileInputRef.current?.click();
@@ -57,9 +61,7 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
 
   return (
     <div className="photo-upload">
-      <label>
-        <strong>{label}</strong>
-      </label>
+      <strong>{label}</strong>
       {hint && <p className="hint">{hint}</p>}
 
       {photos.length === 0 ? (
@@ -67,6 +69,7 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
           type="button"
           onClick={openFileDialog}
           className="image-preview-container workshop-empty-photo-upload"
+          aria-describedby={descriptionIds}
         >
           <div className="image-placeholder">
             <span className="upload-icon" aria-hidden="true">
@@ -93,6 +96,7 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
               onClick={() => removePhoto(index)}
               className="photo-remove"
               title="Foto entfernen"
+              aria-label={`Foto ${index + 1} entfernen`}
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -105,6 +109,7 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
             type="button"
             onClick={openFileDialog}
             className="photo-upload-button"
+            aria-describedby={descriptionIds}
           >
             <div className="photo-placeholder">
               <span className="upload-icon" aria-hidden="true">
@@ -125,11 +130,12 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
       </div>
       )}
 
-      {error && <p className="field-error">{error}</p>}
+      {error && <p id={internalErrorId} className="field-error" role="alert">{error}</p>}
       <p className="meta-text">{photos.length} von {maxPhotos} Fotos</p>
 
       <input
         ref={fileInputRef}
+        id={inputId}
         type="file"
         accept="image/*"
         multiple

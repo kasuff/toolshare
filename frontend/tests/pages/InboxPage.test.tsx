@@ -199,7 +199,7 @@ describe("InboxPage", () => {
     expect(card).toBeTruthy();
     expect(card).toHaveClass("request-message-card--unread");
 
-    fireEvent.click(card!);
+    fireEvent.click(screen.getByRole("button", { name: "Nachricht als gelesen markieren" }));
     expect(card).not.toHaveClass("request-message-card--unread");
   });
 

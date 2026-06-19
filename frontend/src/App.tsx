@@ -239,7 +239,7 @@ function AuthScreen({
               </>
             )}
             {redirectHint && <p className="status-pill">{redirectHint}</p>}
-            {error && <p className="status-pill danger">{error}</p>}
+            {error && <p className="status-pill danger" role="alert">{error}</p>}
             <button type="submit" disabled={isSubmitting || (isRegister && passwordsMismatch)}>
               {isSubmitting ? "Bitte warten..." : isRegister ? "Registrieren und starten" : "Einloggen"}
             </button>

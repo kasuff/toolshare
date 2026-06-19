@@ -73,7 +73,7 @@ describe("WorkshopsPage coverage", () => {
     renderWorkshopsPage();
 
     expect(await screen.findByText("Maker Space")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Maker Space").closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Maker Space: Details anzeigen" }));
     expect(await screen.findByRole("region", { name: "Maker Space" })).toBeInTheDocument();
     expect(screen.getByText("Eigene Werkstatt")).toBeInTheDocument();
     expect(screen.getByText("Bohrmaschine")).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe("WorkshopsPage coverage", () => {
     renderWorkshopsPage();
 
     expect(await screen.findByText("Holzwerkstatt")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Holzwerkstatt").closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Holzwerkstatt: Details anzeigen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Anfrage senden" }));
 
     await waitFor(() => {

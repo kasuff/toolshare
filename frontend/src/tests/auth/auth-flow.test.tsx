@@ -88,7 +88,7 @@ describe("Authentication user journey", () => {
 
     await screen.findByText("Vorschläge - klicken zum Übernehmen");
 
-    fireEvent.mouseDown(await screen.findByRole("button", { name: /Musterstrasse 10/i }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /Musterstrasse 10/i }));
 
     expect(screen.queryByPlaceholderText("Straße")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));

@@ -1,4 +1,6 @@
+import { useCallback, useRef } from "react";
 import { Field } from "./ui";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 type Props = {
   title: string;
@@ -25,14 +27,20 @@ export function ReportFormPanel({
   onSubmit,
   onCancel
 }: Props) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const reasonInputRef = useRef<HTMLInputElement>(null);
+  const closeDialog = useCallback(() => onCancel(), [onCancel]);
+  useModalFocus(dialogRef, closeDialog, reasonInputRef);
+
   return (
-    <div className="report-form-backdrop" role="presentation" onClick={onCancel}>
+    <div className="report-form-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="report-form-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="report-form-title"
-        onClick={(event) => event.stopPropagation()}
+        tabIndex={-1}
       >
         <header className="report-form-head">
           <h2 id="report-form-title">{title}</h2>
@@ -43,10 +51,10 @@ export function ReportFormPanel({
         {hint && <p className="hint">{hint}</p>}
         <Field label="Grund">
           <input
+            ref={reasonInputRef}
             value={reason}
             onChange={(event) => onReasonChange(event.target.value)}
             placeholder="z. B. unpassende Inhalte oder Verhalten"
-            autoFocus
           />
         </Field>
         <Field label="Details (optional)">

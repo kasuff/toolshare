@@ -182,8 +182,9 @@ export function NewWorkshopPage({ token }: Props) {
           label="Werkstatt Fotos *"
           hint="Lade bis zu drei gute Fotos deiner Werkstatt hoch (JPG, PNG, WebP, max. 5 MB pro Foto)."
           maxPhotos={3}
+          describedBy={showFieldError("photos") ? "new-workshop-photos-error" : undefined}
         />
-        {showFieldError("photos") && <p className="field-error">{formErrors.photos}</p>}
+        {showFieldError("photos") && <p id="new-workshop-photos-error" className="field-error" role="alert">{formErrors.photos}</p>}
 
         <label className="tool-form-field">
           <span>Name *</span>
@@ -196,9 +197,10 @@ export function NewWorkshopPage({ token }: Props) {
             maxLength={100}
             className={showFieldError("name") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("name")}
+            aria-describedby={showFieldError("name") ? "new-workshop-name-error" : undefined}
           />
           <small>Kurz und konkret, z.B. geräumige Garagen-Werkstatt.</small>
-          {showFieldError("name") && <p className="field-error">{formErrors.name}</p>}
+          {showFieldError("name") && <p id="new-workshop-name-error" className="field-error" role="alert">{formErrors.name}</p>}
         </label>
 
         <label className="tool-form-field">
@@ -216,9 +218,10 @@ export function NewWorkshopPage({ token }: Props) {
             rows={5}
             className={showFieldError("description") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("description")}
+            aria-describedby={showFieldError("description") ? "new-workshop-description-error" : undefined}
           />
           <small>Beschreibe Zustand, Nutzungsmöglichkeiten und Besonderheiten deiner Werkstatt.</small>
-          {showFieldError("description") && <p className="field-error">{formErrors.description}</p>}
+          {showFieldError("description") && <p id="new-workshop-description-error" className="field-error" role="alert">{formErrors.description}</p>}
         </label>
 
         <WorkshopToolsInput
@@ -244,9 +247,10 @@ export function NewWorkshopPage({ token }: Props) {
             onChange={setWorkshopAddress}
             required
             hasError={showFieldError("location")}
+            errorMessageId="new-workshop-location-error"
             onBlur={() => markFieldTouched("location")}
           />
-          {showFieldError("location") && <p className="field-error">{formErrors.location}</p>}
+          {showFieldError("location") && <p id="new-workshop-location-error" className="field-error" role="alert">{formErrors.location}</p>}
         </div>
 
         <div className="tool-form-field workshop-capacity-field">
@@ -303,7 +307,7 @@ export function NewWorkshopPage({ token }: Props) {
               <div className="workshop-slot-date-group">
                 <strong>Startdaten</strong>
                 <div className="booking-fields-row">
-                  <label>
+                  <div className="booking-field">
                     <span>Datum</span>
                     <DateInput
                       aria-label="Startdatum"
@@ -311,7 +315,7 @@ export function NewWorkshopPage({ token }: Props) {
                       value={slot.startDate}
                       onChange={(value) => setSlot((current) => ({ ...current, startDate: value }))}
                     />
-                  </label>
+                  </div>
                   <label>
                     <span>Uhrzeit</span>
                     <input
@@ -327,7 +331,7 @@ export function NewWorkshopPage({ token }: Props) {
               <div className="workshop-slot-date-group">
                 <strong>Enddaten</strong>
                 <div className="booking-fields-row">
-                  <label>
+                  <div className="booking-field">
                     <span>Datum</span>
                     <DateInput
                       aria-label="Enddatum"
@@ -336,7 +340,7 @@ export function NewWorkshopPage({ token }: Props) {
                       min={slot.startDate}
                       onChange={(value) => setSlot((current) => ({ ...current, endDate: value }))}
                     />
-                  </label>
+                  </div>
                   <label>
                     <span>Uhrzeit</span>
                     <input

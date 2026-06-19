@@ -140,9 +140,10 @@ export function NewToolPage({ token }: Props) {
             maxLength={100}
             className={showFieldError("name") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("name")}
+            aria-describedby={showFieldError("name") ? "new-tool-name-error" : undefined}
           />
           <small>Kurz und konkret, z.B. Akku-Bohrmaschine DeWalt 18V</small>
-          {showFieldError("name") && <p className="field-error">{formErrors.name}</p>}
+          {showFieldError("name") && <p id="new-tool-name-error" className="field-error" role="alert">{formErrors.name}</p>}
         </label>
 
         <label className="tool-form-field">
@@ -160,9 +161,10 @@ export function NewToolPage({ token }: Props) {
             rows={5}
             className={showFieldError("description") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("description")}
+            aria-describedby={showFieldError("description") ? "new-tool-description-error" : undefined}
           />
           <small>Zustand, Lieferumfang, besondere Hinweise. Schreib alles auf, was potenzielle Nutzer wissen sollten!</small>
-          {showFieldError("description") && <p className="field-error">{formErrors.description}</p>}
+          {showFieldError("description") && <p id="new-tool-description-error" className="field-error" role="alert">{formErrors.description}</p>}
         </label>
 
         <CategorySelect
@@ -184,10 +186,11 @@ export function NewToolPage({ token }: Props) {
             onChange={setPickupAddress}
             required
             hasError={showFieldError("pickupLocation")}
+            errorMessageId="new-tool-location-error"
             onBlur={() => markFieldTouched("pickupLocation")}
           />
 
-          {showFieldError("pickupLocation") && <p className="field-error">{formErrors.pickupLocation}</p>}
+          {showFieldError("pickupLocation") && <p id="new-tool-location-error" className="field-error" role="alert">{formErrors.pickupLocation}</p>}
         </div>
 
         <label className="tool-form-field">

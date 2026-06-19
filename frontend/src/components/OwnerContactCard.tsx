@@ -10,11 +10,11 @@ export function OwnerContactCard({ owner }: OwnerContactCardProps) {
       <h3>Deine Kontaktdaten</h3>
       <div className="contact-info">
         <div className="contact-field">
-          <label>Name</label>
+          <span>Name</span>
           <p>{owner.name}</p>
         </div>
         <div className="contact-field">
-          <label>E-Mail</label>
+          <span>E-Mail</span>
           <p>
             <a href={`mailto:${owner.email}`}>{owner.email}</a>
           </p>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 interface ImageUploadProps {
   onImageSelect: (imageData: string | null) => void;
@@ -13,6 +13,7 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
   const [fileName, setFileName] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
 
   useEffect(() => {
     setPreview(currentImage || null);
@@ -71,7 +72,7 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
 
   return (
     <div className="image-upload">
-      <label htmlFor="image-input">
+      <label htmlFor={inputId}>
         <strong>{label}</strong>
       </label>
       {hint && <p className="hint">{hint}</p>}
@@ -122,7 +123,7 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
 
       <input
         ref={fileInputRef}
-        id="image-input"
+        id={inputId}
         type="file"
         accept="image/*"
         onChange={handleFileSelect}

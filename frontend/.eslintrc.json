@@ -7,7 +7,8 @@
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
-    "plugin:react-hooks/recommended"
+    "plugin:react-hooks/recommended",
+    "plugin:jsx-a11y/recommended"
   ],
   "ignorePatterns": [
     "dist",
@@ -17,7 +18,8 @@
   "plugins": [
     "react-refresh",
     "@typescript-eslint",
-    "react-hooks"
+    "react-hooks",
+    "jsx-a11y"
   ],
   "rules": {
     "react-refresh/only-export-components": [

@@ -272,7 +272,7 @@ describe("management pages", () => {
     fireEvent.change(screen.getByPlaceholderText("z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, 1x Ladegerät. Besonderheiten: sehr leise, eingebaute LED"), {
       target: { value: "Sehr gut erhalten" }
     });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Kategorie *" }), { target: { value: "holz" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });

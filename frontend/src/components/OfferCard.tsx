@@ -75,18 +75,13 @@ export function OfferCard({
   }
 
   return (
-    <article
-      className="ds-workshop-card card-enter"
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onSelect?.();
-        }
-      }}
-    >
+    <article className="ds-workshop-card card-enter">
+      <button
+        type="button"
+        className="offer-card-activation"
+        onClick={onSelect}
+        aria-label={`${name}: Details anzeigen`}
+      />
       {content}
     </article>
   );

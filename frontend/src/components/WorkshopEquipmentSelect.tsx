@@ -18,9 +18,7 @@ export function WorkshopEquipmentSelect({ selected, onChange, label, hint }: Wor
 
   return (
     <div className="equipment-select">
-      <label>
-        <strong>{label}</strong>
-      </label>
+      <strong>{label}</strong>
       {hint && <p className="hint">{hint}</p>}
 
       <div className="equipment-grid">
@@ -28,6 +26,7 @@ export function WorkshopEquipmentSelect({ selected, onChange, label, hint }: Wor
           <label key={equipment.value} className={`equipment-option ${selected.includes(equipment.value) ? "selected" : ""}`}>
             <input
               type="checkbox"
+              aria-label={equipment.label}
               checked={selected.includes(equipment.value)}
               onChange={() => toggleEquipment(equipment.value)}
               className="equipment-checkbox"

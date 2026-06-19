@@ -152,13 +152,13 @@ export function EditToolPage({ currentUser, token }: Props) {
           <span>Name *</span>
           <input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required />
         </label>
-        <label className="tool-form-field">
+        <div className="tool-form-field">
           <span className="field-label-row">
             <span>Beschreibung *</span>
             <span className="char-count">{description.length}/1000 Zeichen</span>
           </span>
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} maxLength={1000} />
-        </label>
+          <textarea aria-label="Beschreibung" value={description} onChange={(event) => setDescription(event.target.value)} rows={5} maxLength={1000} />
+        </div>
         <CategorySelect value={category} onChange={setCategory} label="Kategorie *" />
         <div className="tool-form-field new-tool-address-section">
           <span>Abholort *</span>

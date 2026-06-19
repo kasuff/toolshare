@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api, type ModerationReport } from "../services/api";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 type Props = {
   token?: string;
@@ -101,6 +102,10 @@ function ReportActions({
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [actionReason, setActionReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const closeDialog = useCallback(() => setDialogMode(null), []);
+  useModalFocus(dialogRef, closeDialog, reasonRef, dialogMode !== null);
 
   const subjectId = report.subjectUserId;
   const canActOnUser = Boolean(subjectId);
@@ -196,19 +201,20 @@ function ReportActions({
       </div>
 
       {dialogMode && (
-        <div className="report-form-backdrop" role="presentation" onClick={() => setDialogMode(null)}>
+        <div className="report-form-backdrop" role="presentation">
           <section
+            ref={dialogRef}
             className="report-form-panel"
             role="dialog"
             aria-modal="true"
             aria-labelledby="moderation-action-title"
-            onClick={(event) => event.stopPropagation()}
+            tabIndex={-1}
           >
             <header className="report-form-head">
               <h2 id="moderation-action-title">
                 {dialogMode === "warn" ? "Nutzer ermahnen" : "Sperrung anfordern"}
               </h2>
-              <button type="button" className="icon-button" onClick={() => setDialogMode(null)} aria-label="Schließen">
+              <button type="button" className="icon-button" onClick={closeDialog} aria-label="Schließen">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
@@ -221,6 +227,7 @@ function ReportActions({
               <label className="field">
                 <span>{dialogMode === "warn" ? "Begründung der Ermahnung" : "Begründung der Sperranfrage"}</span>
                 <textarea
+                  ref={reasonRef}
                   value={actionReason}
                   onChange={(event) => setActionReason(event.target.value)}
                   required
@@ -230,7 +237,7 @@ function ReportActions({
                 />
               </label>
               <div className="row">
-                <button type="button" className="btn secondary" onClick={() => setDialogMode(null)} disabled={busy}>
+                <button type="button" className="btn secondary" onClick={closeDialog} disabled={busy}>
                   Abbrechen
                 </button>
                 <button type="submit" className="btn" disabled={busy}>

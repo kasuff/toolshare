@@ -53,6 +53,31 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
   }, [location.pathname]);
 
   useEffect(() => {
+    const routeTitles: Array<[RegExp, string]> = [
+      [/^\/$/, "Entdecken"],
+      [/^\/auth$/, "Anmelden"],
+      [/^\/tools\/new$/, "Werkzeug einstellen"],
+      [/^\/tools\/[^/]+\/edit$/, "Werkzeug bearbeiten"],
+      [/^\/tools\/[^/]+$/, "Werkzeugdetails"],
+      [/^\/tools$/, "Werkzeuge"],
+      [/^\/workshops\/new$/, "Werkstatt einstellen"],
+      [/^\/workshops\/availability$/, "Verfügbarkeit verwalten"],
+      [/^\/workshops\/[^/]+\/edit$/, "Werkstatt bearbeiten"],
+      [/^\/workshops\/[^/]+$/, "Werkstattdetails"],
+      [/^\/workshops$/, "Werkstätten"],
+      [/^\/offers$/, "Meine Angebote"],
+      [/^\/profile$/, "Einstellungen"],
+      [/^\/inbox$/, "Nachrichten"],
+      [/^\/moderation$/, "Moderation"],
+      [/^\/admin$/, "Admin"],
+      [/^\/impressum$/, "Impressum"],
+      [/^\/datenschutz$/, "Datenschutzerklärung"]
+    ];
+    const pageTitle = routeTitles.find(([pattern]) => pattern.test(location.pathname))?.[1] ?? "ToolShare";
+    document.title = pageTitle === "ToolShare" ? pageTitle : `${pageTitle} | ToolShare`;
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (!isMobileNavOpen) return;
 
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -114,6 +139,9 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Zum Hauptinhalt
+      </a>
       <header className="topbar">
         <Link to="/" className="logo">
           Tool<strong>Share</strong>
@@ -192,7 +220,7 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
         </div>
       </header>
 
-      <main className="content">
+      <main id="main-content" className="content" tabIndex={-1}>
         <Outlet />
       </main>
 
