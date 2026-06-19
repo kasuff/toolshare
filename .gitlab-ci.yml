@@ -99,7 +99,7 @@ frontend:lint:
     policy: pull-push   # lint runs first -> it seeds the shared npm cache
   script:
     - cd frontend
-    - npm ci --prefer-offline --cache .npm
+    - npm ci --workspaces=false --prefer-offline --cache .npm
     - npm run lint -- -f html -o ../frontend-lint-report.html || true
     - npm run lint
   artifacts:
@@ -119,7 +119,7 @@ frontend:test:
     NODE_OPTIONS: "--max-old-space-size=2048"   # headroom so the test fork is not OOM-killed
   script:
     - cd frontend
-    - npm ci --prefer-offline --cache .npm
+    - npm ci --workspaces=false --prefer-offline --cache .npm
     - npm run test -- --coverage
     - node ../scripts/check-coverage.js coverage
   coverage: '/Coverage: \d+\.\d+%/'
@@ -199,7 +199,7 @@ frontend:build:
   extends: .frontend_cache
   script:
     - cd frontend
-    - npm ci --prefer-offline --cache .npm
+    - npm ci --workspaces=false --prefer-offline --cache .npm
     - npm run build
 
 backend:build:
