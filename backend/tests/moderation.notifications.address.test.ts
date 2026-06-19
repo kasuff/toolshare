@@ -55,7 +55,8 @@ vi.mock("../src/modules/workshops/workshops.service", () => ({
 
 vi.mock("../src/modules/ratings/ratings.service", () => ({
   ratingsService: {
-    hideFromModeration: vi.fn()
+    hideFromModeration: vi.fn(),
+    removeFromModeration: vi.fn()
   }
 }));
 
@@ -172,6 +173,27 @@ describe("moderationService", () => {
       "mod-1",
       "Bewertung ausgeblendet"
     );
+    expect(result).toMatchObject({ id: "r-rating", status: "RESOLVED" });
+  });
+
+  it("deletes rating when a RATING report is resolved with deleteRating", async () => {
+    mockedModerationRepository.findById.mockResolvedValueOnce({
+      id: "r-rating",
+      targetType: "RATING",
+      targetId: "rating-1"
+    } as any);
+    mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r-rating", status: "RESOLVED" } as any);
+    mockedRatingsService.removeFromModeration.mockResolvedValueOnce({ id: "rating-1" } as any);
+
+    const result = await moderationService.updateReportStatus({
+      reportId: "r-rating",
+      status: "RESOLVED",
+      moderatorId: "mod-1",
+      deleteRating: true
+    });
+
+    expect(mockedRatingsService.removeFromModeration).toHaveBeenCalledWith("rating-1");
+    expect(mockedRatingsService.hideFromModeration).not.toHaveBeenCalled();
     expect(result).toMatchObject({ id: "r-rating", status: "RESOLVED" });
   });
 

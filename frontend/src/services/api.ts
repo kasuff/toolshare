@@ -1163,6 +1163,7 @@ export const api = {
       suspensionReason?: string;
       deleteTool?: boolean;
       deleteWorkshop?: boolean;
+      deleteRating?: boolean;
     },
     token: string
   ) {

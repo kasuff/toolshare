@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminPage } from "../../src/pages/AdminPage";
@@ -291,12 +291,68 @@ describe("management pages", () => {
     );
 
     expect(await screen.findByText(/Bewertung:/)).toBeInTheDocument();
-    const preview = screen.getByText(/Bei Bestätigung wird die Bewertung ausgeblendet/).closest(".moderation-rating-preview");
+    const preview = screen.getByText(/Mit «Bewertung löschen» wird sie dauerhaft entfernt/).closest(".moderation-rating-preview");
     expect(preview).not.toBeNull();
     expect(preview).toHaveTextContent("Anna");
     expect(preview).toHaveTextContent("2 von 5 Sternen");
     expect(preview).toHaveTextContent("Bohrer");
     expect(preview).toHaveTextContent("„Schlechter Service“");
+    expect(screen.getByRole("button", { name: "Bewertung löschen" })).toBeInTheDocument();
+  });
+
+  it("deletes a reported rating from the moderation actions", async () => {
+    listReports.mockResolvedValueOnce([
+      {
+        id: "r-rating",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "RATING",
+        targetId: "rating-1",
+        targetLabel: "Bewertung von Anna",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Max",
+        reason: "Beleidigend",
+        details: "Unangemessener Kommentar",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        ratingPreview: {
+          score: 2,
+          comment: "Schlechter Service",
+          fromUserName: "Anna",
+          listingLabel: "Bohrer"
+        }
+      }
+    ]);
+    listClosedReports.mockResolvedValue([]);
+    updateReportStatus.mockResolvedValueOnce(undefined);
+    listReports.mockResolvedValueOnce([]);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Bewertung löschen" }));
+    expect(screen.getByRole("heading", { name: "Bewertung löschen" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Warum wird diese Bewertung gelöscht?"), {
+      target: { value: "Verstoß gegen Community-Richtlinien" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Bewertung unwiderruflich löschen" }));
+
+    await waitFor(() =>
+      expect(updateReportStatus).toHaveBeenCalledWith(
+        "r-rating",
+        {
+          status: "RESOLVED",
+          decisionNote: "Verstoß gegen Community-Richtlinien",
+          deleteRating: true
+        },
+        "token-123"
+      )
+    );
   });
 
   it("renders closed reports with limit selection", async () => {
