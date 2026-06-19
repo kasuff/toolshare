@@ -135,80 +135,82 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link to="/" className="logo">
-          Tool<strong>Share</strong>
-        </Link>
-        <button
-          type="button"
-          className="mobile-nav-toggle"
-          aria-controls="primary-navigation"
-          aria-expanded={isMobileNavOpen}
-          aria-label={isMobileNavOpen ? "Navigation schließen" : "Navigation öffnen"}
-          onClick={() => setIsMobileNavOpen((isOpen) => !isOpen)}
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            {isMobileNavOpen ? "close" : "menu"}
-          </span>
-        </button>
-        <nav id="primary-navigation" className={`nav ${isMobileNavOpen ? "nav-open" : ""}`}>
-          <NavLink to="/">Entdecken</NavLink>
-          
-          {/* Werkzeuge link */}
-          <NavLink to="/tools" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Werkzeuge
-          </NavLink>
+        <div className="topbar-inner">
+          <Link to="/" className="logo">
+            Tool<strong>Share</strong>
+          </Link>
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            aria-controls="primary-navigation"
+            aria-expanded={isMobileNavOpen}
+            aria-label={isMobileNavOpen ? "Navigation schließen" : "Navigation öffnen"}
+            onClick={() => setIsMobileNavOpen((isOpen) => !isOpen)}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              {isMobileNavOpen ? "close" : "menu"}
+            </span>
+          </button>
+          <nav id="primary-navigation" className={`nav ${isMobileNavOpen ? "nav-open" : ""}`}>
+            <NavLink to="/">Entdecken</NavLink>
+            
+            {/* Werkzeuge link */}
+            <NavLink to="/tools" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Werkzeuge
+            </NavLink>
 
-          {/* Werkstätten link (no dropdown) */}
-          <NavLink to="/workshops" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Werkstätten
-          </NavLink>
+            {/* Werkstätten link (no dropdown) */}
+            <NavLink to="/workshops" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Werkstätten
+            </NavLink>
 
-          {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && <NavLink to="/moderation">Moderation</NavLink>}
-          {currentUser?.role === "ADMIN" && <NavLink to="/admin">Admin</NavLink>}
-        </nav>
-        <div className="topbar-right">
-          {users.length > 1 && <RoleSwitcher users={users} currentUserId={currentUser?.id} onChange={onSwitchUser} />}
-          {currentUser ? (
-            <>
-              <Link to="/inbox" className="notification-bell-wrap" aria-label={inboxAriaLabel}>
-                <span className="notification-bell">
-                  <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
-                    <path d="M12 3.75a6 6 0 0 0-6 6v2.5a4.5 4.5 0 0 1-.92 2.72L3.8 16.62a1.5 1.5 0 0 0 1.2 2.38h14a1.5 1.5 0 0 0 1.2-2.38l-1.28-1.65a4.5 4.5 0 0 1-.92-2.72v-2.5a6 6 0 0 0-6-6Zm0 18a3.25 3.25 0 0 0 3.03-2.06.75.75 0 1 0-1.39-.57 1.75 1.75 0 0 1-3.28 0 .75.75 0 1 0-1.39.57A3.25 3.25 0 0 0 12 21.75Z" />
-                  </svg>
-                </span>
-                {badgeText !== null && (
-                  <span className="notification-bell-badge" aria-hidden="true">
-                    {badgeText}
-                  </span>
-                )}
-              </Link>
-              <details className="profile-menu" ref={profileMenuRef}>
-                <summary aria-label="Profil-Menü öffnen">
-                  <span className="profile-avatar" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" role="img" focusable="false">
-                      <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-4.14 0-7.5 2.69-7.5 6a.75.75 0 0 0 1.5 0c0-2.47 2.69-4.5 6-4.5s6 2.03 6 4.5a.75.75 0 0 0 1.5 0c0-3.31-3.36-6-7.5-6Z" />
+            {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && <NavLink to="/moderation">Moderation</NavLink>}
+            {currentUser?.role === "ADMIN" && <NavLink to="/admin">Admin</NavLink>}
+          </nav>
+          <div className="topbar-right">
+            {users.length > 1 && <RoleSwitcher users={users} currentUserId={currentUser?.id} onChange={onSwitchUser} />}
+            {currentUser ? (
+              <>
+                <Link to="/inbox" className="notification-bell-wrap" aria-label={inboxAriaLabel}>
+                  <span className="notification-bell">
+                    <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
+                      <path d="M12 3.75a6 6 0 0 0-6 6v2.5a4.5 4.5 0 0 1-.92 2.72L3.8 16.62a1.5 1.5 0 0 0 1.2 2.38h14a1.5 1.5 0 0 0 1.2-2.38l-1.28-1.65a4.5 4.5 0 0 1-.92-2.72v-2.5a6 6 0 0 0-6-6Zm0 18a3.25 3.25 0 0 0 3.03-2.06.75.75 0 1 0-1.39-.57 1.75 1.75 0 0 1-3.28 0 .75.75 0 1 0-1.39.57A3.25 3.25 0 0 0 12 21.75Z" />
                     </svg>
                   </span>
-                </summary>
-                <div className="profile-menu-panel">
-                  <p className="profile-menu-meta">{currentUser.name}</p>
-                  <Link to="/offers" className="profile-menu-item">
-                    Meine Angebote
-                  </Link>
-                  <Link to="/profile" className="profile-menu-item">
-                    Einstellungen
-                  </Link>
-                  <button type="button" className="profile-menu-item profile-menu-logout" onClick={onLogout}>
-                    Ausloggen
-                  </button>
-                </div>
-              </details>
-            </>
-          ) : (
-            <Link className="btn ghost" to="/auth">
-              Einloggen
-            </Link>
-          )}
+                  {badgeText !== null && (
+                    <span className="notification-bell-badge" aria-hidden="true">
+                      {badgeText}
+                    </span>
+                  )}
+                </Link>
+                <details className="profile-menu" ref={profileMenuRef}>
+                  <summary aria-label="Profil-Menü öffnen">
+                    <span className="profile-avatar" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" role="img" focusable="false">
+                        <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-4.14 0-7.5 2.69-7.5 6a.75.75 0 0 0 1.5 0c0-2.47 2.69-4.5 6-4.5s6 2.03 6 4.5a.75.75 0 0 0 1.5 0c0-3.31-3.36-6-7.5-6Z" />
+                      </svg>
+                    </span>
+                  </summary>
+                  <div className="profile-menu-panel">
+                    <p className="profile-menu-meta">{currentUser.name}</p>
+                    <Link to="/offers" className="profile-menu-item">
+                      Meine Angebote
+                    </Link>
+                    <Link to="/profile" className="profile-menu-item">
+                      Einstellungen
+                    </Link>
+                    <button type="button" className="profile-menu-item profile-menu-logout" onClick={onLogout}>
+                      Ausloggen
+                    </button>
+                  </div>
+                </details>
+              </>
+            ) : (
+              <Link className="btn ghost" to="/auth">
+                Einloggen
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
