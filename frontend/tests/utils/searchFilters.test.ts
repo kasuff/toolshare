@@ -6,8 +6,8 @@ import {
   formatDistance,
   hasMatchingSlot,
   isWithinRadius
-} from "../../src/utils/searchFilters";
-import type { WorkshopSlot } from "../../src/types/domain";
+} from "@toolshare/shared";
+import type { WorkshopSlot } from "@toolshare/shared";
 
 const baseSlot = {
   id: "slot-1",

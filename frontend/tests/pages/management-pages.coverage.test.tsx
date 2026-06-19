@@ -5,7 +5,7 @@ import { AdminPage } from "../../src/pages/AdminPage";
 import { ModerationPage } from "../../src/pages/ModerationPage";
 import { NewToolPage } from "../../src/pages/NewToolPage";
 import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const {
   pushToast,
@@ -22,7 +22,8 @@ const {
   listSuspensionRequests,
   decideSuspensionRequest,
   createWorkshop,
-  getSystemSettings
+  getSystemSettings,
+  getRatingsReceived
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
@@ -38,7 +39,8 @@ const {
   listSuspensionRequests: vi.fn(),
   decideSuspensionRequest: vi.fn(),
   createWorkshop: vi.fn(),
-  getSystemSettings: vi.fn()
+  getSystemSettings: vi.fn(),
+  getRatingsReceived: vi.fn()
 }));
 
 vi.mock("../../src/hooks/useToast", () => ({
@@ -47,9 +49,13 @@ vi.mock("../../src/hooks/useToast", () => ({
   })
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getCurrentUser,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getCurrentUser,
     createTool,
     validateAddress,
     listUsers,
@@ -60,11 +66,13 @@ vi.mock("../../src/services/api", () => ({
     listClosedReports,
     updateReportStatus,
     listSuspensionRequests,
-    decideSuspensionRequest,
-    createWorkshop,
-    getSystemSettings
-  }
-}));
+      decideSuspensionRequest,
+      createWorkshop,
+      getSystemSettings,
+      getRatingsReceived
+    }
+  };
+});
 
 class FileReaderMock {
   public onload: ((event: { target: { result: string } }) => void) | null = null;

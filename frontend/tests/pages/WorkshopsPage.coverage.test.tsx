@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { WorkshopsPage } from "../../src/pages/WorkshopsPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const { getWorkshops, createWorkshopBooking, getRatingsForWorkshop } = vi.hoisted(() => ({
   getWorkshops: vi.fn(),
@@ -11,14 +11,19 @@ const { getWorkshops, createWorkshopBooking, getRatingsForWorkshop } = vi.hoiste
   getRatingsForWorkshop: vi.fn().mockResolvedValue([])
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getWorkshops,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getWorkshops,
     createWorkshopBooking,
     getRatingsForWorkshop,
     getSystemSettings: vi.fn().mockResolvedValue([])
-  }
-}));
+    }
+  };
+});
 
 const currentUser: User = {
   id: "owner-1",

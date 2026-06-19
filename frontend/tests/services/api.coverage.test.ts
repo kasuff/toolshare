@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../src/services/api";
+import { api } from "@toolshare/shared";
 
 const fetchMock = vi.fn();
 

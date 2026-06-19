@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Layout } from "../../src/components/Layout";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 import {
   INBOX_READ_CHANGED_EVENT,
   requestMessageKey,
@@ -16,13 +16,18 @@ const { getBookingsForUser, getRatingsReceived, getNotifications } = vi.hoisted(
   getNotifications: vi.fn().mockResolvedValue([])
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getBookingsForUser,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getBookingsForUser,
     getRatingsReceived,
     getNotifications
-  }
-}));
+    }
+  };
+});
 
 const users: User[] = [
   { id: "u1", name: "Lea", email: "lea@toolshare.local", role: "NUTZER", isSuspended: false },

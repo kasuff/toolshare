@@ -10,13 +10,18 @@ const { validateAddress, suggestAddresses, changePassword } = vi.hoisted(() => (
   changePassword: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    validateAddress,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      validateAddress,
     suggestAddresses,
     changePassword
-  }
-}));
+    }
+  };
+});
 
 describe("ProfileSettingsPage", () => {
   beforeEach(() => {

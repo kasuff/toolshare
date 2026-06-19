@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { api } from "../../src/services/api";
-import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../../src/services/sessionEvents";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
+import { api } from "@toolshare/shared";
+import { onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
 
 const fetchMock = vi.fn();
 
@@ -21,13 +21,13 @@ beforeEach(() => {
 describe("api service", () => {
   it("notifies the app and returns a consistent error for expired authenticated requests", async () => {
     const handleSessionExpired = vi.fn();
-    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    const unsubscribe = onSessionExpired(handleSessionExpired);
     fetchMock.mockResolvedValueOnce(responseJson({ error: { message: "Invalid or expired token" } }, { status: 401 }));
 
     await expect(api.getCurrentUser("expired-token")).rejects.toThrow(SESSION_EXPIRED_MESSAGE);
 
     expect(handleSessionExpired).toHaveBeenCalledTimes(1);
-    window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    unsubscribe();
   });
 
   it("maps backend users and sends authorization headers", async () => {

@@ -11,14 +11,19 @@ const { getWorkshops, createWorkshopTimeslot, updateWorkshopTimeslot, deleteWork
   deleteWorkshopTimeslot: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getWorkshops,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getWorkshops,
     createWorkshopTimeslot,
     updateWorkshopTimeslot,
     deleteWorkshopTimeslot
-  }
-}));
+    }
+  };
+});
 
 describe("WorkshopAvailabilityPage", () => {
   beforeEach(() => {

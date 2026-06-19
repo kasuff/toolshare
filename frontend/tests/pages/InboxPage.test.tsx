@@ -19,20 +19,25 @@ const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotP
   markNotificationAsRead: vi.fn().mockResolvedValue(undefined)
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getBookingsForUser,
-    decideBooking,
-    createPickupProposal,
-    createTimeslotProposal,
-    createReport,
-    createRating,
-    getRatingsGiven,
-    getRatingsReceived,
-    getNotifications,
-    markNotificationAsRead,
-  },
-}));
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getBookingsForUser,
+      decideBooking,
+      createPickupProposal,
+      createTimeslotProposal,
+      createReport,
+      createRating,
+      getRatingsGiven,
+      getRatingsReceived,
+      getNotifications,
+      markNotificationAsRead
+    }
+  };
+});
 
 const currentUser = {
   id: "provider-1",
