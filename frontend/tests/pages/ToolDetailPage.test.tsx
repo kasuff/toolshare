@@ -6,13 +6,14 @@ import { ToolDetailPage } from "../../src/pages/ToolDetailPage";
 import { ToastViewport } from "../../src/components/ui";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 
-const { getTools, getToolBlockingPeriods, createToolRequest, createToolOwnerBlock, deleteTool, createReport } = vi.hoisted(() => ({
+const { getTools, getToolBlockingPeriods, createToolRequest, createToolOwnerBlock, deleteTool, createReport, getRatingsForTool } = vi.hoisted(() => ({
   getTools: vi.fn(),
   getToolBlockingPeriods: vi.fn().mockResolvedValue([]),
   createToolRequest: vi.fn(),
   createToolOwnerBlock: vi.fn(),
   deleteTool: vi.fn(),
-  createReport: vi.fn()
+  createReport: vi.fn(),
+  getRatingsForTool: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("../../src/services/api", () => ({
@@ -22,7 +23,8 @@ vi.mock("../../src/services/api", () => ({
     createToolRequest,
     createToolOwnerBlock,
     deleteTool,
-    createReport
+    createReport,
+    getRatingsForTool
   }
 }));
 
@@ -391,5 +393,43 @@ describe("ToolDetailPage", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Werkzeug melden" }));
 
     await waitFor(() => expect(createReport).toHaveBeenCalled());
+  });
+
+  it("shows public ratings on the tool detail page", async () => {
+    getTools.mockResolvedValueOnce([
+      {
+        id: "t1",
+        ownerId: "u1",
+        name: "Akkuschrauber Bosch",
+        description: "Leistungsstark",
+        category: "Elektro",
+        imageUrl: "https://example.com/tool.jpg",
+        status: "VERFUEGBAR"
+      }
+    ]);
+    getRatingsForTool.mockResolvedValueOnce([
+      {
+        id: "rating-1",
+        score: 5,
+        comment: "Sehr zuverlässig",
+        fromUserName: "Anna",
+        createdIso: "2026-05-01T10:00:00.000Z"
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/tools/t1"]}>
+          <Routes>
+            <Route path="/tools/:id" element={<ToolDetailPage token="token-123" />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByRole("heading", { name: "Bewertungen" })).toBeInTheDocument();
+    expect(screen.getByText("Sehr zuverlässig")).toBeInTheDocument();
+    expect(screen.getByText(/Anna/)).toBeInTheDocument();
+    expect(getRatingsForTool).toHaveBeenCalledWith("t1");
   });
 });

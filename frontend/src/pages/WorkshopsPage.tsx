@@ -4,6 +4,7 @@ import { DetailTopBar } from "../components/DetailTopBar";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
+import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { SystemRulesInfo } from "../components/SystemRulesInfo";
@@ -15,8 +16,8 @@ import { api } from "../services/api";
 import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../utils/searchFilters";
 import { formatOfferDistance } from "../utils/offerFormatting";
 import { pluralize } from "../utils/pluralize";
-import type { Tool, User, Workshop, WorkshopBookedRange, WorkshopSlot } from "../types/domain";
 import { useModalFocus } from "../hooks/useModalFocus";
+import type { PublicRating, Tool, User, Workshop, WorkshopBookedRange, WorkshopSlot } from "../types/domain";
 
 type Props = {
   token?: string;
@@ -197,6 +198,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const imageViewerCloseRef = useRef<HTMLButtonElement>(null);
   const closeImageViewer = useCallback(() => setActiveImageIndex(null), []);
   useModalFocus(imageViewerRef, closeImageViewer, imageViewerCloseRef, activeImageIndex !== null);
+  const [workshopRatings, setWorkshopRatings] = useState<PublicRating[]>([]);
 
   useEffect(() => {
     const run = async () => {
@@ -279,6 +281,15 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       navigate(`/workshops/${openWorkshopId}`, { replace: true });
     }
   }, [items, navigate, openWorkshopId, selectedWorkshopId]);
+
+  useEffect(() => {
+    const workshopId = selectedWorkshop?.workshop.id;
+    if (!workshopId) {
+      setWorkshopRatings([]);
+      return;
+    }
+    void api.getRatingsForWorkshop(workshopId).then(setWorkshopRatings).catch(() => setWorkshopRatings([]));
+  }, [selectedWorkshop?.workshop.id]);
 
   const hasActiveFilters = Boolean(
     q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== 10 || radiusKm !== 5
@@ -759,15 +770,13 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           <div className="workshop-detail-page-content">
             <div className="workshop-modal-toolbar">
               <DetailTopBar onBack={closeWorkshop}>
-                {currentUser?.id !== selectedWorkshop.workshop.ownerId && (
-                  <button type="button" className="detail-report-trigger" onClick={openReportForm}>
-                    Werkstatt melden
-                  </button>
-                )}
+                <button type="button" className="detail-report-trigger" onClick={openReportForm}>
+                  Werkstatt melden
+                </button>
               </DetailTopBar>
             </div>
 
-            {showReportForm && currentUser?.id !== selectedWorkshop.workshop.ownerId && (
+            {showReportForm && (
               <ReportFormPanel
                 title="Werkstatt melden"
                 hint="Wenn Regeln verletzt werden, melde diese Werkstatt der Moderation."
@@ -962,6 +971,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                     </span>
                   </div>
                 </section>
+
+                <RatingsSection
+                  ratings={workshopRatings}
+                  token={token}
+                  canReport={currentUser?.id !== selectedWorkshop.workshop.ownerId}
+                />
               </div>
 
               {(

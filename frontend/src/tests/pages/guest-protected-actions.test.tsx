@@ -14,6 +14,7 @@ vi.mock("../../services/api", async () => {
     api: {
       ...actual.api,
       getTools: vi.fn(),
+      getRatingsForTool: vi.fn(),
       getToolById: vi.fn(),
       getToolBlockingPeriods: vi.fn(),
       getWorkshops: vi.fn(),
@@ -48,6 +49,7 @@ describe("Guest protected actions", () => {
   });
 
   it("redirects guests to auth when requesting a tool", async () => {
+    vi.mocked(api.getRatingsForTool).mockResolvedValue([]);
     vi.mocked(api.getTools).mockResolvedValue([
       {
         id: "tool-1",

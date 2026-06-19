@@ -7,12 +7,13 @@ import { ToastViewport } from "../../src/components/ui";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
 import type { Tool, Workshop, WorkshopSlot } from "../../src/types/domain";
 
-const { createWorkshopBooking, createWorkshopTimeslot, deleteWorkshop, getWorkshopById, getWorkshops } = vi.hoisted(() => ({
+const { createWorkshopBooking, createWorkshopTimeslot, deleteWorkshop, getWorkshopById, getWorkshops, getRatingsForWorkshop } = vi.hoisted(() => ({
   createWorkshopBooking: vi.fn(),
   createWorkshopTimeslot: vi.fn(),
   deleteWorkshop: vi.fn(),
   getWorkshopById: vi.fn(),
-  getWorkshops: vi.fn()
+  getWorkshops: vi.fn(),
+  getRatingsForWorkshop: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("../../src/services/api", () => ({
@@ -22,6 +23,7 @@ vi.mock("../../src/services/api", () => ({
     deleteWorkshop,
     getWorkshopById,
     getWorkshops,
+    getRatingsForWorkshop,
     getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));

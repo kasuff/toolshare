@@ -1,5 +1,6 @@
 import { usersService } from "../src/modules/users/users.service";
 import { usersRepository } from "../src/modules/users/users.repository";
+import { notificationsService } from "../src/modules/notifications/notifications.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/modules/users/users.repository", () => ({
@@ -11,7 +12,14 @@ vi.mock("../src/modules/users/users.repository", () => ({
   }
 }));
 
+vi.mock("../src/modules/notifications/notifications.service", () => ({
+  notificationsService: {
+    createSuspensionNotice: vi.fn()
+  }
+}));
+
 const mockedUsersRepository = vi.mocked(usersRepository);
+const mockedNotificationsService = vi.mocked(notificationsService);
 
 describe("usersService.updateRole", () => {
   beforeEach(() => {
@@ -157,6 +165,7 @@ describe("usersService.updateSuspension", () => {
       isSuspended: true,
       createdAt: new Date()
     });
+    mockedNotificationsService.createSuspensionNotice.mockResolvedValueOnce({ id: "n1" } as any);
 
     const result = await usersService.updateSuspension({
       targetUserId: "user-1",
@@ -164,7 +173,40 @@ describe("usersService.updateSuspension", () => {
     });
 
     expect(mockedUsersRepository.updateSuspension).toHaveBeenCalledWith("user-1", true);
+    expect(mockedNotificationsService.createSuspensionNotice).toHaveBeenCalledWith(
+      "user-1",
+      "Dein Konto wurde von der Administration gesperrt."
+    );
     expect(result.isSuspended).toBe(true);
+  });
+
+  it("does not send suspension notice when user is already suspended", async () => {
+    mockedUsersRepository.findByIdPublic.mockResolvedValueOnce({
+      id: "user-1",
+      email: "user@example.com",
+      name: "User",
+      address: "Street 1",
+      role: "USER",
+      isSuspended: true,
+      createdAt: new Date()
+    });
+
+    mockedUsersRepository.updateSuspension.mockResolvedValueOnce({
+      id: "user-1",
+      email: "user@example.com",
+      name: "User",
+      address: "Street 1",
+      role: "USER",
+      isSuspended: true,
+      createdAt: new Date()
+    });
+
+    await usersService.updateSuspension({
+      targetUserId: "user-1",
+      isSuspended: true
+    });
+
+    expect(mockedNotificationsService.createSuspensionNotice).not.toHaveBeenCalled();
   });
 });
 

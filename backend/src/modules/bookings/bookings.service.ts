@@ -3,6 +3,8 @@ import { prisma } from "../../config/prisma";
 import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
 import { systemRulesService } from "../system-rules/system-rules.service";
+import { toolsService } from "../tools/tools.service";
+import { workshopsService } from "../workshops/workshops.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 import { assertBookingCanBeCompleted } from "./bookings.completion";
 
@@ -102,6 +104,7 @@ export const bookingsService = {
     }
 
     await assertBookingRules(startDate, endDate, { checkLoanDuration: true });
+    await toolsService.getById(input.toolId);
 
     const result = await bookingsRepository.createToolBookingTransaction({
       userId: input.requesterId,
@@ -170,6 +173,7 @@ export const bookingsService = {
     }
 
     await assertBookingRules(startDate, endDate, { checkLoanDuration: false });
+    await workshopsService.getById(input.workshopId);
 
     const result = await bookingsRepository.createWorkshopBookingTransaction({
       userId: input.requesterId,

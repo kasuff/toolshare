@@ -1,7 +1,7 @@
 export type Role = "NUTZER" | "MODERATOR" | "ADMIN";
 export type ToolStatus = "VERFUEGBAR" | "AUSGELIEHEN";
 export type BookingStatus = "OFFEN" | "BESTAETIGT" | "ABGELEHNT" | "ABGESCHLOSSEN";
-export type BookingType = "TOOL" | "WORKSHOP";
+export type BookingType = "TOOL" | "WORKSHOP" | "SYSTEM_WARNING";
 
 export type PickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
 export type TimeslotProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
@@ -117,6 +117,8 @@ export interface Booking {
   pickupProposals?: PickupProposal[];
   timeslotProposals?: TimeslotProposal[];
   selectedWorkshopTools?: BookingSelectedTool[];
+  systemWarningText?: string;
+  isNotificationRead?: boolean;
 }
 
 export interface Notification {
@@ -144,8 +146,20 @@ export interface Rating {
   fromUserId: string;
   toUserId: string;
   score: number;
-  comment: string;
-  status: "SICHTBAR" | "MODERIERT";
+  comment?: string;
+  status: "SICHTBAR" | "AUSGEBLENDET";
+  createdIso: string;
+  fromUserName?: string;
+  listingLabel?: string;
+  listingType?: "TOOL" | "WORKSHOP";
+}
+
+export interface PublicRating {
+  id: string;
+  score: number;
+  comment?: string;
+  createdIso: string;
+  fromUserName?: string;
 }
 
 export interface SystemRule {

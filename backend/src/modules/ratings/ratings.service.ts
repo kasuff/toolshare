@@ -2,6 +2,20 @@ import { AppError } from "../../utils/app-error";
 import { notificationsRepository } from "../notifications/notifications.repository";
 import { ratingsRepository } from "./ratings.repository";
 
+function getProviderUserId(booking: NonNullable<Awaited<ReturnType<typeof ratingsRepository.findBookingWithParticipants>>>) {
+  if (booking.tool?.ownerId) {
+    return booking.tool.ownerId;
+  }
+  if (booking.timeslot?.workshop?.managerId) {
+    return booking.timeslot.workshop.managerId;
+  }
+  return null;
+}
+
+function isBookingFinished(booking: { status: string; endDate: Date }) {
+  return booking.status === "RETURNED" || booking.endDate <= new Date();
+}
+
 export const ratingsService = {
   listReceived(userId: string) {
     return ratingsRepository.listReceived(userId);
@@ -11,34 +25,35 @@ export const ratingsService = {
     return ratingsRepository.listGiven(userId);
   },
 
+  listForTool(toolId: string) {
+    return ratingsRepository.listForTool(toolId);
+  },
+
+  listForWorkshop(workshopId: string) {
+    return ratingsRepository.listForWorkshop(workshopId);
+  },
+
   async create(input: {
     bookingId: string;
     fromUserId: string;
-    toUserId: string;
     score: number;
     comment?: string;
   }) {
-    if (input.fromUserId === input.toUserId) {
-      throw new AppError("INVALID_RATING_TARGET", "Users cannot rate themselves", 400);
-    }
-
     const booking = await ratingsRepository.findBookingWithParticipants(input.bookingId);
     if (!booking) {
       throw new AppError("BOOKING_NOT_FOUND", "Booking not found", 404);
     }
 
-    const participants = [booking.userId, booking.tool?.ownerId, booking.timeslot?.workshop.managerId].filter(
-      (value): value is string => typeof value === "string"
-    );
-
-    const fromParticipant = participants.includes(input.fromUserId);
-    const toParticipant = participants.includes(input.toUserId);
-    if (!fromParticipant || !toParticipant) {
-      throw new AppError("FORBIDDEN", "Ratings are only allowed between booking participants", 403);
+    if (booking.userId !== input.fromUserId) {
+      throw new AppError("FORBIDDEN", "Only the requester can submit a rating", 403);
     }
 
-    const bookingFinished = booking.status === "RETURNED" || booking.endDate <= new Date();
-    if (!bookingFinished) {
+    const providerUserId = getProviderUserId(booking);
+    if (!providerUserId) {
+      throw new AppError("INVALID_BOOKING", "Booking has no provider", 400);
+    }
+
+    if (!isBookingFinished(booking)) {
       throw new AppError(
         "RATING_NOT_ALLOWED",
         "Rating is only allowed after the booking period has finished",
@@ -46,17 +61,32 @@ export const ratingsService = {
       );
     }
 
-    const existing = await ratingsRepository.findExisting(
-      input.bookingId,
-      input.fromUserId,
-      input.toUserId
-    );
+    const existing = await ratingsRepository.findByBookingAndRequester(input.bookingId, input.fromUserId);
     if (existing) {
-      throw new AppError("RATING_ALREADY_EXISTS", "Rating already exists for this booking pair", 409);
+      throw new AppError("RATING_ALREADY_EXISTS", "Rating already exists for this booking", 409);
     }
 
-    const rating = await ratingsRepository.create(input);
-    await notificationsRepository.create(input.toUserId, "Du hast eine neue Bewertung erhalten.");
+    const rating = await ratingsRepository.create({
+      bookingId: input.bookingId,
+      fromUserId: input.fromUserId,
+      toUserId: providerUserId,
+      score: input.score,
+      comment: input.comment?.trim() || undefined
+    });
+
+    const starsLabel = input.score === 1 ? "1 Stern" : `${input.score} Sterne`;
+    await notificationsRepository.create(providerUserId, `Du hast eine neue Bewertung erhalten (${starsLabel}).`);
     return rating;
+  },
+
+  async hideFromModeration(ratingId: string, moderatorId: string, decisionNote?: string) {
+    const rating = await ratingsRepository.findById(ratingId);
+    if (!rating) {
+      throw new AppError("RATING_NOT_FOUND", "Rating not found", 404);
+    }
+    if (rating.status === "HIDDEN") {
+      return rating;
+    }
+    return ratingsRepository.hide(ratingId, moderatorId, decisionNote);
   }
 };

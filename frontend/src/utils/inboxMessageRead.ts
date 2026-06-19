@@ -21,6 +21,17 @@ export function proposalMessageKey(bookingId: string, proposalId: string): strin
   return `prop:${bookingId}:${proposalId}`;
 }
 
+export function ratingMessageKey(bookingId: string, ratingId: string): string {
+  return `rating:${bookingId}:${ratingId}`;
+}
+
+export type InboxRatingRef = {
+  id: string;
+  bookingId: string;
+  toUserId: string;
+  status?: "SICHTBAR" | "AUSGEBLENDET";
+};
+
 export function collectAllMessageKeys(
   bookings: Array<Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] }>
 ): string[] {
@@ -61,7 +72,8 @@ export function saveReadMessageIds(userId: string, ids: Set<string>): void {
 export function bookingHasUnreadForUser(
   booking: Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] },
   userId: string,
-  readIds: Set<string>
+  readIds: Set<string>,
+  rating?: InboxRatingRef | null
 ): boolean {
   if (booking.requesterId !== userId && !readIds.has(requestMessageKey(booking.id))) {
     return true;
@@ -78,14 +90,28 @@ export function bookingHasUnreadForUser(
       return true;
     }
   }
+  if (
+    rating &&
+    rating.bookingId === booking.id &&
+    rating.toUserId === userId &&
+    rating.status !== "AUSGEBLENDET" &&
+    !readIds.has(ratingMessageKey(booking.id, rating.id))
+  ) {
+    return true;
+  }
   return false;
 }
 
 /** Badge / Glocke: Anzahl Konversationen mit mindestens einem Ungelesenen (Anfrage oder Alternativvorschlag). */
-export function countUnreadInboxThreads(bookings: Booking[], userId: string, readIds: Set<string>): number {
+export function countUnreadInboxThreads(
+  bookings: Booking[],
+  userId: string,
+  readIds: Set<string>,
+  ratingsByBookingId?: Map<string, InboxRatingRef>
+): number {
   let n = 0;
   for (const b of bookings) {
-    if (bookingHasUnreadForUser(b, userId, readIds)) {
+    if (bookingHasUnreadForUser(b, userId, readIds, ratingsByBookingId?.get(b.id))) {
       n += 1;
     }
   }

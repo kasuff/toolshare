@@ -18,7 +18,6 @@ const {
   updateUserSuspension,
   listReports,
   listClosedReports,
-  getRatingsReceived,
   updateReportStatus,
   listSuspensionRequests,
   decideSuspensionRequest,
@@ -35,7 +34,6 @@ const {
   updateUserSuspension: vi.fn(),
   listReports: vi.fn(),
   listClosedReports: vi.fn(),
-  getRatingsReceived: vi.fn(),
   updateReportStatus: vi.fn(),
   listSuspensionRequests: vi.fn(),
   decideSuspensionRequest: vi.fn(),
@@ -60,7 +58,6 @@ vi.mock("../../src/services/api", () => ({
     updateUserSuspension,
     listReports,
     listClosedReports,
-    getRatingsReceived,
     updateReportStatus,
     listSuspensionRequests,
     decideSuspensionRequest,
@@ -189,7 +186,7 @@ describe("management pages", () => {
     expect(updateUserSuspension).toHaveBeenCalledWith("u2", false, "token-123");
   });
 
-  it("loads reports and ratings and rejects a moderation item", async () => {
+  it("loads reports and rejects a moderation item", async () => {
     listClosedReports.mockResolvedValue([]);
     listReports.mockResolvedValueOnce([
       {
@@ -208,9 +205,6 @@ describe("management pages", () => {
         createdAt: "2026-05-05T10:00:00.000Z"
       }
     ]).mockResolvedValueOnce([]);
-    getRatingsReceived.mockResolvedValue([
-      { id: "rt1", score: 5, comment: "Top", createdAt: "2026-05-05T10:00:00.000Z", fromUser: { name: "Lea" } }
-    ]);
     updateReportStatus.mockResolvedValue(undefined);
 
     render(
@@ -220,7 +214,6 @@ describe("management pages", () => {
     );
 
     expect(await screen.findByText(/Gehäuse gebrochen/)).toBeInTheDocument();
-    expect(screen.getByText(/Score 5/)).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText(/Begründung beim Verwerfen/), {
       target: { value: "Kein Verstoss erkennbar" }
     });
@@ -236,7 +229,231 @@ describe("management pages", () => {
         "token-123"
       );
     });
-    expect(await screen.findByText(/Top/)).toBeInTheDocument();
+    expect(await screen.findByText("Keine offenen Meldungen")).toBeInTheDocument();
+  });
+
+  it("renders rating preview for RATING reports", async () => {
+    listReports.mockResolvedValueOnce([
+      {
+        id: "r-rating",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "RATING",
+        targetId: "rating-1",
+        targetLabel: "Bewertung von Anna",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Max",
+        reason: "Beleidigend",
+        details: "Unangemessener Kommentar",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        ratingPreview: {
+          score: 2,
+          comment: "Schlechter Service",
+          fromUserName: "Anna",
+          listingLabel: "Bohrer"
+        }
+      }
+    ]);
+    listClosedReports.mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(/Bewertung:/)).toBeInTheDocument();
+    const preview = screen.getByText(/Bei Bestätigung wird die Bewertung ausgeblendet/).closest(".moderation-rating-preview");
+    expect(preview).not.toBeNull();
+    expect(preview).toHaveTextContent("Anna");
+    expect(preview).toHaveTextContent("2 von 5 Sternen");
+    expect(preview).toHaveTextContent("Bohrer");
+    expect(preview).toHaveTextContent("„Schlechter Service“");
+  });
+
+  it("renders closed reports with limit selection", async () => {
+    listReports.mockResolvedValue([]);
+    listClosedReports.mockResolvedValue([
+      {
+        id: "rc1",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 1",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc2",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 2",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc3",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 3",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc4",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 4",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc5",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 5",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc6",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 6",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      }
+    ]);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    // Click open details
+    const summary = await screen.findByText(/Abgeschlossene Meldungen anzeigen/);
+    fireEvent.click(summary);
+
+    // Initial limit is 10, so all 6 should be visible
+    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(screen.getByText("Entscheidung 6")).toBeInTheDocument();
+
+    // Select limit of 5
+    const select = screen.getByRole("combobox");
+    fireEvent.change(select, { target: { value: "5" } });
+
+    // decision 6 should no longer be visible because limit is 5
+    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(screen.queryByText("Entscheidung 6")).not.toBeInTheDocument();
+  });
+
+  it("renders delete tool option and submits deletion", async () => {
+    listClosedReports.mockResolvedValue([]);
+    listReports.mockResolvedValueOnce([
+      {
+        id: "r2",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "TOOL",
+        targetId: "tool-1",
+        targetLabel: "Spammy Tool",
+        targetHref: "/tools/tool-1",
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Spam",
+        details: "Double post",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z"
+      }
+    ]).mockResolvedValueOnce([]);
+    updateReportStatus.mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Spammy Tool")).toBeInTheDocument();
+    const deleteBtn = screen.getByRole("button", { name: "Angebot löschen" });
+    fireEvent.click(deleteBtn);
+
+    expect(screen.getByRole("heading", { name: "Angebot löschen" })).toBeInTheDocument();
+    
+    fireEvent.change(screen.getByPlaceholderText("Warum wird dieses Angebot/diese Werkstatt gelöscht?"), {
+      target: { value: "Verstoß gegen Richtlinien" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Angebot unwiderruflich löschen" }));
+
+    await waitFor(() => {
+      expect(updateReportStatus).toHaveBeenCalledWith(
+        "r2",
+        {
+          status: "RESOLVED",
+          deleteTool: true,
+          deleteWorkshop: false,
+          warningReason: "Verstoß gegen Richtlinien",
+          decisionNote: undefined
+        },
+        "token-123"
+      );
+    });
   });
 
   it("requires login and submits a new tool with pickup data", async () => {

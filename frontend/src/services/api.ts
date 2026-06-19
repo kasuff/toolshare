@@ -3,6 +3,8 @@ import type {
   BookingSelectedTool,
   BookingStatus,
   PickupProposal,
+  PublicRating,
+  Rating,
   TimeslotProposal,
   Tool,
   User,
@@ -49,12 +51,18 @@ export type ModerationReport = {
   id: string;
   reporterId: string;
   reporterName: string;
-  targetType: "TOOL" | "WORKSHOP" | "USER";
+  targetType: "TOOL" | "WORKSHOP" | "USER" | "RATING";
   targetId: string;
   targetLabel: string;
   targetHref: string | null;
   subjectUserId: string | null;
   subjectUserName: string | null;
+  ratingPreview?: {
+    score: number;
+    comment: string | null;
+    fromUserName: string;
+    listingLabel: string | null;
+  } | null;
   reason: string;
   details?: string;
   conversationContext?: string;
@@ -64,6 +72,22 @@ export type ModerationReport = {
   moderatorId?: string | null;
   moderatorName?: string | null;
   createdAt: string;
+};
+
+type BackendRating = {
+  id: string;
+  bookingId: string;
+  fromUserId: string;
+  toUserId: string;
+  score: number;
+  comment?: string | null;
+  status?: "VISIBLE" | "HIDDEN";
+  createdAt: string;
+  fromUser?: { id: string; name: string } | null;
+  booking?: {
+    tool?: { id: string; name: string } | null;
+    timeslot?: { workshop?: { id: string; name: string } | null } | null;
+  } | null;
 };
 
 export type SuspensionRequestItem = {
@@ -431,6 +455,34 @@ function mapTimeslotProposal(p: BackendTimeslotProposal): TimeslotProposal {
     previousEndIso: p.previousEndDate ?? undefined,
     status: p.status,
     createdIso: p.createdAt
+  };
+}
+
+function mapPublicRating(rating: BackendRating): PublicRating {
+  return {
+    id: rating.id,
+    score: rating.score,
+    comment: rating.comment ?? undefined,
+    createdIso: rating.createdAt,
+    fromUserName: rating.fromUser?.name
+  };
+}
+
+function mapRating(rating: BackendRating): Rating {
+  const tool = rating.booking?.tool;
+  const workshop = rating.booking?.timeslot?.workshop;
+  return {
+    id: rating.id,
+    bookingId: rating.bookingId,
+    fromUserId: rating.fromUserId,
+    toUserId: rating.toUserId,
+    score: rating.score,
+    comment: rating.comment ?? undefined,
+    status: rating.status === "HIDDEN" ? "AUSGEBLENDET" : "SICHTBAR",
+    createdIso: rating.createdAt,
+    fromUserName: rating.fromUser?.name,
+    listingLabel: tool?.name ?? workshop?.name,
+    listingType: tool ? "TOOL" : workshop ? "WORKSHOP" : undefined
   };
 }
 
@@ -1067,6 +1119,10 @@ export const api = {
     return notifications.map((n) => ({ ...n, createdIso: n.createdAt }));
   },
 
+  async markNotificationAsRead(notificationId: string, token: string) {
+    await request(`/notifications/${notificationId}/read`, { method: "PATCH" }, token);
+  },
+
   async listReports(token: string) {
     return request<ModerationReport[]>("/moderation/reports", undefined, token);
   },
@@ -1077,7 +1133,7 @@ export const api = {
 
   async createReport(
     input: {
-      targetType: "TOOL" | "WORKSHOP" | "USER";
+      targetType: "TOOL" | "WORKSHOP" | "USER" | "RATING";
       targetId: string;
       reason: string;
       details?: string;
@@ -1105,6 +1161,8 @@ export const api = {
       warningReason?: string;
       requestSuspensionUserId?: string;
       suspensionReason?: string;
+      deleteTool?: boolean;
+      deleteWorkshop?: boolean;
     },
     token: string
   ) {
@@ -1137,12 +1195,42 @@ export const api = {
     );
   },
 
-  async getRatingsReceived(token: string) {
-    return request<Array<{ id: string; score: number; comment?: string; createdAt: string; fromUser?: { name?: string } }>>(
-      "/ratings/me/received",
-      undefined,
+  async createRating(
+    input: { bookingId: string; score: number; comment?: string },
+    token: string
+  ) {
+    return request<BackendRating>(
+      "/ratings",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          bookingId: input.bookingId,
+          score: input.score,
+          comment: input.comment?.trim() || undefined
+        })
+      },
       token
     );
+  },
+
+  async getRatingsReceived(token: string) {
+    const ratings = await request<BackendRating[]>("/ratings/me/received", undefined, token);
+    return ratings.map(mapRating);
+  },
+
+  async getRatingsGiven(token: string) {
+    const ratings = await request<BackendRating[]>("/ratings/me/given", undefined, token);
+    return ratings.map(mapRating);
+  },
+
+  async getRatingsForTool(toolId: string) {
+    const ratings = await request<BackendRating[]>(`/ratings/tools/${toolId}`);
+    return ratings.map(mapPublicRating);
+  },
+
+  async getRatingsForWorkshop(workshopId: string) {
+    const ratings = await request<BackendRating[]>(`/ratings/workshops/${workshopId}`);
+    return ratings.map(mapPublicRating);
   },
 
   async getMetrics(token: string): Promise<BackendMetrics> {

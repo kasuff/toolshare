@@ -381,7 +381,7 @@ describe("api coverage", () => {
     await api.updateReportStatus("r1", "RESOLVED", "token-123");
 
     const ratings = await api.getRatingsReceived("token-123");
-    expect(ratings[0]).toMatchObject({ id: "rt1", score: 5, fromUser: { name: "Lea" } });
+    expect(ratings[0]).toMatchObject({ id: "rt1", score: 5, fromUserName: "Lea", status: "SICHTBAR" });
 
     expect(await api.getMetrics("token-123")).toMatchObject({
       users: 7,

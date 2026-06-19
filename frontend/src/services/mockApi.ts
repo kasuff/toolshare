@@ -56,12 +56,19 @@ export const api = {
     saveDb(db);
   },
 
-  getTools(filters: { q?: string; category?: string } = {}): Tool[] {
+  getTools(filters: { q?: string; category?: string; ownerId?: string } = {}): Tool[] {
     const db = loadDb();
     const q = (filters.q || "").trim().toLowerCase();
     const category = (filters.category || "").trim().toLowerCase();
     return db.tools
       .filter((t) => {
+        const owner = db.users.find((user) => user.id === t.ownerId);
+        if (!filters.ownerId && owner?.isSuspended) {
+          return false;
+        }
+        if (filters.ownerId && t.ownerId !== filters.ownerId) {
+          return false;
+        }
         const qMatch =
           !q ||
           t.name.toLowerCase().includes(q) ||
@@ -93,6 +100,10 @@ export const api = {
     const toolFilter = (filters.toolFilter || "").trim().toLowerCase();
     return db.workshops
       .filter((w) => {
+        const owner = db.users.find((user) => user.id === w.ownerId);
+        if (owner?.isSuspended) {
+          return false;
+        }
         const baseMatch =
           !q ||
           w.name.toLowerCase().includes(q) ||
@@ -306,6 +317,15 @@ export const api = {
     return loadDb().notifications.filter((n) => n.userId === userId);
   },
 
+  markNotificationAsRead(notificationId: string, _token?: string): void {
+    const db = loadDb();
+    const n = db.notifications.find((it) => it.id === notificationId);
+    if (n) {
+      n.read = true;
+      saveDb(db);
+    }
+  },
+
   createReport(input: Omit<Report, "id" | "status" | "createdIso">): void {
     const db = loadDb();
     db.reports.unshift({
@@ -340,6 +360,7 @@ export const api = {
       score: input.score,
       comment: input.comment,
       status: "SICHTBAR",
+      createdIso: new Date().toISOString()
     });
     saveDb(db);
   },
@@ -352,7 +373,7 @@ export const api = {
     const db = loadDb();
     const r = db.ratings.find((it) => it.id === ratingId);
     if (!r) return;
-    r.status = "MODERIERT";
+    r.status = "AUSGEBLENDET";
     saveDb(db);
   },
 

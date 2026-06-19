@@ -9,12 +9,13 @@ type Props = {
   token?: string;
 };
 
-type DialogMode = "warn" | "suspend" | null;
+type DialogMode = "warn" | "suspend" | "delete" | null;
 
 const targetTypeLabel: Record<ModerationReport["targetType"], string> = {
   TOOL: "Werkzeug",
   WORKSHOP: "Werkstatt",
-  USER: "Nutzer"
+  USER: "Nutzer",
+  RATING: "Bewertung"
 };
 
 const statusPresentation: Record<
@@ -65,6 +66,17 @@ function ReportSummary({ report, showDecision }: { report: ModerationReport; sho
         <strong>Meldegrund:</strong> {report.reason}
       </p>
       {report.details && <p>{report.details}</p>}
+
+      {report.ratingPreview && (
+        <div className="moderation-rating-preview">
+          <p>
+            <strong>{report.ratingPreview.fromUserName}</strong> · {report.ratingPreview.score} von 5 Sternen
+            {report.ratingPreview.listingLabel ? ` · ${report.ratingPreview.listingLabel}` : ""}
+          </p>
+          {report.ratingPreview.comment && <p className="moderation-rating-preview-comment">„{report.ratingPreview.comment}“</p>}
+          <p className="hint">Bei Bestätigung wird die Bewertung ausgeblendet.</p>
+        </div>
+      )}
 
       {showDecision && (
         <div className="moderation-decision-box">
@@ -139,7 +151,7 @@ function ReportActions({
     if (reason.length < 3) {
       return;
     }
-    if (!subjectId) {
+    if (dialogMode !== "delete" && !subjectId) {
       pushToast("Kein betroffener Nutzer für diese Meldung gefunden.", "error");
       return;
     }
@@ -149,7 +161,7 @@ function ReportActions({
       void runUpdate({
         status: "RESOLVED",
         decisionNote: note,
-        warnUserId: subjectId,
+        warnUserId: subjectId ?? undefined,
         warningReason: reason
       });
       return;
@@ -159,8 +171,19 @@ function ReportActions({
       void runUpdate({
         status: "RESOLVED",
         decisionNote: note,
-        requestSuspensionUserId: subjectId,
+        requestSuspensionUserId: subjectId ?? undefined,
         suspensionReason: reason
+      });
+      return;
+    }
+
+    if (dialogMode === "delete") {
+      void runUpdate({
+        status: "RESOLVED",
+        decisionNote: note,
+        deleteTool: report.targetType === "TOOL",
+        deleteWorkshop: report.targetType === "WORKSHOP",
+        warningReason: reason
       });
     }
   };
@@ -198,6 +221,26 @@ function ReportActions({
         >
           Sperrung anfordern
         </button>
+        {report.targetType === "TOOL" && (
+          <button
+            type="button"
+            className="btn danger mini"
+            disabled={busy}
+            onClick={() => setDialogMode("delete")}
+          >
+            Angebot löschen
+          </button>
+        )}
+        {report.targetType === "WORKSHOP" && (
+          <button
+            type="button"
+            className="btn danger mini"
+            disabled={busy}
+            onClick={() => setDialogMode("delete")}
+          >
+            Werkstatt löschen
+          </button>
+        )}
       </div>
 
       {dialogMode && (
@@ -212,7 +255,13 @@ function ReportActions({
           >
             <header className="report-form-head">
               <h2 id="moderation-action-title">
-                {dialogMode === "warn" ? "Nutzer ermahnen" : "Sperrung anfordern"}
+                {dialogMode === "warn"
+                  ? "Nutzer ermahnen"
+                  : dialogMode === "suspend"
+                    ? "Sperrung anfordern"
+                    : report.targetType === "TOOL"
+                      ? "Angebot löschen"
+                      : "Werkstatt löschen"}
               </h2>
               <button type="button" className="icon-button" onClick={closeDialog} aria-label="Schließen">
                 <span className="material-symbols-outlined">close</span>
@@ -222,10 +271,18 @@ function ReportActions({
               <p className="hint">
                 {dialogMode === "warn"
                   ? `Die Ermahnung wird an ${report.subjectUserName ?? "den Nutzer"} in der Inbox zugestellt.`
-                  : `Der Admin erhält eine Anfrage zur Sperrung von ${report.subjectUserName ?? "dem Nutzer"}.`}
+                  : dialogMode === "suspend"
+                    ? `Der Admin erhält eine Anfrage zur Sperrung von ${report.subjectUserName ?? "dem Nutzer"}.`
+                    : `Das Angebot/die Werkstatt wird unwiderruflich gelöscht und der Besitzer erhält eine Benachrichtigung.`}
               </p>
               <label className="field">
-                <span>{dialogMode === "warn" ? "Begründung der Ermahnung" : "Begründung der Sperranfrage"}</span>
+                <span>
+                  {dialogMode === "warn"
+                    ? "Begründung der Ermahnung"
+                    : dialogMode === "suspend"
+                      ? "Begründung der Sperranfrage"
+                      : "Grund für das Herunternehmen"}
+                </span>
                 <textarea
                   ref={reasonRef}
                   value={actionReason}
@@ -233,15 +290,25 @@ function ReportActions({
                   required
                   minLength={3}
                   rows={4}
-                  placeholder="Was ist passiert und warum ist diese Maßnahme angemessen?"
+                  placeholder={
+                    dialogMode === "delete"
+                      ? "Warum wird dieses Angebot/diese Werkstatt gelöscht?"
+                      : "Was ist passiert und warum ist diese Maßnahme angemessen?"
+                  }
                 />
               </label>
               <div className="row">
                 <button type="button" className="btn secondary" onClick={closeDialog} disabled={busy}>
                   Abbrechen
                 </button>
-                <button type="submit" className="btn" disabled={busy}>
-                  {dialogMode === "warn" ? "Ermahnung senden" : "Sperrung anfordern"}
+                <button type="submit" className={dialogMode === "delete" ? "btn danger" : "btn"} disabled={busy}>
+                  {dialogMode === "warn"
+                    ? "Ermahnung senden"
+                    : dialogMode === "suspend"
+                      ? "Sperrung anfordern"
+                      : report.targetType === "TOOL"
+                        ? "Angebot unwiderruflich löschen"
+                        : "Werkstatt unwiderruflich löschen"}
                 </button>
               </div>
             </form>
@@ -256,21 +323,17 @@ export function ModerationPage({ token }: Props) {
   const { pushToast } = useToast();
   const [reports, setReports] = useState<ModerationReport[]>([]);
   const [closedReports, setClosedReports] = useState<ModerationReport[]>([]);
-  const [ratings, setRatings] = useState<
-    Array<{ id: string; score: number; comment?: string; createdAt: string; fromUser?: { name?: string } }>
-  >([]);
+  const [archiveLimit, setArchiveLimit] = useState<number | "all">(10);
 
   const loadData = async () => {
     if (!token) return;
     try {
-      const [nextReports, nextClosedReports, nextRatings] = await Promise.all([
+      const [nextReports, nextClosedReports] = await Promise.all([
         api.listReports(token),
-        api.listClosedReports(token),
-        api.getRatingsReceived(token)
+        api.listClosedReports(token)
       ]);
       setReports(nextReports);
       setClosedReports(nextClosedReports);
-      setRatings(nextRatings);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Moderationsdaten konnten nicht geladen werden.", "error");
     }
@@ -283,6 +346,7 @@ export function ModerationPage({ token }: Props) {
   }, [token]);
 
   const rejectedCount = closedReports.filter((r) => r.status === "REJECTED").length;
+  const displayedReports = archiveLimit === "all" ? closedReports : closedReports.slice(0, archiveLimit);
 
   if (!token) {
     return (
@@ -330,34 +394,37 @@ export function ModerationPage({ token }: Props) {
           {closedReports.length === 0 ? (
             <p className="hint moderation-archive-empty">Noch keine abgeschlossenen Meldungen vorhanden.</p>
           ) : (
-            <ul className="moderation-report-list">
-              {closedReports.map((report) => (
-                <li
-                  key={report.id}
-                  className={`inbox-item moderation-report moderation-report--closed${report.status === "REJECTED" ? " moderation-report--rejected" : ""}`}
+            <>
+              <div className="row archive-limit-row" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+                <span className="hint">Einträge anzeigen:</span>
+                <select
+                  value={archiveLimit}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setArchiveLimit(val === "all" ? "all" : Number(val));
+                  }}
+                  style={{ width: "auto", padding: "0.25rem 0.5rem" }}
                 >
-                  <ReportSummary report={report} showDecision />
-                </li>
-              ))}
-            </ul>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value="all">Alle</option>
+                </select>
+              </div>
+              <ul className="moderation-report-list">
+                {displayedReports.map((report) => (
+                  <li
+                    key={report.id}
+                    className={`inbox-item moderation-report moderation-report--closed${report.status === "REJECTED" ? " moderation-report--rejected" : ""}`}
+                  >
+                    <ReportSummary report={report} showDecision />
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </details>
-      </Surface>
-
-      <Surface title="Bewertungen (eingehend)">
-        {ratings.length === 0 ? (
-          <EmptyState title="Keine Bewertungen" text="Es sind derzeit keine eingehenden Bewertungen vorhanden." />
-        ) : (
-          <ul className="meta-list">
-            {ratings.map((rating) => (
-              <li key={rating.id}>
-                {new Date(rating.createdAt).toLocaleString()} | Score {rating.score} | von{" "}
-                {rating.fromUser?.name ?? "Unbekannt"}
-                {rating.comment ? ` | "${rating.comment}"` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
       </Surface>
     </section>
   );

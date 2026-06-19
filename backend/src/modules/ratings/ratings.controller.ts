@@ -7,7 +7,6 @@ export const ratingsController = {
     const rating = await ratingsService.create({
       bookingId: req.body.bookingId,
       fromUserId: req.authUser!.userId,
-      toUserId: req.body.toUserId,
       score: req.body.score,
       comment: req.body.comment
     });
@@ -26,6 +25,16 @@ export const ratingsController = {
 
   listForUser: asyncHandler(async (req: Request, res: Response) => {
     const ratings = await ratingsService.listReceived(req.params.id);
+    res.status(200).json(ratings);
+  }),
+
+  listForTool: asyncHandler(async (req: Request, res: Response) => {
+    const ratings = await ratingsService.listForTool(req.params.toolId);
+    res.status(200).json(ratings);
+  }),
+
+  listForWorkshop: asyncHandler(async (req: Request, res: Response) => {
+    const ratings = await ratingsService.listForWorkshop(req.params.workshopId);
     res.status(200).json(ratings);
   })
 };

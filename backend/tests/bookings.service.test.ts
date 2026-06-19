@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
 import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
+import { toolsService } from "../src/modules/tools/tools.service";
+import { workshopsService } from "../src/modules/workshops/workshops.service";
 import { bookingsService } from "../src/modules/bookings/bookings.service";
 import { systemRulesService } from "../src/modules/system-rules/system-rules.service";
 
@@ -52,9 +54,23 @@ vi.mock("../src/modules/system-rules/system-rules.service", () => ({
   }
 }));
 
+vi.mock("../src/modules/tools/tools.service", () => ({
+  toolsService: {
+    getById: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/workshops/workshops.service", () => ({
+  workshopsService: {
+    getById: vi.fn()
+  }
+}));
+
 const mockedBookingsRepository = vi.mocked(bookingsRepository);
 const mockedNotificationsRepository = vi.mocked(notificationsRepository);
 const mockedSystemRulesService = vi.mocked(systemRulesService);
+const mockedToolsService = vi.mocked(toolsService);
+const mockedWorkshopsService = vi.mocked(workshopsService);
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -78,6 +94,8 @@ describe("bookingsService", () => {
       maxSearchRadiusKm: 20,
       maxActiveOffersPerUser: 20
     });
+    mockedToolsService.getById.mockResolvedValue({ id: "t1", owner: { isSuspended: false } } as any);
+    mockedWorkshopsService.getById.mockResolvedValue({ id: "w1", manager: { isSuspended: false } } as any);
   });
 
   it("creates a tool counter proposal with pickup and return times", async () => {
@@ -210,7 +228,7 @@ describe("bookingsService", () => {
   });
 
   it("rejects tool booking when tool does not exist", async () => {
-    mockedBookingsRepository.createToolBookingTransaction.mockResolvedValueOnce(null as any);
+    mockedToolsService.getById.mockRejectedValueOnce({ code: "TOOL_NOT_FOUND", status: 404 });
 
     await expect(
       bookingsService.createToolBooking({
@@ -221,6 +239,7 @@ describe("bookingsService", () => {
         pickupTime: validPickup()
       })
     ).rejects.toMatchObject({ code: "TOOL_NOT_FOUND", status: 404 });
+    expect(mockedBookingsRepository.createToolBookingTransaction).not.toHaveBeenCalled();
   });
 
   it("rejects tool booking when it starts inside the minimum lead time", async () => {
@@ -302,6 +321,7 @@ describe("bookingsService", () => {
       pickupTime: validPickup()
     });
 
+    expect(mockedToolsService.getById).toHaveBeenCalledWith("t1");
     expect(mockedBookingsRepository.createToolBookingTransaction).toHaveBeenCalled();
     expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner-1", expect.stringContaining("Ausleihanfrage"));
     expect(result).toMatchObject({ id: "b1" });
@@ -323,6 +343,7 @@ describe("bookingsService", () => {
       workshopToolIds: ["wt-1"]
     });
 
+    expect(mockedWorkshopsService.getById).toHaveBeenCalledWith("workshop-1");
     expect(mockedBookingsRepository.createWorkshopBookingTransaction).toHaveBeenCalledWith({
       userId: "user-1",
       workshopId: "workshop-1",
