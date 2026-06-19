@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { HammerIcon } from "../components/ui";
-import discoverToolsHero from "../assets/discover-tools-hero.png";
+import discoverToolsHero from "../assets/discover-tools-hero-orange.png";
 
 export function DashboardPage() {
   return (

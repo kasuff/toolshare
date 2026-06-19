@@ -19,7 +19,7 @@ describe("categories utilities", () => {
 
   it("replaces the legacy green placeholder without changing uploaded images", () => {
     const legacyPlaceholder = DEFAULT_PLACEHOLDER_IMAGE.replace(
-      encodeURIComponent("#FF6600"),
+      encodeURIComponent("#D14700"),
       encodeURIComponent("#1f925a")
     );
     const uploadedImage = "data:image/png;base64,uploaded";
