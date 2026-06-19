@@ -358,8 +358,8 @@ export default function ToolDetailScreen() {
                     return <View key={day.key} style={styles.dayCell} />;
                   }
 
-                  let dayStyle: any = [styles.dayCellBtn];
-                  let textStyle: any = [styles.dayText];
+                  const dayStyle: any = [styles.dayCellBtn];
+                  const textStyle: any = [styles.dayText];
 
                   if (!day.available) {
                     dayStyle.push(styles.dayUnavailable);

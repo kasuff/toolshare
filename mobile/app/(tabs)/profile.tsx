@@ -4,7 +4,6 @@ import { Colors, Radius, Spacing } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
 import { useAuth } from '../../hooks/useAuth';
 import { api, SystemSetting } from '@toolshare/shared';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   AddressInput,

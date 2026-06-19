@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
-import { Workshop, WorkshopSlot, Tool, api, getPlaceholderImageForCategory, TOOL_CATEGORIES, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
+import { Workshop, WorkshopSlot, Tool, api, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { LoadingSpinner } from '../../../components/EmptyState';
 import { ImageLightbox } from '../../../components/ImageLightbox';
@@ -486,8 +486,8 @@ export default function WorkshopDetailScreen() {
                     return <View key={day.key} style={styles.dayCell} />;
                   }
 
-                  let dayStyle: any = [styles.dayCellBtn];
-                  let textStyle: any = [styles.dayText];
+                  const dayStyle: any = [styles.dayCellBtn];
+                  const textStyle: any = [styles.dayText];
 
                   if (!day.available) {
                     dayStyle.push(styles.dayUnavailable);

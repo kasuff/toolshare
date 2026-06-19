@@ -8,7 +8,6 @@ import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from '../../../components/AddressInput';
 import { ImageLightbox } from '../../../components/ImageLightbox';
-import { DateTimeRangeFields } from '../../../components/DateTimeFields';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '../../../hooks/useToast';
 

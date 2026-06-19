@@ -10,7 +10,6 @@ import { useToast } from '../../hooks/useToast';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
@@ -20,7 +19,6 @@ export default function LoginScreen() {
     if (isLoading) return;
     try {
       setIsLoading(true);
-      setError('');
       const { accessToken } = await api.login(email, password);
       await login(accessToken);
       router.replace('/tools');

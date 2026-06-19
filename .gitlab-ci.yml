@@ -65,6 +65,24 @@ workflow:
       - backend/.npm/
     policy: pull
 
+.mobile_cache:
+  cache:
+    key:
+      files:
+        - mobile/package-lock.json
+      prefix: mobile-npm
+    paths:
+      - mobile/.npm/
+    policy: pull
+
+# The Expo dependency tree carries peer-dependency conflicts (React 19 vs.
+# packages that still pin React 18-era peers), so the mobile install needs
+# --legacy-peer-deps. Factored out so lint and test stay in sync.
+.mobile_install:
+  script:
+    - cd mobile
+    - npm ci --workspaces=false --legacy-peer-deps --prefer-offline --cache .npm
+
 # Block until the Postgres service actually accepts TCP connections before
 # touching it. Removes the race where `prisma db push` runs before the DB
 # is up -- the main cause of flaky backend:test runs.
@@ -187,6 +205,50 @@ backend:test:
       - backend/coverage/
     expire_in: 1 week
 
+# === MOBILE JOBS ===
+#
+# The mobile app is an Expo / React Native client: it runs on-device and only
+# talks to the backend over HTTP. There is therefore no server-side build to
+# produce in CI -- bundling happens via EAS/expo on the client side -- so the
+# pipeline only lints and unit-tests the shared business logic.
+
+mobile:lint:
+  stage: lint
+  image: node:20.19-alpine   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
+  extends: .mobile_cache
+  cache:
+    policy: pull-push   # lint runs first -> it seeds the shared npm cache
+  script:
+    - !reference [.mobile_install, script]
+    - npm run lint -- -f html -o ../mobile-lint-report.html || true
+    - npm run lint
+  artifacts:
+    when: always
+    paths:
+      - mobile-lint-report.html
+
+mobile:test:
+  stage: test
+  image: node:20.19-slim
+  extends: .mobile_cache
+  timeout: 15m
+  variables:
+    NODE_OPTIONS: "--max-old-space-size=2048"
+  script:
+    - !reference [.mobile_install, script]
+    - npm run test -- --coverage
+    - node ../scripts/check-coverage.js coverage
+  coverage: '/Lines:\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: mobile/coverage/cobertura-coverage.xml
+      junit: mobile/junit.xml
+    paths:
+      - mobile/coverage/
+    expire_in: 1 week
+
 # === BUILD JOBS ===
 
 frontend:build:
@@ -263,6 +325,8 @@ pages:
     - frontend:test
     - backend:lint
     - backend:test
+    - mobile:lint
+    - mobile:test
     - job: security:container:trivy
       optional: true
     - job: semgrep-sast
@@ -659,6 +723,49 @@ pages:
                   </div>
               </div>
       
+              <h2 class="section-title">Mobile Metriken</h2>
+              <div class="grid">
+                  <div class="card">
+                      <div>
+                          <div class="card-header">
+                              <div class="card-icon">
+                                  <svg viewBox="0 0 24 24">
+                                      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2z"/>
+                                  </svg>
+                              </div>
+                          </div>
+                          <div class="card-title">Mobile Test Coverage</div>
+                          <p class="card-description">Testabdeckung der geräteunabhängigen Geschäftslogik (Datum/Zeit, Inbox-Status) der Expo/React-Native-App.</p>
+                      </div>
+                      <a href="mobile-coverage/index.html" class="card-action">
+                          <span>Coverage ansehen</span>
+                          <svg viewBox="0 0 24 24">
+                              <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21 12l-8.15-8.15-1.42 1.42 5.43 5.43H5v2z"/>
+                          </svg>
+                      </a>
+                  </div>
+
+                  <div class="card">
+                      <div>
+                          <div class="card-header">
+                              <div class="card-icon">
+                                  <svg viewBox="0 0 24 24">
+                                      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                  </svg>
+                              </div>
+                          </div>
+                          <div class="card-title">Mobile Linting Report</div>
+                          <p class="card-description">Statische Codeanalyse des Expo/React-Native-Quellcodes zur Sicherstellung einheitlicher Codierungsrichtlinien.</p>
+                      </div>
+                      <a href="mobile-lint-report.html" class="card-action">
+                          <span>Lint-Report ansehen</span>
+                          <svg viewBox="0 0 24 24">
+                              <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21 12l-8.15-8.15-1.42 1.42 5.43 5.43H5v2z"/>
+                          </svg>
+                      </a>
+                  </div>
+              </div>
+
               <h2 class="section-title security">Security Metriken</h2>
               <div class="grid">
                   <div class="card security-card">
@@ -711,8 +818,10 @@ pages:
       EOF
     - cp -r frontend/coverage public/frontend-coverage || true
     - cp -r backend/coverage public/backend-coverage || true
+    - cp -r mobile/coverage public/mobile-coverage || true
     - cp frontend-lint-report.html public/ || true
     - cp backend-lint-report.html public/ || true
+    - cp mobile-lint-report.html public/ || true
     - cp trivy-report.txt public/ || true
     - cp gl-sast-report.json public/ || true
     - cp sast-report.txt public/ || true
@@ -752,11 +861,14 @@ semgrep-sast:
   stage: test
   image: semgrep/semgrep:latest
   script:
-    - semgrep scan --config=auto --gitlab-sast -o gl-sast-report.json || true
+    # monitoring/ is an external, third-party observability stack (Grafana,
+    # Prometheus, Loki, Promtail configs) -- not our application code -- so it
+    # is excluded from static analysis.
+    - semgrep scan --config=auto --exclude monitoring --gitlab-sast -o gl-sast-report.json || true
     - echo "=== Semgrep SAST Security Report ===" > sast-report.txt
     - echo "====================================" >> sast-report.txt
     - echo "" >> sast-report.txt
-    - semgrep scan --config=auto --text >> sast-report.txt || true
+    - semgrep scan --config=auto --exclude monitoring --text >> sast-report.txt || true
   artifacts:
     paths:
       - gl-sast-report.json
@@ -772,8 +884,9 @@ security:container:trivy:
     entrypoint: [""]
   allow_failure: true
   script:
-    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table -o trivy-report.txt . || true
-    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 0 .
+    # monitoring/ is an external, third-party observability stack -- skip it.
+    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --skip-dirs monitoring --format table -o trivy-report.txt . || true
+    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --skip-dirs monitoring --exit-code 0 .
   artifacts:
     when: always
     paths:
