@@ -1,14 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
+import { ToastViewport } from "../../src/components/ui";
 import { WorkshopsPage } from "../../src/pages/WorkshopsPage";
 import type { User } from "../../src/types/domain";
 
-const { getWorkshops, createWorkshopBooking, getRatingsForWorkshop } = vi.hoisted(() => ({
+const { getWorkshops, createWorkshopBooking, getRatingsForWorkshop, createReport } = vi.hoisted(() => ({
   getWorkshops: vi.fn(),
   createWorkshopBooking: vi.fn(),
-  getRatingsForWorkshop: vi.fn().mockResolvedValue([])
+  getRatingsForWorkshop: vi.fn().mockResolvedValue([]),
+  createReport: vi.fn()
 }));
 
 vi.mock("../../src/services/api", () => ({
@@ -16,6 +18,7 @@ vi.mock("../../src/services/api", () => ({
     getWorkshops,
     createWorkshopBooking,
     getRatingsForWorkshop,
+    createReport,
     getSystemSettings: vi.fn().mockResolvedValue([])
   }
 }));
@@ -32,6 +35,7 @@ const currentUser: User = {
 function renderWorkshopsPage(user = currentUser) {
   return render(
     <ToastProvider>
+      <ToastViewport />
       <MemoryRouter initialEntries={["/workshops"]}>
         <Routes>
           <Route path="/workshops" element={<WorkshopsPage token="token-123" currentUser={user} />} />
@@ -136,5 +140,60 @@ describe("WorkshopsPage coverage", () => {
         "token-123"
       );
     });
+  });
+
+  it("reports a foreign workshop from the detail view", async () => {
+    getWorkshops.mockResolvedValueOnce([
+      {
+        workshop: {
+          id: "w2",
+          ownerId: "provider-2",
+          ownerName: "Konstantin",
+          name: "Holzwerkstatt",
+          description: "Mit Säge",
+          location: "München",
+          maxCapacity: 6,
+          extras: [],
+          imageUrls: ["https://example.com/workshop-2.png"],
+          equipmentItems: [],
+          workshopTools: [],
+          toolIds: []
+        },
+        slots: [
+          {
+            id: "s2",
+            workshopId: "w2",
+            startIso: "2026-06-01T08:00:00.000Z",
+            endIso: "2026-06-01T10:00:00.000Z",
+            blockedByOwner: false
+          }
+        ]
+      }
+    ]);
+    createReport.mockResolvedValueOnce({ id: "report-w2" });
+
+    renderWorkshopsPage();
+
+    fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
+    const detail = await screen.findByRole("region", { name: "Holzwerkstatt" });
+    fireEvent.click(within(detail).getByRole("button", { name: "Werkstatt melden" }));
+    const reportDialog = screen.getByRole("dialog");
+    fireEvent.change(within(reportDialog).getByPlaceholderText("z. B. unpassende Inhalte oder Verhalten"), {
+      target: { value: "Unsaubere Werkstatt" }
+    });
+    fireEvent.click(within(reportDialog).getByRole("button", { name: "Werkstatt melden" }));
+
+    await waitFor(() =>
+      expect(createReport).toHaveBeenCalledWith(
+        {
+          targetType: "WORKSHOP",
+          targetId: "w2",
+          reason: "Unsaubere Werkstatt",
+          details: undefined
+        },
+        "token-123"
+      )
+    );
+    expect(await screen.findByText("Werkstatt wurde gemeldet.")).toBeInTheDocument();
   });
 });

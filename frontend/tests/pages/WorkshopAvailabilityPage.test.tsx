@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
+import { ToastViewport } from "../../src/components/ui";
 import { WorkshopAvailabilityPage } from "../../src/pages/WorkshopAvailabilityPage";
 
 const { getWorkshops, createWorkshopTimeslot, updateWorkshopTimeslot, deleteWorkshopTimeslot } = vi.hoisted(() => ({
@@ -111,4 +112,67 @@ describe("WorkshopAvailabilityPage", () => {
     await waitFor(() => expect(deleteWorkshopTimeslot).toHaveBeenCalledWith("w1", "s1", "token-123"));
   });
 
+  it("shows an error toast when workshops cannot be loaded", async () => {
+    getWorkshops.mockRejectedValueOnce(new Error("load failed"));
+
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter>
+          <WorkshopAvailabilityPage
+            token="token-123"
+            currentUser={{
+              id: "u1",
+              name: "Lea",
+              email: "lea@example.com",
+              role: "NUTZER",
+              isSuspended: false
+            }}
+          />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByText("Werkstätten konnten nicht geladen werden.")).toBeInTheDocument();
+  });
+
+  it("shows empty state when the user owns no workshops", async () => {
+    getWorkshops.mockResolvedValueOnce([
+      {
+        workshop: {
+          id: "w-other",
+          ownerId: "other-user",
+          name: "Fremde Werkstatt",
+          description: "Werkstatt",
+          location: "Muenchen",
+          maxCapacity: 2,
+          extras: [],
+          imageUrls: [],
+          equipmentItems: [],
+          toolIds: []
+        },
+        slots: []
+      }
+    ]);
+
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter>
+          <WorkshopAvailabilityPage
+            token="token-123"
+            currentUser={{
+              id: "u1",
+              name: "Lea",
+              email: "lea@example.com",
+              role: "NUTZER",
+              isSuspended: false
+            }}
+          />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByText("Keine Werkstätten gefunden")).toBeInTheDocument();
+  });
 });

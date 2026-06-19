@@ -9,6 +9,8 @@ import { ratingsService } from "../src/modules/ratings/ratings.service";
 import { moderationService } from "../src/modules/moderation/moderation.service";
 import { notificationsService } from "../src/modules/notifications/notifications.service";
 import { usersService } from "../src/modules/users/users.service";
+import { authService } from "../src/modules/auth/auth.service";
+import { bookingsService } from "../src/modules/bookings/bookings.service";
 
 vi.mock("../src/modules/auth/auth.repository", () => ({
   authRepository: {
@@ -52,6 +54,7 @@ vi.mock("../src/modules/moderation/moderation.service", () => ({
   moderationService: {
     createReport: vi.fn(),
     listReports: vi.fn(),
+    listClosedReports: vi.fn(),
     updateReportStatus: vi.fn()
   }
 }));
@@ -75,6 +78,29 @@ vi.mock("../src/modules/users/users.service", () => ({
   }
 }));
 
+vi.mock("../src/modules/auth/auth.service", () => ({
+  authService: {
+    register: vi.fn(),
+    login: vi.fn(),
+    refresh: vi.fn(),
+    changePassword: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/bookings/bookings.service", () => ({
+  bookingsService: {
+    listForUserContext: vi.fn(),
+    createToolBooking: vi.fn(),
+    createToolOwnerBlock: vi.fn(),
+    createWorkshopBooking: vi.fn(),
+    updateBookingStatus: vi.fn(),
+    createPickupProposal: vi.fn(),
+    respondPickupProposal: vi.fn(),
+    createTimeslotProposal: vi.fn(),
+    respondTimeslotProposal: vi.fn()
+  }
+}));
+
 const mockedAuthRepository = vi.mocked(authRepository);
 const mockedToolsService = vi.mocked(toolsService);
 const mockedWorkshopsService = vi.mocked(workshopsService);
@@ -82,6 +108,8 @@ const mockedRatingsService = vi.mocked(ratingsService);
 const mockedModerationService = vi.mocked(moderationService);
 const mockedNotificationsService = vi.mocked(notificationsService);
 const mockedUsersService = vi.mocked(usersService);
+const mockedAuthService = vi.mocked(authService);
+const mockedBookingsService = vi.mocked(bookingsService);
 
 const MANAGER_ID = "11111111-1111-1111-1111-111111111111";
 const TOOL_ID = "22222222-2222-2222-2222-222222222222";
@@ -91,8 +119,10 @@ const BOOKING_ID = "55555555-5555-5555-5555-555555555555";
 const REPORT_ID = "66666666-6666-6666-6666-666666666666";
 const NOTIFICATION_ID = "77777777-7777-7777-7777-777777777777";
 const TARGET_USER_ID = "88888888-8888-8888-8888-888888888888";
+const USER_ID = "99999999-9999-9999-9999-999999999999";
+const PROPOSAL_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 
-describe.skip("Controller route integration coverage", () => {
+describe("Controller route integration coverage", () => {
   let app: Express;
 
   const managerToken = () =>
@@ -100,6 +130,15 @@ describe.skip("Controller route integration coverage", () => {
       {
         userId: MANAGER_ID,
         role: "MANAGER"
+      },
+      process.env.JWT_SECRET as string
+    );
+
+  const userToken = () =>
+    jwt.sign(
+      {
+        userId: USER_ID,
+        role: "USER"
       },
       process.env.JWT_SECRET as string
     );
@@ -114,11 +153,15 @@ describe.skip("Controller route integration coverage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedAuthRepository.findById.mockResolvedValue({
-      id: MANAGER_ID,
-      role: "MANAGER",
-      isSuspended: false
-    } as any);
+    mockedAuthRepository.findById.mockImplementation(async (id) => {
+      if (id === MANAGER_ID) {
+        return { id: MANAGER_ID, role: "MANAGER", isSuspended: false } as any;
+      }
+      if (id === USER_ID) {
+        return { id: USER_ID, role: "USER", isSuspended: false } as any;
+      }
+      return null;
+    });
   });
 
   describe("tools controller routes", () => {
@@ -351,12 +394,26 @@ describe.skip("Controller route integration coverage", () => {
       expect(mockedRatingsService.listGiven).toHaveBeenCalledWith(MANAGER_ID);
       expect(mockedRatingsService.listReceived).toHaveBeenNthCalledWith(2, TARGET_USER_ID);
     });
+
+    it("handles public list endpoints for tools and workshops", async () => {
+      mockedRatingsService.listForTool.mockResolvedValueOnce([{ id: "rating-tool" }] as any);
+      mockedRatingsService.listForWorkshop.mockResolvedValueOnce([{ id: "rating-workshop" }] as any);
+
+      const toolResponse = await request(app).get(`/api/ratings/tools/${TOOL_ID}`);
+      const workshopResponse = await request(app).get(`/api/ratings/workshops/${WORKSHOP_ID}`);
+
+      expect(toolResponse.status).toBe(200);
+      expect(workshopResponse.status).toBe(200);
+      expect(mockedRatingsService.listForTool).toHaveBeenCalledWith(TOOL_ID);
+      expect(mockedRatingsService.listForWorkshop).toHaveBeenCalledWith(WORKSHOP_ID);
+    });
   });
 
   describe("moderation controller routes", () => {
     it("handles report create/list/update", async () => {
       mockedModerationService.createReport.mockResolvedValueOnce({ id: REPORT_ID } as any);
       mockedModerationService.listReports.mockResolvedValueOnce([{ id: REPORT_ID }] as any);
+      mockedModerationService.listClosedReports.mockResolvedValueOnce([{ id: "closed-1" }] as any);
       mockedModerationService.updateReportStatus.mockResolvedValueOnce({ id: REPORT_ID, status: "RESOLVED" } as any);
 
       const createResponse = await request(app)
@@ -374,6 +431,10 @@ describe.skip("Controller route integration coverage", () => {
         .get("/api/moderation/reports")
         .set("Authorization", `Bearer ${managerToken()}`);
 
+      const closedResponse = await request(app)
+        .get("/api/moderation/reports/closed")
+        .set("Authorization", `Bearer ${managerToken()}`);
+
       const updateResponse = await request(app)
         .patch(`/api/moderation/reports/${REPORT_ID}`)
         .set("Authorization", `Bearer ${managerToken()}`)
@@ -381,6 +442,7 @@ describe.skip("Controller route integration coverage", () => {
 
       expect(createResponse.status).toBe(201);
       expect(listResponse.status).toBe(200);
+      expect(closedResponse.status).toBe(200);
       expect(updateResponse.status).toBe(200);
       expect(mockedModerationService.createReport).toHaveBeenCalledWith({
         reporterId: MANAGER_ID,
@@ -391,6 +453,7 @@ describe.skip("Controller route integration coverage", () => {
         details: "Details"
       });
       expect(mockedModerationService.listReports).toHaveBeenCalledTimes(1);
+      expect(mockedModerationService.listClosedReports).toHaveBeenCalledTimes(1);
       expect(mockedModerationService.updateReportStatus).toHaveBeenCalledWith({
         reportId: REPORT_ID,
         status: "RESOLVED",
@@ -468,6 +531,271 @@ describe.skip("Controller route integration coverage", () => {
       expect(mockedUsersService.getAdminMetrics).toHaveBeenCalledTimes(1);
       expect(mockedUsersService.listUsers).toHaveBeenCalledWith({ role: "USER", search: "lea" });
       expect(mockedUsersService.getById).toHaveBeenCalledWith(TARGET_USER_ID);
+    });
+
+    it("handles manager-only role and suspension endpoints", async () => {
+      mockedUsersService.updateRole.mockResolvedValueOnce({
+        id: TARGET_USER_ID,
+        role: "MODERATOR"
+      } as any);
+      mockedUsersService.updateSuspension.mockResolvedValueOnce({
+        id: TARGET_USER_ID,
+        isSuspended: true
+      } as any);
+
+      const roleResponse = await request(app)
+        .patch(`/api/users/${TARGET_USER_ID}/role`)
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ role: "MODERATOR" });
+      const suspensionResponse = await request(app)
+        .patch(`/api/users/${TARGET_USER_ID}/suspension`)
+        .set("Authorization", `Bearer ${managerToken()}`)
+        .send({ isSuspended: true });
+
+      expect(roleResponse.status).toBe(200);
+      expect(suspensionResponse.status).toBe(200);
+      expect(mockedUsersService.updateRole).toHaveBeenCalledWith({
+        actorId: MANAGER_ID,
+        targetUserId: TARGET_USER_ID,
+        role: "MODERATOR"
+      });
+      expect(mockedUsersService.updateSuspension).toHaveBeenCalledWith({
+        targetUserId: TARGET_USER_ID,
+        isSuspended: true
+      });
+    });
+
+    it("rejects role and suspension updates from non-managers", async () => {
+      const moderatorToken = () =>
+        jwt.sign(
+          {
+            userId: USER_ID,
+            role: "MODERATOR"
+          },
+          process.env.JWT_SECRET as string
+        );
+
+      mockedAuthRepository.findById.mockResolvedValueOnce({
+        id: USER_ID,
+        role: "MODERATOR",
+        isSuspended: false
+      } as any);
+
+      const roleResponse = await request(app)
+        .patch(`/api/users/${TARGET_USER_ID}/role`)
+        .set("Authorization", `Bearer ${moderatorToken()}`)
+        .send({ role: "MODERATOR" });
+      const suspensionResponse = await request(app)
+        .patch(`/api/users/${TARGET_USER_ID}/suspension`)
+        .set("Authorization", `Bearer ${moderatorToken()}`)
+        .send({ isSuspended: true });
+
+      expect(roleResponse.status).toBe(403);
+      expect(suspensionResponse.status).toBe(403);
+      expect(mockedUsersService.updateRole).not.toHaveBeenCalled();
+      expect(mockedUsersService.updateSuspension).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("auth controller routes", () => {
+    it("handles register, login and refresh", async () => {
+      mockedAuthService.register.mockResolvedValueOnce({
+        user: { id: USER_ID, email: "new@example.com", role: "USER", name: "Neu" },
+        accessToken: "access-new",
+        refreshToken: "refresh-new"
+      } as any);
+      mockedAuthService.login.mockResolvedValueOnce({
+        user: { id: USER_ID, email: "new@example.com", role: "USER", name: "Neu" },
+        accessToken: "access-login",
+        refreshToken: "refresh-login"
+      } as any);
+      mockedAuthService.refresh.mockResolvedValueOnce({
+        accessToken: "access-refreshed",
+        refreshToken: "refresh-refreshed"
+      } as any);
+
+      const registerResponse = await request(app).post("/api/auth/register").send({
+        email: "new@example.com",
+        password: "Register123!",
+        name: "Neu",
+        address: "Neue Straße 5"
+      });
+      const loginResponse = await request(app).post("/api/auth/login").send({
+        email: "new@example.com",
+        password: "Register123!"
+      });
+      const refreshResponse = await request(app).post("/api/auth/refresh").send({
+        refreshToken: "refresh-login"
+      });
+
+      expect(registerResponse.status).toBe(201);
+      expect(loginResponse.status).toBe(200);
+      expect(refreshResponse.status).toBe(200);
+      expect(mockedAuthService.register).toHaveBeenCalledWith({
+        email: "new@example.com",
+        password: "Register123!",
+        name: "Neu",
+        address: "Neue Straße 5"
+      });
+      expect(mockedAuthService.login).toHaveBeenCalledWith({
+        email: "new@example.com",
+        password: "Register123!"
+      });
+      expect(mockedAuthService.refresh).toHaveBeenCalledWith("refresh-login");
+    });
+
+    it("handles change-password for authenticated users", async () => {
+      mockedAuthService.changePassword.mockResolvedValueOnce(undefined);
+
+      const response = await request(app)
+        .post("/api/auth/change-password")
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({
+          currentPassword: "OldPass123!",
+          newPassword: "NewPass1234!"
+        });
+
+      expect(response.status).toBe(204);
+      expect(mockedAuthService.changePassword).toHaveBeenCalledWith({
+        userId: USER_ID,
+        currentPassword: "OldPass123!",
+        newPassword: "NewPass1234!"
+      });
+    });
+  });
+
+  describe("bookings controller routes", () => {
+    it("handles listMine and booking creation endpoints", async () => {
+      mockedBookingsService.listForUserContext.mockResolvedValueOnce([{ id: BOOKING_ID }] as any);
+      mockedBookingsService.createToolBooking.mockResolvedValueOnce({ id: BOOKING_ID } as any);
+      mockedBookingsService.createToolOwnerBlock.mockResolvedValueOnce({ id: "block-1" } as any);
+      mockedBookingsService.createWorkshopBooking.mockResolvedValueOnce({ id: "workshop-booking-1" } as any);
+
+      const listResponse = await request(app)
+        .get("/api/bookings/me")
+        .set("Authorization", `Bearer ${userToken()}`);
+      const toolResponse = await request(app)
+        .post("/api/bookings/tool")
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({
+          toolId: TOOL_ID,
+          startDate: "2026-07-01T00:00:00.000Z",
+          endDate: "2026-07-05T00:00:00.000Z",
+          pickupTime: "2026-07-01T10:00:00.000Z"
+        });
+      const blockResponse = await request(app)
+        .post("/api/bookings/tool-owner-block")
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({
+          toolId: TOOL_ID,
+          startDate: "2026-07-10T00:00:00.000Z",
+          endDate: "2026-07-12T00:00:00.000Z"
+        });
+      const workshopResponse = await request(app)
+        .post("/api/bookings/workshop")
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({
+          workshopId: WORKSHOP_ID,
+          startDate: "2026-07-01T00:00:00.000Z",
+          endDate: "2026-07-01T02:00:00.000Z"
+        });
+
+      expect(listResponse.status).toBe(200);
+      expect(toolResponse.status).toBe(201);
+      expect(blockResponse.status).toBe(201);
+      expect(workshopResponse.status).toBe(201);
+      expect(mockedBookingsService.listForUserContext).toHaveBeenCalledWith(USER_ID);
+      expect(mockedBookingsService.createToolBooking).toHaveBeenCalledWith({
+        requesterId: USER_ID,
+        toolId: TOOL_ID,
+        startDate: "2026-07-01T00:00:00.000Z",
+        endDate: "2026-07-05T00:00:00.000Z",
+        pickupTime: "2026-07-01T10:00:00.000Z"
+      });
+      expect(mockedBookingsService.createToolOwnerBlock).toHaveBeenCalledWith({
+        ownerId: USER_ID,
+        toolId: TOOL_ID,
+        startDate: "2026-07-10T00:00:00.000Z",
+        endDate: "2026-07-12T00:00:00.000Z"
+      });
+      expect(mockedBookingsService.createWorkshopBooking).toHaveBeenCalledWith({
+        requesterId: USER_ID,
+        workshopId: WORKSHOP_ID,
+        startDate: "2026-07-01T00:00:00.000Z",
+        endDate: "2026-07-01T02:00:00.000Z",
+        workshopToolIds: []
+      });
+    });
+
+    it("handles status updates and proposal flows", async () => {
+      mockedBookingsService.updateBookingStatus.mockResolvedValueOnce({ id: BOOKING_ID, status: "ACCEPTED" } as any);
+      mockedBookingsService.createPickupProposal.mockResolvedValueOnce({ id: PROPOSAL_ID } as any);
+      mockedBookingsService.respondPickupProposal.mockResolvedValueOnce({ id: BOOKING_ID, status: "ACCEPTED" } as any);
+      mockedBookingsService.createTimeslotProposal.mockResolvedValueOnce({ id: PROPOSAL_ID } as any);
+      mockedBookingsService.respondTimeslotProposal.mockResolvedValueOnce({ id: BOOKING_ID, status: "ACCEPTED" } as any);
+
+      const statusResponse = await request(app)
+        .patch(`/api/bookings/${BOOKING_ID}/status`)
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({ status: "ACCEPTED" });
+      const pickupCreateResponse = await request(app)
+        .post(`/api/bookings/${BOOKING_ID}/pickup-proposals`)
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({
+          pickupTime: "2026-07-01T10:00:00.000Z",
+          returnTime: "2026-07-05T18:00:00.000Z"
+        });
+      const pickupRespondResponse = await request(app)
+        .patch(`/api/bookings/${BOOKING_ID}/pickup-proposals/${PROPOSAL_ID}`)
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({ decision: "ACCEPT" });
+      const timeslotCreateResponse = await request(app)
+        .post(`/api/bookings/${BOOKING_ID}/timeslot-proposals`)
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({
+          startDate: "2026-07-02T08:00:00.000Z",
+          endDate: "2026-07-02T12:00:00.000Z"
+        });
+      const timeslotRespondResponse = await request(app)
+        .patch(`/api/bookings/${BOOKING_ID}/timeslot-proposals/${PROPOSAL_ID}`)
+        .set("Authorization", `Bearer ${userToken()}`)
+        .send({ decision: "DECLINE" });
+
+      expect(statusResponse.status).toBe(200);
+      expect(pickupCreateResponse.status).toBe(201);
+      expect(pickupRespondResponse.status).toBe(200);
+      expect(timeslotCreateResponse.status).toBe(201);
+      expect(timeslotRespondResponse.status).toBe(200);
+      expect(mockedBookingsService.updateBookingStatus).toHaveBeenCalledWith({
+        actorId: USER_ID,
+        actorRole: "USER",
+        bookingId: BOOKING_ID,
+        status: "ACCEPTED"
+      });
+      expect(mockedBookingsService.createPickupProposal).toHaveBeenCalledWith({
+        actorId: USER_ID,
+        bookingId: BOOKING_ID,
+        pickupTime: "2026-07-01T10:00:00.000Z",
+        returnTime: "2026-07-05T18:00:00.000Z"
+      });
+      expect(mockedBookingsService.respondPickupProposal).toHaveBeenCalledWith({
+        actorId: USER_ID,
+        bookingId: BOOKING_ID,
+        proposalId: PROPOSAL_ID,
+        decision: "ACCEPT"
+      });
+      expect(mockedBookingsService.createTimeslotProposal).toHaveBeenCalledWith({
+        actorId: USER_ID,
+        bookingId: BOOKING_ID,
+        startDate: "2026-07-02T08:00:00.000Z",
+        endDate: "2026-07-02T12:00:00.000Z"
+      });
+      expect(mockedBookingsService.respondTimeslotProposal).toHaveBeenCalledWith({
+        actorId: USER_ID,
+        bookingId: BOOKING_ID,
+        proposalId: PROPOSAL_ID,
+        decision: "DECLINE"
+      });
     });
   });
 });

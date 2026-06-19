@@ -32,7 +32,7 @@ const USER_ID = "22222222-2222-2222-2222-222222222222";
 // When: ich Systemeinstellungen öffnen/ändern möchte
 // Then: Zugriff verweigert
 
-describe.skip("System settings acceptance tests", () => {
+describe("System settings acceptance tests", () => {
   let app: Express;
 
   const makeToken = (userId: string, role: "MANAGER" | "MODERATOR" | "USER") =>
