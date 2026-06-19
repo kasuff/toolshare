@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TextInput, Pressable } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useRouter } from 'expo-router';
-import { Workshop, api, pluralize, isWithinRadius, isDateRangeAvailable } from '@toolshare/shared';
+import { Workshop, api, pluralize, isDateRangeAvailable } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { WorkshopCard } from '../../../components/WorkshopCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
@@ -28,7 +28,7 @@ export default function WorkshopsScreen() {
   const [borrowUntil, setBorrowUntil] = useState('');
   const [capacityStr, setCapacityStr] = useState('10');
 
-  const { token, currentUser } = useAuth();
+  const { token } = useAuth();
   const router = useRouter();
 
   const loadWorkshops = async (query = search) => {

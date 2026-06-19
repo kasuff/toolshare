@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, TextInput, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Tool, api, TOOL_CATEGORIES, pluralize, isWithinRadius } from '@toolshare/shared';
+import { Tool, api, TOOL_CATEGORIES, pluralize } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { ToolCard } from '../../../components/ToolCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
@@ -21,7 +21,7 @@ export default function ToolsScreen() {
   const [borrowFrom, setBorrowFrom] = useState('');
   const [borrowUntil, setBorrowUntil] = useState('');
   
-  const { token, currentUser } = useAuth();
+  const { token } = useAuth();
   const router = useRouter();
 
   const loadTools = async (query = search, cat = selectedCategory) => {
