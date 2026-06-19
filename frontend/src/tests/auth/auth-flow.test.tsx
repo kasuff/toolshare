@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../App";
 import { ToastProvider } from "../../hooks/useToast";
-import { api } from "../../services/api";
+import {  api  } from "@toolshare/shared";
 
 const mockUseSession = vi.fn();
 
@@ -11,8 +11,8 @@ vi.mock("../../hooks/useSession", () => ({
   useSession: () => mockUseSession()
 }));
 
-vi.mock("../../services/api", async () => {
-  const actual = await vi.importActual<typeof import("../../services/api")>("../../services/api");
+vi.mock("@toolshare/shared", async () => {
+  const actual = await vi.importActual<typeof import("@toolshare/shared")>("@toolshare/shared");
   return {
     ...actual,
     api: {

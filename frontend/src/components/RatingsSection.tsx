@@ -2,9 +2,9 @@ import { useState } from "react";
 import { ReportFormPanel } from "./ReportFormPanel";
 import { EmptyState, Surface } from "./ui";
 import { StarRatingDisplay } from "./StarRatingInput";
-import { api } from "../services/api";
+import { api } from "@toolshare/shared";
 import { useToast } from "../hooks/useToast";
-import type { PublicRating } from "../types/domain";
+import type { PublicRating } from "@toolshare/shared";
 
 type Props = {
   title?: string;

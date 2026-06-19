@@ -3,12 +3,12 @@ import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../hooks/useToast";
-import { api } from "../../services/api";
+import {  api  } from "@toolshare/shared";
 import { ToolDetailPage } from "../../pages/ToolDetailPage";
 import { WorkshopsPage } from "../../pages/WorkshopsPage";
 
-vi.mock("../../services/api", async () => {
-  const actual = await vi.importActual<typeof import("../../services/api")>("../../services/api");
+vi.mock("@toolshare/shared", async () => {
+  const actual = await vi.importActual<typeof import("@toolshare/shared")>("@toolshare/shared");
   return {
     ...actual,
     api: {

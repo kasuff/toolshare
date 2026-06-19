@@ -62,6 +62,15 @@ describe("workshopsService", () => {
     });
   });
 
+  it("hides workshops from suspended managers", async () => {
+    mockedWorkshopsRepository.findById.mockResolvedValueOnce({ id: "w1", manager: { isSuspended: true } } as any);
+
+    await expect(workshopsService.getById("w1")).rejects.toMatchObject({
+      code: "WORKSHOP_NOT_FOUND",
+      status: 404
+    });
+  });
+
   it("throws when workshop is missing", async () => {
     mockedWorkshopsRepository.findById.mockResolvedValueOnce(null);
 

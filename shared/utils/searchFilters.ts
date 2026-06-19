@@ -1,4 +1,4 @@
-import type { WorkshopSlot } from "../types/domain";
+import type {  WorkshopSlot  } from "../types/domain";
 
 export type AvailabilityFilter = "all" | "available";
 
@@ -81,4 +81,43 @@ function endsAfterOrAt(slotEnd: string, filterStart?: string) {
 export function hasMatchingSlot(slots: WorkshopSlot[], filterStart?: string, filterEnd?: string): boolean {
   if (!filterStart && !filterEnd) return true;
   return slots.some((slot) => !slot.blockedByOwner && startsBeforeOrAt(slot.startIso, filterEnd) && endsAfterOrAt(slot.endIso, filterStart));
+}
+
+export function rangeOverlapsDay(startIso: string, endIso: string, day: Date) {
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
+  const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0);
+  return new Date(startIso) < dayEnd && new Date(endIso) > dayStart;
+}
+
+export function isDayUnavailable(day: Date, slots: any[], bookedRanges: any[]) {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  if (day < todayStart) {
+    return true;
+  }
+  const blocked = slots.some((slot) => slot.blockedByOwner && rangeOverlapsDay(slot.startIso, slot.endIso, day));
+  const booked = bookedRanges.some((range) => rangeOverlapsDay(range.startIso, range.endIso, day));
+  return blocked || booked;
+}
+
+export function isDateRangeAvailable(
+  startDate: string,
+  endDate: string,
+  slots: any[],
+  bookedRanges: any[]
+) {
+  if (!startDate || !endDate) return false;
+  if (startDate > endDate) return false;
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    if (isDayUnavailable(d, slots, bookedRanges)) {
+      return false;
+    }
+  }
+  return true;
 }

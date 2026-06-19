@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { TOOL_CATEGORIES } from "../utils/categories";
+import {  TOOL_CATEGORIES  } from "@toolshare/shared";
 
 export type WorkshopToolDraftItem = {
   name: string;

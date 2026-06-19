@@ -1,4 +1,4 @@
-import type { Booking, PickupProposal, TimeslotProposal } from "../types/domain";
+import type {  Booking, PickupProposal, TimeslotProposal  } from "@toolshare/shared";
 
 const STORAGE_VER = "v1";
 

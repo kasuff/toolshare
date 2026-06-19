@@ -1,5 +1,5 @@
-import type { AppDb } from "../types/domain";
-import { DEFAULT_PLACEHOLDER_IMAGE, normalizePlaceholderImage } from "../utils/categories";
+import type {  AppDb  } from "@toolshare/shared";
+import {  DEFAULT_PLACEHOLDER_IMAGE, normalizePlaceholderImage  } from "@toolshare/shared";
 
 const STORAGE_KEY = "toolshare_mvp_db_v1";
 

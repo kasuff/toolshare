@@ -7,7 +7,8 @@ import { ReportFormPanel } from "../components/ReportFormPanel";
 import { StarRatingDisplay } from "../components/StarRatingInput";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
+import { api } from "@toolshare/shared";
+
 import type {
   Booking,
   BookingStatus,
@@ -17,7 +18,7 @@ import type {
   Rating,
   TimeslotProposal,
   User
-} from "../types/domain";
+} from "@toolshare/shared";
 import {
   bookingHasUnreadForUser,
   collectAllMessageKeys,
@@ -883,7 +884,7 @@ export function InboxPage({ currentUser, token }: Props) {
                 ) : (
                   <>
                 <MessengerRow
-                  variant={selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}
+                  variant={selectedBooking.requesterId === currentUser.id ? "incoming" : "outgoing"}
                   avatar={<UserAvatar name={selectedBooking.requesterName ?? currentUser.name} imageUrl={null} size="sm" />}
                 >
                   <RequestMessageCard
@@ -901,16 +902,16 @@ export function InboxPage({ currentUser, token }: Props) {
                   />
                 </MessengerRow>
 
-                {selectedBooking.pickupProposals.map((proposal) => {
-                  const incoming = proposal.proposedById !== currentUser.id;
+                {selectedBooking.pickupProposals.map((proposal: PickupProposal) => {
+                  const fromOtherUser = proposal.proposedById !== currentUser.id;
                   const key = proposalMessageKey(selectedBooking.id, proposal.id);
                   return (
                     <MessengerRow
                       key={proposal.id}
-                      variant={incoming ? "incoming" : "outgoing"}
+                      variant={fromOtherUser ? "outgoing" : "incoming"}
                       avatar={
                         <UserAvatar
-                          name={incoming ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
+                          name={fromOtherUser ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
                           imageUrl={null}
                           size="sm"
                         />
@@ -924,23 +925,23 @@ export function InboxPage({ currentUser, token }: Props) {
                         firstValue={formatDateTime(proposal.proposedPickupIso)}
                         secondLabel="Rückgabe"
                         secondValue={formatDateTime(proposal.proposedReturnIso ?? selectedBooking.endIso)}
-                        unread={incoming && proposal.status === "PENDING" && !readMessageIds.has(key)}
-                        onClick={incoming ? () => markIncomingRead(key) : undefined}
+                        unread={fromOtherUser && proposal.status === "PENDING" && !readMessageIds.has(key)}
+                        onClick={fromOtherUser ? () => markIncomingRead(key) : undefined}
                       />
                     </MessengerRow>
                   );
                 })}
 
-                {selectedBooking.timeslotProposals.map((proposal) => {
-                  const incoming = proposal.proposedById !== currentUser.id;
+                {selectedBooking.timeslotProposals.map((proposal: TimeslotProposal) => {
+                  const fromOtherUser = proposal.proposedById !== currentUser.id;
                   const key = proposalMessageKey(selectedBooking.id, proposal.id);
                   return (
                     <MessengerRow
                       key={proposal.id}
-                      variant={incoming ? "incoming" : "outgoing"}
+                      variant={fromOtherUser ? "outgoing" : "incoming"}
                       avatar={
                         <UserAvatar
-                          name={incoming ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
+                          name={fromOtherUser ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
                           imageUrl={null}
                           size="sm"
                         />
@@ -954,8 +955,8 @@ export function InboxPage({ currentUser, token }: Props) {
                         firstValue={formatDateTime(proposal.proposedStartIso)}
                         secondLabel="Bis"
                         secondValue={formatDateTime(proposal.proposedEndIso)}
-                        unread={incoming && proposal.status === "PENDING" && !readMessageIds.has(key)}
-                        onClick={incoming ? () => markIncomingRead(key) : undefined}
+                        unread={fromOtherUser && proposal.status === "PENDING" && !readMessageIds.has(key)}
+                        onClick={fromOtherUser ? () => markIncomingRead(key) : undefined}
                       />
                     </MessengerRow>
                   );
@@ -963,7 +964,7 @@ export function InboxPage({ currentUser, token }: Props) {
 
                 {selectedBooking.status !== "OFFEN" && (
                   <MessengerRow
-                    variant={selectedBooking.providerId === currentUser.id ? "outgoing" : "incoming"}
+                    variant={selectedBooking.providerId === currentUser.id ? "incoming" : "outgoing"}
                     avatar={<UserAvatar name={selectedBooking.providerName ?? currentUser.name} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
@@ -1031,7 +1032,7 @@ export function InboxPage({ currentUser, token }: Props) {
 
                 {counterFormBookingId === selectedBooking.id && selectedBooking.status === "OFFEN" && (
                   <MessengerRow
-                    variant="outgoing"
+                    variant="incoming"
                     avatar={<UserAvatar name={currentUser.name} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
@@ -1606,12 +1607,12 @@ function formatDateTime(value?: string) {
 }
 
 function getPendingPickupProposal(booking: Booking): PickupProposal | null {
-  const pending = (booking.pickupProposals ?? []).filter((p) => p.status === "PENDING");
+  const pending = (booking.pickupProposals ?? []).filter((p: PickupProposal) => p.status === "PENDING");
   return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
 function getPendingTimeslotProposal(booking: Booking): TimeslotProposal | null {
-  const pending = (booking.timeslotProposals ?? []).filter((p) => p.status === "PENDING");
+  const pending = (booking.timeslotProposals ?? []).filter((p: TimeslotProposal) => p.status === "PENDING");
   return pending.length > 0 ? pending[pending.length - 1] : null;
 }
 
