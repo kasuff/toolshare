@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { ToastViewport } from "../../src/components/ui";
 import { NewToolPage } from "../../src/pages/NewToolPage";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
 
 const { createTool, validateAddress, suggestAddresses } = vi.hoisted(() => ({
   createTool: vi.fn(),
@@ -12,14 +12,18 @@ const { createTool, validateAddress, suggestAddresses } = vi.hoisted(() => ({
   suggestAddresses: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    createTool,
-    validateAddress,
-    suggestAddresses,
-    getSystemSettings: vi.fn().mockResolvedValue([])
-  }
-}));
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      createTool,
+      validateAddress,
+      suggestAddresses,
+      getSystemSettings: vi.fn().mockResolvedValue([])
+    }
+  };
+});
 
 class FileReaderMock {
   public onload: ((event: { target: { result: string } }) => void) | null = null;

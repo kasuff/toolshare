@@ -6,11 +6,15 @@ const { getSystemSettings } = vi.hoisted(() => ({
   getSystemSettings: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getSystemSettings
-  }
-}));
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      getSystemSettings
+    }
+  };
+});
 
 describe("SystemRulesInfo", () => {
   beforeEach(() => {
