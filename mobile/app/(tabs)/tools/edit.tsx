@@ -543,10 +543,10 @@ const styles = StyleSheet.create({
     color: Colors.brand,
     fontWeight: 'bold',
   },
-  actionButtonsContainer: {
+  buttonContainer: {
     flexDirection: 'row',
     marginTop: Spacing.xl,
-    gap: Spacing.xl,
+    gap: Spacing.md,
   },
   submitButton: {
     flex: 1,
