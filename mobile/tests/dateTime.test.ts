@@ -44,6 +44,10 @@ describe('parseLocalDateKey', () => {
     expect(parseLocalDateKey('abc')).toBeNull();
   });
 
+  it('returns null for an invalid date that produces NaN', () => {
+    expect(parseLocalDateKey('1000000000000-01-01')).toBeNull();
+  });
+
   it('round-trips with toLocalDateKey', () => {
     const key = '2026-02-28';
     expect(toLocalDateKey(parseLocalDateKey(key)!)).toBe(key);

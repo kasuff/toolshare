@@ -122,6 +122,12 @@ describe('toToolRangeDraft', () => {
       returnTime: '',
     });
   });
+
+  it('handles invalid dates by returning empty strings', () => {
+    const draft = toToolRangeDraft(baseBooking({ startIso: 'invalid-date' }));
+    expect(draft.pickupDate).toBe('');
+    expect(draft.pickupTime).toBe('');
+  });
 });
 
 describe('toWorkshopDraft', () => {
@@ -152,6 +158,14 @@ describe('toWorkshopDraft', () => {
       `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`
     );
   });
+
+  it('handles invalid end date by returning start date and default end time', () => {
+    const draft = toWorkshopDraft(baseBooking({ type: 'WORKSHOP', startIso: '2026-06-10T10:00:00.000Z', endIso: 'invalid' }));
+    expect(draft.startDate).toBe('2026-06-10');
+    expect(draft.startTime).toBe('12:00'); // 10:00Z is 12:00 local time
+    expect(draft.endDate).toBe('2026-06-10');
+    expect(draft.endTime).toBe('12:00');
+  });
 });
 
 describe('combineLocalDateTimeToIso', () => {
@@ -163,6 +177,10 @@ describe('combineLocalDateTimeToIso', () => {
   it('returns null for malformed values', () => {
     expect(combineLocalDateTimeToIso('2026-06', '10:00')).toBeNull();
     expect(combineLocalDateTimeToIso('2026-06-19', 'xx:yy')).toBeNull();
+  });
+
+  it('returns null if date component values produce an invalid date', () => {
+    expect(combineLocalDateTimeToIso('1000000000000-01-01', '12:00')).toBeNull();
   });
 
   it('combines date and time into an ISO string', () => {

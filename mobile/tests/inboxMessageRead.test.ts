@@ -143,6 +143,16 @@ describe('bookingHasUnreadForUser', () => {
     ).toBe(false);
   });
 
+  it('flags pending timeslot proposals from the other party', () => {
+    const b = booking({
+      timeslotProposals: [timeslot({ id: 't1', proposedById: 'provider' })],
+    });
+    expect(bookingHasUnreadForUser(b, 'requester', new Set())).toBe(true);
+    expect(
+      bookingHasUnreadForUser(b, 'requester', new Set(['prop:b1:t1']))
+    ).toBe(false);
+  });
+
   it('ignores non-pending proposals', () => {
     const b = booking({
       requesterId: 'requester',
@@ -184,6 +194,13 @@ describe('collectIncomingMessageKeys', () => {
     expect(collectIncomingMessageKeys(b, 'requester')).toEqual(['prop:b1:p1']);
   });
 
+  it('collects pending timeslot proposals from the other party', () => {
+    const b = booking({
+      timeslotProposals: [timeslot({ id: 't1', proposedById: 'provider' })],
+    });
+    expect(collectIncomingMessageKeys(b, 'requester')).toEqual(['prop:b1:t1']);
+  });
+
   it('includes the request key for the provider (the other party)', () => {
     expect(collectIncomingMessageKeys(booking(), 'provider')).toEqual(['req:b1']);
   });
@@ -203,6 +220,13 @@ describe('seedReadMessagesIfNeeded', () => {
     await seedReadMessagesIfNeeded('u1', [booking()]);
     const second = await seedReadMessagesIfNeeded('u1', [booking({ id: 'b2' })]);
     expect(second).toBeNull();
+  });
+
+  it('returns null if storage throws', async () => {
+    const originalHas = memory.has;
+    memory.has = () => { throw new Error('storage error'); };
+    expect(await seedReadMessagesIfNeeded('u1', [])).toBeNull();
+    memory.has = originalHas;
   });
 });
 
