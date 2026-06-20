@@ -22,7 +22,8 @@ export const updateReportSchema = z.object({
     requestSuspensionUserId: z.string().uuid().optional(),
     suspensionReason: z.string().min(3).max(600).optional(),
     deleteTool: z.boolean().optional(),
-    deleteWorkshop: z.boolean().optional()
+    deleteWorkshop: z.boolean().optional(),
+    deleteRating: z.boolean().optional()
   }),
   params: z.object({
     id: z.string().uuid()

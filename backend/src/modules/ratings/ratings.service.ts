@@ -88,5 +88,14 @@ export const ratingsService = {
       return rating;
     }
     return ratingsRepository.hide(ratingId, moderatorId, decisionNote);
+  },
+
+  async removeFromModeration(ratingId: string) {
+    const rating = await ratingsRepository.findById(ratingId);
+    if (!rating) {
+      throw new AppError("RATING_NOT_FOUND", "Rating not found", 404);
+    }
+    await ratingsRepository.remove(ratingId);
+    return rating;
   }
 };

@@ -150,6 +150,7 @@ export const moderationService = {
     suspensionReason?: string;
     deleteTool?: boolean;
     deleteWorkshop?: boolean;
+    deleteRating?: boolean;
   }) {
     const report = await moderationRepository.findById(input.reportId);
     if (!report) {
@@ -160,7 +161,10 @@ export const moderationService = {
       throw new AppError("REPORT_ALREADY_CLOSED", "Report is already closed", 409);
     }
 
-    if ((input.warnUserId && !input.warningReason) || (!input.warnUserId && input.warningReason && !input.deleteTool && !input.deleteWorkshop)) {
+    if (
+      (input.warnUserId && !input.warningReason) ||
+      (!input.warnUserId && input.warningReason && !input.deleteTool && !input.deleteWorkshop && !input.deleteRating)
+    ) {
       throw new AppError(
         "INVALID_WARNING_INPUT",
         "warnUserId and warningReason must be provided together",
@@ -197,6 +201,12 @@ export const moderationService = {
       }
     }
 
+    if (input.deleteRating) {
+      if (report.targetType !== "RATING") {
+        throw new AppError("INVALID_TARGET_TYPE", "Cannot delete rating: report target is not a rating", 400);
+      }
+    }
+
     if (input.status === "REJECTED" && !input.decisionNote?.trim()) {
       throw new AppError("DECISION_NOTE_REQUIRED", "decisionNote is required when rejecting a report", 400);
     }
@@ -207,6 +217,7 @@ export const moderationService = {
       !input.requestSuspensionUserId &&
       !input.deleteTool &&
       !input.deleteWorkshop &&
+      !input.deleteRating &&
       !input.decisionNote?.trim()
     ) {
       throw new AppError(
@@ -289,11 +300,15 @@ export const moderationService = {
     );
 
     if (input.status === "RESOLVED" && report.targetType === "RATING") {
-      await ratingsService.hideFromModeration(
-        report.targetId,
-        input.moderatorId,
-        input.decisionNote?.trim()
-      );
+      if (input.deleteRating) {
+        await ratingsService.removeFromModeration(report.targetId);
+      } else {
+        await ratingsService.hideFromModeration(
+          report.targetId,
+          input.moderatorId,
+          input.decisionNote?.trim()
+        );
+      }
     }
 
     if (input.warnUserId && input.warningReason) {

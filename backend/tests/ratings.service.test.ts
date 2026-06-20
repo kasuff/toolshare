@@ -13,7 +13,8 @@ vi.mock("../src/modules/ratings/ratings.repository", () => ({
     listForTool: vi.fn(),
     listForWorkshop: vi.fn(),
     hide: vi.fn(),
-    findById: vi.fn()
+    findById: vi.fn(),
+    remove: vi.fn()
   }
 }));
 
@@ -199,6 +200,25 @@ describe("ratingsService", () => {
     mockedRatingsRepository.findById.mockResolvedValueOnce(null);
 
     await expect(ratingsService.hideFromModeration("missing", "mod-1")).rejects.toMatchObject({
+      code: "RATING_NOT_FOUND",
+      status: 404
+    });
+  });
+
+  it("removes rating from moderation", async () => {
+    mockedRatingsRepository.findById.mockResolvedValueOnce({ id: "rating-1", status: "VISIBLE" } as any);
+    mockedRatingsRepository.remove.mockResolvedValueOnce({ id: "rating-1" } as any);
+
+    const result = await ratingsService.removeFromModeration("rating-1");
+
+    expect(mockedRatingsRepository.remove).toHaveBeenCalledWith("rating-1");
+    expect(result).toMatchObject({ id: "rating-1" });
+  });
+
+  it("rejects remove when rating is missing", async () => {
+    mockedRatingsRepository.findById.mockResolvedValueOnce(null);
+
+    await expect(ratingsService.removeFromModeration("missing")).rejects.toMatchObject({
       code: "RATING_NOT_FOUND",
       status: 404
     });
