@@ -12,7 +12,7 @@ import {
   NativeSyntheticEvent,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Workshop, WorkshopSlot, Tool, api, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
@@ -151,45 +151,47 @@ export default function WorkshopDetailScreen() {
     setActiveImageIndex(0);
   }, [id]);
 
-  useEffect(() => {
-    async function load() {
-      if (!token || !id) return;
-      try {
-        const [found, workshopRatings] = await Promise.all([
-          api.getWorkshopById(id, token),
-          api.getRatingsForWorkshop(id).catch(() => [])
-        ]);
-        
-        if (found) {
-          setWorkshop(found.workshop);
-          setSlots(found.slots);
-          setBookedRanges(found.bookedRanges);
-          setRatings(workshopRatings);
+  useFocusEffect(
+    useCallback(() => {
+      async function load() {
+        if (!token || !id) return;
+        try {
+          const [found, workshopRatings] = await Promise.all([
+            api.getWorkshopById(id, token),
+            api.getRatingsForWorkshop(id).catch(() => [])
+          ]);
           
-          const mappedTools = found.workshop.equipmentItems.map(item => ({
-            id: item.id,
-            ownerId: found.workshop.ownerId,
-            ownerName: found.workshop.ownerName,
-            name: item.name,
-            description: "Werkstatt-Werkzeug",
-            category: item.category,
-            imageUrl: "",
-            status: "VERFUEGBAR" as const,
-            selectable: true
-          }));
-          
-          setTools(mappedTools);
-          setSelectedToolIds(mappedTools.filter(t => t.selectable).map(t => t.id));
+          if (found) {
+            setWorkshop(found.workshop);
+            setSlots(found.slots);
+            setBookedRanges(found.bookedRanges);
+            setRatings(workshopRatings);
+            
+            const mappedTools = found.workshop.equipmentItems.map(item => ({
+              id: item.id,
+              ownerId: found.workshop.ownerId,
+              ownerName: found.workshop.ownerName,
+              name: item.name,
+              description: "Werkstatt-Werkzeug",
+              category: item.category,
+              imageUrl: "",
+              status: "VERFUEGBAR" as const,
+              selectable: true
+            }));
+            
+            setTools(mappedTools);
+            setSelectedToolIds(mappedTools.filter(t => t.selectable).map(t => t.id));
+          }
+        } catch (e) {
+          console.error(e);
+          setError('Fehler beim Laden der Werkstattdaten.');
+        } finally {
+          setIsLoading(false);
         }
-      } catch (e) {
-        console.error(e);
-        setError('Fehler beim Laden der Werkstattdaten.');
-      } finally {
-        setIsLoading(false);
       }
-    }
-    load();
-  }, [id, token]);
+      load();
+    }, [id, token])
+  );
 
   const isOwnWorkshop = Boolean(workshop && currentUser?.id === workshop.ownerId);
   const workshopImages = useMemo(() => {

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { PublicRating } from '@toolshare/shared';
 import { Colors, Spacing, Radius } from '../constants/theme';
 import { ThemedText } from './ThemedText';

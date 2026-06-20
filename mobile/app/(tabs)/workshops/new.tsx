@@ -10,6 +10,7 @@ import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAd
 import { ImageLightbox } from '../../../components/ImageLightbox';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '../../../hooks/useToast';
+import { FormErrorText } from '../../../components/FormErrorText';
 
 const MAX_WORKSHOP_PHOTOS = 3;
 const ADDRESS_VALIDATION_ERROR =
@@ -47,6 +48,8 @@ export default function NewWorkshopScreen() {
 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const { pushToast } = useToast();
   const returnToPath =
     typeof returnTo === 'string'
@@ -201,15 +204,22 @@ export default function NewWorkshopScreen() {
 
 
   const submit = async () => {
-    if (!name.trim()) return pushToast('Bitte gib einen Namen ein.', 'error');
-    if (description.trim().length < 5) return pushToast('Die Beschreibung muss mindestens 5 Zeichen lang sein.', 'error');
+    setApiError(null);
+    const newErrors: Record<string, string> = {};
+    if (!name.trim()) newErrors.name = 'Bitte gib einen Namen ein.';
+    if (description.trim().length < 5) newErrors.description = 'Die Beschreibung muss mindestens 5 Zeichen lang sein.';
     const addressStr = toAddressPayload(address);
-    if (!isAddressComplete(address)) return pushToast('Bitte gib eine vollständige Werkstattadresse an.', 'error');
+    if (!isAddressComplete(address)) newErrors.address = 'Bitte gib eine vollständige Werkstattadresse an.';
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
     setIsSubmitting(true);
     try {
       const validation = await api.validateAddress(addressStr);
       if (!validation.isValid) {
-        pushToast(ADDRESS_VALIDATION_ERROR, 'error');
+        setErrors({ address: ADDRESS_VALIDATION_ERROR });
+        setIsSubmitting(false);
         return;
       }
       const normalizedLocation = validation.normalizedAddress?.trim() || addressStr;
@@ -228,9 +238,8 @@ export default function NewWorkshopScreen() {
       }, token!);
 
       router.replace('/offers');
-      pushToast('Werkstatt erfolgreich eingestellt.', 'success');
     } catch (err: any) {
-      pushToast(err.message || 'Werkstatt konnte nicht angelegt werden.', 'error');
+      setApiError(err.message || 'Werkstatt konnte nicht angelegt werden.');
     } finally {
       setIsSubmitting(false);
     }
@@ -307,6 +316,7 @@ export default function NewWorkshopScreen() {
             placeholder="z.B. Garagen-Werkstatt"
             placeholderTextColor={Colors.textMuted}
           />
+          <FormErrorText error={errors.name} />
         </View>
 
         <View style={styles.field}>
@@ -321,9 +331,13 @@ export default function NewWorkshopScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
+          <FormErrorText error={errors.description} />
         </View>
 
-        <AddressInput value={address} onChange={setAddress} label="Adresse" required initialMode="manual" />
+        <View style={styles.field}>
+          <AddressInput value={address} onChange={setAddress} label="Adresse" required initialMode="manual" />
+          <FormErrorText error={errors.address} />
+        </View>
 
         <View style={styles.field}>
           <ThemedText style={styles.label}>Maximale Personenzahl *</ThemedText>
@@ -448,7 +462,7 @@ export default function NewWorkshopScreen() {
           </View>
         </View>
 
-
+        <FormErrorText error={apiError} style={{ marginBottom: Spacing.md }} />
 
         <TouchableOpacity 
           style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 

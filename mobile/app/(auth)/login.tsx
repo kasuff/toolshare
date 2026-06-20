@@ -5,25 +5,26 @@ import { useAuth } from '../../hooks/useAuth';
 import { ThemedText } from '../../components/ThemedText';
 import { Colors, Spacing, Radius } from '../../constants/theme';
 import { useRouter } from 'expo-router';
-import { useToast } from '../../hooks/useToast';
+import { FormErrorText } from '../../components/FormErrorText';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
   const router = useRouter();
-  const { pushToast } = useToast();
 
   const handleLogin = async () => {
     if (isLoading) return;
+    setError(null);
     try {
       setIsLoading(true);
       const { accessToken } = await api.login(email, password);
       await login(accessToken);
       router.replace('/tools');
     } catch (err: any) {
-      pushToast(err.message || 'Login fehlgeschlagen', 'error');
+      setError(err.message || 'Login fehlgeschlagen');
       setIsLoading(false);
     }
   };
@@ -49,6 +50,8 @@ export default function LoginScreen() {
           onChangeText={setPassword}
           secureTextEntry
         />
+
+        <FormErrorText error={error} style={{ marginBottom: Spacing.sm }} />
 
         <TouchableOpacity style={[styles.button, isLoading && { opacity: 0.7 }]} onPress={handleLogin} disabled={isLoading}>
           <ThemedText style={styles.buttonText}>{isLoading ? 'Lädt...' : 'Einloggen'}</ThemedText>

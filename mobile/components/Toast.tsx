@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useToast } from '../hooks/useToast';
 import { Colors, Spacing, Radius } from '../constants/theme';
 import { ThemedText } from './ThemedText';

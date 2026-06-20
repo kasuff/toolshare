@@ -6,11 +6,12 @@ import { useAuth } from '../../../hooks/useAuth';
 import { Colors, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
-import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from '../../../components/AddressInput';
+import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAddressPayload, parseAddress } from '../../../components/AddressInput';
 import { ImageLightbox } from '../../../components/ImageLightbox';
-import { DateTimeRangeFields } from '../../../components/DateTimeFields';
+
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '../../../hooks/useToast';
+import { FormErrorText } from '../../../components/FormErrorText';
 
 const MAX_WORKSHOP_PHOTOS = 3;
 const ADDRESS_VALIDATION_ERROR =
@@ -49,6 +50,8 @@ export default function EditWorkshopScreen() {
 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const { pushToast } = useToast();
   const navigateBack = useCallback(() => {
     router.back();
@@ -72,14 +75,14 @@ export default function EditWorkshopScreen() {
           const { workshop } = await api.getWorkshopById(id, token);
           setName(workshop.name);
           setDescription(workshop.description);
-          setAddress({ ...EMPTY_ADDRESS, street: workshop.location });
+          setAddress(parseAddress(workshop.location));
           setMaxCapacity(workshop.maxCapacity.toString());
           setExtras(workshop.extras);
           setEquipmentItems(workshop.equipmentItems);
           if (workshop.imageUrls) setSelectedImages(workshop.imageUrls);
           
 
-        } catch (e) {
+        } catch {
           pushToast('Fehler beim Laden der Werkstatt', 'error');
         } finally {
           setIsLoading(false);
@@ -214,15 +217,22 @@ export default function EditWorkshopScreen() {
 
 
   const submit = async () => {
-    if (!name.trim()) return pushToast('Bitte gib einen Namen ein.', 'error');
-    if (description.trim().length < 5) return pushToast('Die Beschreibung muss mindestens 5 Zeichen lang sein.', 'error');
+    setApiError(null);
+    const newErrors: Record<string, string> = {};
+    if (!name.trim()) newErrors.name = 'Bitte gib einen Namen ein.';
+    if (description.trim().length < 5) newErrors.description = 'Die Beschreibung muss mindestens 5 Zeichen lang sein.';
     const addressStr = toAddressPayload(address);
-    if (!isAddressComplete(address)) return pushToast('Bitte gib eine vollständige Werkstattadresse an.', 'error');
+    if (!isAddressComplete(address)) newErrors.address = 'Bitte gib eine vollständige Werkstattadresse an.';
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
     setIsSubmitting(true);
     try {
       const validation = await api.validateAddress(addressStr);
       if (!validation.isValid) {
-        pushToast(ADDRESS_VALIDATION_ERROR, 'error');
+        setErrors({ address: ADDRESS_VALIDATION_ERROR });
+        setIsSubmitting(false);
         return;
       }
       const normalizedLocation = validation.normalizedAddress?.trim() || addressStr;
@@ -240,9 +250,8 @@ export default function EditWorkshopScreen() {
       }, token!);
 
       router.back();
-      pushToast('Werkstatt erfolgreich aktualisiert.', 'success');
     } catch (err: any) {
-      pushToast(err.message || 'Werkstatt konnte nicht angelegt werden.', 'error');
+      setApiError(err.message || 'Werkstatt konnte nicht angelegt werden.');
     } finally {
       setIsSubmitting(false);
     }
@@ -324,6 +333,7 @@ export default function EditWorkshopScreen() {
             placeholder="z.B. Garagen-Werkstatt"
             placeholderTextColor={Colors.textMuted}
           />
+          <FormErrorText error={errors.name} />
         </View>
 
         <View style={styles.field}>
@@ -338,9 +348,13 @@ export default function EditWorkshopScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
+          <FormErrorText error={errors.description} />
         </View>
 
-        <AddressInput value={address} onChange={setAddress} label="Adresse" required initialMode="manual" />
+        <View style={styles.field}>
+          <AddressInput value={address} onChange={setAddress} label="Adresse" required initialMode="manual" />
+          <FormErrorText error={errors.address} />
+        </View>
 
         <View style={styles.field}>
           <ThemedText style={styles.label}>Maximale Personenzahl *</ThemedText>
@@ -465,7 +479,7 @@ export default function EditWorkshopScreen() {
           </View>
         </View>
 
-
+        <FormErrorText error={apiError} style={{ marginBottom: Spacing.md }} />
 
         <TouchableOpacity 
           style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 

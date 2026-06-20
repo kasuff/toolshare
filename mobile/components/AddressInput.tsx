@@ -94,6 +94,7 @@ export function AddressInput({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSelectingSuggestion = useRef(false);
   const lastEmittedRef = useRef(value);
+  const lastSelectedSearchValue = useRef<string | null>(null);
 
   useEffect(() => {
     if (addressesEqual(value, lastEmittedRef.current)) return;
@@ -119,6 +120,9 @@ export function AddressInput({
     if (mode !== 'automatic' || searchValue.trim().length < 3) {
       setSuggestions([]);
       setLoading(false);
+      return;
+    }
+    if (searchValue === lastSelectedSearchValue.current) {
       return;
     }
 
@@ -154,6 +158,7 @@ export function AddressInput({
     };
     setFields(next);
     emitChange(next);
+    lastSelectedSearchValue.current = suggestion.label;
     setSearchValue(suggestion.label);
     setSuggestions([]);
   };
@@ -173,7 +178,7 @@ export function AddressInput({
     setMode('automatic');
   };
 
-  const showDropdown = mode === 'automatic' && searchValue.trim().length >= 3;
+  const showDropdown = mode === 'automatic' && searchValue.trim().length >= 3 && searchValue !== lastSelectedSearchValue.current;
 
   return (
     <View style={styles.container}>
@@ -187,7 +192,13 @@ export function AddressInput({
             <TextInput
               style={styles.input}
               value={searchValue}
-              onChangeText={setSearchValue}
+              onChangeText={(text) => {
+                lastSelectedSearchValue.current = null;
+                setSearchValue(text);
+                const parsed = parseAddress(text);
+                setFields(parsed);
+                emitChange(parsed);
+              }}
               placeholder="Adresse suchen..."
               placeholderTextColor={Colors.textMuted}
               blurOnSubmit={false}

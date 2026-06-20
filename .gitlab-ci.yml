@@ -856,6 +856,7 @@ security:audit:
   script:
     - (cd backend && npm audit --audit-level=moderate)
     - (cd frontend && npm audit --audit-level=moderate)
+    - (cd mobile && npm audit --audit-level=high)
 
 semgrep-sast:
   stage: test

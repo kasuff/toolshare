@@ -1,16 +1,17 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Pressable, Alert } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { api, TOOL_CATEGORIES, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { Colors, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
-import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from '../../../components/AddressInput';
+import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAddressPayload, parseAddress } from '../../../components/AddressInput';
 import { ImageLightbox } from '../../../components/ImageLightbox';
 import * as ImagePicker from 'expo-image-picker';
 import { BackHandler } from 'react-native';
 import { useToast } from '../../../hooks/useToast';
+import { FormErrorText } from '../../../components/FormErrorText';
 
 const ADDRESS_VALIDATION_ERROR =
   'Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.';
@@ -29,6 +30,8 @@ export default function EditToolScreen() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const { pushToast } = useToast();
   const navigateBack = useCallback(() => {
     router.back();
@@ -53,12 +56,12 @@ export default function EditToolScreen() {
           setName(tool.name);
           setDescription(tool.description);
           setCategory(tool.category);
-          setAddress({ ...EMPTY_ADDRESS, street: tool.pickupLocation || "" });
+          setAddress(parseAddress(tool.pickupLocation));
           setPickupLocationNote(tool.pickupLocationNote || '');
           if (tool.imageUrl && tool.imageUrl !== DEFAULT_PLACEHOLDER_IMAGE) {
             setSelectedImage(tool.imageUrl);
           }
-        } catch (e) {
+        } catch {
           pushToast('Fehler beim Laden des Werkzeugs', 'error');
         } finally {
           setIsLoading(false);
@@ -149,17 +152,23 @@ export default function EditToolScreen() {
   };
 
   const submit = async () => {
-    if (!name.trim()) return pushToast('Bitte gib einen Namen ein.', 'error');
-    if (description.trim().length < 5) return pushToast('Die Beschreibung muss mindestens 5 Zeichen lang sein.', 'error');
-    if (!category) return pushToast('Bitte wähle eine Kategorie.', 'error');
+    setApiError(null);
+    const newErrors: Record<string, string> = {};
+    if (!name.trim()) newErrors.name = 'Bitte gib einen Namen ein.';
+    if (description.trim().length < 5) newErrors.description = 'Die Beschreibung muss mindestens 5 Zeichen lang sein.';
+    if (!category) newErrors.category = 'Bitte wähle eine Kategorie.';
     const addressStr = toAddressPayload(address);
-    if (!isAddressComplete(address)) return pushToast('Bitte gib einen vollständigen Abholort an.', 'error');
+    if (!isAddressComplete(address)) newErrors.address = 'Bitte gib einen vollständigen Abholort an.';
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     setIsSubmitting(true);
     try {
       const validation = await api.validateAddress(addressStr);
       if (!validation.isValid) {
-        pushToast(ADDRESS_VALIDATION_ERROR, 'error');
+        setErrors({ address: ADDRESS_VALIDATION_ERROR });
+        setIsSubmitting(false);
         return;
       }
       const normalizedLocation = validation.normalizedAddress?.trim() || addressStr;
@@ -174,12 +183,35 @@ export default function EditToolScreen() {
       }, token!);
 
       router.back();
-      pushToast('Werkzeug erfolgreich aktualisiert.', 'success');
     } catch (err: any) {
-      pushToast(err.message || 'Werkzeug konnte nicht angelegt werden.', 'error');
+      setApiError(err.message || 'Werkzeug konnte nicht angelegt werden.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Werkzeug löschen",
+      "Möchtest du dieses Werkzeug wirklich löschen?",
+      [
+        { text: "Abbrechen", style: "cancel" },
+        { 
+          text: "Löschen", 
+          style: "destructive",
+          onPress: async () => {
+            setIsSubmitting(true);
+            try {
+              await api.deleteTool(id!, token!);
+              router.back();
+            } catch (err: any) {
+              setApiError(err.message || 'Werkzeug konnte nicht gelöscht werden.');
+            } finally {setIsSubmitting(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -249,6 +281,7 @@ export default function EditToolScreen() {
             placeholder="z.B. Akku-Bohrmaschine"
             placeholderTextColor={Colors.textMuted}
           />
+          <FormErrorText error={errors.name} />
         </View>
 
         <View style={styles.field}>
@@ -263,6 +296,7 @@ export default function EditToolScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
+          <FormErrorText error={errors.description} />
         </View>
 
         <View style={[styles.field, isDropdownOpen && { zIndex: 10 }]}>
@@ -306,9 +340,13 @@ export default function EditToolScreen() {
               </ScrollView>
             </View>
           )}
+          <FormErrorText error={errors.category} />
         </View>
 
-        <AddressInput value={address} onChange={setAddress} label="Abholort" required />
+        <View style={styles.field}>
+          <AddressInput value={address} onChange={setAddress} label="Abholort" required />
+          <FormErrorText error={errors.address} />
+        </View>
 
         <View style={styles.field}>
           <ThemedText style={styles.label}>Hinweis zur Abholung</ThemedText>
@@ -324,17 +362,28 @@ export default function EditToolScreen() {
           />
         </View>
 
-        <TouchableOpacity 
-          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
-          onPress={submit} 
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <ThemedText style={styles.submitButtonText}>Werkzeug speichern</ThemedText>
-          )}
-        </TouchableOpacity>
+        <FormErrorText error={apiError} style={{ marginBottom: Spacing.md }} />
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={[styles.deleteButton, isSubmitting && styles.submitButtonDisabled]} 
+            onPress={handleDelete} 
+            disabled={isSubmitting}
+          >
+            <ThemedText style={styles.deleteButtonText}>Löschen</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+            onPress={submit} 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <ThemedText style={styles.submitButtonText}>Speichern</ThemedText>
+            )}
+          </TouchableOpacity>
+        </View>
         </>
         )}
       </ScrollView>
@@ -494,18 +543,37 @@ const styles = StyleSheet.create({
     color: Colors.brand,
     fontWeight: 'bold',
   },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    marginTop: Spacing.xl,
+    gap: Spacing.xl,
+  },
   submitButton: {
+    flex: 1,
     backgroundColor: Colors.brand,
     padding: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
-    marginTop: Spacing.xl,
   },
   submitButtonDisabled: {
     opacity: 0.7,
   },
   submitButtonText: {
     color: Colors.surface,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  deleteButton: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: Colors.danger,
     fontWeight: 'bold',
     fontSize: 16,
   },

@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Tool, api, getPlaceholderImageForCategory, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { LoadingSpinner } from '../../../components/EmptyState';
@@ -131,9 +131,11 @@ export default function ToolDetailScreen() {
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, [id, token]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [id, token])
+  );
 
   const isAvailable = tool?.status === 'VERFUEGBAR';
   const isOwnTool = Boolean(tool && currentUser?.id === tool.ownerId);
