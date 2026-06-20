@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { MonitoringSection } from "../components/MonitoringSection";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api, type SuspensionRequestItem, type SystemSetting } from "../services/api";
-import type { User } from "../types/domain";
+import { api, type SuspensionRequestItem, type SystemSetting } from "@toolshare/shared";
+import type { User } from "@toolshare/shared";
 
 type AdminTab = "management" | "monitoring" | "rules";
 

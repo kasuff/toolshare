@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type SystemSetting } from "../services/api";
+import { api, type SystemSetting } from "@toolshare/shared";
 
 type Props = {
   token: string;

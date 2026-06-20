@@ -5,7 +5,7 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { ToastViewport } from "../../src/components/ui";
 import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
 import { EditWorkshopPage } from "../../src/pages/EditWorkshopPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const {
   createWorkshop,
@@ -27,9 +27,13 @@ const {
   suggestAddresses: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    createWorkshop,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      createWorkshop,
     getWorkshopById,
     updateWorkshop,
     createWorkshopTimeslot,
@@ -38,8 +42,9 @@ vi.mock("../../src/services/api", () => ({
     validateAddress,
     suggestAddresses,
     getSystemSettings: vi.fn().mockResolvedValue([])
-  }
-}));
+    }
+  };
+});
 
 class FileReaderMock {
   public onload: ((event: { target: { result: string } }) => void) | null = null;

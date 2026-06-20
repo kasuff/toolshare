@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ImageUpload } from "../../src/components/ImageUpload";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
 
 class MockFileReader {
   result: string | ArrayBuffer | null = null;
@@ -59,7 +59,6 @@ describe("ImageUpload", () => {
 
   it("rejects invalid file types and oversized files", () => {
     const onImageSelect = vi.fn();
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
 
     const { container } = render(
       <ImageUpload
@@ -77,10 +76,8 @@ describe("ImageUpload", () => {
       item: (index: number) => (index === 0 ? invalidFile : null)
     } as FileList;
     fireEvent.change(input, { target: { files: invalidFileList } });
-    expect(alertSpy).toHaveBeenCalled();
-    expect(alertSpy.mock.calls[0]?.[0]).toMatch(/Bilddatei/i);
+    expect(screen.getByText(/Bitte wähle eine Bilddatei aus/i)).toBeInTheDocument();
 
-    alertSpy.mockClear();
     const largeFile = new File([new ArrayBuffer(6 * 1024 * 1024)], "large.png", { type: "image/png" });
     const largeFileList = {
       0: largeFile,
@@ -88,8 +85,7 @@ describe("ImageUpload", () => {
       item: (index: number) => (index === 0 ? largeFile : null)
     } as FileList;
     fireEvent.change(input, { target: { files: largeFileList } });
-    expect(alertSpy).toHaveBeenCalled();
-    expect(alertSpy.mock.calls[0]?.[0]).toMatch(/groß|5\s*MB/i);
+    expect(screen.getByText(/Datei ist zu groß/i)).toBeInTheDocument();
     expect(onImageSelect).not.toHaveBeenCalled();
   });
 });

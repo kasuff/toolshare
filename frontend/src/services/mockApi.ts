@@ -1,4 +1,4 @@
-import type {
+import type { 
   Booking,
   BookingStatus,
   Report,
@@ -8,7 +8,7 @@ import type {
   User,
   Workshop,
   WorkshopSlot,
-} from "../types/domain";
+ } from "@toolshare/shared";
 import { loadDb, saveDb, uid } from "./storage";
 
 function addNotification(userId: string, message: string): void {

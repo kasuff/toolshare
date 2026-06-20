@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  getActiveRequestCount,
-  subscribeToRequestActivity
-} from "../services/requestActivity";
+import { getActiveRequestCount, subscribeToRequestActivity } from "@toolshare/shared";
 
 const SHOW_DELAY_MS = 180;
 const MIN_VISIBLE_MS = 420;

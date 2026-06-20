@@ -10,13 +10,13 @@ import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
-import { DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES } from "../utils/categories";
+import {  DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES  } from "@toolshare/shared";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import { distanceBetweenLocations, hasMatchingSlot, isWithinRadius } from "../utils/searchFilters";
+import {  api  } from "@toolshare/shared";
+import { distanceBetweenLocations, isDateRangeAvailable, isDayUnavailable, isWithinRadius } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
-import { pluralize } from "../utils/pluralize";
-import type { PublicRating, Tool, User, Workshop, WorkshopBookedRange, WorkshopSlot } from "../types/domain";
+import { pluralize } from "@toolshare/shared";
+import type { PublicRating, Tool, User, Workshop, WorkshopBookedRange, WorkshopSlot } from "@toolshare/shared";
 
 type Props = {
   token?: string;
@@ -106,20 +106,6 @@ function toLocalDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function rangeOverlapsDay(startIso: string, endIso: string, day: Date) {
-  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
-  const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0);
-  return new Date(startIso) < dayEnd && new Date(endIso) > dayStart;
-}
-
-// Eine Werkstatt ist standardmäßig verfügbar. Ein Tag ist nur dann nicht verfügbar (und wird
-// im Kalender durchgestrichen), wenn ihn der Anbieter blockiert hat oder er bereits gebucht ist.
-function isDayUnavailable(day: Date, slots: WorkshopSlot[], bookedRanges: WorkshopBookedRange[]) {
-  const blocked = slots.some((slot) => slot.blockedByOwner && rangeOverlapsDay(slot.startIso, slot.endIso, day));
-  const booked = bookedRanges.some((range) => rangeOverlapsDay(range.startIso, range.endIso, day));
-  return blocked || booked;
-}
-
 function getWorkshopCalendarDays(monthDate: Date, slots: WorkshopSlot[], bookedRanges: WorkshopBookedRange[]) {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
@@ -146,24 +132,6 @@ function getWorkshopCalendarDays(monthDate: Date, slots: WorkshopSlot[], bookedR
   }
 
   return days;
-}
-
-function isDateRangeAvailable(
-  startDate: string,
-  endDate: string,
-  slots: WorkshopSlot[],
-  bookedRanges: WorkshopBookedRange[]
-) {
-  const start = new Date(`${startDate}T12:00:00`);
-  const end = new Date(`${endDate}T12:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return false;
-
-  const current = new Date(start);
-  while (current <= end) {
-    if (isDayUnavailable(current, slots, bookedRanges)) return false;
-    current.setDate(current.getDate() + 1);
-  }
-  return true;
 }
 
 export function WorkshopsPage({ token, currentUser }: Props) {
@@ -256,7 +224,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
         );
       })
       .filter((item) => item.workshop.maxCapacity <= maxCapacityFilter)
-      .filter((item) => hasMatchingSlot(item.slots, borrowFrom, borrowUntil));
+      .filter((item) => (!borrowFrom || !borrowUntil) ? true : isDateRangeAvailable(borrowFrom, borrowUntil, item.slots, item.bookedRanges));
   }, [borrowFrom, borrowUntil, items, maxCapacityFilter, toolFilter]);
 
   const filteredItems = useMemo(() => {
@@ -407,6 +375,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     if (!startIso || !endIso) {
       return;
     }
+    if (new Date(startIso) < new Date()) {
+      pushToast("Der Startzeitpunkt darf nicht in der Vergangenheit liegen.", "error");
+      return;
+    }
     if (new Date(endIso) <= new Date(startIso)) {
       pushToast("Das Ende muss nach dem Start liegen.", "error");
       return;
@@ -443,6 +415,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
     const endIso = combineLocalDateTimeToIso(draft.endDate, draft.endTime);
     if (!startIso || !endIso) {
+      return;
+    }
+    if (new Date(startIso) < new Date()) {
+      pushToast("Der Startzeitpunkt darf nicht in der Vergangenheit liegen.", "error");
       return;
     }
     if (new Date(endIso) <= new Date(startIso)) {

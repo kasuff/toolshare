@@ -8,11 +8,16 @@ const { createReport } = vi.hoisted(() => ({
   createReport: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    createReport
-  }
-}));
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      createReport
+    }
+  };
+});
 
 const sampleRatings = [
   {

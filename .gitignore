@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.npm/
 .pnp
 .pnp.js
 
@@ -31,6 +32,7 @@ npm-debug.log*
 
 # Testing
 coverage/
+frontend/src/**/*.js
 
 # Docker
 .docker/
@@ -38,6 +40,3 @@ coverage/
 # Prisma
 backend/prisma/*.db
 backend/prisma/migrations/**/migration_lock.toml
-
-# Mobile
-/mobile/

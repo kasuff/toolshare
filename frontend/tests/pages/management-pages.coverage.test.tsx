@@ -5,7 +5,7 @@ import { AdminPage } from "../../src/pages/AdminPage";
 import { ModerationPage } from "../../src/pages/ModerationPage";
 import { NewToolPage } from "../../src/pages/NewToolPage";
 import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const {
   pushToast,
@@ -23,7 +23,8 @@ const {
   decideSuspensionRequest,
   createWorkshop,
   getSystemSettings,
-  updateSystemSetting
+  updateSystemSetting,
+  getRatingsReceived
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
@@ -40,7 +41,8 @@ const {
   decideSuspensionRequest: vi.fn(),
   createWorkshop: vi.fn(),
   getSystemSettings: vi.fn(),
-  updateSystemSetting: vi.fn()
+  updateSystemSetting: vi.fn(),
+  getRatingsReceived: vi.fn()
 }));
 
 vi.mock("../../src/hooks/useToast", () => ({
@@ -49,9 +51,13 @@ vi.mock("../../src/hooks/useToast", () => ({
   })
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getCurrentUser,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getCurrentUser,
     createTool,
     validateAddress,
     listUsers,
@@ -62,12 +68,14 @@ vi.mock("../../src/services/api", () => ({
     listClosedReports,
     updateReportStatus,
     listSuspensionRequests,
-    decideSuspensionRequest,
-    createWorkshop,
-    getSystemSettings,
-    updateSystemSetting
-  }
-}));
+      decideSuspensionRequest,
+      createWorkshop,
+      getSystemSettings,
+      updateSystemSetting,
+      getRatingsReceived
+    }
+  };
+});
 
 const { getMonitoringOverview, getMonitoringLogs } = vi.hoisted(() => ({
   getMonitoringOverview: vi.fn(),
@@ -504,6 +512,191 @@ describe("management pages", () => {
         createdAt: "2026-05-05T10:00:00.000Z"
       }
     ]).mockResolvedValueOnce([]);
+    updateReportStatus.mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Spammy Tool")).toBeInTheDocument();
+    const deleteBtn = screen.getByRole("button", { name: "Angebot löschen" });
+    fireEvent.click(deleteBtn);
+
+    expect(screen.getByRole("heading", { name: "Angebot löschen" })).toBeInTheDocument();
+    
+    fireEvent.change(screen.getByPlaceholderText("Warum wird dieses Angebot/diese Werkstatt gelöscht?"), {
+      target: { value: "Verstoß gegen Richtlinien" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Angebot unwiderruflich löschen" }));
+
+    await waitFor(() => {
+      expect(updateReportStatus).toHaveBeenCalledWith(
+        "r2",
+        {
+          status: "RESOLVED",
+          deleteTool: true,
+          deleteWorkshop: false,
+          warningReason: "Verstoß gegen Richtlinien",
+          decisionNote: undefined
+        },
+        "token-123"
+      );
+    });
+  });
+
+  it("renders closed reports with limit selection", async () => {
+    listReports.mockResolvedValue([]);
+    listClosedReports.mockResolvedValue([
+      {
+        id: "rc1",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 1",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc2",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 2",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc3",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 3",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc4",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 4",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc5",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 5",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc6",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 6",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      }
+    ]);
+    getRatingsReceived.mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    // Click open details
+    const summary = await screen.findByText(/Abgeschlossene Meldungen anzeigen/);
+    fireEvent.click(summary);
+
+    // Initial limit is 10, so all 6 should be visible
+    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(screen.getByText("Entscheidung 6")).toBeInTheDocument();
+
+    // Select limit of 5
+    const select = screen.getByRole("combobox");
+    fireEvent.change(select, { target: { value: "5" } });
+
+    // decision 6 should no longer be visible because limit is 5
+    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(screen.queryByText("Entscheidung 6")).not.toBeInTheDocument();
+  });
+
+  it("renders delete tool option and submits deletion", async () => {
+    listClosedReports.mockResolvedValue([]);
+    listReports.mockResolvedValueOnce([
+      {
+        id: "r2",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "TOOL",
+        targetId: "tool-1",
+        targetLabel: "Spammy Tool",
+        targetHref: "/tools/tool-1",
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Spam",
+        details: "Double post",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z"
+      }
+    ]).mockResolvedValueOnce([]);
+    getRatingsReceived.mockResolvedValue([]);
     updateReportStatus.mockResolvedValue(undefined);
 
     render(

@@ -1,7 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSession } from "../../src/hooks/useSession";
-import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../../src/services/sessionEvents";
+import { notifySessionExpired, onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
 
 const { login, register, getCurrentUser, updateMyProfile } = vi.hoisted(() => ({
   login: vi.fn(),
@@ -10,14 +10,19 @@ const { login, register, getCurrentUser, updateMyProfile } = vi.hoisted(() => ({
   updateMyProfile: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    login,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      login,
     register,
     getCurrentUser,
     updateMyProfile
-  }
-}));
+    }
+  };
+});
 
 describe("useSession", () => {
   beforeEach(() => {
@@ -67,7 +72,7 @@ describe("useSession", () => {
     await waitFor(() => expect(result.current.currentUser?.name).toBe("Lea"));
 
     act(() => {
-      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      notifySessionExpired();
     });
 
     expect(localStorage.getItem("toolshare_access_token")).toBeNull();

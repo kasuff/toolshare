@@ -11,11 +11,15 @@ interface ImageUploadProps {
 export function ImageUpload({ onImageSelect, currentImage, placeholderImage, label, hint }: ImageUploadProps) {
   const [preview, setPreview] = useState<string | null>(currentImage || null);
   const [fileName, setFileName] = useState<string>("");
+  const [error, setError] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPreview(currentImage || null);
+    if (!currentImage) {
+      setFileName("");
+    }
   }, [currentImage]);
 
   const openFileDialog = () => {
@@ -23,13 +27,14 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
   };
 
   const applyFile = (file: File) => {
+    setError("");
     if (file.size > 5 * 1024 * 1024) {
-      alert("Datei ist zu groß. Maximum 5MB.");
+      setError("Datei ist zu groß. Maximum 5MB.");
       return;
     }
 
     if (!file.type.startsWith("image/")) {
-      alert("Bitte wähle eine Bilddatei aus (JPG, PNG, etc.).");
+      setError("Bitte wähle eine Bilddatei aus (JPG, PNG, etc.).");
       return;
     }
 
@@ -48,6 +53,8 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
     if (!file) return;
 
     applyFile(file);
+    // allow selecting the same file again
+    event.target.value = "";
   };
 
   const handleDrop = (event: React.DragEvent<HTMLButtonElement>) => {
@@ -61,6 +68,7 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
   };
 
   const handleClear = () => {
+    setError("");
     setPreview(placeholderImage);
     setFileName("");
     onImageSelect(null);
@@ -143,6 +151,7 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
           </button>
         )}
       </div>
+      {error && <p className="field-error">{error}</p>}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { ToastViewport } from "../../src/components/ui";
 import { WorkshopsPage } from "../../src/pages/WorkshopsPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const { getWorkshops, createWorkshopBooking, getRatingsForWorkshop, createReport } = vi.hoisted(() => ({
   getWorkshops: vi.fn(),
@@ -13,15 +13,20 @@ const { getWorkshops, createWorkshopBooking, getRatingsForWorkshop, createReport
   createReport: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getWorkshops,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getWorkshops,
     createWorkshopBooking,
     getRatingsForWorkshop,
     createReport,
     getSystemSettings: vi.fn().mockResolvedValue([])
-  }
-}));
+    }
+  };
+});
 
 const currentUser: User = {
   id: "owner-1",

@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api, type ModerationReport } from "../services/api";
+import {  api, type ModerationReport  } from "@toolshare/shared";
 
 type Props = {
   token?: string;

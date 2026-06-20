@@ -1,4 +1,4 @@
-import { User } from "../types/domain";
+import {  User  } from "@toolshare/shared";
 
 interface OwnerContactCardProps {
   owner: User;

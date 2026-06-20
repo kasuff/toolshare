@@ -5,10 +5,10 @@ import { DateInput } from "../components/DateInput";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
-import { api } from "../services/api";
+import {  api  } from "@toolshare/shared";
 import { useToast } from "../hooks/useToast";
-import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "../utils/categories";
-import type { PublicRating, Tool, User } from "../types/domain";
+import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "@toolshare/shared";
+import type { PublicRating, Tool, User } from "@toolshare/shared";
 
 type Props = {
   token?: string;

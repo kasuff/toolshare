@@ -12,9 +12,9 @@ import { CategorySelect } from "../components/CategorySelect";
 import { ImageUpload } from "../components/ImageUpload";
 import { Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../utils/categories";
-import type { User } from "../types/domain";
+import {  api  } from "@toolshare/shared";
+import {  DEFAULT_PLACEHOLDER_IMAGE  } from "@toolshare/shared";
+import type {  User  } from "@toolshare/shared";
 
 type Props = {
   currentUser?: User;
