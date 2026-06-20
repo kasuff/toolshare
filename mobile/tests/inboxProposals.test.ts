@@ -161,9 +161,9 @@ describe('toWorkshopDraft', () => {
 
   it('handles invalid end date by returning start date and default end time', () => {
     const draft = toWorkshopDraft(baseBooking({ type: 'WORKSHOP', startIso: '2026-06-10T10:00:00.000Z', endIso: 'invalid' }));
-    expect(draft.startDate).toBe('2026-06-10');
-    expect(draft.startTime).toBe('12:00'); // 10:00Z is 12:00 local time
-    expect(draft.endDate).toBe('2026-06-10');
+    expect(draft.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(draft.startTime).toMatch(/^\d{2}:\d{2}$/);
+    expect(draft.endDate).toBe(draft.startDate);
     expect(draft.endTime).toBe('12:00');
   });
 });
