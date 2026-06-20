@@ -12,7 +12,18 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "strict": true
+    "strict": true,
+    "baseUrl": ".",
+    // The mobile workspace pulls in @types/react@19, which npm hoists to the
+    // repo-root node_modules. When the frontend is built as part of a root
+    // `npm ci` (e.g. the prod Docker image), tsc would otherwise resolve BOTH
+    // that hoisted v19 and the frontend's own @types/react@18 -> incompatible
+    // React/JSX types (TS2786 "cannot be used as a JSX component"). Pin React
+    // type resolution to the frontend's own v18 copy.
+    "paths": {
+      "react": ["./node_modules/@types/react"],
+      "react-dom": ["./node_modules/@types/react-dom"]
+    }
   },
   "include": ["src"]
 }
