@@ -1,6 +1,7 @@
 import { AppError } from "../../utils/app-error";
 import { suspensionRepository } from "../users/suspension.repository";
 import { notificationsRepository } from "./notifications.repository";
+import { pushService } from "./push.service";
 
 export const notificationsService = {
   listForUser(userId: string) {
@@ -10,7 +11,9 @@ export const notificationsService = {
   async createWarning(userId: string, reason: string, moderatorName = "Moderator") {
     const safeReason = reason.trim();
     const message = `ERMAHNUNG: ${safeReason}\nModerator: ${moderatorName}\nHinweis: Bei weiteren Verstößen kann dein Konto gesperrt werden.`;
-    return notificationsRepository.create(userId, message);
+    const notification = await notificationsRepository.create(userId, message);
+    await pushService.sendPushNotification(userId, "System-Ermahnung", "Du hast eine neue Ermahnung erhalten.");
+    return notification;
   },
 
   async notifyManagersSuspensionRequest(requestId: string, userName: string, reason: string) {
@@ -22,7 +25,9 @@ export const notificationsService = {
   async createSuspensionNotice(userId: string, reason: string) {
     const safeReason = reason.trim();
     const message = `SPERRUNG: Dein Konto wurde gesperrt.\nGrund: ${safeReason}`;
-    return notificationsRepository.create(userId, message);
+    const notification = await notificationsRepository.create(userId, message);
+    await pushService.sendPushNotification(userId, "Konto gesperrt", "Dein Konto wurde von der Administration gesperrt.");
+    return notification;
   },
 
   async markAsRead(userId: string, notificationId: string) {

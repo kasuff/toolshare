@@ -1,12 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   Platform,
   TextInput,
-  Pressable,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,35 +36,7 @@ type TimeFieldProps = BaseFieldProps & {
   baseDate?: string;
 };
 
-function PickerModal({
-  visible,
-  title,
-  onClose,
-  children,
-}: {
-  visible: boolean;
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  if (Platform.OS !== 'ios') return null;
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={styles.modalSheet} onPress={(event) => event.stopPropagation()}>
-          <View style={styles.modalHeader}>
-            <ThemedText type="defaultSemiBold">{title}</ThemedText>
-            <TouchableOpacity onPress={onClose} hitSlop={8}>
-              <ThemedText style={styles.modalDone}>Fertig</ThemedText>
-            </TouchableOpacity>
-          </View>
-          {children}
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
 
 export function DateField({
   label,
@@ -113,29 +83,34 @@ export function DateField({
       <ThemedText style={styles.label}>{label}</ThemedText>
       <TouchableOpacity
         style={[styles.inputButton, disabled && styles.inputDisabled]}
-        onPress={() => setShowPicker(true)}
+        onPress={() => {
+          if (Platform.OS === 'android') {
+            setShowPicker(true);
+          }
+        }}
         disabled={disabled}
-        activeOpacity={0.8}
+        activeOpacity={Platform.OS === 'ios' ? 1.0 : 0.8}
       >
         <ThemedText style={[styles.inputButtonText, !value && styles.placeholderText]}>
           {formatDateLabel(value, placeholder)}
         </ThemedText>
         <Ionicons name="calendar-outline" size={18} color={Colors.brand} />
-      </TouchableOpacity>
 
-      {Platform.OS === 'ios' ? (
-        <PickerModal visible={showPicker} title={label} onClose={() => setShowPicker(false)}>
+        {Platform.OS === 'ios' && !disabled && (
           <DateTimePicker
             value={pickerValue}
             mode="date"
-            display="spinner"
+            display="compact"
             onChange={handleChange}
             minimumDate={minimumDate}
             maximumDate={maximumDate}
             locale="de-DE"
+            style={styles.absolutePicker}
           />
-        </PickerModal>
-      ) : showPicker ? (
+        )}
+      </TouchableOpacity>
+
+      {Platform.OS === 'android' && showPicker && (
         <DateTimePicker
           value={pickerValue}
           mode="date"
@@ -144,7 +119,7 @@ export function DateField({
           minimumDate={minimumDate}
           maximumDate={maximumDate}
         />
-      ) : null}
+      )}
     </View>
   );
 }
@@ -193,28 +168,33 @@ export function TimeField({
       <ThemedText style={styles.label}>{label}</ThemedText>
       <TouchableOpacity
         style={[styles.inputButton, disabled && styles.inputDisabled]}
-        onPress={() => setShowPicker(true)}
+        onPress={() => {
+          if (Platform.OS === 'android') {
+            setShowPicker(true);
+          }
+        }}
         disabled={disabled}
-        activeOpacity={0.8}
+        activeOpacity={Platform.OS === 'ios' ? 1.0 : 0.8}
       >
         <ThemedText style={[styles.inputButtonText, !value && styles.placeholderText]}>
           {formatTimeLabel(value, placeholder)}
         </ThemedText>
         <Ionicons name="time-outline" size={18} color={Colors.brand} />
-      </TouchableOpacity>
 
-      {Platform.OS === 'ios' ? (
-        <PickerModal visible={showPicker} title={label} onClose={() => setShowPicker(false)}>
+        {Platform.OS === 'ios' && !disabled && (
           <DateTimePicker
             value={pickerValue}
             mode="time"
-            display="spinner"
+            display="compact"
             onChange={handleChange}
             is24Hour
             locale="de-DE"
+            style={styles.absolutePicker}
           />
-        </PickerModal>
-      ) : showPicker ? (
+        )}
+      </TouchableOpacity>
+
+      {Platform.OS === 'android' && showPicker && (
         <DateTimePicker
           value={pickerValue}
           mode="time"
@@ -222,7 +202,7 @@ export function TimeField({
           onChange={handleChange}
           is24Hour
         />
-      ) : null}
+      )}
     </View>
   );
 }
@@ -357,28 +337,14 @@ const styles = StyleSheet.create({
   column: {
     flex: 1,
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-  },
-  modalSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    paddingBottom: Spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  modalDone: {
-    color: Colors.brand,
-    fontWeight: '700',
+  absolutePicker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.015,
   },
 });

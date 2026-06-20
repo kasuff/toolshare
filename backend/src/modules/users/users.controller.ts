@@ -46,7 +46,8 @@ export const usersController = {
     const user = await usersService.updateMyProfile({
       userId: req.authUser!.userId,
       name: req.body.name,
-      address: req.body.address
+      address: req.body.address,
+      expoPushToken: req.body.expoPushToken
     });
     res.status(200).json(user);
   }),

@@ -15,6 +15,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.maik22.toolshare",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -32,6 +34,13 @@
     "scheme": "toolshare",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "965e4f3b-71b7-405b-abf0-e29702003186"
+      }
+    },
+    "owner": "maik22"
   }
 }

@@ -32,9 +32,10 @@ export const updateMyProfileSchema = z.object({
       name: z.string().min(2).optional(),
       address: z.string().min(5).refine(hasHouseNumber, {
         message: "Die Adresse muss eine Hausnummer enthalten."
-      }).optional()
+      }).optional(),
+      expoPushToken: z.string().optional()
     })
-    .refine((value) => value.name !== undefined || value.address !== undefined, {
+    .refine((value) => value.name !== undefined || value.address !== undefined || value.expoPushToken !== undefined, {
       message: "Mindestens ein Feld muss angegeben werden."
     }),
   params: z.object({}),

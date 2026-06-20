@@ -26,7 +26,7 @@ export function WorkshopCard({ workshop, onPress }: Props) {
           {workshop.description}
         </ThemedText>
         <View style={styles.footer}>
-          <ThemedText type="muted" style={styles.location}>{workshop.location}</ThemedText>
+          <ThemedText type="muted" style={styles.category}>Werkstatt</ThemedText>
           <ThemedText style={styles.details}>Details →</ThemedText>
         </View>
       </View>
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   imageContainer: {
-    height: 180,
+    height: 220,
     width: '100%',
     backgroundColor: Colors.bg,
   },
@@ -71,7 +71,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-  location: {
+  category: {
+    textTransform: 'uppercase',
     fontSize: 12,
   },
   details: {

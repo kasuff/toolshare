@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   imageContainer: {
-    height: 160,
+    height: 200,
     width: '100%',
     position: 'relative',
   },

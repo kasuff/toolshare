@@ -34,7 +34,7 @@ type CalendarDay = {
 };
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-const GALLERY_HEIGHT = 240;
+const GALLERY_HEIGHT = 320;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const WORKSHOP_EXTRAS = [

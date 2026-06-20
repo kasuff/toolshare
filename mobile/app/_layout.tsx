@@ -42,8 +42,11 @@ function getApiUrl() {
 
 setApiBaseUrl(getApiUrl());
 
+import { usePushNotifications } from '../hooks/usePushNotifications';
+
 function AppLayout() {
-  const { isLoaded } = useAuth();
+  const { isLoaded, token } = useAuth();
+  usePushNotifications(token);
 
   if (!isLoaded) {
     return <LoadingSpinner />;

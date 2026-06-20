@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Tool, api, getPlaceholderImageForCategory, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
@@ -12,6 +12,7 @@ import { getDefaultDateRange, parseLocalDateKey, toLocalDateKey } from '../../..
 import { RatingsSection } from '../../../components/RatingsSection';
 import type { PublicRating } from '@toolshare/shared';
 import { ReportForm } from '../../../components/ReportForm';
+import { ImageLightbox } from '../../../components/ImageLightbox';
 
 type BlockingPeriod = {
   startIso: string;
@@ -102,6 +103,7 @@ export default function ToolDetailScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Report states
   const [reportTarget, setReportTarget] = useState<'TOOL' | null>(null);
@@ -254,10 +256,13 @@ export default function ToolDetailScreen() {
   }
 
   return (
+    <>
     <ScrollView style={styles.container}>
       {/* Tool Image Header */}
       <View style={styles.imageContainer}>
-        <Image source={{ uri: toolImage }} style={styles.image} />
+        <Pressable onPress={() => setPreviewImage(toolImage)} style={{ flex: 1 }}>
+          <Image source={{ uri: toolImage }} style={styles.image} />
+        </Pressable>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
@@ -514,6 +519,13 @@ export default function ToolDetailScreen() {
         onCancel={() => setReportTarget(null)}
       />
     </ScrollView>
+
+    <ImageLightbox
+      uri={previewImage}
+      visible={previewImage !== null}
+      onClose={() => setPreviewImage(null)}
+    />
+    </>
   );
 }
 
@@ -529,7 +541,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   imageContainer: {
-    height: 240,
+    height: 320,
     backgroundColor: Colors.border,
     position: 'relative',
   },

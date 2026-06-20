@@ -637,7 +637,10 @@ export const api = {
     );
   },
 
-  async updateMyProfile(input: { name?: string; address?: string }, token: string): Promise<User> {
+  async updateMyProfile(
+    input: { name?: string; address?: string; expoPushToken?: string },
+    token: string
+  ): Promise<User> {
     const user = await request<BackendUser>(
       "/users/me",
       {

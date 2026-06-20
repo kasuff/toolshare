@@ -1,5 +1,6 @@
 import { AppError } from "../../utils/app-error";
 import { notificationsRepository } from "../notifications/notifications.repository";
+import { pushService } from "../notifications/push.service";
 import { ratingsRepository } from "./ratings.repository";
 
 function getProviderUserId(booking: NonNullable<Awaited<ReturnType<typeof ratingsRepository.findBookingWithParticipants>>>) {
@@ -76,6 +77,7 @@ export const ratingsService = {
 
     const starsLabel = input.score === 1 ? "1 Stern" : `${input.score} Sterne`;
     await notificationsRepository.create(providerUserId, `Du hast eine neue Bewertung erhalten (${starsLabel}).`);
+    await pushService.sendPushNotification(providerUserId, "Neue Bewertung", `Du hast eine neue Bewertung erhalten (${starsLabel}).`);
     return rating;
   },
 
