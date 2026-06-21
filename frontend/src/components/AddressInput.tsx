@@ -187,7 +187,7 @@ export function AddressInput({
                 value={value.houseNumber}
                 onChange={(event) => updateField("houseNumber", event.target.value)}
                 onBlur={onBlur}
-                placeholder="Hausnummer"
+                placeholder={compactManualLayout ? "Hausnr." : "Hausnummer"}
                 autoComplete="address-line2"
                 required={required}
                 aria-invalid={hasError}
