@@ -862,14 +862,16 @@ semgrep-sast:
   stage: test
   image: semgrep/semgrep:latest
   script:
-    # monitoring/ is an external, third-party observability stack (Grafana,
-    # Prometheus, Loki, Promtail configs) -- not our application code -- so it
-    # is excluded from static analysis.
-    - semgrep scan --config=auto --exclude monitoring --gitlab-sast -o gl-sast-report.json || true
+    # Full scan incl. monitoring/ (the dora-exporter is our own Python code).
+    # First two commands only produce the report artifacts and never fail the
+    # job; the final command gates the pipeline on ERROR-severity findings.
+    - semgrep scan --config=auto --gitlab-sast -o gl-sast-report.json || true
     - echo "=== Semgrep SAST Security Report ===" > sast-report.txt
     - echo "====================================" >> sast-report.txt
     - echo "" >> sast-report.txt
-    - semgrep scan --config=auto --exclude monitoring --text >> sast-report.txt || true
+    - semgrep scan --config=auto --text >> sast-report.txt || true
+    # Gate: fail the pipeline on high-confidence ERROR-severity findings.
+    - semgrep scan --config=auto --severity ERROR --error
   artifacts:
     paths:
       - gl-sast-report.json
@@ -883,11 +885,12 @@ security:container:trivy:
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
-  allow_failure: true
   script:
-    # monitoring/ is an external, third-party observability stack -- skip it.
-    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --skip-dirs monitoring --format table -o trivy-report.txt . || true
-    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --skip-dirs monitoring --exit-code 0 .
+    # Full scan incl. monitoring/ (the dora-exporter is our own image/code).
+    # First command writes the HIGH+CRITICAL report and never fails the job;
+    # the second gates the pipeline on CRITICAL findings only.
+    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table -o trivy-report.txt . || true
+    - trivy fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 1 .
   artifacts:
     when: always
     paths:

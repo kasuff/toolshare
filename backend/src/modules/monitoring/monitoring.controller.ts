@@ -18,7 +18,16 @@ const QUERIES = {
   registrationsTotal: "toolshare_user_registrations_total",
   bookingsTotal: "toolshare_bookings_created_total",
   loginsSuccess: "toolshare_user_logins_total{status=\"success\"}",
-  loginsFailed: "toolshare_user_logins_total{status=\"failed\"}"
+  loginsFailed: "toolshare_user_logins_total{status=\"failed\"}",
+  // ── DORA (vom dora-exporter gescraped) ───────────────────────────────────
+  doraDeployFreq: "dora_deployment_frequency_per_day",
+  doraLeadTime: "dora_lead_time_seconds",
+  doraChangeFailureRate: "dora_change_failure_rate",
+  doraTimeToRestore: "dora_time_to_restore_seconds",
+  doraDeploymentsWindow: "dora_deployments_window",
+  doraFailuresWindow: "dora_failures_window",
+  doraWindowDays: "dora_window_days",
+  doraLastCollect: "dora_last_collect_timestamp_seconds"
 } as const;
 
 async function queryPrometheus(query: string): Promise<number | null> {
@@ -169,6 +178,21 @@ export const monitoringController = {
     const format = String(req.query.format ?? "json");
     const range = String(req.query.range ?? "1h");
 
+    // PDF: charted Report über den Reporting-Service (dora-exporter) erzeugen.
+    if (format === "pdf") {
+      const url = new URL("/metrics-report.pdf", env.doraExporterUrl);
+      url.searchParams.set("range", range);
+      const upstream = await fetch(url.toString(), { signal: AbortSignal.timeout(60000) });
+      if (!upstream.ok) {
+        return res.status(502).json({ error: "Report-Service nicht erreichbar." });
+      }
+      const filename = `toolshare-metrics-${range}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.send(buffer);
+    }
+
     const rangeSec = range === "7d" ? 7 * 86400 : range === "24h" ? 86400 : 3600;
     const endSec = Math.floor(Date.now() / 1000);
     const startSec = endSec - rangeSec;
@@ -213,5 +237,61 @@ export const monitoringController = {
       columns: ["timestamp", "requestsPerSec", "errorRatePercent", "p95LatencySeconds"],
       rows
     });
+  }),
+
+  // GET /api/monitoring/dora
+  // Snapshot der vier DORA-Metriken (vom dora-exporter, via Prometheus).
+  // NaN-Gauges (noch keine Daten) werden von JSON.stringify zu null.
+  dora: asyncHandler(async (_req: Request, res: Response) => {
+    const [freq, lead, cfr, ttr, deployments, failures, windowDays, lastCollect] =
+      await Promise.allSettled([
+        queryPrometheus(QUERIES.doraDeployFreq),
+        queryPrometheus(QUERIES.doraLeadTime),
+        queryPrometheus(QUERIES.doraChangeFailureRate),
+        queryPrometheus(QUERIES.doraTimeToRestore),
+        queryPrometheus(QUERIES.doraDeploymentsWindow),
+        queryPrometheus(QUERIES.doraFailuresWindow),
+        queryPrometheus(QUERIES.doraWindowDays),
+        queryPrometheus(QUERIES.doraLastCollect)
+      ]);
+
+    const val = (r: PromiseSettledResult<number | null>) => {
+      const v = r.status === "fulfilled" ? r.value : null;
+      return v != null && Number.isFinite(v) ? v : null;
+    };
+
+    res.json({
+      collectedAt: new Date().toISOString(),
+      windowDays: val(windowDays),
+      lastCollectedAt: val(lastCollect) != null ? new Date(val(lastCollect)! * 1000).toISOString() : null,
+      deploymentFrequencyPerDay: val(freq),
+      leadTimeSeconds: val(lead),
+      changeFailureRate: val(cfr),
+      timeToRestoreSeconds: val(ttr),
+      deploymentsInWindow: val(deployments),
+      failuresInWindow: val(failures)
+    });
+  }),
+
+  // GET /api/monitoring/dora/report.pdf?days=90
+  // Proxyt den PDF-Report des dora-exporters (Port bleibt intern, MANAGER-Auth
+  // greift über den Router). Antwort wird als Datei-Download durchgereicht.
+  doraReport: asyncHandler(async (req: Request, res: Response) => {
+    const daysRaw = parseInt(String(req.query.days ?? "90"), 10);
+    const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 730) : 90;
+
+    const url = new URL("/report.pdf", env.doraExporterUrl);
+    url.searchParams.set("days", String(days));
+
+    const upstream = await fetch(url.toString(), { signal: AbortSignal.timeout(60000) });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: "DORA-Exporter nicht erreichbar oder Report fehlgeschlagen." });
+    }
+
+    const filename = `toolshare-dora-${new Date().toISOString().slice(0, 10)}-${days}d.pdf`;
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(buffer);
   })
 };

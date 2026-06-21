@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Surface } from "./ui";
 import {
+  type DoraMetrics,
   type ExportFormat,
   type ExportRange,
   type LogEntry,
@@ -12,7 +13,7 @@ import {
 } from "../services/monitoringApi";
 
 type Props = { token: string };
-type Tab = "overview" | "system" | "application" | "logs";
+type Tab = "overview" | "system" | "application" | "dora" | "logs";
 
 // ── SVG Sparkline ─────────────────────────────────────────────────────────────
 
@@ -256,6 +257,9 @@ function ExportBar({ token }: { token: string }) {
         <button type="button" className="btn secondary mini" disabled={busy !== null} onClick={() => void download("csv")}>
           {busy === "csv" ? "…" : "↓ CSV"}
         </button>
+        <button type="button" className="btn secondary mini" disabled={busy !== null} onClick={() => void download("pdf")}>
+          {busy === "pdf" ? "…" : "↓ PDF"}
+        </button>
       </div>
       {error && <span className="field-error">{error}</span>}
     </div>
@@ -287,6 +291,179 @@ function GrafanaFrame({ src, title, height = 280 }: { src: string; title: string
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
       />
+    </div>
+  );
+}
+
+// ── DORA Section ──────────────────────────────────────────────────────────────
+
+function fmtDuration(seconds: number | null): string {
+  if (seconds == null) return "–";
+  if (seconds < 60) return `${seconds.toFixed(0)} s`;
+  if (seconds < 3600) return `${(seconds / 60).toFixed(0)} min`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)} h`;
+  return `${(seconds / 86400).toFixed(1)} d`;
+}
+
+function DoraCard({
+  label,
+  value,
+  sub,
+  tone = "neutral"
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "neutral" | "success" | "warning" | "danger";
+}) {
+  return (
+    <div className={`kpi-card kpi-${tone}`}>
+      <div className="kpi-top">
+        <span className="kpi-label">{label}</span>
+      </div>
+      <div className="kpi-value">{value}</div>
+      {sub && <span className="kpi-unit" style={{ display: "block", marginTop: 4 }}>{sub}</span>}
+    </div>
+  );
+}
+
+function DoraSection({ token }: Props) {
+  const [data, setData] = useState<DoraMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [days, setDays] = useState(90);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await monitoringApi.getDora(token));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "DORA-Metriken nicht erreichbar");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const downloadPdf = async () => {
+    setPdfBusy(true);
+    setPdfError(null);
+    try {
+      await monitoringApi.downloadDoraReport(token, days);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : "PDF-Export fehlgeschlagen");
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
+  const cfrPct = data?.changeFailureRate != null ? data.changeFailureRate * 100 : null;
+
+  return (
+    <div className="stack">
+      <Surface
+        title="DORA-Metriken"
+        subtitle={
+          data?.windowDays != null
+            ? `Rollierendes Fenster: ${data.windowDays} Tage. Quelle: GitLab-Deployments + kritische Alerts.`
+            : "Deployment Frequency, Lead Time, Change Failure Rate und Time to Restore."
+        }
+      >
+        {error && (
+          <div className="monitoring-error-banner">
+            <strong>DORA nicht erreichbar</strong> – Läuft der dora-exporter?
+            <button type="button" className="btn secondary mini" style={{ marginLeft: 12 }} onClick={() => void load()}>
+              Erneut versuchen
+            </button>
+          </div>
+        )}
+
+        {loading && !data && (
+          <div className="monitoring-skeleton-grid">
+            {[...Array(4)].map((_, i) => <div key={i} className="monitoring-skeleton" />)}
+          </div>
+        )}
+
+        {data && (
+          <div className="kpi-grid">
+            <DoraCard
+              label="Deployment Frequency"
+              value={data.deploymentFrequencyPerDay != null ? data.deploymentFrequencyPerDay.toFixed(2) : "–"}
+              sub="Deploys / Tag"
+              tone="neutral"
+            />
+            <DoraCard
+              label="Lead Time for Changes"
+              value={fmtDuration(data.leadTimeSeconds)}
+              sub="Median: Commit → Deploy"
+              tone="neutral"
+            />
+            <DoraCard
+              label="Change Failure Rate"
+              value={cfrPct != null ? `${cfrPct.toFixed(1)} %` : "–"}
+              sub={data.failuresInWindow != null ? `${data.failuresInWindow} Ausfälle im Fenster` : undefined}
+              tone={cfrPct == null ? "neutral" : cfrPct > 30 ? "danger" : cfrPct > 15 ? "warning" : "success"}
+            />
+            <DoraCard
+              label="Time to Restore Service"
+              value={fmtDuration(data.timeToRestoreSeconds)}
+              sub="Median der Ausfalldauer"
+              tone={
+                data.timeToRestoreSeconds == null
+                  ? "neutral"
+                  : data.timeToRestoreSeconds > 86400
+                  ? "danger"
+                  : data.timeToRestoreSeconds > 3600
+                  ? "warning"
+                  : "success"
+              }
+            />
+          </div>
+        )}
+
+        {data?.lastCollectedAt && (
+          <p className="hint" style={{ marginTop: 8 }}>
+            Zuletzt gesammelt: {new Date(data.lastCollectedAt).toLocaleString("de-DE")}
+          </p>
+        )}
+      </Surface>
+
+      {/* Trends over time – eingebettetes Grafana-Dashboard */}
+      <Surface title="Verlauf" subtitle="Alle vier Metriken über die Zeit.">
+        <GrafanaFrame src={grafanaDashboardUrl("toolshare-dora")} title="DORA Dashboard" height={520} />
+        <p className="hint">
+          <a href={grafanaDashboardUrl("toolshare-dora")} target="_blank" rel="noreferrer">Vollständiges Dashboard in Grafana ↗</a>
+        </p>
+      </Surface>
+
+      {/* PDF-Report */}
+      <Surface title="PDF-Report" subtitle="DORA-Bericht mit Kennzahlen-Übersicht und Wochentrends als PDF.">
+        <div className="export-bar">
+          <div className="export-bar-ranges">
+            <span className="export-bar-label">Zeitraum:</span>
+            {[30, 90, 180, 365].map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`btn secondary mini ${days === d ? "active" : ""}`}
+                onClick={() => setDays(d)}
+              >
+                {d < 365 ? `${d} Tage` : "1 Jahr"}
+              </button>
+            ))}
+          </div>
+          <div className="export-bar-actions">
+            <button type="button" className="btn mini" disabled={pdfBusy} onClick={() => void downloadPdf()}>
+              {pdfBusy ? "Erstelle PDF…" : "↓ PDF herunterladen"}
+            </button>
+          </div>
+          {pdfError && <span className="field-error">{pdfError}</span>}
+        </div>
+      </Surface>
     </div>
   );
 }
@@ -386,14 +563,22 @@ export function MonitoringSection({ token }: Props) {
       {/* ── Tab-Navigation ───────────────────────────────────────────────── */}
       <div className="monitoring-tabs-bar">
         <nav className="monitoring-tabs">
-          {(["overview", "system", "application", "logs"] as Tab[]).map((t) => (
+          {(["overview", "system", "application", "dora", "logs"] as Tab[]).map((t) => (
             <button
               key={t}
               type="button"
               className={`monitoring-tab${tab === t ? " active" : ""}`}
               onClick={() => setTab(t)}
             >
-              {t === "overview" ? "Übersicht" : t === "system" ? "System" : t === "application" ? "Application" : "Logs"}
+              {t === "overview"
+                ? "Übersicht"
+                : t === "system"
+                ? "System"
+                : t === "application"
+                ? "Application"
+                : t === "dora"
+                ? "DORA"
+                : "Logs"}
             </button>
           ))}
         </nav>
@@ -544,6 +729,9 @@ export function MonitoringSection({ token }: Props) {
           </p>
         </Surface>
       )}
+
+      {/* ── DORA ─────────────────────────────────────────────────────────── */}
+      {tab === "dora" && <DoraSection token={token} />}
 
       {/* ── Logs ─────────────────────────────────────────────────────────── */}
       {tab === "logs" && (
