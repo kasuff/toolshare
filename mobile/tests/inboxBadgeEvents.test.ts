@@ -25,6 +25,16 @@ describe('inbox badge events', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('passes an optional precomputed count to listeners', () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeInboxBadgeRefresh(listener);
+
+    notifyInboxBadgeRefresh(3);
+    expect(listener).toHaveBeenCalledWith(3);
+
+    unsubscribe();
+  });
+
   it('fans out to multiple listeners', () => {
     const a = vi.fn();
     const b = vi.fn();

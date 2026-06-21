@@ -46,8 +46,8 @@ import { createThemedStyleSheet } from '../constants/theme';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function AppLayout() {
-  const { isLoaded, token } = useAuth();
-  usePushNotifications(token);
+  const { isLoaded, token, currentUser } = useAuth();
+  usePushNotifications(token, currentUser?.id);
   const styles = useStyles();
 
   if (!isLoaded) {

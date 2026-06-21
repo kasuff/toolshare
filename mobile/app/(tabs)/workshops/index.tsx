@@ -5,12 +5,14 @@ const SliderComponent = Slider as unknown as React.ComponentType<ComponentProps<
 import { useRouter } from 'expo-router';
 import { Workshop, WorkshopBookedRange, WorkshopSlot, api, pluralize, isDateRangeAvailable } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { WorkshopCard } from '../../../components/WorkshopCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { DateField } from '../../../components/DateTimeFields';
+import { getErrorMessage } from '../../../utils/errors';
 
 interface WorkshopOffer {
   workshop: Workshop;
@@ -24,7 +26,9 @@ export default function WorkshopsScreen() {
   const [workshops, setWorkshops] = useState<WorkshopOffer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 450);
   
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [borrowFrom, setBorrowFrom] = useState('');
@@ -34,22 +38,25 @@ export default function WorkshopsScreen() {
   const { token } = useAuth();
   const router = useRouter();
 
-  const loadWorkshops = useCallback(async (query = search) => {
+  const loadWorkshops = useCallback(async (query: string) => {
     if (!token) return;
     try {
+      setError(null);
       const data = await api.getWorkshops({ q: query || undefined }, token);
       setWorkshops(data);
     } catch (e) {
       console.error(e);
+      setError(getErrorMessage(e, 'Werkstätten konnten nicht geladen werden.'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [token, search]);
+  }, [token]);
 
   useEffect(() => {
-    loadWorkshops(search);
-  }, [loadWorkshops, search]);
+    setIsLoading(true);
+    loadWorkshops(debouncedSearch);
+  }, [loadWorkshops, debouncedSearch]);
 
   const handleSearchSubmit = () => {
     setIsLoading(true);
@@ -64,7 +71,7 @@ export default function WorkshopsScreen() {
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    loadWorkshops(search);
+    loadWorkshops(debouncedSearch);
   };
 
   const maxCapacity = parseInt(capacityStr, 10) || 10;
@@ -142,6 +149,18 @@ export default function WorkshopsScreen() {
           </View>
         )}
       </View>
+
+      {error ? (
+        <View style={styles.errorBanner}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <Pressable onPress={() => {
+            setIsLoading(true);
+            loadWorkshops(debouncedSearch);
+          }}>
+            <ThemedText style={styles.retryText}>Erneut versuchen</ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
 
       {isLoading ? (
         <LoadingSpinner />
@@ -263,5 +282,24 @@ const useStyles = createThemedStyleSheet((colors) => ({
   list: {
     padding: Spacing.md,
     paddingTop: 0,
+  },
+  errorBanner: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    gap: Spacing.xs,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 14,
+  },
+  retryText: {
+    color: colors.brand,
+    fontWeight: '600',
+    fontSize: 14,
   },
 }));

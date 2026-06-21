@@ -325,6 +325,10 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
       throw new Error(SESSION_EXPIRED_MESSAGE);
     }
 
+    if (response.status === 429) {
+      throw new Error("Zu viele Anfragen. Bitte kurz warten und erneut versuchen.");
+    }
+
     if (!response.ok) {
       let message = `Anfrage fehlgeschlagen (Fehler ${response.status}).`;
       try {

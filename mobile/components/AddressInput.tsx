@@ -134,7 +134,7 @@ export function AddressInput({
       } finally {
         setLoading(false);
       }
-    }, 300);
+    }, 400);
 
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
