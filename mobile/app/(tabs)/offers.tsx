@@ -9,6 +9,7 @@ import { ToolCard } from '../../components/ToolCard';
 import { WorkshopCard } from '../../components/WorkshopCard';
 import { useAuth } from '../../hooks/useAuth';
 import { api, Tool, Workshop } from '@toolshare/shared';
+import { getErrorMessage } from '../../utils/errors';
 
 export default function OffersScreen() {
   const { currentUser, token } = useAuth();
@@ -37,7 +38,7 @@ export default function OffersScreen() {
       setWorkshops(ownedWorkshops.filter(w => w.workshop.ownerId === currentUser.id).map(w => w.workshop));
     } catch (e) {
       console.error('Failed to load offers:', e);
-      setError('Angebote konnten nicht geladen werden.');
+      setError(getErrorMessage(e, 'Angebote konnten nicht geladen werden.'));
     } finally {
       setLoading(false);
       setRefreshing(false);

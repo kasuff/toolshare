@@ -7,7 +7,7 @@ import { api, Booking } from '@toolshare/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { EmptyState, LoadingSpinner } from '../../components/EmptyState';
 import { Ionicons } from '@expo/vector-icons';
-import { isInboxSystemNotification, isInboxThreadUnread } from '../../utils/inboxUnread';
+import { isInboxSystemNotification, isInboxThreadUnread, countUnreadInboxItems } from '../../utils/inboxUnread';
 import { notifyInboxBadgeRefresh } from '../../utils/inboxBadgeEvents';
 import { useInboxReadMessages } from '../../hooks/useInboxReadMessages';
 import { DateField, TimeField } from '../../components/DateTimeFields';
@@ -118,6 +118,7 @@ export default function InboxScreen() {
   const styles = useStyles();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showCounterForm, setShowCounterForm] = useState(false);
   const [pickupDraft, setPickupDraft] = useState<DraftToolRangeParts | null>(null);
@@ -133,8 +134,9 @@ export default function InboxScreen() {
   const [showMenu, setShowMenu] = useState(false);
 
   const loadBookings = useCallback(async () => {
-    if (!token) return;
+    if (!token || !currentUser?.id) return;
     try {
+      setLoadError(null);
       const bookingsData = await api.getBookingsForUser(token);
       const notificationsData = await api.getNotifications(token);
       
@@ -151,12 +153,12 @@ export default function InboxScreen() {
           return {
             id: n.id,
             type: "SYSTEM_WARNING" as const,
-            requesterId: currentUser?.id ?? "",
+            requesterId: currentUser.id,
             providerId: "system",
             status: "BESTAETIGT" as const,
             createdIso: n.createdIso,
             providerName: parsed.moderator,
-            requesterName: currentUser?.name ?? "Du",
+            requesterName: currentUser.name ?? "Du",
             toolName: isWarning ? "Ermahnung der Moderation" : isSuspension ? "Kontosperrung" : "System-Benachrichtigung",
             pickupProposals: [],
             timeslotProposals: [],
@@ -171,9 +173,11 @@ export default function InboxScreen() {
       
       setBookings(combined);
       setSelectedBooking((prev) => (prev ? combined.find((b) => b.id === prev.id) ?? prev : null));
-      notifyInboxBadgeRefresh();
+      const unreadCount = await countUnreadInboxItems(bookingsData, notificationsData, currentUser.id);
+      notifyInboxBadgeRefresh(unreadCount);
     } catch (e) {
       console.error(e);
+      setLoadError(getErrorMessage(e, 'Nachrichten konnten nicht geladen werden.'));
     } finally {
       setIsLoading(false);
     }
@@ -388,6 +392,20 @@ export default function InboxScreen() {
   };
 
   if (isLoading) return <LoadingSpinner />;
+
+  if (loadError) {
+    return (
+      <View style={styles.center}>
+        <EmptyState title="Laden fehlgeschlagen" text={loadError} />
+        <TouchableOpacity style={styles.retryButton} onPress={() => {
+          setIsLoading(true);
+          void loadBookings();
+        }}>
+          <ThemedText style={styles.retryButtonText}>Erneut versuchen</ThemedText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!currentUser || !token) {
     return (
@@ -987,6 +1005,17 @@ const useStyles = createThemedStyleSheet((colors) => ({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
+  },
+  retryButton: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: colors.brand,
+  },
+  retryButtonText: {
+    color: colors.surface,
+    fontWeight: '600',
   },
   threadItem: {
     flexDirection: 'row',

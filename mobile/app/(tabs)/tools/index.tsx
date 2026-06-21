@@ -3,12 +3,14 @@ import { View, FlatList, RefreshControl, TextInput, ScrollView, Pressable } from
 import { useRouter } from 'expo-router';
 import { Tool, api, TOOL_CATEGORIES, pluralize } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { ToolCard } from '../../../components/ToolCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { DateField } from '../../../components/DateTimeFields';
+import { getErrorMessage } from '../../../utils/errors';
 
 export default function ToolsScreen() {
   const Colors = useThemeColors();
@@ -16,7 +18,9 @@ export default function ToolsScreen() {
   const [tools, setTools] = useState<Tool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 450);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
@@ -26,9 +30,10 @@ export default function ToolsScreen() {
   const { token } = useAuth();
   const router = useRouter();
 
-  const loadTools = useCallback(async (query = search, cat = selectedCategory) => {
+  const loadTools = useCallback(async (query: string, cat: string | null) => {
     if (!token) return;
     try {
+      setError(null);
       const data = await api.getTools({
         q: query || undefined,
         category: cat || undefined
@@ -36,15 +41,17 @@ export default function ToolsScreen() {
       setTools(data);
     } catch (e) {
       console.error(e);
+      setError(getErrorMessage(e, 'Werkzeuge konnten nicht geladen werden.'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [token, search, selectedCategory]);
+  }, [token]);
 
   useEffect(() => {
-    loadTools(search, selectedCategory);
-  }, [loadTools, search, selectedCategory]);
+    setIsLoading(true);
+    loadTools(debouncedSearch, selectedCategory);
+  }, [loadTools, debouncedSearch, selectedCategory]);
 
   const handleSearchSubmit = () => {
     setIsLoading(true);
@@ -59,7 +66,7 @@ export default function ToolsScreen() {
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    loadTools(search, selectedCategory);
+    loadTools(debouncedSearch, selectedCategory);
   };
 
   const filteredTools = useMemo(() => {
@@ -138,6 +145,18 @@ export default function ToolsScreen() {
           })}
         </ScrollView>
       </View>
+
+      {error ? (
+        <View style={styles.errorBanner}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <Pressable onPress={() => {
+            setIsLoading(true);
+            loadTools(debouncedSearch, selectedCategory);
+          }}>
+            <ThemedText style={styles.retryText}>Erneut versuchen</ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
 
       {isLoading ? (
         <LoadingSpinner />
@@ -284,5 +303,24 @@ const useStyles = createThemedStyleSheet((colors) => ({
   list: {
     padding: Spacing.md,
     paddingTop: 0,
+  },
+  errorBanner: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    gap: Spacing.xs,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 14,
+  },
+  retryText: {
+    color: colors.brand,
+    fontWeight: '600',
+    fontSize: 14,
   },
 }));

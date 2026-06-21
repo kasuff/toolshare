@@ -1,9 +1,10 @@
-type Listener = () => void;
+type Listener = (count?: number) => void;
 
 const listeners = new Set<Listener>();
 
-export function notifyInboxBadgeRefresh(): void {
-  listeners.forEach((listener) => listener());
+/** Pass a precomputed count to update the tab badge without another API round-trip. */
+export function notifyInboxBadgeRefresh(count?: number): void {
+  listeners.forEach((listener) => listener(count));
 }
 
 export function subscribeInboxBadgeRefresh(listener: Listener): () => void {

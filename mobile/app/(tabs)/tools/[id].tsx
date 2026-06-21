@@ -118,20 +118,18 @@ export default function ToolDetailScreen() {
   const loadData = useCallback(async () => {
     if (!token || !id) return;
     try {
-      const [toolsData, periodsData, toolRatings] = await Promise.all([
-        api.getTools({}, token),
+      setError('');
+      const [toolData, periodsData, toolRatings] = await Promise.all([
+        api.getToolById(id, token),
         api.getToolBlockingPeriods(id),
         api.getRatingsForTool(id).catch(() => [])
       ]);
-      const found = toolsData.find(t => t.id === id);
-      if (found) {
-        setTool(found);
-        setBlockingPeriods(periodsData);
-        setRatings(toolRatings);
-      }
+      setTool(toolData);
+      setBlockingPeriods(periodsData);
+      setRatings(toolRatings);
     } catch (e) {
       console.error(e);
-      setError('Fehler beim Laden der Werkzeugdaten');
+      setError(getErrorMessage(e, 'Fehler beim Laden der Werkzeugdaten'));
     } finally {
       setIsLoading(false);
     }
