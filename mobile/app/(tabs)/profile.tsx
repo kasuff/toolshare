@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from 'react-native';
-import { Colors, Radius, Spacing } from '../../constants/theme';
+import { View, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from 'react-native';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
 import { useAuth } from '../../hooks/useAuth';
 import { api, SystemSetting } from '@toolshare/shared';
@@ -12,6 +12,7 @@ import {
   parseAddress,
   toAddressPayload,
 } from '../../components/AddressInput';
+import { getErrorMessage } from '../../utils/errors';
 
 const ADDRESS_VALIDATION_ERROR =
   'Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.';
@@ -30,6 +31,8 @@ export default function ProfileScreen() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [systemRules, setSystemRules] = useState<SystemSetting[]>([]);
   const [success, setSuccess] = useState('');
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   useEffect(() => {
     if (token) {
@@ -64,8 +67,8 @@ export default function ProfileScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setError(err.message || 'Passwort konnte nicht geändert werden.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Passwort konnte nicht geändert werden.'));
     } finally {
       setIsChangingPassword(false);
     }
@@ -122,8 +125,8 @@ export default function ProfileScreen() {
         setIsEditing(false);
         setSuccess('');
       }, 1000);
-    } catch (err: any) {
-      setError(err.message || 'Speichern fehlgeschlagen.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Speichern fehlgeschlagen.'));
     } finally {
       setIsSaving(false);
     }
@@ -165,7 +168,7 @@ export default function ProfileScreen() {
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={20} color={Colors.brand} style={styles.infoIcon} />
+              <Ionicons name="location-outline" size={20} color={colors.brand} style={styles.infoIcon} />
               <View style={styles.infoContent}>
                 <ThemedText type="muted" style={styles.infoLabel}>Adresse</ThemedText>
                 <ThemedText style={styles.infoValue}>{currentUser?.address || 'Keine Adresse angegeben'}</ThemedText>
@@ -185,14 +188,13 @@ export default function ProfileScreen() {
             </View>
           )}
 
-
           <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
-            <Ionicons name="create-outline" size={20} color={Colors.surface} style={styles.btnIcon} />
+            <Ionicons name="create-outline" size={20} color={colors.surface} style={styles.btnIcon} />
             <ThemedText style={styles.editButtonText}>Profil bearbeiten</ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-            <Ionicons name="log-out-outline" size={20} color={Colors.danger} style={styles.btnIcon} />
+            <Ionicons name="log-out-outline" size={20} color={colors.danger} style={styles.btnIcon} />
             <ThemedText style={styles.logoutText}>Abmelden</ThemedText>
           </TouchableOpacity>
         </View>
@@ -211,6 +213,7 @@ export default function ProfileScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Name"
+                placeholderTextColor={colors.textMuted}
                 value={name}
                 onChangeText={setName}
               />
@@ -230,7 +233,7 @@ export default function ProfileScreen() {
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
                 placeholder="Aktuelles Passwort"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
               />
             </View>
             <View style={styles.field}>
@@ -241,7 +244,7 @@ export default function ProfileScreen() {
                 value={newPassword}
                 onChangeText={setNewPassword}
                 placeholder="Mindestens 8 Zeichen"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
               />
             </View>
             <View style={styles.field}>
@@ -252,7 +255,7 @@ export default function ProfileScreen() {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 placeholder="Neues Passwort erneut eingeben"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
               />
             </View>
             <TouchableOpacity 
@@ -289,10 +292,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     padding: Spacing.md,
   },
   header: {
@@ -305,11 +308,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.lg,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: Spacing.xl,
     position: 'relative',
     zIndex: 10,
@@ -323,13 +326,13 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
   },
   largeAvatarText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 22,
   },
@@ -338,11 +341,11 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 20,
-    color: Colors.text,
+    color: colors.text,
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
     marginVertical: Spacing.md,
   },
   infoRow: {
@@ -360,12 +363,12 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
     marginTop: 2,
   },
   editButton: {
     flexDirection: 'row',
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     padding: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
@@ -373,22 +376,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   editButtonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
   logoutButton: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.danger,
+    borderColor: colors.danger,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoutText: {
-    color: Colors.danger,
+    color: colors.danger,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -397,7 +400,7 @@ const styles = StyleSheet.create({
   },
   editCardTitle: {
     fontSize: 18,
-    color: Colors.text,
+    color: colors.text,
     marginBottom: Spacing.md,
   },
   field: {
@@ -406,25 +409,25 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: Colors.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
     fontWeight: 'bold',
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     fontSize: 16,
-    color: Colors.text,
-    backgroundColor: Colors.bg,
+    color: colors.text,
+    backgroundColor: colors.bg,
   },
   editBtnRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   saveButton: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     flex: 0.48,
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
@@ -433,14 +436,14 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   saveButtonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
   cancelButton: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     flex: 0.48,
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
@@ -449,12 +452,12 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   cancelButtonText: {
-    color: Colors.text,
+    color: colors.text,
     fontWeight: 'bold',
     fontSize: 16,
   },
   errorText: {
-    color: Colors.danger,
+    color: colors.danger,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: Spacing.md,
@@ -464,7 +467,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceSoft,
+    borderBottomColor: colors.border,
   },
   linkRow: {
     flexDirection: 'row',
@@ -474,12 +477,12 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   successText: {
-    color: Colors.success,
+    color: colors.success,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: Spacing.md,
   }
-});
+}));

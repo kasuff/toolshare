@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicator, Pressable } from 'react-native';
+import { View, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { Colors, Spacing, Radius } from '../../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
 import { api, Booking } from '@toolshare/shared';
 import { useAuth } from '../../hooks/useAuth';
@@ -22,6 +22,7 @@ import {
 } from '../../utils/inboxProposals';
 import { parseLocalDateKey } from '../../utils/dateTime';
 import { ReportForm } from '../../components/ReportForm';
+import { getErrorMessage } from '../../utils/errors';
 
 interface ParsedWarning {
   reason: string;
@@ -112,6 +113,9 @@ function getBubbleMetaLabel(booking: Booking, currentUserId: string) {
 
 export default function InboxScreen() {
   const { token, currentUser } = useAuth();
+  const colors = useThemeColors();
+  const Colors = colors;
+  const styles = useStyles();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -128,7 +132,7 @@ export default function InboxScreen() {
   const [isReporting, setIsReporting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  const loadBookings = async () => {
+  const loadBookings = useCallback(async () => {
     if (!token) return;
     try {
       const bookingsData = await api.getBookingsForUser(token);
@@ -173,12 +177,12 @@ export default function InboxScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser?.id, currentUser?.name, token]);
 
   useFocusEffect(
     useCallback(() => {
       loadBookings();
-    }, [token])
+    }, [loadBookings])
   );
 
   useEffect(() => {
@@ -195,6 +199,7 @@ export default function InboxScreen() {
     selectedBooking?.pickupTimeIso,
     selectedBooking?.startIso,
     selectedBooking?.endIso,
+    selectedBooking,
   ]);
 
   useFocusEffect(
@@ -375,8 +380,8 @@ export default function InboxScreen() {
       setReportTargetUserId(null);
       setReportReason('');
       setReportDetails('');
-    } catch (err: any) {
-      Alert.alert('Fehler', err.message || 'Meldung fehlgeschlagen.');
+    } catch (err) {
+      Alert.alert('Fehler', getErrorMessage(err, 'Meldung fehlgeschlagen.'));
     } finally {
       setIsReporting(false);
     }
@@ -567,20 +572,20 @@ export default function InboxScreen() {
                 style={[
                   styles.chatMessageRow,
                   selectedBooking.requesterId === currentUser.id
-                    ? styles.chatMessageRowIncoming
-                    : styles.chatMessageRowOutgoing,
+                    ? styles.chatMessageRowOutgoing
+                    : styles.chatMessageRowIncoming,
                 ]}
               >
-                {selectedBooking.requesterId === currentUser.id && (
+                {selectedBooking.requesterId !== currentUser.id && (
                   <View style={[styles.msgAvatar, styles.msgAvatarIncoming]}>
-                    <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
+                    <ThemedText style={styles.msgAvatarText}>{getInitials(counterpartName || 'Kontakt') || 'K'}</ThemedText>
                   </View>
                 )}
                 <View
                   style={
                     selectedBooking.requesterId === currentUser.id
-                      ? styles.messageMetaWrapIncoming
-                      : styles.messageMetaWrapOutgoing
+                      ? styles.messageMetaWrapOutgoing
+                      : styles.messageMetaWrapIncoming
                   }
                 >
                   <ThemedText type="muted" style={styles.messageMeta}>
@@ -589,7 +594,7 @@ export default function InboxScreen() {
                   <View
                     style={[
                       styles.messageBubble,
-                      selectedBooking.requesterId === currentUser.id ? styles.incomingBubble : styles.outgoingBubble,
+                      selectedBooking.requesterId === currentUser.id ? styles.outgoingBubble : styles.incomingBubble,
                     ]}
                   >
                     <View style={styles.messageIconRow}>
@@ -606,9 +611,9 @@ export default function InboxScreen() {
                     </View>
                   </View>
                 </View>
-                {selectedBooking.requesterId !== currentUser.id && (
+                {selectedBooking.requesterId === currentUser.id && (
                   <View style={[styles.msgAvatar, styles.msgAvatarOutgoing]}>
-                    <ThemedText style={styles.msgAvatarText}>{getInitials(counterpartName || 'Kontakt') || 'K'}</ThemedText>
+                    <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
                   </View>
                 )}
               </View>
@@ -623,19 +628,19 @@ export default function InboxScreen() {
                     key={proposal.id}
                     style={[
                       styles.chatMessageRow,
-                      fromOtherUser ? styles.chatMessageRowOutgoing : styles.chatMessageRowIncoming,
+                      fromOtherUser ? styles.chatMessageRowIncoming : styles.chatMessageRowOutgoing,
                     ]}
                   >
-                    {!fromOtherUser && (
+                    {fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarIncoming]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(senderName) || 'K'}</ThemedText>
                       </View>
                     )}
-                    <View style={fromOtherUser ? styles.messageMetaWrapOutgoing : styles.messageMetaWrapIncoming}>
+                    <View style={fromOtherUser ? styles.messageMetaWrapIncoming : styles.messageMetaWrapOutgoing}>
                       <ThemedText type="muted" style={styles.messageMeta}>
                         {fromOtherUser ? senderName : 'Du'} · {formatDateTime(proposal.createdIso)}
                       </ThemedText>
-                      <View style={[styles.messageBubble, fromOtherUser ? styles.outgoingBubble : styles.incomingBubble]}>
+                      <View style={[styles.messageBubble, fromOtherUser ? styles.incomingBubble : styles.outgoingBubble]}>
                         <View style={styles.messageIconRow}>
                           <Ionicons name="swap-horizontal-outline" size={20} color={Colors.brand} />
                           <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
@@ -652,7 +657,7 @@ export default function InboxScreen() {
                         </View>
                       </View>
                     </View>
-                    {fromOtherUser && (
+                    {!fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarOutgoing]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
                       </View>
@@ -671,19 +676,19 @@ export default function InboxScreen() {
                     key={proposal.id}
                     style={[
                       styles.chatMessageRow,
-                      fromOtherUser ? styles.chatMessageRowOutgoing : styles.chatMessageRowIncoming,
+                      fromOtherUser ? styles.chatMessageRowIncoming : styles.chatMessageRowOutgoing,
                     ]}
                   >
-                    {!fromOtherUser && (
+                    {fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarIncoming]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(senderName) || 'K'}</ThemedText>
                       </View>
                     )}
-                    <View style={fromOtherUser ? styles.messageMetaWrapOutgoing : styles.messageMetaWrapIncoming}>
+                    <View style={fromOtherUser ? styles.messageMetaWrapIncoming : styles.messageMetaWrapOutgoing}>
                       <ThemedText type="muted" style={styles.messageMeta}>
                         {fromOtherUser ? senderName : 'Du'} · {formatDateTime(proposal.createdIso)}
                       </ThemedText>
-                      <View style={[styles.messageBubble, fromOtherUser ? styles.outgoingBubble : styles.incomingBubble]}>
+                      <View style={[styles.messageBubble, fromOtherUser ? styles.incomingBubble : styles.outgoingBubble]}>
                         <View style={styles.messageIconRow}>
                           <Ionicons name="swap-horizontal-outline" size={20} color={Colors.brand} />
                           <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
@@ -700,7 +705,7 @@ export default function InboxScreen() {
                         </View>
                       </View>
                     </View>
-                    {fromOtherUser && (
+                    {!fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarOutgoing]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
                       </View>
@@ -711,8 +716,12 @@ export default function InboxScreen() {
 
               {selectedBooking.status !== 'OFFEN' && (
                 <View style={styles.systemEventWrap}>
-                  <View style={[styles.messageBubble, styles.statusBubble]}>
-                    <View style={styles.messageIconRow}>
+                  <View style={[
+                    styles.messageBubble,
+                    styles.statusBubble,
+                    selectedBooking.status === 'ABGELEHNT' && { borderColor: Colors.danger }
+                  ]}>
+                    <View style={[styles.messageIconRow, { justifyContent: 'center', marginBottom: 0 }]}>
                       <Ionicons
                         name={
                           selectedBooking.status === 'BESTAETIGT'
@@ -724,7 +733,10 @@ export default function InboxScreen() {
                         size={20}
                         color={selectedBooking.status === 'ABGELEHNT' ? Colors.danger : Colors.success}
                       />
-                      <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
+                      <ThemedText type="defaultSemiBold" style={{
+                        marginLeft: Spacing.xs,
+                        color: selectedBooking.status === 'ABGELEHNT' ? Colors.danger : Colors.success
+                      }}>
                         {selectedBooking.status === 'BESTAETIGT'
                           ? 'Anfrage angenommen'
                           : selectedBooking.status === 'ABGELEHNT'
@@ -965,10 +977,10 @@ export default function InboxScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   center: {
     flex: 1,
@@ -980,24 +992,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: 'center',
   },
   threadUnread: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
   },
   avatar: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
   },
   avatarText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -1013,16 +1025,16 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     marginLeft: Spacing.sm,
   },
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   backButton: {
     padding: Spacing.xs,
@@ -1045,24 +1057,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messageBubble: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: Spacing.md,
   },
   incomingBubble: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   outgoingBubble: {
-    backgroundColor: Colors.brandSoft,
-    borderColor: Colors.brand,
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
   },
   statusBubble: {
-    borderColor: Colors.success,
-    backgroundColor: Colors.surface,
+    borderColor: colors.success,
+    backgroundColor: colors.surface,
   },
   chatMessageRow: {
     flexDirection: 'row',
@@ -1084,17 +1096,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   msgAvatarIncoming: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginRight: Spacing.xs,
   },
   msgAvatarOutgoing: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     marginLeft: Spacing.xs,
   },
   msgAvatarText: {
-    color: Colors.text,
+    color: colors.text,
     fontWeight: '700',
     fontSize: 11,
   },
@@ -1144,8 +1156,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   counterFormBubble: {
-    backgroundColor: Colors.brandSoft,
-    borderColor: Colors.brand,
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
   },
   formRow: {
     flexDirection: 'row',
@@ -1163,14 +1175,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   counterFormCancelText: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '600',
   },
   counterFormSendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
@@ -1185,9 +1197,9 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   footerIconBtn: {
     width: 48,
@@ -1206,22 +1218,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerBtnPrimary: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
   },
   footerBtnSecondary: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
     borderWidth: 1,
-    borderColor: Colors.brand,
+    borderColor: colors.brand,
   },
   footerBtnSecondaryText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: '700',
     fontSize: 12,
   },
   footerBtnGhost: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   warningContainer: {
     paddingVertical: Spacing.xs,
@@ -1233,7 +1245,7 @@ const styles = StyleSheet.create({
   },
   warningQuote: {
     borderLeftWidth: 4,
-    borderLeftColor: Colors.warning,
+    borderLeftColor: colors.warning,
     backgroundColor: 'rgba(146, 64, 14, 0.06)',
     padding: Spacing.sm,
     borderRadius: Radius.sm,
@@ -1241,7 +1253,7 @@ const styles = StyleSheet.create({
   },
   suspensionQuote: {
     borderLeftWidth: 4,
-    borderLeftColor: Colors.danger,
+    borderLeftColor: colors.danger,
     backgroundColor: 'rgba(239, 68, 68, 0.06)',
     padding: Spacing.sm,
     borderRadius: Radius.sm,
@@ -1249,7 +1261,7 @@ const styles = StyleSheet.create({
   },
   quoteText: {
     fontStyle: 'italic',
-    color: Colors.text,
+    color: colors.text,
     lineHeight: 20,
   },
   hintContainer: {
@@ -1270,4 +1282,4 @@ const styles = StyleSheet.create({
   systemMessageContainer: {
     paddingVertical: Spacing.xs,
   }
-});
+}));

@@ -23,7 +23,7 @@ export const usersService = {
     return user;
   },
 
-  async updateMyProfile(input: { userId: string; name?: string; address?: string }) {
+  async updateMyProfile(input: { userId: string; name?: string; address?: string; expoPushToken?: string }) {
     const existing = await usersRepository.findByIdPublic(input.userId);
     if (!existing) {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
@@ -31,7 +31,8 @@ export const usersService = {
 
     return usersRepository.updateProfile(input.userId, {
       name: input.name,
-      address: input.address
+      address: input.address,
+      expoPushToken: input.expoPushToken
     });
   },
 

@@ -1,16 +1,13 @@
-import { useState, type ReactNode } from 'react';
-import {
+import { useState } from 'react';
+import { 
   View,
-  StyleSheet,
   TouchableOpacity,
-  Modal,
   Platform,
   TextInput,
-  Pressable,
-} from 'react-native';
+ } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius, Spacing } from '../constants/theme';
+import { Radius, Spacing, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 import {
   formatDateLabel,
@@ -38,36 +35,6 @@ type TimeFieldProps = BaseFieldProps & {
   baseDate?: string;
 };
 
-function PickerModal({
-  visible,
-  title,
-  onClose,
-  children,
-}: {
-  visible: boolean;
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  if (Platform.OS !== 'ios') return null;
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={styles.modalSheet} onPress={(event) => event.stopPropagation()}>
-          <View style={styles.modalHeader}>
-            <ThemedText type="defaultSemiBold">{title}</ThemedText>
-            <TouchableOpacity onPress={onClose} hitSlop={8}>
-              <ThemedText style={styles.modalDone}>Fertig</ThemedText>
-            </TouchableOpacity>
-          </View>
-          {children}
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
 export function DateField({
   label,
   value,
@@ -79,6 +46,8 @@ export function DateField({
 }: DateFieldProps) {
   const [showPicker, setShowPicker] = useState(false);
   const pickerValue = parseLocalDateKey(value) ?? new Date();
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -101,7 +70,7 @@ export function DateField({
           placeholder={placeholder}
           value={value}
           onChangeText={onChange}
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={colors.textMuted}
           editable={!disabled}
         />
       </View>
@@ -113,29 +82,34 @@ export function DateField({
       <ThemedText style={styles.label}>{label}</ThemedText>
       <TouchableOpacity
         style={[styles.inputButton, disabled && styles.inputDisabled]}
-        onPress={() => setShowPicker(true)}
+        onPress={() => {
+          if (Platform.OS === 'android') {
+            setShowPicker(true);
+          }
+        }}
         disabled={disabled}
-        activeOpacity={0.8}
+        activeOpacity={Platform.OS === 'ios' ? 1.0 : 0.8}
       >
         <ThemedText style={[styles.inputButtonText, !value && styles.placeholderText]}>
           {formatDateLabel(value, placeholder)}
         </ThemedText>
-        <Ionicons name="calendar-outline" size={18} color={Colors.brand} />
-      </TouchableOpacity>
+        <Ionicons name="calendar-outline" size={18} color={colors.brand} />
 
-      {Platform.OS === 'ios' ? (
-        <PickerModal visible={showPicker} title={label} onClose={() => setShowPicker(false)}>
+        {Platform.OS === 'ios' && !disabled && (
           <DateTimePicker
             value={pickerValue}
             mode="date"
-            display="spinner"
+            display="compact"
             onChange={handleChange}
             minimumDate={minimumDate}
             maximumDate={maximumDate}
             locale="de-DE"
+            style={styles.absolutePicker}
           />
-        </PickerModal>
-      ) : showPicker ? (
+        )}
+      </TouchableOpacity>
+
+      {Platform.OS === 'android' && showPicker && (
         <DateTimePicker
           value={pickerValue}
           mode="date"
@@ -144,7 +118,7 @@ export function DateField({
           minimumDate={minimumDate}
           maximumDate={maximumDate}
         />
-      ) : null}
+      )}
     </View>
   );
 }
@@ -159,6 +133,8 @@ export function TimeField({
 }: TimeFieldProps) {
   const [showPicker, setShowPicker] = useState(false);
   const pickerValue = parseLocalTimeKey(value || '10:00', baseDate);
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -181,7 +157,7 @@ export function TimeField({
           placeholder={placeholder}
           value={value}
           onChangeText={onChange}
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={colors.textMuted}
           editable={!disabled}
         />
       </View>
@@ -193,28 +169,32 @@ export function TimeField({
       <ThemedText style={styles.label}>{label}</ThemedText>
       <TouchableOpacity
         style={[styles.inputButton, disabled && styles.inputDisabled]}
-        onPress={() => setShowPicker(true)}
+        onPress={() => {
+          if (Platform.OS === 'android') {
+            setShowPicker(true);
+          }
+        }}
         disabled={disabled}
-        activeOpacity={0.8}
+        activeOpacity={Platform.OS === 'ios' ? 1.0 : 0.8}
       >
         <ThemedText style={[styles.inputButtonText, !value && styles.placeholderText]}>
           {formatTimeLabel(value, placeholder)}
         </ThemedText>
-        <Ionicons name="time-outline" size={18} color={Colors.brand} />
-      </TouchableOpacity>
+        <Ionicons name="time-outline" size={18} color={colors.brand} />
 
-      {Platform.OS === 'ios' ? (
-        <PickerModal visible={showPicker} title={label} onClose={() => setShowPicker(false)}>
+        {Platform.OS === 'ios' && !disabled && (
           <DateTimePicker
             value={pickerValue}
             mode="time"
-            display="spinner"
+            display="compact"
             onChange={handleChange}
-            is24Hour
             locale="de-DE"
+            style={styles.absolutePicker}
           />
-        </PickerModal>
-      ) : showPicker ? (
+        )}
+      </TouchableOpacity>
+
+      {Platform.OS === 'android' && showPicker && (
         <DateTimePicker
           value={pickerValue}
           mode="time"
@@ -222,7 +202,7 @@ export function TimeField({
           onChange={handleChange}
           is24Hour
         />
-      ) : null}
+      )}
     </View>
   );
 }
@@ -260,6 +240,7 @@ export function DateTimeRangeFields({
   minimumDate,
   disabled = false,
 }: DateTimeRangeFieldsProps) {
+  const styles = useStyles();
   return (
     <>
       <View style={styles.row}>
@@ -306,45 +287,45 @@ export function DateTimeRangeFields({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   field: {
     flex: 1,
   },
   label: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: 4,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
-    color: Colors.text,
+    backgroundColor: colors.surface,
+    color: colors.text,
     fontSize: 14,
   },
   inputButton: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 44,
   },
   inputButtonText: {
-    color: Colors.text,
+    color: colors.text,
     fontSize: 14,
     flex: 1,
     marginRight: Spacing.xs,
   },
   placeholderText: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   inputDisabled: {
     opacity: 0.6,
@@ -357,28 +338,14 @@ const styles = StyleSheet.create({
   column: {
     flex: 1,
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  absolutePicker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.015,
   },
-  modalSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    paddingBottom: Spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  modalDone: {
-    color: Colors.brand,
-    fontWeight: '700',
-  },
-});
+}));

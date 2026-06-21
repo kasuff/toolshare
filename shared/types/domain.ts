@@ -41,6 +41,7 @@ export interface User {
   address?: string;
   role: Role;
   isSuspended: boolean;
+  expoPushToken?: string | null;
 }
 
 export interface Tool {

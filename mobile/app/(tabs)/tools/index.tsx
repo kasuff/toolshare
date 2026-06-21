@@ -1,16 +1,18 @@
-import { useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, TextInput, ScrollView, Pressable } from 'react-native';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { View, FlatList, RefreshControl, TextInput, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Tool, api, TOOL_CATEGORIES, pluralize } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { ToolCard } from '../../../components/ToolCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
-import { Colors, Spacing, Radius } from '../../../constants/theme';
+import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { DateField } from '../../../components/DateTimeFields';
 
 export default function ToolsScreen() {
+  const Colors = useThemeColors();
+  const styles = useStyles();
   const [tools, setTools] = useState<Tool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -24,7 +26,7 @@ export default function ToolsScreen() {
   const { token } = useAuth();
   const router = useRouter();
 
-  const loadTools = async (query = search, cat = selectedCategory) => {
+  const loadTools = useCallback(async (query = search, cat = selectedCategory) => {
     if (!token) return;
     try {
       const data = await api.getTools({
@@ -38,11 +40,11 @@ export default function ToolsScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [token, search, selectedCategory]);
 
   useEffect(() => {
     loadTools(search, selectedCategory);
-  }, [token, selectedCategory]);
+  }, [loadTools, search, selectedCategory]);
 
   const handleSearchSubmit = () => {
     setIsLoading(true);
@@ -170,18 +172,18 @@ export default function ToolsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   filterContainer: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   searchRow: {
     flexDirection: 'row',
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
     height: 44,
@@ -203,7 +205,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: '100%',
-    color: Colors.text,
+    color: colors.text,
     fontSize: 15,
   },
   clearButton: {
@@ -213,61 +215,61 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.md,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   filterToggleButtonActive: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
   },
   advancedFilters: {
     marginTop: Spacing.sm,
     padding: Spacing.md,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderRadius: Radius.md,
     gap: Spacing.md,
   },
   filterLabel: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: Spacing.xs,
   },
   numericField: {
     flexDirection: 'column',
   },
   numericInput: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
     height: 44,
-    color: Colors.text,
+    color: colors.text,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   categoryScroll: {
     paddingVertical: Spacing.sm,
     alignItems: 'center',
   },
   categoryBadge: {
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     paddingHorizontal: Spacing.md,
     paddingVertical: 6,
     borderRadius: 20,
     marginRight: Spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   categoryBadgeActive: {
-    backgroundColor: Colors.brand,
-    borderColor: Colors.brand,
+    backgroundColor: colors.brand,
+    borderColor: colors.brand,
   },
   categoryText: {
     fontSize: 13,
-    color: Colors.text,
+    color: colors.text,
   },
   categoryTextActive: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
   },
   resultsHeader: {
@@ -277,10 +279,10 @@ const styles = StyleSheet.create({
   },
   resultsText: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   list: {
     padding: Spacing.md,
     paddingTop: 0,
   },
-});
+}));

@@ -1,6 +1,6 @@
-import { View, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Image, TouchableOpacity } from 'react-native';
 import { Tool } from '@toolshare/shared';
-import { Colors, Radius, Spacing } from '../constants/theme';
+import { Radius, Spacing, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
 }
 
 export function ToolCard({ tool, onPress }: Props) {
+  const styles = useStyles();
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
@@ -18,7 +19,6 @@ export function ToolCard({ tool, onPress }: Props) {
         ) : (
           <View style={[styles.image, styles.placeholder]} />
         )}
-
       </View>
       <View style={styles.content}>
         <ThemedText type="defaultSemiBold" numberOfLines={1}>{tool.name}</ThemedText>
@@ -34,17 +34,17 @@ export function ToolCard({ tool, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.md,
     marginBottom: Spacing.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   imageContainer: {
-    height: 160,
+    height: 200,
     width: '100%',
     position: 'relative',
   },
@@ -54,9 +54,8 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   placeholder: {
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
-
   content: {
     padding: Spacing.md,
   },
@@ -70,15 +69,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   category: {
     textTransform: 'uppercase',
     fontSize: 12,
   },
   details: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
     fontSize: 14,
   }
-});
+}));

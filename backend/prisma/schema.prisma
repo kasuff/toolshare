@@ -66,6 +66,7 @@ model User {
   address       String
   role          Role           @default(USER)
   isSuspended   Boolean        @default(false)
+  expoPushToken String?
   createdAt     DateTime       @default(now())
   tools         Tool[]
   bookings      Booking[]

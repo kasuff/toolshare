@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/theme';
+import { useThemeColors } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInboxBadgeCount } from '../../hooks/useInboxBadgeCount';
 import { TabBarBadge } from '../../components/TabBarBadge';
@@ -9,21 +9,22 @@ import { TabBarBadge } from '../../components/TabBarBadge';
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const inboxBadgeCount = useInboxBadgeCount();
+  const colors = useThemeColors();
 
   return (
     <Tabs
       backBehavior="history"
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: Colors.surface },
-        headerTintColor: Colors.text,
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: 'bold' },
-        tabBarActiveTintColor: Colors.brand,
-        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarActiveTintColor: colors.brand,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           height: 60 + (insets.bottom > 0 ? insets.bottom - 4 : 0),
           paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           paddingTop: 8,

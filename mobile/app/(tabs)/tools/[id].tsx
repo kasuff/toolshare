@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Pressable } from 'react-native';
+import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Tool, api, getPlaceholderImageForCategory, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { LoadingSpinner } from '../../../components/EmptyState';
-import { Colors, Spacing, Radius } from '../../../constants/theme';
+import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { DateField, TimeField } from '../../../components/DateTimeFields';
@@ -12,6 +13,8 @@ import { getDefaultDateRange, parseLocalDateKey, toLocalDateKey } from '../../..
 import { RatingsSection } from '../../../components/RatingsSection';
 import type { PublicRating } from '@toolshare/shared';
 import { ReportForm } from '../../../components/ReportForm';
+import { ImageLightbox } from '../../../components/ImageLightbox';
+import { getErrorMessage } from '../../../utils/errors';
 
 type BlockingPeriod = {
   startIso: string;
@@ -83,6 +86,8 @@ function getInitials(name: string) {
 }
 
 export default function ToolDetailScreen() {
+  const Colors = useThemeColors();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { token, currentUser } = useAuth();
@@ -102,6 +107,7 @@ export default function ToolDetailScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Report states
   const [reportTarget, setReportTarget] = useState<'TOOL' | null>(null);
@@ -109,7 +115,7 @@ export default function ToolDetailScreen() {
   const [reportDetails, setReportDetails] = useState('');
   const [isReporting, setIsReporting] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!token || !id) return;
     try {
       const [toolsData, periodsData, toolRatings] = await Promise.all([
@@ -123,18 +129,18 @@ export default function ToolDetailScreen() {
         setBlockingPeriods(periodsData);
         setRatings(toolRatings);
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       setError('Fehler beim Laden der Werkzeugdaten');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, token]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [id, token])
+    }, [loadData])
   );
 
   const isAvailable = tool?.status === 'VERFUEGBAR';
@@ -213,8 +219,8 @@ export default function ToolDetailScreen() {
           router.replace('/inbox');
         }, 1500);
       }
-    } catch (err: any) {
-      setError(err.message || 'Aktion fehlgeschlagen.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Aktion fehlgeschlagen.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -237,8 +243,8 @@ export default function ToolDetailScreen() {
       setReportTarget(null);
       setReportReason('');
       setReportDetails('');
-    } catch (err: any) {
-      Alert.alert('Fehler', err.message || 'Fehler beim Senden der Meldung');
+    } catch (err) {
+      Alert.alert('Fehler', getErrorMessage(err, 'Fehler beim Senden der Meldung'));
     } finally {
       setIsReporting(false);
     }
@@ -254,10 +260,13 @@ export default function ToolDetailScreen() {
   }
 
   return (
+    <>
     <ScrollView style={styles.container}>
       {/* Tool Image Header */}
       <View style={styles.imageContainer}>
-        <Image source={{ uri: toolImage }} style={styles.image} />
+        <Pressable onPress={() => setPreviewImage(toolImage)} style={{ flex: 1 }}>
+          <Image source={{ uri: toolImage }} style={styles.image} />
+        </Pressable>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
@@ -360,8 +369,8 @@ export default function ToolDetailScreen() {
                     return <View key={day.key} style={styles.dayCell} />;
                   }
 
-                  const dayStyle: any = [styles.dayCellBtn];
-                  const textStyle: any = [styles.dayText];
+                  const dayStyle: StyleProp<ViewStyle> = [styles.dayCellBtn];
+                  const textStyle: StyleProp<TextStyle> = [styles.dayText];
 
                   if (!day.available) {
                     dayStyle.push(styles.dayUnavailable);
@@ -514,13 +523,20 @@ export default function ToolDetailScreen() {
         onCancel={() => setReportTarget(null)}
       />
     </ScrollView>
+
+    <ImageLightbox
+      uri={previewImage}
+      visible={previewImage !== null}
+      onClose={() => setPreviewImage(null)}
+    />
+    </>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   center: {
     flex: 1,
@@ -529,8 +545,8 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   imageContainer: {
-    height: 240,
-    backgroundColor: Colors.border,
+    height: 320,
+    backgroundColor: colors.border,
     position: 'relative',
   },
   image: {
@@ -550,7 +566,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.md,
     right: Spacing.md,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     borderRadius: 20,
     padding: Spacing.sm,
   },
@@ -566,27 +582,27 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   categoryBadge: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: Radius.sm,
     marginRight: Spacing.sm,
   },
   categoryText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
     fontSize: 12,
     textTransform: 'uppercase',
   },
   title: {
     fontSize: 24,
-    color: Colors.text,
+    color: colors.text,
   },
   section: {
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   sectionTitle: {
     fontSize: 18,
@@ -594,7 +610,7 @@ const styles = StyleSheet.create({
   },
   descriptionText: {
     lineHeight: 22,
-    color: Colors.text,
+    color: colors.text,
   },
   row: {
     flexDirection: 'row',
@@ -605,7 +621,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 15,
-    color: Colors.text,
+    color: colors.text,
   },
   locationNote: {
     fontSize: 13,
@@ -619,13 +635,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
   },
   avatarText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -648,9 +664,9 @@ const styles = StyleSheet.create({
   navBtn: {
     padding: Spacing.sm,
     marginLeft: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
   },
   monthContainer: {
@@ -669,7 +685,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     fontWeight: 'bold',
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -689,22 +705,22 @@ const styles = StyleSheet.create({
     marginVertical: 1,
   },
   dayAvailable: {
-    backgroundColor: '#DEF7EC',
+    backgroundColor: colors.success + '20',
   },
   dayUnavailable: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceSoft,
   },
   dayInRange: {
-    backgroundColor: '#31C48D',
+    backgroundColor: colors.success,
   },
   dayRangeExtreme: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
   },
   dayText: {
     fontSize: 14,
   },
   dayTextUnavailable: {
-    color: '#9CA3AF',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   dayTextInRange: {
@@ -730,11 +746,11 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   bookingCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginTop: Spacing.lg,
   },
   bookingTitle: {
@@ -758,21 +774,21 @@ const styles = StyleSheet.create({
   },
   miniLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: 2,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
     height: 40,
     paddingHorizontal: Spacing.sm,
     fontSize: 14,
-    color: Colors.text,
-    backgroundColor: Colors.bg,
+    color: colors.text,
+    backgroundColor: colors.bg,
   },
   submitButton: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     height: 46,
     borderRadius: Radius.md,
     justifyContent: 'center',
@@ -780,18 +796,18 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   submitButtonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
   disabledPanel: {
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     padding: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
   },
   disabledText: {
-    color: Colors.text,
+    color: colors.text,
     fontWeight: 'bold',
   },
   hintText: {
@@ -800,15 +816,15 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   errorText: {
-    color: Colors.danger,
+    color: colors.danger,
     textAlign: 'center',
     marginBottom: Spacing.sm,
     fontWeight: 'bold',
   },
   successText: {
-    color: Colors.success,
+    color: colors.success,
     textAlign: 'center',
     marginBottom: Spacing.sm,
     fontWeight: 'bold',
   }
-});
+}));

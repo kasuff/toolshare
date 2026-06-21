@@ -1,6 +1,5 @@
 import { Slot } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
-import { Colors } from '../constants/theme';
+import { View } from 'react-native';
 import { LoadingSpinner } from '../components/EmptyState';
 import { setApiBaseUrl } from '@toolshare/shared';
 import { AuthProvider, useAuth } from '../hooks/useAuth';
@@ -42,8 +41,14 @@ function getApiUrl() {
 
 setApiBaseUrl(getApiUrl());
 
+import { StatusBar } from 'expo-status-bar';
+import { createThemedStyleSheet } from '../constants/theme';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+
 function AppLayout() {
-  const { isLoaded } = useAuth();
+  const { isLoaded, token } = useAuth();
+  usePushNotifications(token);
+  const styles = useStyles();
 
   if (!isLoaded) {
     return <LoadingSpinner />;
@@ -53,6 +58,7 @@ function AppLayout() {
     <View style={styles.container}>
       <Slot />
       <ToastViewport />
+      <StatusBar style="auto" />
     </View>
   );
 }
@@ -67,9 +73,9 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
-});
+}));

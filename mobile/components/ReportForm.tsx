@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, TextInput, Pressable, Modal, ActivityIndicator } from 'react-native';
+import { View, TextInput, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { ThemedText } from './ThemedText';
-import { Colors, Spacing, Radius } from '../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 interface ReportFormProps {
@@ -31,6 +31,9 @@ export function ReportForm({
   onSubmit,
   onCancel
 }: ReportFormProps) {
+  const colors = useThemeColors();
+  const styles = useStyles();
+
   return (
     <Modal
       visible={visible}
@@ -43,7 +46,7 @@ export function ReportForm({
           <View style={styles.header}>
             <ThemedText style={styles.title}>{title}</ThemedText>
             <Pressable onPress={onCancel} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={Colors.textMuted} />
+              <Ionicons name="close" size={24} color={colors.textMuted} />
             </Pressable>
           </View>
           
@@ -56,7 +59,7 @@ export function ReportForm({
               value={reason}
               onChangeText={onReasonChange}
               placeholder="z. B. unpassende Inhalte oder Verhalten"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.textMuted}
               editable={!isSubmitting}
             />
           </View>
@@ -68,7 +71,7 @@ export function ReportForm({
               value={details}
               onChangeText={onDetailsChange}
               placeholder="Weitere Hinweise für die Moderation"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={4}
               editable={!isSubmitting}
@@ -90,7 +93,7 @@ export function ReportForm({
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <ActivityIndicator color={Colors.surface} size="small" />
+                <ActivityIndicator color={colors.surface} size="small" />
               ) : (
                 <ThemedText style={styles.submitButtonText}>{submitLabel}</ThemedText>
               )}
@@ -102,7 +105,7 @@ export function ReportForm({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -111,7 +114,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   panel: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.md,
     width: '100%',
@@ -132,7 +135,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: Spacing.md,
   },
   field: {
@@ -144,13 +147,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   input: {
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.sm,
     fontSize: 15,
-    color: Colors.text,
+    color: colors.text,
   },
   textArea: {
     height: 100,
@@ -170,21 +173,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   cancelButtonText: {
-    color: Colors.text,
+    color: colors.text,
     fontWeight: '600',
   },
   submitButton: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     minWidth: 120,
   },
   submitButtonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
   },
   buttonDisabled: {
     opacity: 0.7,
   },
-});
+}));

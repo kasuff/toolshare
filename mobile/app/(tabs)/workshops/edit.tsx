@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, BackHandler, Pressable } from 'react-native';
+import { View, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, BackHandler, Pressable } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { api, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
-import { Colors, Spacing, Radius } from '../../../constants/theme';
+import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAddressPayload, parseAddress } from '../../../components/AddressInput';
@@ -12,6 +12,8 @@ import { ImageLightbox } from '../../../components/ImageLightbox';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '../../../hooks/useToast';
 import { FormErrorText } from '../../../components/FormErrorText';
+import { getErrorMessage } from '../../../utils/errors';
+import type { ComponentProps } from 'react';
 
 const MAX_WORKSHOP_PHOTOS = 3;
 const ADDRESS_VALIDATION_ERROR =
@@ -27,10 +29,13 @@ const WORKSHOP_EXTRAS = [
   { value: "werkstube", label: "Werkstube", icon: "construct-outline" },
   { value: "parkplatz", label: "Parkplatz", icon: "car-sport-outline" }
 ] as const;
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 
 
 export default function EditWorkshopScreen() {
+  const Colors = useThemeColors();
+  const styles = useStyles();
   const { token } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [name, setName] = useState('');
@@ -89,7 +94,7 @@ export default function EditWorkshopScreen() {
         }
       }
       load();
-    }, [id, token])
+    }, [id, token, pushToast])
   );
 
   const uriToDataUrl = async (uri: string, mimeType: string): Promise<string | null> => {
@@ -250,8 +255,8 @@ export default function EditWorkshopScreen() {
       }, token!);
 
       router.back();
-    } catch (err: any) {
-      setApiError(err.message || 'Werkstatt konnte nicht angelegt werden.');
+    } catch (err) {
+      setApiError(getErrorMessage(err, 'Werkstatt konnte nicht angelegt werden.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -465,7 +470,7 @@ export default function EditWorkshopScreen() {
                   onPress={() => toggleExtra(extra.value)}
                 >
                   <Ionicons 
-                    name={extra.icon as any} 
+                    name={extra.icon as IoniconName} 
                     size={20} 
                     color={isSelected ? Colors.brand : Colors.textMuted} 
                     style={{ marginRight: 6 }}
@@ -505,10 +510,10 @@ export default function EditWorkshopScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   content: {
     padding: Spacing.md,
@@ -530,22 +535,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     paddingTop: Spacing.lg,
     borderTopWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   label: {
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: Spacing.sm,
-    color: Colors.text,
+    color: colors.text,
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   textArea: {
     minHeight: 100,
@@ -571,12 +576,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.xs,
     right: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
   },
   imagePlaceholder: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderStyle: 'dashed',
     borderRadius: Radius.md,
     paddingVertical: Spacing.lg,
@@ -584,7 +589,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.xs,
     marginBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   imageCount: {
     fontSize: 12,
@@ -598,18 +603,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.brandSoft,
+    borderColor: colors.brandSoft,
     borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 102, 0, 0.05)',
+    backgroundColor: colors.brandSoft,
     paddingVertical: Spacing.sm,
     gap: Spacing.xs,
   },
   imageButtonText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
   },
   submitButton: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     padding: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
@@ -619,16 +624,16 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   submitButtonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
   slotEditor: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   slotRow: {
     flexDirection: 'row',
@@ -640,7 +645,7 @@ const styles = StyleSheet.create({
   },
   miniLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: 2,
   },
   addSlotBtn: {
@@ -650,12 +655,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     marginTop: Spacing.xs,
     borderWidth: 1,
-    borderColor: Colors.brandSoft,
+    borderColor: colors.brandSoft,
     borderRadius: Radius.sm,
-    backgroundColor: 'rgba(49, 196, 141, 0.1)',
+    backgroundColor: colors.success + '15',
   },
   addSlotBtnText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
     marginLeft: 4,
   },
@@ -665,17 +670,17 @@ const styles = StyleSheet.create({
   slotItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.sm,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: Spacing.xs,
   },
   dropdownTrigger: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     flexDirection: 'row',
@@ -684,16 +689,16 @@ const styles = StyleSheet.create({
   },
   dropdownTriggerText: {
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   dropdownList: {
     position: 'absolute',
     top: 55,
     left: 0,
     right: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     zIndex: 1000,
     elevation: 5,
@@ -708,25 +713,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.md,
     borderBottomWidth: 1,
-    borderColor: Colors.surfaceSoft,
+    borderColor: colors.surfaceSoft,
   },
   dropdownItemActive: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
   },
   dropdownItemText: {
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   dropdownItemTextActive: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
   },
   equipmentInputBox: {
-    backgroundColor: Colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   equipmentList: {
     marginBottom: Spacing.md,
@@ -734,11 +739,11 @@ const styles = StyleSheet.create({
   equipmentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.sm,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: Spacing.xs,
   },
   addEquipmentBtn: {
@@ -748,12 +753,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     marginTop: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.brandSoft,
+    borderColor: colors.brandSoft,
     borderRadius: Radius.sm,
-    backgroundColor: 'rgba(255, 102, 0, 0.05)',
+    backgroundColor: colors.brandSoft,
   },
   addEquipmentBtnText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
     marginLeft: 4,
   },
@@ -765,23 +770,23 @@ const styles = StyleSheet.create({
   extraChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
   },
   extraChipSelected: {
-    backgroundColor: Colors.brandSoft,
-    borderColor: Colors.brand,
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
   },
   extraChipText: {
     fontSize: 14,
-    color: Colors.text,
+    color: colors.text,
   },
   extraChipTextSelected: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
   },
-});
+}));

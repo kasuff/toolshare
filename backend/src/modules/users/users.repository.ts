@@ -7,6 +7,7 @@ const publicUserSelect = {
   address: true,
   role: true,
   isSuspended: true,
+  expoPushToken: true,
   createdAt: true
 } as const;
 
@@ -37,7 +38,7 @@ export const usersRepository = {
     });
   },
 
-  updateProfile(id: string, data: { name?: string; address?: string }) {
+  updateProfile(id: string, data: { name?: string; address?: string; expoPushToken?: string | null }) {
     return prisma.user.update({
       where: { id },
       data,

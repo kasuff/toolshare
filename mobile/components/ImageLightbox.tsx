@@ -1,6 +1,6 @@
 import { Modal, StyleSheet, Image, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing } from '../constants/theme';
+import { Spacing } from '../constants/theme';
 
 type Props = {
   uri: string | null;
@@ -15,7 +15,7 @@ export function ImageLightbox({ uri, visible, onClose }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <TouchableOpacity style={styles.closeButton} onPress={onClose} accessibilityLabel="Vorschau schließen">
-          <Ionicons name="close" size={28} color={Colors.surface} />
+          <Ionicons name="close" size={28} color="#ffffff" />
         </TouchableOpacity>
         <Image source={{ uri }} style={styles.image} resizeMode="contain" />
       </Pressable>

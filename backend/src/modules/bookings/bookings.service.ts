@@ -7,6 +7,7 @@ import { toolsService } from "../tools/tools.service";
 import { workshopsService } from "../workshops/workshops.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 import { assertBookingCanBeCompleted } from "./bookings.completion";
+import { pushService } from "../notifications/push.service";
 
 const BLOCKING_BOOKING_STATUSES: Array<"PENDING" | "ACCEPTED"> = ["PENDING", "ACCEPTED"];
 
@@ -126,6 +127,7 @@ export const bookingsService = {
     }
 
     await notificationsRepository.create(result.tool.ownerId, "Neue Ausleihanfrage für dein Werkzeug.");
+    await pushService.sendPushNotification(result.tool.ownerId, "Neue Anfrage", "Neue Ausleihanfrage für dein Werkzeug.");
     return result.booking;
   },
 
@@ -209,6 +211,7 @@ export const bookingsService = {
     const providerId = result.workshop?.managerId ?? result.timeslot?.workshop?.managerId ?? null;
     if (providerId && providerId !== input.requesterId) {
       await notificationsRepository.create(providerId, "Neue Buchungsanfrage für deine Werkstatt.");
+      await pushService.sendPushNotification(providerId, "Neue Anfrage", "Neue Buchungsanfrage für deine Werkstatt.");
     }
     return result;
   },
@@ -250,6 +253,7 @@ export const bookingsService = {
     }
     if (notifyUserId && notifyUserId !== input.actorId) {
       await notificationsRepository.create(notifyUserId, `Deine Buchung wurde auf ${input.status} gesetzt.`);
+      await pushService.sendPushNotification(notifyUserId, "Buchungs-Update", `Deine Buchung wurde auf ${input.status} gesetzt.`);
     }
     return updated;
   },
@@ -330,6 +334,7 @@ export const bookingsService = {
 
     const recipientId = isRequester ? providerId : booking.userId;
     await notificationsRepository.create(recipientId, "Neuer Alternativvorschlag zu einer Ausleihanfrage.");
+    await pushService.sendPushNotification(recipientId, "Neuer Alternativvorschlag", "Neuer Alternativvorschlag zu einer Ausleihanfrage.");
 
     return created;
   },
@@ -383,6 +388,7 @@ export const bookingsService = {
         proposalRow.proposedByUserId,
         "Dein Alternativvorschlag wurde abgelehnt."
       );
+      await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag abgelehnt", "Dein Alternativvorschlag wurde abgelehnt.");
       return prisma.bookingPickupProposal.findUnique({
         where: { id: input.proposalId },
         include: { proposedBy: { select: { id: true, name: true } } }
@@ -433,6 +439,7 @@ export const bookingsService = {
       proposalRow.proposedByUserId,
       "Dein Alternativvorschlag wurde angenommen."
     );
+    await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag angenommen", "Dein Alternativvorschlag wurde angenommen.");
 
     return prisma.bookingPickupProposal.findUnique({
       where: { id: input.proposalId },
@@ -506,6 +513,7 @@ export const bookingsService = {
 
     const recipientId = isRequester ? providerId : booking.userId;
     await notificationsRepository.create(recipientId, "Neuer Alternativvorschlag für die Werkstattbuchung.");
+    await pushService.sendPushNotification(recipientId, "Neuer Alternativvorschlag", "Neuer Alternativvorschlag für die Werkstattbuchung.");
 
     return created;
   },
@@ -566,6 +574,7 @@ export const bookingsService = {
         proposalRow.proposedByUserId,
         "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt."
       );
+      await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag abgelehnt", "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt.");
       return prisma.bookingTimeslotProposal.findUnique({
         where: { id: input.proposalId },
         include: { proposedBy: { select: { id: true, name: true } } }
@@ -608,6 +617,7 @@ export const bookingsService = {
       proposalRow.proposedByUserId,
       "Dein Alternativvorschlag zur Werkstattbuchung wurde angenommen."
     );
+    await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag angenommen", "Dein Alternativvorschlag zur Werkstattbuchung wurde angenommen.");
 
     return prisma.bookingTimeslotProposal.findUnique({
       where: { id: input.proposalId },

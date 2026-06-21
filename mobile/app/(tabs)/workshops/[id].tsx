@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import {
+import { 
   View,
-  StyleSheet,
   ScrollView,
   Image,
   TouchableOpacity,
@@ -11,9 +10,10 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Alert,
-} from 'react-native';
+ } from 'react-native';
+import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { Colors, Spacing, Radius } from '../../../constants/theme';
+import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Workshop, WorkshopSlot, Tool, api, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
@@ -25,6 +25,8 @@ import { getDefaultDateRange, parseLocalDateKey, toLocalDateKey } from '../../..
 import { RatingsSection } from '../../../components/RatingsSection';
 import type { PublicRating } from '@toolshare/shared';
 import { ReportForm } from '../../../components/ReportForm';
+import { getErrorMessage } from '../../../utils/errors';
+import type { ComponentProps } from 'react';
 
 type CalendarDay = {
   key: string;
@@ -34,7 +36,7 @@ type CalendarDay = {
 };
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-const GALLERY_HEIGHT = 240;
+const GALLERY_HEIGHT = 320;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const WORKSHOP_EXTRAS = [
@@ -47,6 +49,7 @@ const WORKSHOP_EXTRAS = [
   { value: "werkstube", label: "Werkstube", icon: "construct-outline" },
   { value: "parkplatz", label: "Parkplatz", icon: "car-sport-outline" }
 ] as const;
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function rangeOverlapsDay(startIso: string, endIso: string, day: Date) {
   const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
@@ -115,6 +118,8 @@ function getInitials(name: string) {
 }
 
 export default function WorkshopDetailScreen() {
+  const Colors = useThemeColors();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [slots, setSlots] = useState<WorkshopSlot[]>([]);
@@ -277,8 +282,8 @@ export default function WorkshopDetailScreen() {
           router.replace('/inbox');
         }, 1500);
       }
-    } catch (err: any) {
-      setError(err.message || 'Buchung fehlgeschlagen');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Buchung fehlgeschlagen'));
     } finally {
       setIsSubmitting(false);
     }
@@ -301,8 +306,8 @@ export default function WorkshopDetailScreen() {
       setReportTarget(null);
       setReportReason('');
       setReportDetails('');
-    } catch (err: any) {
-      Alert.alert('Fehler', err.message || 'Fehler beim Senden der Meldung');
+    } catch (err) {
+      Alert.alert('Fehler', getErrorMessage(err, 'Fehler beim Senden der Meldung'));
     } finally {
       setIsReporting(false);
     }
@@ -419,7 +424,7 @@ export default function WorkshopDetailScreen() {
                     if (!extraDef) return null;
                     return (
                       <View key={extraVal} style={styles.extraChip}>
-                        <Ionicons name={extraDef.icon as any} size={16} color={Colors.text} style={{ marginRight: 6 }} />
+                        <Ionicons name={extraDef.icon as IoniconName} size={16} color={Colors.text} style={{ marginRight: 6 }} />
                         <ThemedText style={styles.extraChipText}>{extraDef.label}</ThemedText>
                       </View>
                     );
@@ -488,8 +493,8 @@ export default function WorkshopDetailScreen() {
                     return <View key={day.key} style={styles.dayCell} />;
                   }
 
-                  const dayStyle: any = [styles.dayCellBtn];
-                  const textStyle: any = [styles.dayText];
+                  const dayStyle: StyleProp<ViewStyle> = [styles.dayCellBtn];
+                  const textStyle: StyleProp<TextStyle> = [styles.dayText];
 
                   if (!day.available) {
                     dayStyle.push(styles.dayUnavailable);
@@ -649,10 +654,10 @@ export default function WorkshopDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   center: {
     flex: 1,
@@ -662,7 +667,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     height: GALLERY_HEIGHT,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
     position: 'relative',
   },
   galleryScroll: {
@@ -715,7 +720,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   placeholder: {
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
   backButton: {
     position: 'absolute',
@@ -729,7 +734,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.md,
     right: Spacing.md,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     borderRadius: 20,
     padding: Spacing.sm,
   },
@@ -744,7 +749,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   iconMargin: {
     marginRight: Spacing.sm,
@@ -753,7 +758,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   sectionTitle: {
     fontSize: 18,
@@ -761,14 +766,14 @@ const styles = StyleSheet.create({
   },
   descriptionText: {
     lineHeight: 22,
-    color: Colors.text,
+    color: colors.text,
   },
   detailsCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   detailsItem: {
     flexDirection: 'row',
@@ -776,7 +781,7 @@ const styles = StyleSheet.create({
   },
   detailsText: {
     fontSize: 14,
-    color: Colors.text,
+    color: colors.text,
   },
   ownerCard: {
     flexDirection: 'row',
@@ -786,13 +791,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
   },
   avatarText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -815,9 +820,9 @@ const styles = StyleSheet.create({
   navBtn: {
     padding: Spacing.sm,
     marginLeft: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
   },
   monthContainer: {
@@ -836,7 +841,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     fontWeight: 'bold',
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -856,22 +861,22 @@ const styles = StyleSheet.create({
     marginVertical: 1,
   },
   dayAvailable: {
-    backgroundColor: '#DEF7EC',
+    backgroundColor: colors.success + '20',
   },
   dayUnavailable: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceSoft,
   },
   dayInRange: {
-    backgroundColor: '#31C48D',
+    backgroundColor: colors.success,
   },
   dayRangeExtreme: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
   },
   dayText: {
     fontSize: 14,
   },
   dayTextUnavailable: {
-    color: '#9CA3AF',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   dayTextInRange: {
@@ -891,18 +896,18 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   toolSelectionRowSelected: {
-    backgroundColor: Colors.brandSoft,
-    borderColor: Colors.brand,
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
   },
   toolSelectionText: {
     fontSize: 15,
   },
   bookingCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginTop: Spacing.lg,
   },
   bookingTitle: {
@@ -926,21 +931,21 @@ const styles = StyleSheet.create({
   },
   miniLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: 2,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
     height: 40,
     paddingHorizontal: Spacing.sm,
     fontSize: 14,
-    color: Colors.text,
-    backgroundColor: Colors.bg,
+    color: colors.text,
+    backgroundColor: colors.bg,
   },
   submitButton: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     height: 46,
     borderRadius: Radius.md,
     justifyContent: 'center',
@@ -949,7 +954,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   submitButtonText: {
-    color: '#FFF',
+    color: colors.surface,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -958,12 +963,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorText: {
-    color: Colors.danger,
+    color: colors.danger,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   successText: {
-    color: Colors.success,
+    color: colors.success,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
@@ -975,9 +980,9 @@ const styles = StyleSheet.create({
   extraChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: 999,
     paddingVertical: 4,
     paddingHorizontal: 10,
@@ -985,4 +990,4 @@ const styles = StyleSheet.create({
   extraChipText: {
     fontSize: 13,
   },
-});
+}));

@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { PublicRating } from '@toolshare/shared';
-import { Colors, Spacing, Radius } from '../constants/theme';
+import { Spacing, Radius, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 import { StarRatingDisplay } from './StarRatingInput';
 
@@ -23,6 +23,7 @@ export function RatingsSection({
   emptyText = "Noch keine Bewertungen vorhanden."
 }: Props) {
   const avg = averageScore(ratings);
+  const styles = useStyles();
 
   return (
     <View style={styles.container}>
@@ -69,13 +70,13 @@ export function RatingsSection({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: Spacing.lg,
   },
   header: {
@@ -95,7 +96,7 @@ const styles = StyleSheet.create({
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     padding: Spacing.md,
     borderRadius: Radius.md,
     marginBottom: Spacing.md,
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
   },
   listItem: {
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     paddingBottom: Spacing.md,
   },
   listHead: {
@@ -126,4 +127,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: Spacing.xs,
   }
-});
+}));

@@ -2,7 +2,7 @@ import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Toucha
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius } from '../../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
 import { EmptyState } from '../../components/EmptyState';
 import { ToolCard } from '../../components/ToolCard';
@@ -19,6 +19,8 @@ export default function OffersScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownAnimation = useRef(new Animated.Value(0)).current;
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   const loadOffers = useCallback(async () => {
     if (!currentUser || !token) {
@@ -85,7 +87,7 @@ export default function OffersScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.brand} />
+        <ActivityIndicator size="large" color={colors.brand} />
       </View>
     );
   }
@@ -142,7 +144,7 @@ export default function OffersScreen() {
                 });
               }}
             >
-              <Ionicons name="hammer-outline" size={20} color={Colors.text} style={styles.dropdownIcon} />
+              <Ionicons name="hammer-outline" size={20} color={colors.text} style={styles.dropdownIcon} />
               <ThemedText>Werkzeug hinzufügen</ThemedText>
             </TouchableOpacity>
             <View style={styles.dropdownDivider} />
@@ -154,7 +156,7 @@ export default function OffersScreen() {
                 });
               }}
             >
-              <Ionicons name="home-outline" size={20} color={Colors.text} style={styles.dropdownIcon} />
+              <Ionicons name="home-outline" size={20} color={colors.text} style={styles.dropdownIcon} />
               <ThemedText>Werkstatt hinzufügen</ThemedText>
             </TouchableOpacity>
           </Animated.View>
@@ -201,10 +203,10 @@ export default function OffersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   content: {
     padding: Spacing.md,
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   header: {
     flexDirection: 'row',
@@ -229,10 +231,10 @@ const styles = StyleSheet.create({
   addButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: Colors.brandStrong,
+    borderColor: colors.brandStrong,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -246,7 +248,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   error: {
-    color: Colors.danger,
+    color: colors.danger,
     marginBottom: Spacing.md,
     textAlign: 'center',
   },
@@ -262,7 +264,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   dropdownMenu: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 8,
     padding: Spacing.sm,
     minWidth: 200,
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
   },
   dropdownDivider: {
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
     marginHorizontal: Spacing.sm,
   }
-});
+}));

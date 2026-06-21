@@ -38,7 +38,8 @@ const publicUserSelect = {
   address: true,
   role: true,
   isSuspended: true,
-  createdAt: true
+  createdAt: true,
+  expoPushToken: true
 };
 
 describe("usersRepository", () => {

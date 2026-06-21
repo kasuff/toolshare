@@ -1,11 +1,13 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { Colors } from '../constants/theme';
+import { View, Text } from 'react-native';
+import { createThemedStyleSheet } from '../constants/theme';
 
 type Props = {
   count: number;
 };
 
 export function TabBarBadge({ count }: Props) {
+  const styles = useStyles();
+
   if (count <= 0) return null;
 
   const label = count > 99 ? '99+' : String(count);
@@ -17,7 +19,7 @@ export function TabBarBadge({ count }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   badge: {
     position: 'absolute',
     top: -5,
@@ -26,11 +28,11 @@ const styles = StyleSheet.create({
     height: 18,
     paddingHorizontal: 4,
     borderRadius: 9,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: Colors.surface,
+    borderColor: colors.surface,
   },
   text: {
     color: '#fff',
@@ -38,4 +40,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 12,
   },
-});
+}));

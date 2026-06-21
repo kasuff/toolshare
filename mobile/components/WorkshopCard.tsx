@@ -1,6 +1,6 @@
-import { View, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Image, TouchableOpacity } from 'react-native';
 import { Workshop } from '@toolshare/shared';
-import { Colors, Radius, Spacing } from '../constants/theme';
+import { Radius, Spacing, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 
 export function WorkshopCard({ workshop, onPress }: Props) {
   const imageUrl = workshop.imageUrls?.[0];
+  const styles = useStyles();
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
@@ -26,7 +27,7 @@ export function WorkshopCard({ workshop, onPress }: Props) {
           {workshop.description}
         </ThemedText>
         <View style={styles.footer}>
-          <ThemedText type="muted" style={styles.location}>{workshop.location}</ThemedText>
+          <ThemedText type="muted" style={styles.category}>Werkstatt</ThemedText>
           <ThemedText style={styles.details}>Details →</ThemedText>
         </View>
       </View>
@@ -34,19 +35,19 @@ export function WorkshopCard({ workshop, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.md,
     marginBottom: Spacing.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   imageContainer: {
-    height: 180,
+    height: 220,
     width: '100%',
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   image: {
     width: '100%',
@@ -54,7 +55,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   placeholder: {
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
   content: {
     padding: Spacing.md,
@@ -69,14 +70,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
-  location: {
+  category: {
+    textTransform: 'uppercase',
     fontSize: 12,
   },
   details: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
     fontSize: 14,
   }
-});
+}));
