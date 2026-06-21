@@ -81,7 +81,28 @@ workflow:
 .mobile_install:
   script:
     - cd mobile
-    - npm ci --workspaces=false --legacy-peer-deps --prefer-offline --cache .npm
+    # npm ci occasionally fails on a corrupted registry response cached in
+    # .npm ("invalid json response body ... Bad control character"). Retry up
+    # to 3x; from the 2nd attempt on, purge the content-addressable cache so a
+    # poisoned metadata blob can't fail every run identically.
+    - |
+      ok=0
+      for attempt in 1 2 3; do
+        if [ "$attempt" -eq 1 ]; then
+          flags="--prefer-offline"
+        else
+          echo "Purging npm cache before retry $attempt"
+          rm -rf .npm/_cacache
+          flags=""
+        fi
+        if npm ci --workspaces=false --legacy-peer-deps --cache .npm $flags; then
+          ok=1
+          break
+        fi
+        echo "npm ci failed (attempt $attempt) -- retrying in 3s"
+        sleep 3
+      done
+      [ "$ok" -eq 1 ]
 
 # Block until the Postgres service actually accepts TCP connections before
 # touching it. Removes the race where `prisma db push` runs before the DB
@@ -862,16 +883,21 @@ semgrep-sast:
   stage: test
   image: semgrep/semgrep:latest
   script:
+    # The semgrep image expects code at /src; GitLab checks it out to
+    # $CI_PROJECT_DIR (/builds/...). Without an explicit target, newer semgrep
+    # versions abort with "Detected Docker environment without a code volume"
+    # instead of scanning the working dir. Pass the checkout dir explicitly.
+    - SCAN_TARGET="${CI_PROJECT_DIR:-.}"
     # Full scan incl. monitoring/ (the dora-exporter is our own Python code).
     # First two commands only produce the report artifacts and never fail the
     # job; the final command gates the pipeline on ERROR-severity findings.
-    - semgrep scan --config=auto --gitlab-sast -o gl-sast-report.json || true
+    - semgrep scan --config=auto --gitlab-sast -o gl-sast-report.json "$SCAN_TARGET" || true
     - echo "=== Semgrep SAST Security Report ===" > sast-report.txt
     - echo "====================================" >> sast-report.txt
     - echo "" >> sast-report.txt
-    - semgrep scan --config=auto --text >> sast-report.txt || true
+    - semgrep scan --config=auto --text "$SCAN_TARGET" >> sast-report.txt || true
     # Gate: fail the pipeline on high-confidence ERROR-severity findings.
-    - semgrep scan --config=auto --severity ERROR --error
+    - semgrep scan --config=auto --severity ERROR --error "$SCAN_TARGET"
   artifacts:
     paths:
       - gl-sast-report.json
