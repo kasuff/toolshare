@@ -4,6 +4,14 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { api } from "@toolshare/shared";
+import { storage } from "../utils/appStorage";
+
+const PUSH_LISTENER_DEBOUNCE_MS = 3_000;
+const MIN_SYNC_INTERVAL_MS = 30_000;
+
+function syncedPushTokenKey(userId: string) {
+  return `toolshare.synced_push.${userId}`;
+}
 
 try {
   Notifications.setNotificationHandler({
@@ -19,55 +27,100 @@ try {
   console.warn("Push notifications are not supported in this environment:", error);
 }
 
-export function usePushNotifications(token: string | null) {
+export function usePushNotifications(token: string | null, userId?: string) {
   const [expoPushToken, setExpoPushToken] = useState("");
   const [notification, setNotification] = useState<Notifications.Notification | undefined>(
     undefined
   );
   const notificationListener = useRef<Notifications.Subscription>(null);
   const responseListener = useRef<Notifications.Subscription>(null);
+  const lastSyncedTokenRef = useRef<string | null>(null);
+  const syncInFlightRef = useRef(false);
+  const lastSyncAttemptAtRef = useRef(0);
+  const listenerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !userId) {
+      lastSyncedTokenRef.current = null;
+      return;
+    }
 
-    const syncPushToken = (pushToken: string) => {
-      setExpoPushToken(pushToken);
-      api.updateMyProfile({ expoPushToken: pushToken }, token).catch((error) => {
-        console.error("Failed to sync push token", error);
-      });
-    };
+    let cancelled = false;
+    const storageKey = syncedPushTokenKey(userId);
 
-    registerForPushNotificationsAsync().then((pushToken) => {
-      if (pushToken) {
-        syncPushToken(pushToken);
+    void storage.getItem(storageKey).then((stored) => {
+      if (!cancelled && stored) {
+        lastSyncedTokenRef.current = stored;
+        setExpoPushToken(stored);
       }
     });
 
-    const pushTokenListener = Notifications.addPushTokenListener((devicePushToken) => {
+    const syncPushToken = async (pushToken: string) => {
+      if (pushToken === lastSyncedTokenRef.current) {
+        setExpoPushToken(pushToken);
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        syncInFlightRef.current ||
+        (now - lastSyncAttemptAtRef.current < MIN_SYNC_INTERVAL_MS &&
+          lastSyncAttemptAtRef.current > 0)
+      ) {
+        return;
+      }
+
+      syncInFlightRef.current = true;
+      lastSyncAttemptAtRef.current = now;
+      setExpoPushToken(pushToken);
+
+      try {
+        await api.updateMyProfile({ expoPushToken: pushToken }, token);
+        lastSyncedTokenRef.current = pushToken;
+        await storage.setItem(storageKey, pushToken);
+      } catch (error) {
+        console.error("Failed to sync push token", error);
+      } finally {
+        syncInFlightRef.current = false;
+      }
+    };
+
+    const refreshExpoPushToken = () => {
       registerForPushNotificationsAsync().then((pushToken) => {
         if (pushToken) {
-          console.log("Expo push token refreshed:", pushToken);
-          syncPushToken(pushToken);
+          void syncPushToken(pushToken);
         }
-      }).catch((error) => {
-        console.warn("Failed to refresh Expo push token", error, devicePushToken);
       });
+    };
+
+    refreshExpoPushToken();
+
+    const pushTokenListener = Notifications.addPushTokenListener(() => {
+      if (listenerDebounceRef.current) {
+        clearTimeout(listenerDebounceRef.current);
+      }
+      listenerDebounceRef.current = setTimeout(() => {
+        refreshExpoPushToken();
+      }, PUSH_LISTENER_DEBOUNCE_MS);
     });
 
     notificationListener.current = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        setNotification(notification);
+      (nextNotification) => {
+        setNotification(nextNotification);
       }
     );
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         console.log("Notification tapped", response);
-        // Here you could handle navigation, e.g. navigate to /inbox
       }
     );
 
     return () => {
+      cancelled = true;
+      if (listenerDebounceRef.current) {
+        clearTimeout(listenerDebounceRef.current);
+      }
       pushTokenListener.remove();
       if (notificationListener.current) {
         notificationListener.current.remove();
@@ -76,7 +129,7 @@ export function usePushNotifications(token: string | null) {
         responseListener.current.remove();
       }
     };
-  }, [token]);
+  }, [token, userId]);
 
   return {
     expoPushToken,
