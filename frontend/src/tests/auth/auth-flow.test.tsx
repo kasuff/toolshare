@@ -113,6 +113,6 @@ describe("Authentication user journey", () => {
     expect(await screen.findByText("Keine Vorschläge gefunden.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
     expect(screen.getByPlaceholderText("Straße")).toHaveValue("");
-    expect(screen.getByPlaceholderText("Hausnummer")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Hausnr.")).toHaveValue("");
   });
 });
