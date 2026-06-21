@@ -15,6 +15,8 @@ COPY src ./src
 FROM base AS dev
 ENV NODE_ENV=development
 EXPOSE 4000
+# Drop root: the node image ships a non-privileged "node" user (uid 1000).
+USER node
 CMD ["npm", "run", "dev"]
 
 FROM base AS build
@@ -34,4 +36,6 @@ COPY --from=build /app/prisma ./prisma
 RUN npx prisma generate
 
 EXPOSE 4000
+# Drop root: the node image ships a non-privileged "node" user (uid 1000).
+USER node
 CMD ["node", "dist/index.js"]

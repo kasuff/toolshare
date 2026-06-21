@@ -9,6 +9,8 @@ RUN npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtim
 COPY . .
 
 EXPOSE 3000
+# Drop root: the node image ships a non-privileged "node" user (uid 1000).
+USER node
 CMD ["npm", "run", "dev", "--workspace=frontend", "--", "--host", "0.0.0.0", "--port", "3000"]
 
 FROM node:20-bookworm-slim AS build
