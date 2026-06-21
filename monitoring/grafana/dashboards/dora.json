@@ -1,0 +1,178 @@
+{
+  "__inputs": [
+    { "name": "DS_PROMETHEUS", "label": "Prometheus", "type": "datasource", "pluginId": "prometheus" }
+  ],
+  "__requires": [
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "uid": "toolshare-dora",
+  "title": "DORA Metrics",
+  "description": "Deployment Frequency, Lead Time for Changes, Change Failure Rate, Time to Restore Service – über die Zeit. PDF-Export: http://<host>:9110/report.pdf?days=90",
+  "tags": ["dora", "delivery", "toolshare"],
+  "timezone": "browser",
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "time": { "from": "now-90d", "to": "now" },
+  "timepicker": {},
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Deployment Frequency (akt. Fenster)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_deployment_frequency_per_day", "legendFormat": "Deploys/Tag", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "graphMode": "area" }
+    },
+    {
+      "id": 2,
+      "title": "Lead Time for Changes (Median)",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_lead_time_seconds", "legendFormat": "Lead Time", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "graphMode": "area" }
+    },
+    {
+      "id": 3,
+      "title": "Change Failure Rate (akt. Fenster)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_change_failure_rate", "legendFormat": "CFR", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.15 },
+              { "color": "red", "value": 0.3 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "graphMode": "area", "colorMode": "value" }
+    },
+    {
+      "id": 4,
+      "title": "Time to Restore Service (Median)",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_time_to_restore_seconds", "legendFormat": "TTR", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3600 },
+              { "color": "red", "value": 86400 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "graphMode": "area", "colorMode": "value" }
+    },
+
+    {
+      "id": 10,
+      "title": "Deployment Frequency über die Zeit",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_deployment_frequency_per_day", "legendFormat": "rollierend (Fenster)", "refId": "A" },
+        { "expr": "increase(dora_deployments[7d]) / 7", "legendFormat": "Deploys/Tag (7d-increase)", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 2, "custom": { "lineWidth": 2, "fillOpacity": 12 } }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Change Failure Rate über die Zeit",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_change_failure_rate", "legendFormat": "rollierend (Fenster)", "refId": "A" },
+        { "expr": "clamp_min(increase(dora_failures[30d]), 0) / clamp_min(increase(dora_deployments[30d]), 1)", "legendFormat": "30d-increase", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "custom": { "lineWidth": 2, "fillOpacity": 12 },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.15 }] }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Lead Time for Changes über die Zeit (Median)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_lead_time_seconds", "legendFormat": "Lead Time (Median)", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 12 } }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Time to Restore Service über die Zeit",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "dora_time_to_restore_seconds", "legendFormat": "TTR (Median, Fenster)", "refId": "A" },
+        { "expr": "clamp_min(increase(dora_restore_seconds[30d]), 0) / clamp_min(increase(dora_restored_incidents[30d]), 1)", "legendFormat": "MTTR (30d-increase)", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 12 } }
+      }
+    },
+
+    {
+      "id": 20,
+      "title": "PDF-Export",
+      "type": "text",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 3 },
+      "options": {
+        "mode": "markdown",
+        "content": "**PDF-Report erstellen:** `http://<host>:9110/report.pdf?days=90` im Browser öffnen (Zeitraum über `?days=` wählbar, 1–730 Tage). Der Report enthält die Kennzahlen-Übersicht mit DORA-Einordnung und die vier Wochentrends.\n\n_Ausfall-Quelle für CFR & Time to Restore: kritische Prometheus-Alerts (kein manuelles Markieren nötig)._"
+      }
+    }
+  ]
+}

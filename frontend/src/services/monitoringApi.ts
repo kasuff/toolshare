@@ -47,7 +47,19 @@ export type LogsResponse = {
 };
 
 export type ExportRange = "1h" | "24h" | "7d";
-export type ExportFormat = "json" | "csv";
+export type ExportFormat = "json" | "csv" | "pdf";
+
+export type DoraMetrics = {
+  collectedAt: string;
+  windowDays: number | null;
+  lastCollectedAt: string | null;
+  deploymentFrequencyPerDay: number | null;
+  leadTimeSeconds: number | null;
+  changeFailureRate: number | null; // 0..1
+  timeToRestoreSeconds: number | null;
+  deploymentsInWindow: number | null;
+  failuresInWindow: number | null;
+};
 
 // ── Grafana Panel URLs ────────────────────────────────────────────────────────
 
@@ -92,6 +104,10 @@ export const monitoringApi = {
     return monitoringFetch<LogsResponse>(`/logs${qs}`, token);
   },
 
+  getDora(token: string): Promise<DoraMetrics> {
+    return monitoringFetch<DoraMetrics>("/dora", token);
+  },
+
   // Lädt Exportdaten als Blob und löst Browser-Download aus
   async downloadExport(token: string, format: ExportFormat, range: ExportRange): Promise<void> {
     const res = await fetch(
@@ -100,16 +116,31 @@ export const monitoringApi = {
     );
     if (!res.ok) throw new Error(`Export fehlgeschlagen: ${res.statusText}`);
 
-    const disposition = res.headers.get("Content-Disposition") ?? "";
-    const filenameMatch = disposition.match(/filename="([^"]+)"/);
-    const filename = filenameMatch?.[1] ?? `export-${range}.${format}`;
+    await triggerDownload(res, `export-${range}.${format}`);
+  },
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Lädt den DORA-PDF-Report (Backend proxyt den dora-exporter)
+  async downloadDoraReport(token: string, days: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/monitoring/dora/report.pdf?days=${days}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`PDF-Export fehlgeschlagen: ${res.statusText}`);
+
+    await triggerDownload(res, `toolshare-dora-${days}d.pdf`);
   }
 };
+
+// Löst aus einer fetch-Response einen Browser-Download aus.
+async function triggerDownload(res: Response, fallbackName: string): Promise<void> {
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const filenameMatch = disposition.match(/filename="([^"]+)"/);
+  const filename = filenameMatch?.[1] ?? fallbackName;
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

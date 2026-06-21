@@ -61,3 +61,14 @@ scrape_configs:
         labels:
           service: "grafana"
     metrics_path: /metrics
+
+  # ── DORA Exporter (Deployment Freq, Lead Time, CFR, Time to Restore) ───────
+  - job_name: "dora-exporter"
+    static_configs:
+      - targets: ["dora-exporter:9110"]
+        labels:
+          service: "dora-exporter"
+          app: "toolshare"
+    metrics_path: /metrics
+    # DORA-Werte ändern sich langsam – seltener scrapen reicht.
+    scrape_interval: 60s
