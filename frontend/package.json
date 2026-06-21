@@ -13,8 +13,10 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "test": "vitest run",
+    "test:a11y": "vitest run tests/accessibility --maxWorkers=1",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lighthouse": "lhci autorun"
   },
   "dependencies": {
     "@toolshare/shared": "file:../shared",
@@ -23,10 +25,12 @@
     "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.15.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
+    "@types/jest-axe": "^3.5.9",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.59.2",
@@ -35,19 +39,22 @@
     "@vitest/coverage-istanbul": "^4.1.5",
     "@vitest/coverage-v8": "^4.1.5",
     "@vitest/ui": "^4.1.5",
+    "axe-core": "^4.12.1",
     "c8": "^11.0.0",
     "chai": "^6.2.2",
     "estree-walker": "^3.0.3",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-prettier": "^5.1.2",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.7",
+    "jest-axe": "^10.0.0",
     "jsdom": "^23.0.1",
     "prettier": "^3.1.1",
     "typescript": "^5.5.4",
-    "vite": "^8.0.10",
+    "vite": "8.0.10",
     "vitest": "^4.1.5"
   }
 }

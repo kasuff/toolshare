@@ -42,7 +42,7 @@ body,
   height: 100%;
   margin: 0;
   color: var(--color-text);
-  overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior-x: none;
 }
 
@@ -173,7 +173,7 @@ select:focus {
 textarea {
   width: 100%;
   min-height: 120px;
-  resize: none;
+  resize: vertical;
   border: 1px solid var(--color-border-interactive);
   border-radius: var(--radius-md);
   background: #fff;
@@ -203,6 +203,36 @@ button:disabled {
 :focus-visible {
   outline: 2px solid #D14700;
   outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 1000;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-text);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(calc(-100% - var(--space-4)));
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 .app-shell {
@@ -1366,6 +1396,7 @@ button.mini {
 }
 
 .ds-workshop-card {
+  position: relative;
   width: 100%;
   max-width: 100%;
   border: 1px solid #e5e7eb;
@@ -1813,9 +1844,26 @@ button.mini {
   color: var(--color-text-muted);
 }
 
-.address-suggestion-item:hover {
+.address-suggestion-item:hover,
+.address-suggestion-item.is-active {
   background: var(--color-brand-soft);
   color: var(--color-brand-strong);
+}
+
+.offer-card-activation {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ds-workshop-card:has(.offer-card-activation:focus-visible) {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
 }
 
 .address-suggestion-empty {
@@ -1897,6 +1945,14 @@ button.mini {
 .input-invalid {
   border-color: var(--color-danger);
   background: #fff5f5;
+}
+
+.address-suggestion-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
 }
 
 .field-error {
@@ -2396,7 +2452,7 @@ summary {
 }
 
 .auth-brand {
-  background: linear-gradient(165deg, #ff8533 0%, var(--color-brand) 100%);
+  background: linear-gradient(165deg, var(--color-brand) 0%, var(--color-brand-strong) 100%);
   color: #ffffff;
   padding: 2.2rem;
   display: grid;
@@ -2433,13 +2489,13 @@ summary {
 .auth-brand p {
   font-size: 16px;
   line-height: 26px;
-  color: rgba(255, 255, 255, 0.92);
+  color: #ffffff;
   position: relative;
   z-index: 1;
 }
 
 .auth-brand p.eyebrow {
-  color: rgba(255, 255, 255, 0.9);
+  color: #ffffff;
   font-size: 14px;
   font-weight: 700;
   text-transform: uppercase;
@@ -2736,6 +2792,25 @@ td {
   flex-wrap: wrap;
 }
 
+.admin-user-table-scroll {
+  max-width: 100%;
+}
+
+.admin-user-table {
+  min-width: 44rem;
+}
+
+@media (max-width: 640px) {
+  .admin-tabs {
+    flex-wrap: wrap;
+  }
+
+  .admin-user-search input {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 .moderation-report-list {
   list-style: none;
   margin: 0;
@@ -2893,6 +2968,31 @@ td {
 }
 
 @media (max-width: 640px) {
+  .auth-wrapper,
+  .auth-card,
+  .auth-brand,
+  .auth-form {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .auth-brand,
+  .auth-form {
+    padding: var(--space-5);
+  }
+
+  .auth-brand h1,
+  .auth-form h2 {
+    font-size: 1.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-brand p,
+  .auth-switch {
+    overflow-wrap: anywhere;
+  }
+
   .topbar:has(.role-switcher) .topbar-right {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -2958,6 +3058,7 @@ td {
 
 @media (max-width: 380px) {
   .topbar {
+    grid-template-columns: minmax(0, 1fr) 44px auto;
     padding-inline: var(--space-3);
   }
 
@@ -3477,6 +3578,9 @@ td {
   .discover-hero {
     height: auto;
     min-height: 420px;
+    display: flex;
+    align-items: flex-end;
+    padding: var(--space-4);
     overflow: hidden;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
@@ -3494,11 +3598,13 @@ td {
   }
 
   .discover-hero-copy {
+    position: relative;
     top: auto;
-    right: var(--space-4);
-    bottom: var(--space-4);
-    left: var(--space-4);
-    width: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+    margin-top: 220px;
     padding: var(--space-5);
     transform: none;
   }
@@ -3522,6 +3628,7 @@ td {
   }
 
   .discover-hero-copy {
+    margin-top: 180px;
     padding: var(--space-4);
   }
 
@@ -4357,13 +4464,15 @@ td {
   gap: var(--space-3);
 }
 
-.booking-fields-row label {
+.booking-fields-row label,
+.booking-fields-row .booking-field {
   display: grid;
   gap: var(--space-2);
   min-width: 0;
 }
 
-.booking-fields-row label > span {
+.booking-fields-row label > span,
+.booking-fields-row .booking-field > span {
   color: var(--color-text);
   font-size: 14px;
   line-height: 21px;
@@ -6526,7 +6635,8 @@ button .material-symbols-outlined {
   grid-template-columns: minmax(0, 1fr) minmax(7rem, 0.65fr);
 }
 
-.request-card-form-grid label {
+.request-card-form-grid label,
+.request-card-form-grid .booking-field {
   min-width: 0;
   display: grid;
   gap: var(--space-2);
@@ -7316,4 +7426,41 @@ button.active {
 
 .system-rules-info-list span {
   color: var(--color-text-muted);
+}
+
+.request-message-read-button {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .skip-link,
+  .btn,
+  button,
+  input,
+  select,
+  textarea,
+  .status-pill,
+  .workshop-card,
+  .ds-workshop-card {
+    forced-color-adjust: auto;
+  }
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-text) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 2px var(--color-surface) !important;
 }

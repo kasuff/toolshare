@@ -93,7 +93,7 @@ describe("WorkshopsPage coverage", () => {
         createdIso: "2026-05-02T12:00:00.000Z"
       }
     ]);
-    fireEvent.click(screen.getByText("Maker Space").closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Maker Space: Details anzeigen" }));
     expect(await screen.findByRole("heading", { name: "Bewertungen" })).toBeInTheDocument();
     expect(screen.getByText("Gute Ausstattung")).toBeInTheDocument();
     expect(getRatingsForWorkshop).toHaveBeenCalledWith("w1");
@@ -133,7 +133,7 @@ describe("WorkshopsPage coverage", () => {
     renderWorkshopsPage();
 
     expect(await screen.findByText("Holzwerkstatt")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Holzwerkstatt").closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Holzwerkstatt: Details anzeigen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Anfrage senden" }));
 
     await waitFor(() => {
@@ -179,7 +179,7 @@ describe("WorkshopsPage coverage", () => {
 
     renderWorkshopsPage();
 
-    fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
+    fireEvent.click(await screen.findByRole("button", { name: "Holzwerkstatt: Details anzeigen" }));
     const detail = await screen.findByRole("region", { name: "Holzwerkstatt" });
     fireEvent.click(within(detail).getByRole("button", { name: "Werkstatt melden" }));
     const reportDialog = screen.getByRole("dialog");

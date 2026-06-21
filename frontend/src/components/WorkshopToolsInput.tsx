@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import {  TOOL_CATEGORIES  } from "@toolshare/shared";
+import { useId, useMemo, useState } from "react";
+import { TOOL_CATEGORIES } from "@toolshare/shared";
 
 export type WorkshopToolDraftItem = {
   name: string;
@@ -16,6 +16,10 @@ interface WorkshopToolsInputProps {
 export function WorkshopToolsInput({ items, onChange, label, hint }: WorkshopToolsInputProps) {
   const [toolName, setToolName] = useState("");
   const [category, setCategory] = useState(TOOL_CATEGORIES[0]?.value ?? "sonstiges");
+  const categoryId = useId();
+  const toolNameId = useId();
+  const labelId = useId();
+  const hintId = useId();
 
   const categoriesByValue = useMemo(
     () => new Map(TOOL_CATEGORIES.map((entry) => [entry.value, entry.label] as const)),
@@ -36,21 +40,23 @@ export function WorkshopToolsInput({ items, onChange, label, hint }: WorkshopToo
   };
 
   return (
-    <div className="workshop-tools-builder">
-      <label>
-        <strong>{label}</strong>
-      </label>
-      {hint && <p className="hint">{hint}</p>}
+    <div className="workshop-tools-builder" role="group" aria-labelledby={labelId} aria-describedby={hint ? hintId : undefined}>
+      <strong id={labelId}>{label}</strong>
+      {hint && <p id={hintId} className="hint">{hint}</p>}
 
       <div className="workshop-tools-input-row">
-        <select value={category} onChange={(event) => setCategory(event.target.value)}>
+        <label className="visually-hidden" htmlFor={categoryId}>Werkzeugkategorie</label>
+        <select id={categoryId} value={category} onChange={(event) => setCategory(event.target.value)} aria-describedby={hint ? hintId : undefined}>
           {TOOL_CATEGORIES.map((entry) => (
             <option key={entry.value} value={entry.value}>
               {entry.label}
             </option>
           ))}
         </select>
+        <label className="visually-hidden" htmlFor={toolNameId}>Werkzeugname</label>
         <input
+          id={toolNameId}
+          aria-describedby={hint ? hintId : undefined}
           value={toolName}
           onChange={(event) => setToolName(event.target.value)}
           placeholder="Werkzeugname (z.B. Bosch Akkuschrauber)"
@@ -67,7 +73,12 @@ export function WorkshopToolsInput({ items, onChange, label, hint }: WorkshopToo
               <span>
                 <strong>{item.name}</strong> · {categoriesByValue.get(item.category) ?? item.category}
               </span>
-              <button type="button" className="btn ghost danger" onClick={() => removeItem(index)}>
+              <button
+                type="button"
+                className="btn ghost danger"
+                onClick={() => removeItem(index)}
+                aria-label={`${item.name} aus der Ausstattung entfernen`}
+              >
                 Entfernen
               </button>
             </li>

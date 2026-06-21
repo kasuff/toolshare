@@ -19,6 +19,7 @@ type Props = {
 
 export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Props) {
   const profileMenuRef = useRef<HTMLDetailsElement>(null);
+  const mainContentRef = useRef<HTMLElement>(null);
   const location = useLocation();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -50,6 +51,31 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
 
   useEffect(() => {
     setIsMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const routeTitles: Array<[RegExp, string]> = [
+      [/^\/$/, "Entdecken"],
+      [/^\/auth$/, "Anmelden"],
+      [/^\/tools\/new$/, "Werkzeug einstellen"],
+      [/^\/tools\/[^/]+\/edit$/, "Werkzeug bearbeiten"],
+      [/^\/tools\/[^/]+$/, "Werkzeugdetails"],
+      [/^\/tools$/, "Werkzeuge"],
+      [/^\/workshops\/new$/, "Werkstatt einstellen"],
+      [/^\/workshops\/availability$/, "Verfügbarkeit verwalten"],
+      [/^\/workshops\/[^/]+\/edit$/, "Werkstatt bearbeiten"],
+      [/^\/workshops\/[^/]+$/, "Werkstattdetails"],
+      [/^\/workshops$/, "Werkstätten"],
+      [/^\/offers$/, "Meine Angebote"],
+      [/^\/profile$/, "Einstellungen"],
+      [/^\/inbox$/, "Nachrichten"],
+      [/^\/moderation$/, "Moderation"],
+      [/^\/admin$/, "Admin"],
+      [/^\/impressum$/, "Impressum"],
+      [/^\/datenschutz$/, "Datenschutzerklärung"]
+    ];
+    const pageTitle = routeTitles.find(([pattern]) => pattern.test(location.pathname))?.[1] ?? "ToolShare";
+    document.title = pageTitle === "ToolShare" ? pageTitle : `${pageTitle} | ToolShare`;
   }, [location.pathname]);
 
   useEffect(() => {
@@ -134,6 +160,16 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
 
   return (
     <div className="app-shell">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          mainContentRef.current?.focus();
+        }}
+      >
+        Zum Hauptinhalt
+      </a>
       <header className="topbar">
         <div className="topbar-inner">
           <Link to="/" className="logo">
@@ -171,7 +207,8 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
             {users.length > 1 && <RoleSwitcher users={users} currentUserId={currentUser?.id} onChange={onSwitchUser} />}
             {currentUser ? (
               <>
-                <Link to="/inbox" className="notification-bell-wrap" aria-label={inboxAriaLabel}>
+                <Link to="/inbox" className="notification-bell-wrap">
+                  <span className="visually-hidden">{inboxAriaLabel}</span>
                   <span className="notification-bell">
                     <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
                       <path d="M12 3.75a6 6 0 0 0-6 6v2.5a4.5 4.5 0 0 1-.92 2.72L3.8 16.62a1.5 1.5 0 0 0 1.2 2.38h14a1.5 1.5 0 0 0 1.2-2.38l-1.28-1.65a4.5 4.5 0 0 1-.92-2.72v-2.5a6 6 0 0 0-6-6Zm0 18a3.25 3.25 0 0 0 3.03-2.06.75.75 0 1 0-1.39-.57 1.75 1.75 0 0 1-3.28 0 .75.75 0 1 0-1.39.57A3.25 3.25 0 0 0 12 21.75Z" />
@@ -184,7 +221,8 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
                   )}
                 </Link>
                 <details className="profile-menu" ref={profileMenuRef}>
-                  <summary aria-label="Profil-Menü öffnen">
+                  <summary>
+                    <span className="visually-hidden">Profil-Menü öffnen</span>
                     <span className="profile-avatar" aria-hidden="true">
                       <svg viewBox="0 0 24 24" role="img" focusable="false">
                         <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-4.14 0-7.5 2.69-7.5 6a.75.75 0 0 0 1.5 0c0-2.47 2.69-4.5 6-4.5s6 2.03 6 4.5a.75.75 0 0 0 1.5 0c0-3.31-3.36-6-7.5-6Z" />
@@ -214,7 +252,7 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
         </div>
       </header>
 
-      <main className="content">
+      <main ref={mainContentRef} id="main-content" className="content" tabIndex={-1}>
         <Outlet />
       </main>
 

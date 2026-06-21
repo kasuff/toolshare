@@ -107,7 +107,7 @@ describe("Guest protected actions", () => {
 
     renderWithRoutes(<WorkshopsPage />, "/workshops");
 
-    fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
+    fireEvent.click(await screen.findByRole("button", { name: "Holzwerkstatt: Details anzeigen" }));
     fireEvent.click(await screen.findByRole("button", { name: "Jetzt einloggen" }));
 
     expect(await screen.findByTestId("redirect-hint")).toHaveTextContent(
@@ -163,7 +163,7 @@ describe("Guest protected actions", () => {
     expect(toolFilter).toHaveTextContent("Bandsäge");
     expect(toolFilter).not.toHaveTextContent("Schleifer");
 
-    fireEvent.click((await screen.findByText("Holzwerkstatt")).closest("article")!);
+    fireEvent.click(await screen.findByRole("button", { name: "Holzwerkstatt: Details anzeigen" }));
 
     expect((await screen.findAllByText("Bandsäge")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Schleifer").length).toBeGreaterThan(0);

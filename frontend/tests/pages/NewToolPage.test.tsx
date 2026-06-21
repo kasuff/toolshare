@@ -70,7 +70,7 @@ function fillRequiredFields(options: { withImage?: boolean; container?: HTMLElem
     ),
     { target: { value: "Sehr gut erhalten" } }
   );
-  fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Kategorie *" }), { target: { value: "holz" } });
   fillManualAddress();
 
   if (options.withImage && options.container) {
@@ -114,7 +114,7 @@ describe("NewToolPage", () => {
       await screen.findByText("Bitte gib eine Beschreibung mit mindestens 5 Zeichen ein.")
     ).toBeInTheDocument();
 
-    fireEvent.blur(screen.getByRole("combobox"));
+    fireEvent.blur(screen.getByRole("combobox", { name: "Kategorie *" }));
     expect(await screen.findByText("Bitte wähle eine Kategorie aus.")).toBeInTheDocument();
 
     fillManualAddress();

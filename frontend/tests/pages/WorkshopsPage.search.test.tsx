@@ -244,7 +244,7 @@ describe("WorkshopsPage search filters", () => {
     const blockedCard = (await screen.findByText("Blockierte Werkstatt")).closest("article")!;
     expect(within(blockedCard).getByText("0 Slots")).toHaveClass("unavailable");
 
-    fireEvent.click(screen.getByText("Nähstube").closest("article")!);
+    fireEvent.click(screen.getByRole("button", { name: "Nähstube: Details anzeigen" }));
 
     expect(await screen.findByRole("region", { name: "Nähstube" })).toBeInTheDocument();
     expect(screen.getByTestId("location-path")).toHaveTextContent("/workshops/available");
@@ -362,7 +362,7 @@ describe("WorkshopsPage search filters", () => {
     fireEvent.change(screen.getByLabelText("Startzeit Eigenbedarf"), { target: { value: "09:00" } });
     fireEvent.change(screen.getByLabelText("Enddatum Eigenbedarf"), { target: { value: "2026-07-08" } });
     fireEvent.change(screen.getByLabelText("Endzeit Eigenbedarf"), { target: { value: "12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
     await waitFor(() =>
       expect(createWorkshopTimeslot).toHaveBeenCalledWith(
         "own",

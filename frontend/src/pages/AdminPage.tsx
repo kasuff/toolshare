@@ -162,10 +162,11 @@ export function AdminPage({ currentUser, token }: Props) {
   }
 
   const tabNav = (
-    <nav className="monitoring-tabs">
+    <nav className="monitoring-tabs admin-tabs" aria-label="Admin-Bereiche">
       <button
         type="button"
         className={`monitoring-tab ${adminTab === "management" ? "active" : ""}`}
+        aria-pressed={adminTab === "management"}
         onClick={() => setAdminTab("management")}
       >
         Verwaltung
@@ -173,6 +174,7 @@ export function AdminPage({ currentUser, token }: Props) {
       <button
         type="button"
         className={`monitoring-tab ${adminTab === "rules" ? "active" : ""}`}
+        aria-pressed={adminTab === "rules"}
         onClick={() => setAdminTab("rules")}
       >
         Systemregeln
@@ -180,6 +182,7 @@ export function AdminPage({ currentUser, token }: Props) {
       <button
         type="button"
         className={`monitoring-tab ${adminTab === "monitoring" ? "active" : ""}`}
+        aria-pressed={adminTab === "monitoring"}
         onClick={() => setAdminTab("monitoring")}
       >
         Monitoring
@@ -312,7 +315,7 @@ export function AdminPage({ currentUser, token }: Props) {
       </Surface>
 
       <Surface title="Nutzerverwaltung" subtitle="Suche nach Nutzern und verwalte Rollen sowie Kontostatus.">
-        <form className="row" onSubmit={onSearchSubmit}>
+        <form className="row admin-user-search" onSubmit={onSearchSubmit} aria-label="Nutzerverwaltung durchsuchen">
           <input
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
@@ -338,25 +341,28 @@ export function AdminPage({ currentUser, token }: Props) {
         )}
 
         {!isLoading && users.length > 0 && (
-          <div className="table-scroll">
-            <table>
+          <div className="table-scroll admin-user-table-scroll">
+            <table className="admin-user-table">
+              <caption className="visually-hidden">
+                Nutzerverwaltung mit Rollen, Kontostatus und verfügbaren Aktionen
+              </caption>
               <thead>
                 <tr>
-                  <th>Nutzer</th>
-                  <th>Rolle</th>
-                  <th>Status</th>
-                  <th>Aktionen</th>
+                  <th scope="col">Nutzer</th>
+                  <th scope="col">Rolle</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Aktionen</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
                   <tr key={user.id}>
-                    <td>
+                    <th scope="row">
                       <div className="admin-user-meta">
                         <strong>{user.name}</strong>
                         <span>{user.email}</span>
                       </div>
-                    </td>
+                    </th>
                     <td>
                       <StatusPill
                         label={user.role}
@@ -373,6 +379,11 @@ export function AdminPage({ currentUser, token }: Props) {
                           className="btn secondary mini"
                           onClick={() => updateRole(user.id, user.role === "MODERATOR" ? "NUTZER" : "MODERATOR")}
                           disabled={busyUserId === user.id || user.role === "ADMIN"}
+                          aria-label={
+                            user.role === "MODERATOR"
+                              ? `Moderatorrolle von ${user.name} entfernen`
+                              : `${user.name} zum Moderator machen`
+                          }
                         >
                           {user.role === "MODERATOR" ? "Moderator entfernen" : "Zum Moderator machen"}
                         </button>
@@ -381,6 +392,7 @@ export function AdminPage({ currentUser, token }: Props) {
                           className={`btn mini ${user.isSuspended ? "secondary" : ""}`.trim()}
                           onClick={() => updateSuspension(user.id, !user.isSuspended)}
                           disabled={busyUserId === user.id || user.role === "ADMIN" || user.id === currentUser?.id}
+                          aria-label={`${user.name} ${user.isSuspended ? "entsperren" : "sperren"}`}
                         >
                           {user.isSuspended ? "Entsperren" : "Sperren"}
                         </button>

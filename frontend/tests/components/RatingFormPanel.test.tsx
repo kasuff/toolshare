@@ -58,14 +58,15 @@ describe("RatingFormPanel", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("closes via backdrop click and Später button", () => {
+  it("closes via Escape and Später button", () => {
     const onCancel = vi.fn();
     render(<RatingFormPanel {...baseProps} onCancel={onCancel} />);
 
+    expect(screen.getByRole("button", { name: "Schließen" })).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "Später" }));
     expect(onCancel).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("presentation"));
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
 });

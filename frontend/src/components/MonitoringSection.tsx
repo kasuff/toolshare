@@ -257,7 +257,7 @@ function ExportBar({ token }: { token: string }) {
           {busy === "csv" ? "…" : "↓ CSV"}
         </button>
       </div>
-      {error && <span className="field-error">{error}</span>}
+      {error && <span className="field-error" role="alert">{error}</span>}
     </div>
   );
 }

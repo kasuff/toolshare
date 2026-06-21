@@ -32,6 +32,8 @@ npm-debug.log*
 
 # Testing
 coverage/
+.lighthouseci/
+lighthouse-results/
 frontend/src/**/*.js
 
 # Docker

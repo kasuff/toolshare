@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import {  api, type ModerationReport  } from "@toolshare/shared";
+import { api, type ModerationReport } from "@toolshare/shared";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 type Props = {
   token?: string;
@@ -115,6 +116,10 @@ function ReportActions({
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [actionReason, setActionReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const closeDialog = useCallback(() => setDialogMode(null), []);
+  useModalFocus(dialogRef, closeDialog, reasonRef, dialogMode !== null);
 
   const subjectId = report.subjectUserId;
   const canActOnUser = Boolean(subjectId);
@@ -260,13 +265,14 @@ function ReportActions({
       </div>
 
       {dialogMode && (
-        <div className="report-form-backdrop" role="presentation" onClick={() => setDialogMode(null)}>
+        <div className="report-form-backdrop" role="presentation">
           <section
+            ref={dialogRef}
             className="report-form-panel"
             role="dialog"
             aria-modal="true"
             aria-labelledby="moderation-action-title"
-            onClick={(event) => event.stopPropagation()}
+            tabIndex={-1}
           >
             <header className="report-form-head">
               <h2 id="moderation-action-title">
@@ -280,7 +286,7 @@ function ReportActions({
                         ? "Angebot löschen"
                         : "Werkstatt löschen"}
               </h2>
-              <button type="button" className="icon-button" onClick={() => setDialogMode(null)} aria-label="Schließen">
+              <button type="button" className="icon-button" onClick={closeDialog} aria-label="Schließen">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
@@ -305,6 +311,7 @@ function ReportActions({
                         : "Grund für das Herunternehmen"}
                 </span>
                 <textarea
+                  ref={reasonRef}
                   value={actionReason}
                   onChange={(event) => setActionReason(event.target.value)}
                   required
@@ -320,7 +327,7 @@ function ReportActions({
                 />
               </label>
               <div className="row">
-                <button type="button" className="btn secondary" onClick={() => setDialogMode(null)} disabled={busy}>
+                <button type="button" className="btn secondary" onClick={closeDialog} disabled={busy}>
                   Abbrechen
                 </button>
                 <button
@@ -414,8 +421,8 @@ export function ModerationPage({ token }: Props) {
       </Surface>
 
       <Surface title="Archiv" subtitle="Abgeschlossene Meldungen mit dokumentierter Entscheidung.">
-        <details className="moderation-archive">
-          <summary>
+        <details className="moderation-archive" aria-labelledby="moderation-archive-summary">
+          <summary id="moderation-archive-summary">
             Abgeschlossene Meldungen anzeigen ({closedReports.length}
             {rejectedCount > 0 ? `, davon ${rejectedCount} verworfen` : ""})
           </summary>
@@ -424,8 +431,9 @@ export function ModerationPage({ token }: Props) {
           ) : (
             <>
               <div className="row archive-limit-row" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
-                <span className="hint">Einträge anzeigen:</span>
+                <label className="hint" htmlFor="moderation-archive-limit">Einträge anzeigen:</label>
                 <select
+                  id="moderation-archive-limit"
                   value={archiveLimit}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -440,11 +448,12 @@ export function ModerationPage({ token }: Props) {
                   <option value="all">Alle</option>
                 </select>
               </div>
-              <ul className="moderation-report-list">
+              <ul className="moderation-report-list" aria-label="Abgeschlossene Meldungen">
                 {displayedReports.map((report) => (
                   <li
                     key={report.id}
                     className={`inbox-item moderation-report moderation-report--closed${report.status === "REJECTED" ? " moderation-report--rejected" : ""}`}
+                    aria-label={`${targetTypeLabel[report.targetType]} ${report.targetLabel}, ${statusPresentation[report.status].label}`}
                   >
                     <ReportSummary report={report} showDecision />
                   </li>

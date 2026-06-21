@@ -129,12 +129,12 @@ export function ToastViewport() {
     <aside className="toast-backdrop" aria-live="polite" aria-atomic="false">
       <div className="toast-viewport">
       {toasts.map((toast) => (
-        <article key={toast.id} className="toast-popup" role={toast.tone === "error" ? "alert" : "status"}>
+        <div key={toast.id} className="toast-popup" role={toast.tone === "error" ? "alert" : "status"}>
           <p>{toast.text}</p>
           <button className="icon-button" onClick={() => removeToast(toast.id)} aria-label="Meldung schließen">
             <span className="material-symbols-outlined" aria-hidden="true">close</span>
           </button>
-        </article>
+        </div>
       ))}
       </div>
     </aside>

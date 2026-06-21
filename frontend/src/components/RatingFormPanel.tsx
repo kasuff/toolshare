@@ -1,3 +1,5 @@
+import { useCallback, useRef } from "react";
+import { useModalFocus } from "../hooks/useModalFocus";
 import { Field } from "./ui";
 import { StarRatingInput } from "./StarRatingInput";
 
@@ -26,18 +28,30 @@ export function RatingFormPanel({
   onSubmit,
   onCancel
 }: Props) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeDialog = useCallback(() => onCancel(), [onCancel]);
+  useModalFocus(dialogRef, closeDialog, closeButtonRef);
+
   return (
-    <div className="report-form-backdrop" role="presentation" onClick={onCancel}>
+    <div className="report-form-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="report-form-panel rating-form-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="rating-form-title"
-        onClick={(event) => event.stopPropagation()}
+        tabIndex={-1}
       >
         <header className="report-form-head">
           <h2 id="rating-form-title">{title}</h2>
-          <button type="button" className="icon-button" onClick={onCancel} aria-label="Schließen">
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="icon-button"
+            onClick={onCancel}
+            aria-label="Schließen"
+          >
             <span className="material-symbols-outlined">close</span>
           </button>
         </header>

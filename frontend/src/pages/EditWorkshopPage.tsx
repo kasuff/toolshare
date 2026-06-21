@@ -356,7 +356,7 @@ export function EditWorkshopPage({ token, currentUser }: Props) {
             </div>
             <div className="workshop-slot-editor-actions">
               <label className="workshop-block-toggle">
-                <input type="checkbox" checked={slotBlocked} onChange={(event) => setSlotBlocked(event.target.checked)} />
+                <input aria-label="Zeitraum blockieren" type="checkbox" checked={slotBlocked} onChange={(event) => setSlotBlocked(event.target.checked)} />
                 <span><strong>Zeitraum blockieren</strong><small>Für Wartung oder Eigenbedarf</small></span>
               </label>
               <button type="button" className="btn btn-outline" onClick={() => void addSlot()}>

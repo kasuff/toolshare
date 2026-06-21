@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 interface ImageUploadProps {
   onImageSelect: (imageData: string | null) => void;
@@ -14,6 +14,8 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
   const [error, setError] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const hintId = `${inputId}-hint`;
 
   useEffect(() => {
     setPreview(currentImage || null);
@@ -79,13 +81,15 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
 
   return (
     <div className="image-upload">
-      <label htmlFor="image-input">
+      <label htmlFor={inputId}>
         <strong>{label}</strong>
       </label>
-      {hint && <p className="hint">{hint}</p>}
+      {hint && <p id={hintId} className="hint">{hint}</p>}
 
       <button
         type="button"
+        aria-label={`${label}: Bilddatei auswählen`}
+        aria-describedby={hint ? hintId : undefined}
         className={`image-preview-container ${isDragging ? "is-dragging" : ""}`.trim()}
         onClick={openFileDialog}
         onDragEnter={(event) => {
@@ -130,7 +134,7 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
 
       <input
         ref={fileInputRef}
-        id="image-input"
+        id={inputId}
         type="file"
         accept="image/*"
         onChange={handleFileSelect}
@@ -140,6 +144,7 @@ export function ImageUpload({ onImageSelect, currentImage, placeholderImage, lab
       <div className="button-group">
         <button
           type="button"
+          aria-describedby={hint ? hintId : undefined}
           onClick={openFileDialog}
           className="btn btn-secondary"
         >

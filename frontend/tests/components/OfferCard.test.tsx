@@ -1,12 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { OfferCard } from "../../src/components/OfferCard";
 import { formatOfferDistance } from "../../src/utils/offerFormatting";
 
 describe("OfferCard", () => {
-  it("supports keyboard selection and renders a fallback for missing images", () => {
+  it("supports keyboard selection and renders a fallback for missing images", async () => {
     const onSelect = vi.fn();
+    const user = userEvent.setup();
 
     render(
       <MemoryRouter>
@@ -25,11 +27,12 @@ describe("OfferCard", () => {
     const card = screen.getByRole("button", { name: /Werkstatt ohne Bild/i });
     expect(screen.getByTitle("Werkstatt ohne Bild")).toBeInTheDocument();
 
-    fireEvent.keyDown(card, { key: "Escape" });
+    card.focus();
+    await user.keyboard("{Escape}");
     expect(onSelect).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(card, { key: "Enter" });
-    fireEvent.keyDown(card, { key: " " });
+    await user.keyboard("{Enter}");
+    await user.keyboard(" ");
     expect(onSelect).toHaveBeenCalledTimes(2);
   });
 

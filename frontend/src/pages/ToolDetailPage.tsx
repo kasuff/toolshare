@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DateInput } from "../components/DateInput";
 import { DetailTopBar } from "../components/DetailTopBar";
@@ -8,6 +8,7 @@ import { ReportFormPanel } from "../components/ReportFormPanel";
 import {  api  } from "@toolshare/shared";
 import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "@toolshare/shared";
+import { useModalFocus } from "../hooks/useModalFocus";
 import type { PublicRating, Tool, User } from "@toolshare/shared";
 
 type Props = {
@@ -146,6 +147,10 @@ export function ToolDetailPage({ token, currentUser }: Props) {
   const [ratings, setRatings] = useState<PublicRating[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const imageViewerRef = useRef<HTMLDivElement>(null);
+  const imageViewerCloseRef = useRef<HTMLButtonElement>(null);
+  const closeImageViewer = useCallback(() => setIsImageOpen(false), []);
+  useModalFocus(imageViewerRef, closeImageViewer, imageViewerCloseRef, isImageOpen);
 
   useEffect(() => {
     const loadTool = async () => {
@@ -523,7 +528,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                   <strong>{isOwnTool ? "Beginn des Eigenbedarfs" : "Abholdaten"}</strong>
                 </div>
                 <div className="booking-fields-row">
-                  <label>
+                  <div className="booking-field">
                     <span>Datum</span>
                     <DateInput
                       aria-label={isOwnTool ? "Startdatum Eigenbedarf" : "Abholdatum"}
@@ -532,7 +537,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                       onChange={setStartDate}
                       className="booking-input"
                     />
-                  </label>
+                  </div>
                   <label>
                     <span>Uhrzeit</span>
                     <input
@@ -554,7 +559,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                   <strong>{isOwnTool ? "Ende des Eigenbedarfs" : "Abgabedaten"}</strong>
                 </div>
                 <div className="booking-fields-row">
-                  <label>
+                  <div className="booking-field">
                     <span>Datum</span>
                     <DateInput
                       aria-label={isOwnTool ? "Enddatum Eigenbedarf" : "Abgabedatum"}
@@ -563,7 +568,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
                       onChange={setEndDate}
                       className="booking-input"
                     />
-                  </label>
+                  </div>
                   <label>
                     <span>Uhrzeit</span>
                     <input
@@ -579,7 +584,12 @@ export function ToolDetailPage({ token, currentUser }: Props) {
 
               <div className="booking-actions">
                 {isOwnTool ? (
-                  <button className="booking-button" onClick={() => void blockToolForOwnUse()} disabled={isSubmitting}>
+                  <button
+                    className="booking-button"
+                    onClick={() => void blockToolForOwnUse()}
+                    disabled={isSubmitting}
+                    aria-label={`Zeitraum für ${tool.name} blockieren`}
+                  >
                     {isSubmitting ? "Wird blockiert..." : "Zeitraum blockieren"}
                   </button>
                 ) : token ? (
@@ -660,22 +670,24 @@ export function ToolDetailPage({ token, currentUser }: Props) {
 
       {isImageOpen && (
         <div
+          ref={imageViewerRef}
           className="workshop-image-viewer"
           role="dialog"
           aria-modal="true"
           aria-label={`Bild von ${tool.name}`}
-          onClick={() => setIsImageOpen(false)}
+          tabIndex={-1}
         >
           <button
+            ref={imageViewerCloseRef}
             type="button"
             className="workshop-image-viewer-close"
             aria-label="Bildansicht schließen"
             title="Schließen"
-            onClick={() => setIsImageOpen(false)}
+            onClick={closeImageViewer}
           >
             <span className="material-symbols-outlined">close</span>
           </button>
-          <div className="workshop-image-viewer-content" onClick={(event) => event.stopPropagation()}>
+          <div className="workshop-image-viewer-content">
             <img src={toolImage} alt={tool.name} />
           </div>
         </div>
