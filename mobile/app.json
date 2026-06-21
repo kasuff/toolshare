@@ -23,7 +23,7 @@
       }
     },
     "androidStatusBar": {
-      "barStyle": "default",
+      "barStyle": "dark-content",
       "translucent": true
     },
     "web": {

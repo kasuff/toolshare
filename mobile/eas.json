@@ -14,7 +14,8 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://toolshare-app.duckdns.org/api"
+        "EXPO_PUBLIC_API_URL": "https://toolshare-app.duckdns.org/api",
+        "EXPO_USE_METRO_WORKSPACE_ROOT": "0"
       },
       "android": {
         "buildType": "apk"
@@ -22,7 +23,8 @@
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://toolshare-app.duckdns.org/api"
+        "EXPO_PUBLIC_API_URL": "https://toolshare-app.duckdns.org/api",
+        "EXPO_USE_METRO_WORKSPACE_ROOT": "0"
       },
       "android": {
         "buildType": "apk"
