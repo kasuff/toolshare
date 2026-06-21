@@ -52,6 +52,71 @@ PROMETHEUS_RETENTION_SIZE=50GB
 | System Overview     | `toolshare-system`     | CPU, RAM, Disk, Netzwerk            |
 | Application Metrics | `toolshare-application`| HTTP-Traffic, Fehler, Antwortzeiten |
 | Log Analysis        | `toolshare-logs`       | Fehlerlogs, Warnungen, Log-Streams  |
+| DORA Metrics        | `toolshare-dora`       | Deployment Freq, Lead Time, CFR, TTR|
+
+---
+
+## DORA-Metriken
+
+Da GitLab **Free** weder die DORA-Charts noch die DORA-API anbietet, berechnet
+der `dora-exporter` (Service im Stack) die vier Metriken selbst und stellt sie
+als Prometheus-Metriken bereit. Das Dashboard `toolshare-dora` zeigt sie *über
+die Zeit*.
+
+| Metrik | Quelle |
+|--------|--------|
+| Deployment Frequency | GitLab Deployments-API (Production-Environment) |
+| Lead Time for Changes | GitLab Deployments-API (Commit → Deploy-Ende) |
+| Change Failure Rate | Ausfall-Episoden ÷ Deployments |
+| Time to Restore Service | Dauer der Ausfall-Episoden |
+
+### Ausfälle markieren – mit dem geringsten Aufwand
+
+**Default: gar nicht manuell markieren.** `OUTAGE_SOURCE=prometheus_alerts`
+leitet Ausfälle automatisch aus den feuernden **kritischen** Prometheus-Alerts
+ab (`BackendDown`, `CriticalHttpErrorRate`, …). Jede zusammenhängende
+Feuer-Phase = ein Ausfall; ihre Dauer = Time to Restore. Kein Incident-Anlegen,
+kein Klick.
+
+> Reichweite ist durch die Prometheus-Retention begrenzt (`PROMETHEUS_RETENTION`,
+> Default 30d / prod 90d). Wer längere CFR-Historie braucht, erhöht die Retention
+> oder nutzt `OUTAGE_SOURCE=gitlab_incidents` (GitLab-Issues vom Typ *incident*,
+> created_at → closed_at).
+
+### Voraussetzungen
+
+1. **Production-Environment** in `.gitlab-ci.yml` mit `deployment_tier: production`
+   (sonst zählt GitLab keine Deployments).
+2. **GitLab-Token** mit Scope `read_api` als `GITLAB_TOKEN` setzen.
+
+### Konfiguration (`.env`)
+
+```bash
+GITLAB_URL=https://gitlab.lrz.de
+GITLAB_PROJECT=gruppe/toolshare      # Pfad oder numerische Projekt-ID
+GITLAB_TOKEN=glpat-xxxxxxxxxxxx      # Scope: read_api
+GITLAB_PRODUCTION_ENV=production     # Name der Production-Environment
+DORA_OUTAGE_SOURCE=prometheus_alerts # oder: gitlab_incidents
+DORA_OUTAGE_SEVERITY=critical
+DORA_WINDOW_DAYS=30                  # rollierendes Fenster für CFR/Frequency
+DORA_COLLECT_INTERVAL=300            # Sammel-Intervall in Sekunden
+```
+
+### PDF-Export
+
+Der Exporter erzeugt den Report on demand – einfach im Browser öffnen:
+
+```
+http://<host>:9110/report.pdf?days=90
+```
+
+`?days=` wählt den Zeitraum (1–730). Der PDF enthält Deckblatt (Kennzahlen +
+DORA-Einordnung Elite/High/Medium/Low) und vier Wochentrends. Die Daten werden
+für den Report direkt aus den Quellen neu berechnet – also auch direkt nach dem
+ersten Start vollständig.
+
+> Hinweis: Grafanas eingebautes PDF-*Reporting* ist Enterprise-only; deshalb
+> erzeugt der Exporter den PDF selbst (matplotlib), unabhängig von Grafana.
 
 ---
 

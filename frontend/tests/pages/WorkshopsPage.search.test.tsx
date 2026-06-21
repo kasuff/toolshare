@@ -264,7 +264,7 @@ describe("WorkshopsPage search filters", () => {
       expect(createWorkshopBooking).toHaveBeenCalledWith(
         expect.objectContaining({
           workshopId: "available",
-          workshopToolIds: ["needle"]
+          workshopToolIds: []
         }),
         "token-123"
       )

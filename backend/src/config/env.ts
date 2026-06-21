@@ -54,5 +54,6 @@ export const env = {
   rateLimitMax: parsePositiveInt(process.env.RATE_LIMIT_MAX, 300),
   rateLimitAuthMax: parsePositiveInt(process.env.RATE_LIMIT_AUTH_MAX, 50),
   prometheusUrl: process.env.PROMETHEUS_URL ?? "http://prometheus:9090",
-  lokiUrl: process.env.LOKI_URL ?? "http://loki:3100"
+  lokiUrl: process.env.LOKI_URL ?? "http://loki:3100",
+  doraExporterUrl: process.env.DORA_EXPORTER_URL ?? "http://dora-exporter:9110"
 };

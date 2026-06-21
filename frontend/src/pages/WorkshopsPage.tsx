@@ -157,7 +157,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const [isReporting, setIsReporting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [selectedToolIdsByWorkshop, setSelectedToolIdsByWorkshop] = useState<Record<string, string[]>>({});
   const [bookingDraftsByWorkshop, setBookingDraftsByWorkshop] = useState<Record<string, BookingDraft>>({});
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
   const [isSelectingRangeEnd, setIsSelectingRangeEnd] = useState(false);
@@ -283,14 +282,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
             [workshop.workshop.id]: getDefaultBookingDraft()
           }
     );
-    setSelectedToolIdsByWorkshop((prev) =>
-      prev[workshop.workshop.id]
-        ? prev
-        : {
-            ...prev,
-            [workshop.workshop.id]: workshop.tools.filter((tool) => tool.selectable).map((tool) => tool.id)
-          }
-    );
     navigate(`/workshops/${workshop.workshop.id}`);
   };
 
@@ -368,11 +359,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
       return;
     }
 
-    const selectedToolIds = selectedToolIdsByWorkshop[workshopId] ?? [];
     const workshopItem = items.find((item) => item.workshop.id === workshopId);
-    if (workshopItem && workshopItem.tools.length > 0 && selectedToolIds.length === 0) {
-      return;
-    }
 
     const draft = bookingDraftsByWorkshop[workshopId] ?? getDefaultBookingDraft();
     const startIso = combineLocalDateTimeToIso(draft.startDate, draft.startTime);
@@ -396,14 +383,10 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
     try {
       const createdBooking = await api.createWorkshopBooking(
-        { workshopId, startIso, endIso, workshopToolIds: selectedToolIds },
+        { workshopId, startIso, endIso, workshopToolIds: [] },
         token
       );
       pushToast("Werkstattbuchung erstellt.", "success");
-      setSelectedToolIdsByWorkshop((prev) => ({
-        ...prev,
-        [workshopId]: []
-      }));
       setBookingDraftsByWorkshop((prev) => ({
         ...prev,
         [workshopId]: getDefaultBookingDraft()
@@ -1055,37 +1038,16 @@ export function WorkshopsPage({ token, currentUser }: Props) {
 
                   {!selectedWorkshopIsOwn && <div className="booking-section">
                     <p className="hint">
-                      <strong>Benötigte Werkzeuge</strong>
+                      <strong>Werkzeuge dieser Werkstatt</strong>
                     </p>
                     {selectedWorkshop.tools.length > 0 ? (
                       <div className="workshop-booking-tools">
-                        {selectedWorkshop.tools.map((tool) => {
-                          const selectedToolIds = selectedToolIdsByWorkshop[selectedWorkshop.workshop.id] ?? [];
-                          const checked = selectedToolIds.includes(tool.id);
-                          return (
-                            <label key={tool.id} className={`workshop-booking-tool-option ${tool.selectable ? "" : "is-disabled"}`.trim()}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                disabled={!token || !tool.selectable}
-                                onChange={(event) =>
-                                  setSelectedToolIdsByWorkshop((prev) => {
-                                    const current = prev[selectedWorkshop.workshop.id] ?? [];
-                                    const next = event.target.checked
-                                      ? Array.from(new Set([...current, tool.id]))
-                                      : current.filter((id) => id !== tool.id);
-                                    return {
-                                      ...prev,
-                                      [selectedWorkshop.workshop.id]: next
-                                    };
-                                  })
-                                }
-                              />
-                              <span>{tool.name}</span>
-                              <small>{tool.selectable ? (toolCategoryByValue.get(tool.category)?.label ?? tool.category) : "Ausgeliehen"}</small>
-                            </label>
-                          );
-                        })}
+                        {selectedWorkshop.tools.map((tool) => (
+                          <div key={tool.id} className={`workshop-booking-tool-option ${tool.selectable ? "" : "is-disabled"}`.trim()}>
+                            <span>{tool.name}</span>
+                            <small>{tool.selectable ? (toolCategoryByValue.get(tool.category)?.label ?? tool.category) : "Ausgeliehen"}</small>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <p className="hint">Für diese Werkstatt wurde noch keine Ausstattung hinterlegt.</p>
