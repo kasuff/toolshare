@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -78,11 +79,18 @@ def _range(query: str, start: float, end: float, step: int):
 
 
 def _step_for(days: int) -> int:
+    # Basisauflösung je Fenstergröße.
     if days <= 1:
-        return 300
-    if days <= 7:
-        return 1800
-    return 3600
+        base = 300
+    elif days <= 7:
+        base = 1800
+    else:
+        base = 3600
+    # Prometheus lehnt query_range mit > 11.000 Punkten je Zeitreihe per HTTP 400
+    # ab. Bei großen Fenstern (z. B. 730 Tage) die Schrittweite so weit
+    # vergröbern, dass wir unter dem Limit bleiben (Sicherheitsabstand 10.000).
+    span_seconds = days * 86_400
+    return max(base, math.ceil(span_seconds / 10_000))
 
 
 def build_full_report(days: int) -> bytes:
