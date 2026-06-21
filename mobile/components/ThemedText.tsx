@@ -1,5 +1,5 @@
 import { Text, TextProps, StyleSheet } from 'react-native';
-import { Colors } from '../constants/theme';
+import { useThemeColors, createThemedStyleSheet } from '../constants/theme';
 
 interface ThemedTextProps extends TextProps {
   type?: 'default' | 'title' | 'subtitle' | 'defaultSemiBold' | 'muted';
@@ -10,10 +10,13 @@ export function ThemedText({
   type = 'default',
   ...rest
 }: ThemedTextProps) {
+  const colors = useThemeColors();
+  const styles = useStyles();
+
   return (
     <Text
       style={[
-        { color: Colors.text },
+        { color: colors.text },
         type === 'default' ? styles.default : undefined,
         type === 'title' ? styles.title : undefined,
         type === 'subtitle' ? styles.subtitle : undefined,
@@ -26,7 +29,7 @@ export function ThemedText({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   default: {
     fontSize: 16,
     lineHeight: 24,
@@ -48,6 +51,6 @@ const styles = StyleSheet.create({
   muted: {
     fontSize: 14,
     lineHeight: 20,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
-});
+}));

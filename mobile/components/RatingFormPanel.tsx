@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius } from '../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 import { StarRatingInput } from './StarRatingInput';
 
@@ -32,6 +32,9 @@ export function RatingFormPanel({
   onCancel,
   visible
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useStyles();
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <KeyboardAvoidingView 
@@ -42,7 +45,7 @@ export function RatingFormPanel({
           <View style={styles.header}>
             <ThemedText type="title" style={{ flex: 1 }}>{title}</ThemedText>
             <TouchableOpacity onPress={onCancel} style={styles.closeButton} disabled={isSubmitting}>
-              <Ionicons name="close" size={24} color={Colors.text} />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -65,7 +68,7 @@ export function RatingFormPanel({
                 value={comment}
                 onChangeText={onCommentChange}
                 placeholder="Wie war die Ausleihe?"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
@@ -99,7 +102,7 @@ export function RatingFormPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -107,7 +110,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   panel: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     maxHeight: '90%',
@@ -133,16 +136,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: Spacing.sm,
-    color: Colors.text,
+    color: colors.text,
   },
   input: {
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   textArea: {
     minHeight: 100,
@@ -154,27 +157,27 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     paddingVertical: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
   },
   buttonSecondary: {
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   buttonSecondaryText: {
-    color: Colors.text,
+    color: colors.text,
     fontWeight: 'bold',
     fontSize: 16,
   },
   buttonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
   buttonDisabled: {
     opacity: 0.5,
   }
-});
+}));

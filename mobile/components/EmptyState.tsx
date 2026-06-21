@@ -1,8 +1,9 @@
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { Colors } from '../constants/theme';
+import { useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 
 export function EmptyState({ title, text }: { title: string; text: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.container}>
       <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
@@ -12,22 +13,24 @@ export function EmptyState({ title, text }: { title: string; text: string }) {
 }
 
 export function LoadingSpinner() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={Colors.brand} />
+      <ActivityIndicator size="large" color={colors.brand} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginVertical: 16,
   },
   title: {
@@ -43,4 +46,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 32,
   }
-});
+}));

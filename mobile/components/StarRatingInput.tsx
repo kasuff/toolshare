@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing } from '../constants/theme';
+import { Spacing, useThemeColors } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
 };
 
 export function StarRatingInput({ value, onChange, disabled = false }: Props) {
+  const colors = useThemeColors();
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -27,7 +28,7 @@ export function StarRatingInput({ value, onChange, disabled = false }: Props) {
               <Ionicons 
                 name={active ? "star" : "star-outline"} 
                 size={32} 
-                color={active ? Colors.highlight : Colors.textMuted} 
+                color={active ? colors.highlight : colors.textMuted} 
               />
             </TouchableOpacity>
           );
@@ -40,6 +41,7 @@ export function StarRatingInput({ value, onChange, disabled = false }: Props) {
 
 export function StarRatingDisplay({ score, size = 16 }: { score: number; size?: number }) {
   const rounded = Math.max(0, Math.min(5, Math.round(score)));
+  const colors = useThemeColors();
   return (
     <View style={styles.displayRow}>
       {Array.from({ length: 5 }, (_, index) => {
@@ -49,7 +51,7 @@ export function StarRatingDisplay({ score, size = 16 }: { score: number; size?: 
             key={index}
             name={active ? "star" : "star-outline"}
             size={size}
-            color={active ? Colors.highlight : Colors.textMuted}
+            color={active ? colors.highlight : colors.textMuted}
             style={{ marginRight: 2 }}
           />
         );

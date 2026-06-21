@@ -1,4 +1,6 @@
-export const Colors = {
+import { useColorScheme, StyleSheet } from 'react-native';
+
+export const LightColors = {
   brand: '#d14700',
   brandStrong: '#b83e00',
   brandSoft: '#fff4ed',
@@ -13,6 +15,39 @@ export const Colors = {
   bg: '#f6f8fb',
   highlight: '#e65c00'
 };
+
+export const DarkColors = {
+  brand: '#d14700',
+  brandStrong: '#ff6c1a',
+  brandSoft: '#2c1508',
+  text: '#F3F4F6',
+  textMuted: '#9CA3AF',
+  surface: '#1F2937',
+  surfaceSoft: '#111827',
+  border: '#374151',
+  success: '#34D399',
+  danger: '#F87171',
+  warning: '#FBBF24',
+  bg: '#111827',
+  highlight: '#ff8c42'
+};
+
+// Legacy fallback
+export const Colors = LightColors;
+
+export function useThemeColors() {
+  const scheme = useColorScheme();
+  return scheme === 'dark' ? DarkColors : LightColors;
+}
+
+export function createThemedStyleSheet<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
+  factory: (colors: typeof LightColors) => T
+): () => T {
+  return () => {
+    const colors = useThemeColors();
+    return factory(colors);
+  };
+}
 
 export const Spacing = {
   xs: 4,

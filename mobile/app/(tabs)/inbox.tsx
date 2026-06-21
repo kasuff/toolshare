@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { Colors, Spacing, Radius } from '../../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
 import { api, Booking } from '@toolshare/shared';
 import { useAuth } from '../../hooks/useAuth';
@@ -112,6 +112,9 @@ function getBubbleMetaLabel(booking: Booking, currentUserId: string) {
 
 export default function InboxScreen() {
   const { token, currentUser } = useAuth();
+  const colors = useThemeColors();
+  const Colors = colors;
+  const styles = useStyles();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -972,10 +975,10 @@ export default function InboxScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   center: {
     flex: 1,
@@ -987,24 +990,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: 'center',
   },
   threadUnread: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
   },
   avatar: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
   },
   avatarText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -1020,16 +1023,16 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     marginLeft: Spacing.sm,
   },
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   backButton: {
     padding: Spacing.xs,
@@ -1052,24 +1055,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messageBubble: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: Spacing.md,
   },
   incomingBubble: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   outgoingBubble: {
-    backgroundColor: Colors.brandSoft,
-    borderColor: Colors.brand,
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
   },
   statusBubble: {
-    borderColor: Colors.success,
-    backgroundColor: Colors.surface,
+    borderColor: colors.success,
+    backgroundColor: colors.surface,
   },
   chatMessageRow: {
     flexDirection: 'row',
@@ -1091,17 +1094,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   msgAvatarIncoming: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginRight: Spacing.xs,
   },
   msgAvatarOutgoing: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     marginLeft: Spacing.xs,
   },
   msgAvatarText: {
-    color: Colors.text,
+    color: colors.text,
     fontWeight: '700',
     fontSize: 11,
   },
@@ -1151,8 +1154,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   counterFormBubble: {
-    backgroundColor: Colors.brandSoft,
-    borderColor: Colors.brand,
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
   },
   formRow: {
     flexDirection: 'row',
@@ -1170,14 +1173,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   counterFormCancelText: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '600',
   },
   counterFormSendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
@@ -1192,9 +1195,9 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   footerIconBtn: {
     width: 48,
@@ -1213,22 +1216,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerBtnPrimary: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
   },
   footerBtnSecondary: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
     borderWidth: 1,
-    borderColor: Colors.brand,
+    borderColor: colors.brand,
   },
   footerBtnSecondaryText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: '700',
     fontSize: 12,
   },
   footerBtnGhost: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   warningContainer: {
     paddingVertical: Spacing.xs,
@@ -1240,7 +1243,7 @@ const styles = StyleSheet.create({
   },
   warningQuote: {
     borderLeftWidth: 4,
-    borderLeftColor: Colors.warning,
+    borderLeftColor: colors.warning,
     backgroundColor: 'rgba(146, 64, 14, 0.06)',
     padding: Spacing.sm,
     borderRadius: Radius.sm,
@@ -1248,7 +1251,7 @@ const styles = StyleSheet.create({
   },
   suspensionQuote: {
     borderLeftWidth: 4,
-    borderLeftColor: Colors.danger,
+    borderLeftColor: colors.danger,
     backgroundColor: 'rgba(239, 68, 68, 0.06)',
     padding: Spacing.sm,
     borderRadius: Radius.sm,
@@ -1256,7 +1259,7 @@ const styles = StyleSheet.create({
   },
   quoteText: {
     fontStyle: 'italic',
-    color: Colors.text,
+    color: colors.text,
     lineHeight: 20,
   },
   hintContainer: {
@@ -1277,4 +1280,4 @@ const styles = StyleSheet.create({
   systemMessageContainer: {
     paddingVertical: Spacing.xs,
   }
-});
+}));

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius, Spacing } from '../constants/theme';
+import { Radius, Spacing, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 import {
   formatDateLabel,
@@ -36,8 +36,6 @@ type TimeFieldProps = BaseFieldProps & {
   baseDate?: string;
 };
 
-
-
 export function DateField({
   label,
   value,
@@ -49,6 +47,8 @@ export function DateField({
 }: DateFieldProps) {
   const [showPicker, setShowPicker] = useState(false);
   const pickerValue = parseLocalDateKey(value) ?? new Date();
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -71,7 +71,7 @@ export function DateField({
           placeholder={placeholder}
           value={value}
           onChangeText={onChange}
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={colors.textMuted}
           editable={!disabled}
         />
       </View>
@@ -94,7 +94,7 @@ export function DateField({
         <ThemedText style={[styles.inputButtonText, !value && styles.placeholderText]}>
           {formatDateLabel(value, placeholder)}
         </ThemedText>
-        <Ionicons name="calendar-outline" size={18} color={Colors.brand} />
+        <Ionicons name="calendar-outline" size={18} color={colors.brand} />
 
         {Platform.OS === 'ios' && !disabled && (
           <DateTimePicker
@@ -134,6 +134,8 @@ export function TimeField({
 }: TimeFieldProps) {
   const [showPicker, setShowPicker] = useState(false);
   const pickerValue = parseLocalTimeKey(value || '10:00', baseDate);
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -156,7 +158,7 @@ export function TimeField({
           placeholder={placeholder}
           value={value}
           onChangeText={onChange}
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={colors.textMuted}
           editable={!disabled}
         />
       </View>
@@ -179,7 +181,7 @@ export function TimeField({
         <ThemedText style={[styles.inputButtonText, !value && styles.placeholderText]}>
           {formatTimeLabel(value, placeholder)}
         </ThemedText>
-        <Ionicons name="time-outline" size={18} color={Colors.brand} />
+        <Ionicons name="time-outline" size={18} color={colors.brand} />
 
         {Platform.OS === 'ios' && !disabled && (
           <DateTimePicker
@@ -240,6 +242,7 @@ export function DateTimeRangeFields({
   minimumDate,
   disabled = false,
 }: DateTimeRangeFieldsProps) {
+  const styles = useStyles();
   return (
     <>
       <View style={styles.row}>
@@ -286,45 +289,45 @@ export function DateTimeRangeFields({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   field: {
     flex: 1,
   },
   label: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: 4,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
-    color: Colors.text,
+    backgroundColor: colors.surface,
+    color: colors.text,
     fontSize: 14,
   },
   inputButton: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 44,
   },
   inputButtonText: {
-    color: Colors.text,
+    color: colors.text,
     fontSize: 14,
     flex: 1,
     marginRight: Spacing.xs,
   },
   placeholderText: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   inputDisabled: {
     opacity: 0.6,
@@ -347,4 +350,4 @@ const styles = StyleSheet.create({
     height: '100%',
     opacity: 0.015,
   },
-});
+}));

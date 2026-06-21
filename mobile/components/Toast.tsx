@@ -1,12 +1,14 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useToast } from '../hooks/useToast';
-import { Colors, Spacing, Radius } from '../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 
 export function ToastViewport() {
   const { toasts, removeToast } = useToast();
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   if (toasts.length === 0) return null;
 
@@ -41,7 +43,7 @@ export function ToastViewport() {
                 <Ionicons 
                   name="close" 
                   size={20} 
-                  color={isError ? Colors.surface : (isSuccess ? Colors.surface : Colors.text)} 
+                  color={isError ? colors.surface : (isSuccess ? colors.surface : colors.text)} 
                 />
               </TouchableOpacity>
             </View>
@@ -52,7 +54,7 @@ export function ToastViewport() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -67,7 +69,7 @@ const styles = StyleSheet.create({
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.md,
@@ -81,25 +83,25 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
   },
   toastError: {
-    backgroundColor: Colors.danger,
+    backgroundColor: colors.danger,
   },
   toastSuccess: {
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
   toastText: {
     flex: 1,
-    color: Colors.text,
+    color: colors.text,
     fontSize: 14,
     textAlign: 'center',
     marginRight: Spacing.sm,
   },
   toastTextError: {
-    color: Colors.surface,
+    color: colors.surface,
   },
   toastTextSuccess: {
-    color: Colors.surface,
+    color: colors.surface,
   },
   closeButton: {
     padding: 2,
   },
-});
+}));

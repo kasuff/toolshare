@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '@toolshare/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { ThemedText } from '../../components/ThemedText';
-import { Colors, Spacing, Radius } from '../../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { useRouter } from 'expo-router';
 import { FormErrorText } from '../../components/FormErrorText';
 import {
@@ -38,6 +38,8 @@ export default function LoginScreen() {
 
   const { login } = useAuth();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   const repeatPasswordTouched = repeatPassword.length > 0;
   const passwordsMatch = password.length > 0 && password === repeatPassword;
@@ -103,7 +105,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="E-Mail"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.textMuted}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -117,7 +119,7 @@ export default function LoginScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Name"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholderTextColor={colors.textMuted}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -140,7 +142,7 @@ export default function LoginScreen() {
               <TextInput
                 style={styles.passwordInput}
                 placeholder={isRegister ? 'Passwort (mind. 8 Zeichen)' : 'Passwort'}
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -154,7 +156,7 @@ export default function LoginScreen() {
                 <Ionicons
                   name={showPassword ? 'eye-off' : 'eye'}
                   size={22}
-                  color={Colors.textMuted}
+                  color={colors.textMuted}
                 />
               </TouchableOpacity>
             </View>
@@ -166,7 +168,7 @@ export default function LoginScreen() {
                   <TextInput
                     style={styles.passwordInput}
                     placeholder="Passwort wiederholen"
-                    placeholderTextColor={Colors.textMuted}
+                    placeholderTextColor={colors.textMuted}
                     value={repeatPassword}
                     onChangeText={setRepeatPassword}
                     secureTextEntry={!showRepeatPassword}
@@ -180,7 +182,7 @@ export default function LoginScreen() {
                     <Ionicons
                       name={showRepeatPassword ? 'eye-off' : 'eye'}
                       size={22}
-                      color={Colors.textMuted}
+                      color={colors.textMuted}
                     />
                   </TouchableOpacity>
                 </View>
@@ -205,7 +207,7 @@ export default function LoginScreen() {
               disabled={isLoading || (isRegister && passwordsMismatch)}
             >
               {isLoading ? (
-                <ActivityIndicator color={Colors.surface} />
+                <ActivityIndicator color={colors.surface} />
               ) : (
                 <ThemedText style={styles.buttonText}>
                   {isRegister ? 'Registrieren und starten' : 'Einloggen'}
@@ -235,10 +237,10 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   scrollContent: {
     flexGrow: 1,
@@ -246,7 +248,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.xl,
     borderRadius: Radius.lg,
     shadowColor: '#000',
@@ -258,7 +260,7 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
-    color: Colors.brand,
+    color: colors.brand,
     marginBottom: Spacing.xs,
   },
   subtitle: {
@@ -270,32 +272,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: Spacing.xs,
-    color: Colors.text,
+    color: colors.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     marginBottom: Spacing.md,
     fontSize: 16,
-    color: Colors.text,
-    backgroundColor: Colors.surface,
+    color: colors.text,
+    backgroundColor: colors.surface,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     marginBottom: Spacing.md,
   },
   passwordInput: {
     flex: 1,
     padding: Spacing.md,
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   eyeButton: {
     paddingHorizontal: Spacing.md,
@@ -303,22 +305,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inputInvalid: {
-    borderColor: Colors.danger,
+    borderColor: colors.danger,
   },
   fieldError: {
-    color: Colors.danger,
+    color: colors.danger,
     fontSize: 12,
     marginTop: -Spacing.sm,
     marginBottom: Spacing.md,
   },
   fieldSuccess: {
-    color: Colors.success,
+    color: colors.success,
     fontSize: 12,
     marginTop: -Spacing.sm,
     marginBottom: Spacing.md,
   },
   button: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     padding: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
@@ -327,7 +329,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -340,10 +342,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   switchTextNormal: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   switchTextLink: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
   },
-});
+}));

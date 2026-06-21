@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { api, AddressSuggestion } from '@toolshare/shared';
-import { Colors, Spacing, Radius } from '../constants/theme';
+import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 
 export type AddressFormFields = {
@@ -10,14 +10,6 @@ export type AddressFormFields = {
   postalCode: string;
   city: string;
   country: string;
-};
-
-type Props = {
-  value: AddressFormFields;
-  onChange: (value: AddressFormFields) => void;
-  label?: string;
-  required?: boolean;
-  initialMode?: 'automatic' | 'manual';
 };
 
 export const EMPTY_ADDRESS: AddressFormFields = {
@@ -95,6 +87,8 @@ export function AddressInput({
   const isSelectingSuggestion = useRef(false);
   const lastEmittedRef = useRef(value);
   const lastSelectedSearchValue = useRef<string | null>(null);
+  const colors = useThemeColors();
+  const styles = useStyles();
 
   useEffect(() => {
     if (addressesEqual(value, lastEmittedRef.current)) return;
@@ -200,7 +194,7 @@ export function AddressInput({
                 emitChange(parsed);
               }}
               placeholder="Adresse suchen..."
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.textMuted}
               blurOnSubmit={false}
               autoCorrect={false}
               {...searchInputProps}
@@ -208,7 +202,7 @@ export function AddressInput({
             <ActivityIndicator
               style={[styles.loader, !loading && styles.loaderHidden]}
               size="small"
-              color={Colors.brand}
+              color={colors.brand}
             />
           </View>
 
@@ -252,7 +246,7 @@ export function AddressInput({
                 value={fields.street}
                 onChangeText={(val) => updateField('street', val)}
                 placeholder="Straße *"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 autoCorrect={false}
                 {...searchInputProps}
               />
@@ -263,7 +257,7 @@ export function AddressInput({
                 value={fields.houseNumber}
                 onChangeText={(val) => updateField('houseNumber', val)}
                 placeholder="Nr. *"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 autoCorrect={false}
                 {...searchInputProps}
               />
@@ -277,7 +271,7 @@ export function AddressInput({
                 value={fields.postalCode}
                 onChangeText={(val) => updateField('postalCode', val)}
                 placeholder="PLZ *"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 autoCorrect={false}
                 keyboardType="number-pad"
                 {...searchInputProps}
@@ -289,7 +283,7 @@ export function AddressInput({
                 value={fields.city}
                 onChangeText={(val) => updateField('city', val)}
                 placeholder="Ort *"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 autoCorrect={false}
                 {...searchInputProps}
               />
@@ -301,7 +295,7 @@ export function AddressInput({
             value={fields.country}
             onChangeText={(val) => updateField('country', val)}
             placeholder="Land"
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.textMuted}
             autoCorrect={false}
             {...searchInputProps}
           />
@@ -315,7 +309,15 @@ export function AddressInput({
   );
 }
 
-const styles = StyleSheet.create({
+type Props = {
+  value: AddressFormFields;
+  onChange: (value: AddressFormFields) => void;
+  label?: string;
+  required?: boolean;
+  initialMode?: 'automatic' | 'manual';
+};
+
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     marginBottom: Spacing.lg,
     position: 'relative',
@@ -325,7 +327,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: Spacing.sm,
-    color: Colors.text,
+    color: colors.text,
   },
   automaticContainer: {
     position: 'relative',
@@ -338,13 +340,13 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   loader: {
     position: 'absolute',
@@ -355,9 +357,9 @@ const styles = StyleSheet.create({
   },
   dropdown: {
     marginTop: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     zIndex: 1000,
     elevation: 5,
@@ -369,7 +371,7 @@ const styles = StyleSheet.create({
   },
   dropdownHead: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: Spacing.xs,
     fontWeight: 'bold',
   },
@@ -379,21 +381,21 @@ const styles = StyleSheet.create({
   suggestionItem: {
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderColor: Colors.surfaceSoft,
+    borderColor: colors.border,
   },
   suggestionTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: colors.text,
   },
   suggestionMeta: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   emptyText: {
     paddingVertical: Spacing.sm,
     fontSize: 14,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
   },
   toggleBtn: {
@@ -402,7 +404,7 @@ const styles = StyleSheet.create({
   },
   toggleBtnText: {
     fontSize: 13,
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
   },
   manualContainer: {},
@@ -410,4 +412,4 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   inputGroup: {},
-});
+}));
