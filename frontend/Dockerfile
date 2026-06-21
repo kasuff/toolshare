@@ -8,6 +8,11 @@ RUN npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtim
 
 COPY . .
 
+# The files above are copied as root. Hand ownership to the non-privileged
+# "node" user so Vite can write its bundled config (vite.config.ts.timestamp-*.mjs)
+# and other temp files into /app/frontend without hitting EACCES.
+RUN chown -R node:node /app
+
 EXPOSE 3000
 # Drop root: the node image ships a non-privileged "node" user (uid 1000).
 USER node

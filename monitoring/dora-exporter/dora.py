@@ -17,6 +17,7 @@ Alle Zeiten werden in UTC (timezone-aware) gehalten.
 from __future__ import annotations
 
 import logging
+import math
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -194,7 +195,13 @@ def _fetch_outages_prometheus(start: datetime, end: datetime) -> list[Outage]:
     Range-Query ab; zusammenhängende Datenpunkte = eine Ausfall-Episode.
     Überlappende Alerts werden zu einer Episode verschmolzen ("Production kaputt").
     """
-    step = 60  # Sekunden – Auflösung der Restore-Zeit
+    # Prometheus lehnt query_range mit > 11.000 Punkten je Zeitreihe per HTTP 400
+    # ab. Bei 60-s-Auflösung wird das schon ab ~7,6 Tagen Fenster überschritten,
+    # deshalb die Schrittweite so vergröbern, dass wir unter dem Limit bleiben
+    # (mit Sicherheitsabstand auf 10.000 Punkte). Kurze Fenster behalten 60 s.
+    MAX_POINTS = 10_000
+    span_seconds = max(end.timestamp() - start.timestamp(), 1)
+    step = max(60, math.ceil(span_seconds / MAX_POINTS))
     query = f'max(ALERTS{{alertstate="firing",severity="{OUTAGE_ALERT_SEVERITY}"}})'
     url = f"{PROMETHEUS_URL}/api/v1/query_range"
     params = {
