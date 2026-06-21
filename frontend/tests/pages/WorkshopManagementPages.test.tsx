@@ -121,6 +121,8 @@ describe("Workshop management pages", () => {
     fireEvent.change(screen.getByLabelText("Enddatum"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "12:00" } });
     fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
+    expect(screen.getByText("01.07.2026, 09:00 Uhr")).toBeInTheDocument();
+    expect(screen.getByText("01.07.2026, 12:00 Uhr")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => expect(createWorkshop).toHaveBeenCalledTimes(1));
