@@ -35,6 +35,24 @@ describe("OfferCard", () => {
     expect(onSelect).toHaveBeenCalledTimes(2);
   });
 
+  it("renders an optional status badge when provided", () => {
+    render(
+      <MemoryRouter>
+        <OfferCard
+          name="Mein Werkzeug"
+          description="Beschreibung"
+          meta="München"
+          ownerName="Lea"
+          statusLabel="Ausgeliehen"
+          statusUnavailable
+        />
+      </MemoryRouter>
+    );
+
+    const badge = screen.getByText("Ausgeliehen");
+    expect(badge).toHaveClass("ds-workshop-card-badge", "unavailable");
+  });
+
   it("formats known and unknown distances", () => {
     expect(formatOfferDistance(1.25)).toBe("1.3 km");
     expect(formatOfferDistance(null)).toBe("Distanz offen");

@@ -4,9 +4,14 @@ import { OfferCard } from "../components/OfferCard";
 import { EmptyState, GuestBanner, SkeletonCards } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import {  api  } from "@toolshare/shared";
-import type {  Tool, User, Workshop, WorkshopSlot  } from "@toolshare/shared";
+import type {  Tool, User, Workshop, WorkshopSlot, Booking  } from "@toolshare/shared";
 import { distanceBetweenLocations } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
+import {
+  getToolStatusBadge,
+  getWorkshopStatusBadge,
+  isWorkshopCurrentlyInUse
+} from "../utils/offerStatus";
 
 type Props = {
   token?: string;
@@ -22,6 +27,7 @@ export function MyOffersPage({ token, currentUser }: Props) {
   const { pushToast } = useToast();
   const [tools, setTools] = useState<Tool[]>([]);
   const [workshops, setWorkshops] = useState<WorkshopOffer[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
@@ -37,9 +43,10 @@ export function MyOffersPage({ token, currentUser }: Props) {
       setIsLoading(true);
       setHasError(false);
       try {
-        const [ownedTools, ownedWorkshops] = await Promise.all([
+        const [ownedTools, ownedWorkshops, userBookings] = await Promise.all([
           api.getTools({ ownerId: currentUser.id }, token),
-          api.getWorkshops({ managerId: currentUser.id }, token)
+          api.getWorkshops({ managerId: currentUser.id }, token),
+          api.getBookingsForUser(token)
         ]);
         if (cancelled) return;
         setTools(ownedTools.filter((tool) => tool.ownerId === currentUser.id));
@@ -48,6 +55,7 @@ export function MyOffersPage({ token, currentUser }: Props) {
             .filter((entry) => entry.workshop.ownerId === currentUser.id)
             .map(({ workshop, slots }) => ({ workshop, slots }))
         );
+        setBookings(userBookings);
       } catch (error) {
         if (cancelled) return;
         setHasError(true);
@@ -126,19 +134,26 @@ export function MyOffersPage({ token, currentUser }: Props) {
               <p className="my-offers-section-empty">Du hast noch keine Werkstatt angeboten.</p>
             ) : (
               <div className="cards">
-                {workshops.map(({ workshop }) => (
+                {workshops.map(({ workshop }) => {
+                  const workshopStatus = getWorkshopStatusBadge(
+                    isWorkshopCurrentlyInUse(workshop.id, bookings)
+                  );
+                  return (
                     <OfferCard
                       key={workshop.id}
                       to={{ pathname: `/workshops/${workshop.id}`, search: "?manage=1" }}
                       name={workshop.name}
                       description={workshop.description}
                       imageUrl={workshop.imageUrls[0]}
+                      statusLabel={workshopStatus.label}
+                      statusUnavailable={workshopStatus.unavailable}
                       meta={formatOfferDistance(
                         distanceBetweenLocations(currentUser.address ?? "München Zentrum", workshop.location)
                       )}
                       ownerName={workshop.ownerName ?? currentUser.name}
                     />
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -149,19 +164,24 @@ export function MyOffersPage({ token, currentUser }: Props) {
               <p className="my-offers-section-empty">Du hast noch kein Werkzeug angeboten.</p>
             ) : (
               <div className="cards">
-                {tools.map((tool) => (
-                  <OfferCard
-                    key={tool.id}
-                    to={{ pathname: `/tools/${tool.id}`, search: "?manage=1" }}
-                    name={tool.name}
-                    description={tool.description}
-                    imageUrl={tool.imageUrl}
-                    meta={formatOfferDistance(
-                      distanceBetweenLocations(currentUser.address ?? "München Zentrum", tool.pickupLocation)
-                    )}
-                    ownerName={tool.ownerName ?? currentUser.name}
-                  />
-                ))}
+                {tools.map((tool) => {
+                  const toolStatus = getToolStatusBadge(tool.status);
+                  return (
+                    <OfferCard
+                      key={tool.id}
+                      to={{ pathname: `/tools/${tool.id}`, search: "?manage=1" }}
+                      name={tool.name}
+                      description={tool.description}
+                      imageUrl={tool.imageUrl}
+                      statusLabel={toolStatus.label}
+                      statusUnavailable={toolStatus.unavailable}
+                      meta={formatOfferDistance(
+                        distanceBetweenLocations(currentUser.address ?? "München Zentrum", tool.pickupLocation)
+                      )}
+                      ownerName={tool.ownerName ?? currentUser.name}
+                    />
+                  );
+                })}
               </div>
             )}
           </section>
