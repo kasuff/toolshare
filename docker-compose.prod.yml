@@ -1,7 +1,8 @@
 services:
   frontend:
     build:
-      context: ./frontend
+      context: .
+      dockerfile: frontend/Dockerfile
       target: prod
       args:
         VITE_API_URL: /api

@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminPage } from "../../src/pages/AdminPage";
 import { ModerationPage } from "../../src/pages/ModerationPage";
 import { NewToolPage } from "../../src/pages/NewToolPage";
 import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const {
   pushToast,
@@ -22,7 +22,9 @@ const {
   listSuspensionRequests,
   decideSuspensionRequest,
   createWorkshop,
-  getSystemSettings
+  getSystemSettings,
+  updateSystemSetting,
+  getRatingsReceived
 } = vi.hoisted(() => ({
   pushToast: vi.fn(),
   getCurrentUser: vi.fn(),
@@ -38,7 +40,9 @@ const {
   listSuspensionRequests: vi.fn(),
   decideSuspensionRequest: vi.fn(),
   createWorkshop: vi.fn(),
-  getSystemSettings: vi.fn()
+  getSystemSettings: vi.fn(),
+  updateSystemSetting: vi.fn(),
+  getRatingsReceived: vi.fn()
 }));
 
 vi.mock("../../src/hooks/useToast", () => ({
@@ -47,9 +51,13 @@ vi.mock("../../src/hooks/useToast", () => ({
   })
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getCurrentUser,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getCurrentUser,
     createTool,
     validateAddress,
     listUsers,
@@ -60,11 +68,33 @@ vi.mock("../../src/services/api", () => ({
     listClosedReports,
     updateReportStatus,
     listSuspensionRequests,
-    decideSuspensionRequest,
-    createWorkshop,
-    getSystemSettings
-  }
+      decideSuspensionRequest,
+      createWorkshop,
+      getSystemSettings,
+      updateSystemSetting,
+      getRatingsReceived
+    }
+  };
+});
+
+const { getMonitoringOverview, getMonitoringLogs } = vi.hoisted(() => ({
+  getMonitoringOverview: vi.fn(),
+  getMonitoringLogs: vi.fn()
 }));
+
+vi.mock("../../src/services/monitoringApi", async () => {
+  const actual = await vi.importActual<typeof import("../../src/services/monitoringApi")>(
+    "../../src/services/monitoringApi"
+  );
+  return {
+    ...actual,
+    monitoringApi: {
+      getOverview: getMonitoringOverview,
+      getLogs: getMonitoringLogs,
+      downloadExport: vi.fn()
+    }
+  };
+});
 
 class FileReaderMock {
   public onload: ((event: { target: { result: string } }) => void) | null = null;
@@ -176,6 +206,10 @@ describe("management pages", () => {
     await waitFor(() => {
       expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: true }, "token-123");
     });
+    fireEvent.click(screen.getByRole("button", { name: "Ablehnen" }));
+    await waitFor(() => {
+      expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: false }, "token-123");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
 
     expect(await screen.findByText("Tobias")).toBeInTheDocument();
@@ -265,12 +299,68 @@ describe("management pages", () => {
     );
 
     expect(await screen.findByText(/Bewertung:/)).toBeInTheDocument();
-    const preview = screen.getByText(/Bei Bestätigung wird die Bewertung ausgeblendet/).closest(".moderation-rating-preview");
+    const preview = screen.getByText(/Mit «Bewertung löschen» wird sie dauerhaft entfernt/).closest(".moderation-rating-preview");
     expect(preview).not.toBeNull();
     expect(preview).toHaveTextContent("Anna");
     expect(preview).toHaveTextContent("2 von 5 Sternen");
     expect(preview).toHaveTextContent("Bohrer");
     expect(preview).toHaveTextContent("„Schlechter Service“");
+    expect(screen.getByRole("button", { name: "Bewertung löschen" })).toBeInTheDocument();
+  });
+
+  it("deletes a reported rating from the moderation actions", async () => {
+    listReports.mockResolvedValueOnce([
+      {
+        id: "r-rating",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "RATING",
+        targetId: "rating-1",
+        targetLabel: "Bewertung von Anna",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Max",
+        reason: "Beleidigend",
+        details: "Unangemessener Kommentar",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        ratingPreview: {
+          score: 2,
+          comment: "Schlechter Service",
+          fromUserName: "Anna",
+          listingLabel: "Bohrer"
+        }
+      }
+    ]);
+    listClosedReports.mockResolvedValue([]);
+    updateReportStatus.mockResolvedValueOnce(undefined);
+    listReports.mockResolvedValueOnce([]);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Bewertung löschen" }));
+    expect(screen.getByRole("heading", { name: "Bewertung löschen" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Warum wird diese Bewertung gelöscht?"), {
+      target: { value: "Verstoß gegen Community-Richtlinien" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Bewertung unwiderruflich löschen" }));
+
+    await waitFor(() =>
+      expect(updateReportStatus).toHaveBeenCalledWith(
+        "r-rating",
+        {
+          status: "RESOLVED",
+          decisionNote: "Verstoß gegen Community-Richtlinien",
+          deleteRating: true
+        },
+        "token-123"
+      )
+    );
   });
 
   it("renders closed reports with limit selection", async () => {
@@ -457,6 +547,191 @@ describe("management pages", () => {
     });
   });
 
+  it("renders closed reports with limit selection", async () => {
+    listReports.mockResolvedValue([]);
+    listClosedReports.mockResolvedValue([
+      {
+        id: "rc1",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 1",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc2",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 2",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc3",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 3",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc4",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 4",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc5",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 5",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      },
+      {
+        id: "rc6",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "USER",
+        targetId: "u2",
+        targetLabel: "Murat",
+        targetHref: null,
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Defekt",
+        details: "Double",
+        status: "RESOLVED",
+        createdAt: "2026-05-05T10:00:00.000Z",
+        decisionNote: "Entscheidung 6",
+        decisionAt: "2026-05-05T11:00:00.000Z"
+      }
+    ]);
+    getRatingsReceived.mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    // Click open details
+    const summary = await screen.findByText(/Abgeschlossene Meldungen anzeigen/);
+    fireEvent.click(summary);
+
+    // Initial limit is 10, so all 6 should be visible
+    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(screen.getByText("Entscheidung 6")).toBeInTheDocument();
+
+    // Select limit of 5
+    const select = screen.getByRole("combobox");
+    fireEvent.change(select, { target: { value: "5" } });
+
+    // decision 6 should no longer be visible because limit is 5
+    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(screen.queryByText("Entscheidung 6")).not.toBeInTheDocument();
+  });
+
+  it("renders delete tool option and submits deletion", async () => {
+    listClosedReports.mockResolvedValue([]);
+    listReports.mockResolvedValueOnce([
+      {
+        id: "r2",
+        reporterId: "u3",
+        reporterName: "Lea",
+        targetType: "TOOL",
+        targetId: "tool-1",
+        targetLabel: "Spammy Tool",
+        targetHref: "/tools/tool-1",
+        subjectUserId: "u2",
+        subjectUserName: "Murat",
+        reason: "Spam",
+        details: "Double post",
+        status: "OPEN",
+        createdAt: "2026-05-05T10:00:00.000Z"
+      }
+    ]).mockResolvedValueOnce([]);
+    getRatingsReceived.mockResolvedValue([]);
+    updateReportStatus.mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <ModerationPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Spammy Tool")).toBeInTheDocument();
+    const deleteBtn = screen.getByRole("button", { name: "Angebot löschen" });
+    fireEvent.click(deleteBtn);
+
+    expect(screen.getByRole("heading", { name: "Angebot löschen" })).toBeInTheDocument();
+    
+    fireEvent.change(screen.getByPlaceholderText("Warum wird dieses Angebot/diese Werkstatt gelöscht?"), {
+      target: { value: "Verstoß gegen Richtlinien" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Angebot unwiderruflich löschen" }));
+
+    await waitFor(() => {
+      expect(updateReportStatus).toHaveBeenCalledWith(
+        "r2",
+        {
+          status: "RESOLVED",
+          deleteTool: true,
+          deleteWorkshop: false,
+          warningReason: "Verstoß gegen Richtlinien",
+          decisionNote: undefined
+        },
+        "token-123"
+      );
+    });
+  });
+
   it("requires login and submits a new tool with pickup data", async () => {
     getCurrentUser.mockResolvedValueOnce({
       id: "u1",
@@ -552,7 +827,7 @@ describe("management pages", () => {
     fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
     fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "München" } });
     fireEvent.click(screen.getByRole("button", { name: "Personenzahl erhöhen" }));
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "holz" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Werkzeugkategorie" }), { target: { value: "holz" } });
     fireEvent.change(screen.getByPlaceholderText("Werkzeugname (z.B. Bosch Akkuschrauber)"), {
       target: { value: "Bohrmaschine" }
     });
@@ -588,5 +863,130 @@ describe("management pages", () => {
       );
     });
     expect(await screen.findByText("Workshops Home")).toBeInTheDocument();
+  });
+
+  it("shows login required on the new tool page without token", () => {
+    render(
+      <MemoryRouter>
+        <NewToolPage token={undefined} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("link", { name: "Einloggen" })).toHaveAttribute("href", "/auth");
+  });
+
+  it("blocks tool creation when address validation fails", async () => {
+    validateAddress.mockResolvedValueOnce({
+      isValid: false,
+      normalizedAddress: null,
+      normalizedParts: null
+    });
+
+    render(
+      <MemoryRouter>
+        <NewToolPage token="token-123" />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("z.B. Akku-Bohrmaschine"), {
+      target: { value: "Akkuschrauber" }
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "z.B.: Zustand: wie neu, selten benutzt. Lieferumfang: 1x Bohrmaschine, 2x Akkus, 1x Ladegerät. Besonderheiten: sehr leise, eingebaute LED"
+      ),
+      { target: { value: "Sehr gut erhalten" } }
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Kategorie *" }), { target: { value: "holz" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adresse manuell eingeben" }));
+    fireEvent.change(screen.getByPlaceholderText("Straße"), { target: { value: "Musterstraße" } });
+    fireEvent.change(screen.getByPlaceholderText("Hausnummer"), { target: { value: "5" } });
+    fireEvent.change(screen.getByPlaceholderText("PLZ"), { target: { value: "80331" } });
+    fireEvent.change(screen.getByPlaceholderText("Ort"), { target: { value: "München" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Werkzeug einstellen" }));
+
+    await waitFor(() => {
+      expect(validateAddress).toHaveBeenCalled();
+      expect(createTool).not.toHaveBeenCalled();
+      expect(pushToast).toHaveBeenCalledWith(
+        "Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.",
+        "error"
+      );
+    });
+  });
+
+  it("switches admin tabs and saves system rules", async () => {
+    getMetrics.mockResolvedValue({
+      users: 1,
+      tools: 2,
+      workshops: 1,
+      openBookings: 0,
+      openReports: 0,
+      openSuspensionRequests: 0
+    });
+    listUsers.mockResolvedValue([]);
+    listSuspensionRequests.mockResolvedValue([]);
+    getSystemSettings.mockResolvedValue([
+      {
+        key: "maxLoanDurationDays",
+        label: "Maximale Ausleihdauer",
+        value: 14,
+        min: 1,
+        max: 90,
+        unit: "Tage",
+        enforced: true
+      }
+    ]);
+    updateSystemSetting.mockResolvedValue({
+      key: "maxLoanDurationDays",
+      label: "Maximale Ausleihdauer",
+      value: 21,
+      min: 1,
+      max: 90,
+      unit: "Tage",
+      enforced: true
+    });
+    getMonitoringOverview.mockResolvedValue({
+      collectedAt: "2026-06-01T12:00:00.000Z",
+      system: { cpuPercent: 10, ramPercent: 20, diskPercent: 30 },
+      http: { requestsPerSec: 1, errorRatePercent: 0, p95LatencySeconds: 0.1 },
+      business: {
+        activeUsers: 1,
+        registrationsTotal: 2,
+        bookingsTotal: 3,
+        loginsSuccess: 4,
+        loginsFailed: 0
+      }
+    });
+    getMonitoringLogs.mockResolvedValue({ logs: [], count: 0, query: "" });
+
+    render(
+      <MemoryRouter>
+        <AdminPage currentUser={adminUser} token="token-123" />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Nutzer: 1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Systemregeln" }));
+    const settingInput = await screen.findByLabelText("Maximale Ausleihdauer");
+    fireEvent.change(settingInput, { target: { value: "abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(pushToast).toHaveBeenCalledWith("Bitte eine ganze Zahl eingeben.", "error");
+
+    fireEvent.change(settingInput, { target: { value: "200" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(pushToast).toHaveBeenCalledWith("Wert muss zwischen 1 und 90 liegen.", "error");
+
+    fireEvent.change(settingInput, { target: { value: "21" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() =>
+      expect(updateSystemSetting).toHaveBeenCalledWith("maxLoanDurationDays", 21, "token-123")
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
+    expect(await screen.findByRole("button", { name: "Übersicht" })).toBeInTheDocument();
+    expect(getMonitoringOverview).toHaveBeenCalledWith("token-123");
   });
 });

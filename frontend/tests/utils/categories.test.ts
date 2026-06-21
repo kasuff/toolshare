@@ -4,7 +4,7 @@ import {
   TOOL_CATEGORIES,
   getPlaceholderImageForCategory,
   normalizePlaceholderImage
-} from "../../src/utils/categories";
+} from "@toolshare/shared";
 
 describe("categories utilities", () => {
   it("exposes the expected category list", () => {

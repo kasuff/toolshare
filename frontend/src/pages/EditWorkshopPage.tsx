@@ -13,8 +13,8 @@ import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import type { User, WorkshopSlot } from "../types/domain";
+import {  api  } from "@toolshare/shared";
+import type {  User, WorkshopSlot  } from "@toolshare/shared";
 
 type Props = {
   currentUser?: User;

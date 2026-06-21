@@ -41,12 +41,17 @@ vi.mock("../src/hooks/useSession", () => ({
   })
 }));
 
-vi.mock("../src/services/api", () => ({
-  api: {
-    suggestAddresses,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      suggestAddresses,
     validateAddress
-  }
-}));
+    }
+  };
+});
 
 vi.mock("../src/components/Layout", () => ({
   Layout: () => <Outlet />

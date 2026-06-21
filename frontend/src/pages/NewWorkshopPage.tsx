@@ -9,9 +9,9 @@ import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { SystemRulesInfo } from "../components/SystemRulesInfo";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import { pluralize } from "../utils/pluralize";
-import type { User } from "../types/domain";
+import {  api  } from "@toolshare/shared";
+import {  pluralize  } from "@toolshare/shared";
+import type {  User  } from "@toolshare/shared";
 
 type Props = {
   currentUser?: User;

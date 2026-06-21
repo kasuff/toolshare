@@ -1,4 +1,4 @@
-import type { Booking } from "../types/domain";
+import type {  Booking  } from "@toolshare/shared";
 
 type CompletionBooking = Pick<Booking, "type" | "status" | "providerId" | "endIso">;
 

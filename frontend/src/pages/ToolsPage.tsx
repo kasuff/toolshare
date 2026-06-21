@@ -5,12 +5,12 @@ import { OfferCard } from "../components/OfferCard";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { useToast } from "../hooks/useToast";
-import { api } from "../services/api";
-import { TOOL_CATEGORIES } from "../utils/categories";
-import { distanceBetweenLocations, isWithinRadius } from "../utils/searchFilters";
+import {  api  } from "@toolshare/shared";
+import {  TOOL_CATEGORIES  } from "@toolshare/shared";
+import { distanceBetweenLocations, isWithinRadius } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
-import { pluralize } from "../utils/pluralize";
-import type { User } from "../types/domain";
+import {  pluralize  } from "@toolshare/shared";
+import type {  User  } from "@toolshare/shared";
 
 type Props = {
   token?: string;

@@ -2,14 +2,14 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api, type ModerationReport } from "../services/api";
+import { api, type ModerationReport } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
 
 type Props = {
   token?: string;
 };
 
-type DialogMode = "warn" | "suspend" | "delete" | null;
+type DialogMode = "warn" | "suspend" | "delete" | "deleteRating" | null;
 
 const targetTypeLabel: Record<ModerationReport["targetType"], string> = {
   TOOL: "Werkzeug",
@@ -74,7 +74,9 @@ function ReportSummary({ report, showDecision }: { report: ModerationReport; sho
             {report.ratingPreview.listingLabel ? ` · ${report.ratingPreview.listingLabel}` : ""}
           </p>
           {report.ratingPreview.comment && <p className="moderation-rating-preview-comment">„{report.ratingPreview.comment}“</p>}
-          <p className="hint">Bei Bestätigung wird die Bewertung ausgeblendet.</p>
+          <p className="hint">
+            Andere Abschlussaktionen blenden die Bewertung aus. Mit «Bewertung löschen» wird sie dauerhaft entfernt.
+          </p>
         </div>
       )}
 
@@ -151,7 +153,7 @@ function ReportActions({
     if (reason.length < 3) {
       return;
     }
-    if (dialogMode !== "delete" && !subjectId) {
+    if (dialogMode !== "delete" && dialogMode !== "deleteRating" && !subjectId) {
       pushToast("Kein betroffener Nutzer für diese Meldung gefunden.", "error");
       return;
     }
@@ -184,6 +186,15 @@ function ReportActions({
         deleteTool: report.targetType === "TOOL",
         deleteWorkshop: report.targetType === "WORKSHOP",
         warningReason: reason
+      });
+      return;
+    }
+
+    if (dialogMode === "deleteRating") {
+      void runUpdate({
+        status: "RESOLVED",
+        decisionNote: reason,
+        deleteRating: true
       });
     }
   };
@@ -241,6 +252,16 @@ function ReportActions({
             Werkstatt löschen
           </button>
         )}
+        {report.targetType === "RATING" && (
+          <button
+            type="button"
+            className="btn danger mini"
+            disabled={busy}
+            onClick={() => setDialogMode("deleteRating")}
+          >
+            Bewertung löschen
+          </button>
+        )}
       </div>
 
       {dialogMode && (
@@ -259,9 +280,11 @@ function ReportActions({
                   ? "Nutzer ermahnen"
                   : dialogMode === "suspend"
                     ? "Sperrung anfordern"
-                    : report.targetType === "TOOL"
-                      ? "Angebot löschen"
-                      : "Werkstatt löschen"}
+                    : dialogMode === "deleteRating"
+                      ? "Bewertung löschen"
+                      : report.targetType === "TOOL"
+                        ? "Angebot löschen"
+                        : "Werkstatt löschen"}
               </h2>
               <button type="button" className="icon-button" onClick={closeDialog} aria-label="Schließen">
                 <span className="material-symbols-outlined">close</span>
@@ -273,7 +296,9 @@ function ReportActions({
                   ? `Die Ermahnung wird an ${report.subjectUserName ?? "den Nutzer"} in der Inbox zugestellt.`
                   : dialogMode === "suspend"
                     ? `Der Admin erhält eine Anfrage zur Sperrung von ${report.subjectUserName ?? "dem Nutzer"}.`
-                    : `Das Angebot/die Werkstatt wird unwiderruflich gelöscht und der Besitzer erhält eine Benachrichtigung.`}
+                    : dialogMode === "deleteRating"
+                      ? "Die Bewertung wird dauerhaft entfernt und kann nicht wiederhergestellt werden."
+                      : "Das Angebot/die Werkstatt wird unwiderruflich gelöscht und der Besitzer erhält eine Benachrichtigung."}
               </p>
               <label className="field">
                 <span>
@@ -281,7 +306,9 @@ function ReportActions({
                     ? "Begründung der Ermahnung"
                     : dialogMode === "suspend"
                       ? "Begründung der Sperranfrage"
-                      : "Grund für das Herunternehmen"}
+                      : dialogMode === "deleteRating"
+                        ? "Begründung für das Löschen"
+                        : "Grund für das Herunternehmen"}
                 </span>
                 <textarea
                   ref={reasonRef}
@@ -291,9 +318,11 @@ function ReportActions({
                   minLength={3}
                   rows={4}
                   placeholder={
-                    dialogMode === "delete"
-                      ? "Warum wird dieses Angebot/diese Werkstatt gelöscht?"
-                      : "Was ist passiert und warum ist diese Maßnahme angemessen?"
+                    dialogMode === "deleteRating"
+                      ? "Warum wird diese Bewertung gelöscht?"
+                      : dialogMode === "delete"
+                        ? "Warum wird dieses Angebot/diese Werkstatt gelöscht?"
+                        : "Was ist passiert und warum ist diese Maßnahme angemessen?"
                   }
                 />
               </label>
@@ -301,14 +330,20 @@ function ReportActions({
                 <button type="button" className="btn secondary" onClick={closeDialog} disabled={busy}>
                   Abbrechen
                 </button>
-                <button type="submit" className={dialogMode === "delete" ? "btn danger" : "btn"} disabled={busy}>
+                <button
+                  type="submit"
+                  className={dialogMode === "delete" || dialogMode === "deleteRating" ? "btn danger" : "btn"}
+                  disabled={busy}
+                >
                   {dialogMode === "warn"
                     ? "Ermahnung senden"
                     : dialogMode === "suspend"
                       ? "Sperrung anfordern"
-                      : report.targetType === "TOOL"
-                        ? "Angebot unwiderruflich löschen"
-                        : "Werkstatt unwiderruflich löschen"}
+                      : dialogMode === "deleteRating"
+                        ? "Bewertung unwiderruflich löschen"
+                        : report.targetType === "TOOL"
+                          ? "Angebot unwiderruflich löschen"
+                          : "Werkstatt unwiderruflich löschen"}
                 </button>
               </div>
             </form>

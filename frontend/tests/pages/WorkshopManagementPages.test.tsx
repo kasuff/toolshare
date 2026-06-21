@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
+import { ToastViewport } from "../../src/components/ui";
 import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
 import { EditWorkshopPage } from "../../src/pages/EditWorkshopPage";
-import type { User } from "../../src/types/domain";
+import type { User } from "@toolshare/shared";
 
 const {
   createWorkshop,
@@ -26,9 +27,13 @@ const {
   suggestAddresses: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    createWorkshop,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      createWorkshop,
     getWorkshopById,
     updateWorkshop,
     createWorkshopTimeslot,
@@ -37,8 +42,9 @@ vi.mock("../../src/services/api", () => ({
     validateAddress,
     suggestAddresses,
     getSystemSettings: vi.fn().mockResolvedValue([])
-  }
-}));
+    }
+  };
+});
 
 class FileReaderMock {
   public onload: ((event: { target: { result: string } }) => void) | null = null;
@@ -168,6 +174,7 @@ describe("Workshop management pages", () => {
 
     render(
       <ToastProvider>
+        <ToastViewport />
         <MemoryRouter initialEntries={["/workshops/workshop-1/edit"]}>
           <Routes>
             <Route
@@ -200,5 +207,174 @@ describe("Workshop management pages", () => {
       }),
       "token-456"
     );
+  });
+
+  it("shows login required when editing without token", () => {
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter initialEntries={["/workshops/workshop-1/edit"]}>
+          <Routes>
+            <Route
+              path="/workshops/:id/edit"
+              element={<EditWorkshopPage token={undefined} currentUser={currentUser} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(screen.getByRole("link", { name: "Einloggen" })).toHaveAttribute("href", "/auth");
+    expect(getWorkshopById).not.toHaveBeenCalled();
+  });
+
+  it("redirects when a different user tries to edit the workshop", async () => {
+    getWorkshopById.mockResolvedValueOnce({
+      workshop: {
+        id: "workshop-1",
+        ownerId: "other-owner",
+        name: "Fremde Werkstatt",
+        description: "Werkstatt",
+        location: "Musterstraße 5, 80331 München, Deutschland",
+        maxCapacity: 2,
+        extras: [],
+        equipmentItems: [],
+        imageUrls: ["data:image/png;base64,existing"],
+        toolIds: []
+      },
+      slots: [
+        {
+          id: "slot-1",
+          workshopId: "workshop-1",
+          startIso: "2026-07-01T09:00:00.000Z",
+          endIso: "2026-07-01T12:00:00.000Z",
+          blockedByOwner: false
+        }
+      ]
+    });
+
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter initialEntries={["/workshops/workshop-1/edit"]}>
+          <Routes>
+            <Route
+              path="/workshops/:id/edit"
+              element={<EditWorkshopPage token="token-456" currentUser={currentUser} />}
+            />
+            <Route path="/workshops" element={<div>Workshops Home</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByText("Workshops Home")).toBeInTheDocument();
+    expect(getWorkshopById).toHaveBeenCalledWith("workshop-1", "token-456");
+  });
+
+  it("manages slots and shows validation errors while editing", async () => {
+    getWorkshopById.mockResolvedValueOnce({
+      workshop: {
+        id: "workshop-1",
+        ownerId: "owner-1",
+        name: "Alte Werkstatt",
+        description: "Werkstatt",
+        location: "Musterstraße 5, 80331 München, Deutschland",
+        maxCapacity: 5,
+        extras: [],
+        equipmentItems: [],
+        imageUrls: ["data:image/png;base64,existing"],
+        toolIds: []
+      },
+      slots: [
+        {
+          id: "slot-1",
+          workshopId: "workshop-1",
+          startIso: "2026-07-01T09:00:00.000Z",
+          endIso: "2026-07-01T12:00:00.000Z",
+          blockedByOwner: false
+        }
+      ]
+    });
+    validateAddress.mockResolvedValue({
+      isValid: true,
+      normalizedAddress: "Musterstraße 5, 80331 München, Deutschland",
+      normalizedParts: null
+    });
+    createWorkshopTimeslot.mockResolvedValueOnce({
+      id: "slot-2",
+      workshopId: "workshop-1",
+      startIso: "2026-07-02T10:00:00.000Z",
+      endIso: "2026-07-02T12:00:00.000Z",
+      blockedByOwner: true
+    });
+    updateWorkshopTimeslot.mockResolvedValueOnce({
+      id: "slot-1",
+      workshopId: "workshop-1",
+      startIso: "2026-07-01T09:00:00.000Z",
+      endIso: "2026-07-01T12:00:00.000Z",
+      blockedByOwner: true
+    });
+    deleteWorkshopTimeslot.mockResolvedValueOnce(undefined);
+
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter initialEntries={["/workshops/workshop-1/edit"]}>
+          <Routes>
+            <Route
+              path="/workshops/:id/edit"
+              element={<EditWorkshopPage token="token-456" currentUser={currentUser} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByDisplayValue("Alte Werkstatt")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Start"), { target: { value: "2026-07-02T14:00" } });
+    fireEvent.change(screen.getByLabelText("Ende"), { target: { value: "2026-07-02T10:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
+    expect(await screen.findByText("Die Endzeit muss nach der Startzeit liegen.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Start"), { target: { value: "2026-07-02T10:00" } });
+    fireEvent.change(screen.getByLabelText("Ende"), { target: { value: "2026-07-02T12:00" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Zeitraum blockieren/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Zeitfenster hinzufügen" }));
+
+    await waitFor(() =>
+      expect(createWorkshopTimeslot).toHaveBeenCalledWith(
+        "workshop-1",
+        { startIso: "2026-07-02T10:00", endIso: "2026-07-02T12:00", blockedByOwner: true },
+        "token-456"
+      )
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Blockieren" }));
+    await waitFor(() => expect(updateWorkshopTimeslot).toHaveBeenCalled());
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Entfernen" })[0]);
+    await waitFor(() => expect(deleteWorkshopTimeslot).toHaveBeenCalledWith("workshop-1", "slot-1", "token-456"));
+  });
+
+  it("shows a toast when loading the workshop fails", async () => {
+    getWorkshopById.mockRejectedValueOnce(new Error("Netzwerkfehler"));
+
+    render(
+      <ToastProvider>
+        <ToastViewport />
+        <MemoryRouter initialEntries={["/workshops/workshop-1/edit"]}>
+          <Routes>
+            <Route
+              path="/workshops/:id/edit"
+              element={<EditWorkshopPage token="token-456" currentUser={currentUser} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    expect(await screen.findByText("Netzwerkfehler")).toBeInTheDocument();
   });
 });

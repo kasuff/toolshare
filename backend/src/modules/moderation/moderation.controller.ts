@@ -37,7 +37,8 @@ export const moderationController = {
       requestSuspensionUserId: req.body.requestSuspensionUserId,
       suspensionReason: req.body.suspensionReason,
       deleteTool: req.body.deleteTool,
-      deleteWorkshop: req.body.deleteWorkshop
+      deleteWorkshop: req.body.deleteWorkshop,
+      deleteRating: req.body.deleteRating
     });
     res.status(200).json(report);
   })

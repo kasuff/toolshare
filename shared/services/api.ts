@@ -16,15 +16,11 @@ import { DEFAULT_PLACEHOLDER_IMAGE, normalizePlaceholderImage } from "../utils/c
 import { beginRequestActivity } from "./requestActivity";
 import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "./sessionEvents";
 
-interface FrontendImportMetaEnv {
-  readonly VITE_API_URL?: string;
-}
+let API_BASE = "http://localhost:4000/api";
 
-interface FrontendImportMeta {
-  readonly env: FrontendImportMetaEnv;
+export function setApiBaseUrl(url: string) {
+  API_BASE = url;
 }
-
-const API_BASE = ((import.meta as unknown as FrontendImportMeta).env.VITE_API_URL as string | undefined) ?? "http://localhost:4000/api";
 
 type BackendRole = "USER" | "MODERATOR" | "MANAGER";
 type BackendToolStatus = "AVAILABLE" | "REQUESTED" | "BORROWED";
@@ -1163,6 +1159,7 @@ export const api = {
       suspensionReason?: string;
       deleteTool?: boolean;
       deleteWorkshop?: boolean;
+      deleteRating?: boolean;
     },
     token: string
   ) {

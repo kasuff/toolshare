@@ -12,7 +12,11 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "cobertura", "html", "lcov"],
-      reportsDirectory: "./coverage"
+      reportsDirectory: "./coverage",
+      // The monitoring module only exposes a Prometheus metrics endpoint for the
+      // external observability stack -- it is not application logic we unit-test,
+      // so keep it out of the coverage numbers (it is loaded transitively via app.ts).
+      exclude: ["src/modules/monitoring/**"]
     }
   }
 });

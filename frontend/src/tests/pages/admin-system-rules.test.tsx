@@ -2,12 +2,11 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../hooks/useToast";
-import { api, type SystemSetting } from "../../services/api";
 import { AdminPage } from "../../pages/AdminPage";
-import type { User } from "../../types/domain";
+import { api, type SystemSetting, type User } from "@toolshare/shared";
 
-vi.mock("../../services/api", async () => {
-  const actual = await vi.importActual<typeof import("../../services/api")>("../../services/api");
+vi.mock("@toolshare/shared", async () => {
+  const actual = await vi.importActual<typeof import("@toolshare/shared")>("@toolshare/shared");
   return {
     ...actual,
     api: {

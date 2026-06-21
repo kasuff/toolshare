@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { coordinatesForLocation, distanceInKm, type Coordinates } from "../utils/searchFilters";
+import { coordinatesForLocation, distanceInKm, type Coordinates } from "@toolshare/shared";
 
 type SearchMapPoint = {
   id: string;

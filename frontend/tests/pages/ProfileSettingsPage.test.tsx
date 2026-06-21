@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
+import { ToastViewport } from "../../src/components/ui";
 import { ProfileSettingsPage } from "../../src/pages/ProfileSettingsPage";
 
 const { validateAddress, suggestAddresses, changePassword } = vi.hoisted(() => ({
@@ -10,13 +11,18 @@ const { validateAddress, suggestAddresses, changePassword } = vi.hoisted(() => (
   changePassword: vi.fn()
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    validateAddress,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      validateAddress,
     suggestAddresses,
     changePassword
-  }
-}));
+    }
+  };
+});
 
 describe("ProfileSettingsPage", () => {
   beforeEach(() => {
@@ -134,6 +140,7 @@ describe("ProfileSettingsPage", () => {
   const renderWithUser = () =>
     render(
       <ToastProvider>
+        <ToastViewport />
         <MemoryRouter>
           <ProfileSettingsPage
             currentUser={{
@@ -162,6 +169,40 @@ describe("ProfileSettingsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
 
     await waitFor(() => expect(changePassword).not.toHaveBeenCalled());
+  });
+
+  it("rejects password change when fields are empty or too short", async () => {
+    renderWithUser();
+
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+
+    expect(await screen.findByText("Bitte alle Passwortfelder ausfüllen.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Aktuelles Passwort"), { target: { value: "Current123" } });
+    fireEvent.change(screen.getByPlaceholderText("Mindestens 8 Zeichen"), { target: { value: "short" } });
+    fireEvent.change(screen.getByPlaceholderText("Neues Passwort erneut eingeben"), {
+      target: { value: "short" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+
+    expect(await screen.findByText("Das neue Passwort muss mindestens 8 Zeichen haben.")).toBeInTheDocument();
+    expect(changePassword).not.toHaveBeenCalled();
+  });
+
+  it("shows API error when password change fails", async () => {
+    changePassword.mockRejectedValueOnce(new Error("Aktuelles Passwort ist falsch."));
+    renderWithUser();
+
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+    fireEvent.change(screen.getByPlaceholderText("Aktuelles Passwort"), { target: { value: "Current123" } });
+    fireEvent.change(screen.getByPlaceholderText("Mindestens 8 Zeichen"), { target: { value: "NewPass1234" } });
+    fireEvent.change(screen.getByPlaceholderText("Neues Passwort erneut eingeben"), {
+      target: { value: "NewPass1234" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Passwort ändern" }));
+
+    expect(await screen.findByText("Aktuelles Passwort ist falsch.")).toBeInTheDocument();
   });
 
   it("changes the password and closes the form on success", async () => {

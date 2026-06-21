@@ -1,0 +1,28 @@
+{
+  "name": "toolshare-root",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "mobile",
+    "shared"
+  ],
+  "comment:overrides": "Pin vulnerable transitive deps of the Expo dev/build toolchain (CLI, prebuild, config-plugins, dev-server, ngrok) to patched versions. Mirrors mobile/package.json so a root-level `npm audit` is clean too. These are build-time tools, not on-device runtime deps.",
+  "overrides": {
+    "postcss": "^8.5.10",
+    "@expo/metro-config": {
+      "postcss": "^8.5.10"
+    },
+    "@expo/cli": {
+      "postcss": "^8.5.10"
+    },
+    "semver": "^7.8.4",
+    "qs": "^6.15.2",
+    "body-parser": "^1.20.3",
+    "send": "^0.19.0",
+    "js-yaml": "^4.2.0",
+    "xml2js": "^0.6.2",
+    "@xmldom/xmldom": "^0.9.10",
+    "tar": "^7.5.16",
+    "uuid": "^11.1.1"
+  }
+}

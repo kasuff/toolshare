@@ -13,7 +13,8 @@ vi.mock("../src/modules/ratings/ratings.repository", () => ({
     listForTool: vi.fn(),
     listForWorkshop: vi.fn(),
     hide: vi.fn(),
-    findById: vi.fn()
+    findById: vi.fn(),
+    remove: vi.fn()
   }
 }));
 
@@ -185,5 +186,64 @@ describe("ratingsService", () => {
 
     expect(mockedRatingsRepository.hide).not.toHaveBeenCalled();
     expect(result).toMatchObject({ id: "rating-1", status: "HIDDEN" });
+  });
+
+  it("lists ratings for tools and workshops", async () => {
+    mockedRatingsRepository.listForTool.mockResolvedValueOnce([{ id: "r-tool" }] as any);
+    mockedRatingsRepository.listForWorkshop.mockResolvedValueOnce([{ id: "r-workshop" }] as any);
+
+    await expect(ratingsService.listForTool("tool-1")).resolves.toEqual([{ id: "r-tool" }]);
+    await expect(ratingsService.listForWorkshop("workshop-1")).resolves.toEqual([{ id: "r-workshop" }]);
+  });
+
+  it("rejects hide when rating is missing", async () => {
+    mockedRatingsRepository.findById.mockResolvedValueOnce(null);
+
+    await expect(ratingsService.hideFromModeration("missing", "mod-1")).rejects.toMatchObject({
+      code: "RATING_NOT_FOUND",
+      status: 404
+    });
+  });
+
+  it("removes rating from moderation", async () => {
+    mockedRatingsRepository.findById.mockResolvedValueOnce({ id: "rating-1", status: "VISIBLE" } as any);
+    mockedRatingsRepository.remove.mockResolvedValueOnce({ id: "rating-1" } as any);
+
+    const result = await ratingsService.removeFromModeration("rating-1");
+
+    expect(mockedRatingsRepository.remove).toHaveBeenCalledWith("rating-1");
+    expect(result).toMatchObject({ id: "rating-1" });
+  });
+
+  it("rejects remove when rating is missing", async () => {
+    mockedRatingsRepository.findById.mockResolvedValueOnce(null);
+
+    await expect(ratingsService.removeFromModeration("missing")).rejects.toMatchObject({
+      code: "RATING_NOT_FOUND",
+      status: 404
+    });
+  });
+
+  it("uses workshop manager as provider when booking has no tool", async () => {
+    mockedRatingsRepository.findBookingWithParticipants.mockResolvedValueOnce({
+      id: "b1",
+      userId: "requester",
+      tool: null,
+      timeslot: { workshop: { managerId: "manager-1" } },
+      status: "RETURNED",
+      endDate: new Date("2026-01-01T00:00:00.000Z")
+    } as any);
+    mockedRatingsRepository.findByBookingAndRequester.mockResolvedValueOnce(null);
+    mockedRatingsRepository.create.mockResolvedValueOnce({ id: "rating-3", score: 5 } as any);
+
+    await ratingsService.create({
+      bookingId: "b1",
+      fromUserId: "requester",
+      score: 5
+    });
+
+    expect(mockedRatingsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ toUserId: "manager-1" })
+    );
   });
 });

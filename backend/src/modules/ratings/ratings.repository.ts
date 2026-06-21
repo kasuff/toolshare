@@ -124,6 +124,12 @@ export const ratingsRepository = {
     });
   },
 
+  remove(ratingId: string) {
+    return prisma.rating.delete({
+      where: { id: ratingId }
+    });
+  },
+
   listReceived(userId: string, includeHidden = false) {
     return prisma.rating.findMany({
       where: {

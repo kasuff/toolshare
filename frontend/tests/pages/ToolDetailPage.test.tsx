@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { ToolDetailPage } from "../../src/pages/ToolDetailPage";
 import { ToastViewport } from "../../src/components/ui";
-import { DEFAULT_PLACEHOLDER_IMAGE } from "../../src/utils/categories";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
 
 const { getTools, getToolBlockingPeriods, createToolRequest, createToolOwnerBlock, deleteTool, createReport, getRatingsForTool } = vi.hoisted(() => ({
   getTools: vi.fn(),
@@ -16,17 +16,22 @@ const { getTools, getToolBlockingPeriods, createToolRequest, createToolOwnerBloc
   getRatingsForTool: vi.fn().mockResolvedValue([])
 }));
 
-vi.mock("../../src/services/api", () => ({
-  api: {
-    getTools,
+vi.mock("@toolshare/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@toolshare/shared")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getTools,
     getToolBlockingPeriods,
     createToolRequest,
     createToolOwnerBlock,
     deleteTool,
     createReport,
     getRatingsForTool
-  }
-}));
+    }
+  };
+});
 
 describe("ToolDetailPage", () => {
   it("shows the design-system detail layout with calendar and discrete booking inputs", async () => {

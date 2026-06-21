@@ -94,23 +94,35 @@ echo "Starting production deployment..."
 
 COMPOSE="$(compose_cmd)"
 
-# Stop monitoring first — it depends on toolshare-network which the app stack owns
-echo "Stopping monitoring stack..."
-$COMPOSE -f "$MONITORING_COMPOSE_FILE" down || true
+# Both stacks attach to toolshare-network as an *external* network, so nothing
+# in the compose files creates it. Ensure it exists before anything starts.
+if ! docker network inspect toolshare-network >/dev/null 2>&1; then
+	echo "Creating shared external network toolshare-network..."
+	docker network create toolshare-network
+fi
 
-# Stop app stack and recreate network
-echo "Stopping app stack..."
-$COMPOSE -f "$COMPOSE_FILE" down --remove-orphans
+# 1) Build app images FIRST — before touching anything that is running.
+#    If a build fails (e.g. a transient npm-registry ECONNRESET), abort here:
+#    the current app keeps serving and, crucially, the monitoring stack
+#    (Grafana) is never stopped. Build failures no longer take observability
+#    down with them.
+echo "Building app images..."
+$COMPOSE -f "$COMPOSE_FILE" build
 
-# Start app stack first (creates toolshare-network)
+# 2) Roll the app stack onto the freshly built images. up -d recreates only
+#    the containers whose image/config changed, minimising downtime.
 echo "Starting app stack..."
-$COMPOSE -f "$COMPOSE_FILE" up -d --build
+$COMPOSE -f "$COMPOSE_FILE" up -d --remove-orphans
 wait_for_containers "$COMPOSE_FILE"
 
-# Start monitoring stack (joins existing toolshare-network)
-# --build: Configs sind in die Images gebacken → bei Änderungen neu bauen.
+# 3) Ensure the monitoring stack is up. It runs as an independent compose
+#    project on the same external network, so it is brought up separately and
+#    is unaffected by an app build/health failure above.
+#    --build: Configs sind in die Images gebacken → bei Änderungen neu bauen.
+echo "Building monitoring images..."
+$COMPOSE -f "$MONITORING_COMPOSE_FILE" build
 echo "Starting monitoring stack..."
-$COMPOSE -f "$MONITORING_COMPOSE_FILE" up -d --build
+$COMPOSE -f "$MONITORING_COMPOSE_FILE" up -d
 wait_for_containers "$MONITORING_COMPOSE_FILE"
 
 echo "Deployment finished successfully!"

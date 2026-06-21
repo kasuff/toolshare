@@ -6,11 +6,11 @@ import { AddressInput } from "../../src/components/AddressInput";
 import { ConfirmDialog } from "../../src/components/ConfirmDialog";
 import { KebabMenu } from "../../src/components/KebabMenu";
 import { Layout } from "../../src/components/Layout";
-import { api } from "../../src/services/api";
+import { api } from "@toolshare/shared";
 import { EMPTY_ADDRESS } from "../../src/utils/address";
 
-vi.mock("../../src/services/api", async () => {
-  const actual = await vi.importActual<typeof import("../../src/services/api")>("../../src/services/api");
+vi.mock("@toolshare/shared", async () => {
+  const actual = await vi.importActual<typeof import("@toolshare/shared")>("@toolshare/shared");
   return {
     ...actual,
     api: {

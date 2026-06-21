@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import type { User } from "../types/domain";
-import { api } from "../services/api";
+import type {  User  } from "@toolshare/shared";
+import {  api  } from "@toolshare/shared";
 import {
   countUnreadInboxThreads,
   INBOX_READ_CHANGED_EVENT,

@@ -171,7 +171,12 @@ services:
           cpus: "0.05"
           memory: "128M"
     networks:
+      # monitoring-network: Promtail/Grafana erreichen Loki.
+      # toolshare-network: Backend (/api/monitoring/logs) erreicht Loki – sonst
+      # ENOTFOUND beim fetch → HTTP 500. Vgl. Prometheus, das ebenfalls an
+      # beiden Netzen hängt.
       - monitoring-network
+      - toolshare-network
 
   # ─── Promtail ───────────────────────────────────────────────────────────────
   promtail:

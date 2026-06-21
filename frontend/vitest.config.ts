@@ -13,15 +13,7 @@ export default defineConfig({
     hookTimeout: 30_000,
     pool: 'forks',
     maxWorkers: process.env.CI ? 1 : undefined,
-    poolOptions: {
-      forks: {
-        // In CI, run all test files in one long-lived fork instead of
-        // spawning/tearing down a process per file. That removes the
-        // process churn that intermittently triggers
-        // "Worker exited unexpectedly" on the memory-constrained runner.
-        singleFork: !!process.env.CI,
-      },
-    },
+    singleFork: !!process.env.CI,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],
@@ -39,6 +31,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
     },
   },
 });
