@@ -5,8 +5,8 @@ import { useAuth } from './useAuth';
 import { countUnreadInboxItems } from '../utils/inboxUnread';
 import { subscribeInboxBadgeRefresh } from '../utils/inboxBadgeEvents';
 
-const POLL_INTERVAL_MS = 120_000;
-const MIN_FETCH_INTERVAL_MS = 8_000;
+const POLL_INTERVAL_MS = 30_000;
+const MIN_FETCH_INTERVAL_MS = 3_000;
 
 export function useInboxBadgeCount(): number {
   const { token, currentUser } = useAuth();
@@ -14,13 +14,13 @@ export function useInboxBadgeCount(): number {
   const lastFetchAtRef = useRef(0);
   const inFlightRef = useRef(false);
 
-  const fetchFromApi = useCallback(async () => {
+  const fetchFromApi = useCallback(async (force = false) => {
     if (!token || !currentUser?.id || inFlightRef.current) {
       return;
     }
 
     const now = Date.now();
-    if (now - lastFetchAtRef.current < MIN_FETCH_INTERVAL_MS) {
+    if (!force && now - lastFetchAtRef.current < MIN_FETCH_INTERVAL_MS) {
       return;
     }
 
@@ -52,17 +52,17 @@ export function useInboxBadgeCount(): number {
         return;
       }
 
-      void fetchFromApi();
+      void fetchFromApi(true);
     },
     [token, currentUser?.id, fetchFromApi]
   );
 
   useEffect(() => {
-    void fetchFromApi();
+    void fetchFromApi(true);
 
     const intervalId = setInterval(() => void fetchFromApi(), POLL_INTERVAL_MS);
     const appStateSubscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void fetchFromApi();
+      if (state === 'active') void fetchFromApi(true);
     });
     const unsubscribe = subscribeInboxBadgeRefresh((knownCount) => refresh(knownCount));
 

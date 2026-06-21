@@ -186,6 +186,11 @@ export default function InboxScreen() {
   useFocusEffect(
     useCallback(() => {
       loadBookings();
+      const intervalId = setInterval(() => {
+        void loadBookings();
+      }, 20_000);
+
+      return () => clearInterval(intervalId);
     }, [loadBookings])
   );
 

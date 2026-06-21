@@ -6,8 +6,7 @@ import Constants from "expo-constants";
 import { api } from "@toolshare/shared";
 import { storage } from "../utils/appStorage";
 
-const PUSH_LISTENER_DEBOUNCE_MS = 3_000;
-const MIN_SYNC_INTERVAL_MS = 30_000;
+const PUSH_LISTENER_DEBOUNCE_MS = 1_000;
 
 function syncedPushTokenKey(userId: string) {
   return `toolshare.synced_push.${userId}`;
@@ -36,7 +35,6 @@ export function usePushNotifications(token: string | null, userId?: string) {
   const responseListener = useRef<Notifications.Subscription>(null);
   const lastSyncedTokenRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
-  const lastSyncAttemptAtRef = useRef(0);
   const listenerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -61,17 +59,11 @@ export function usePushNotifications(token: string | null, userId?: string) {
         return;
       }
 
-      const now = Date.now();
-      if (
-        syncInFlightRef.current ||
-        (now - lastSyncAttemptAtRef.current < MIN_SYNC_INTERVAL_MS &&
-          lastSyncAttemptAtRef.current > 0)
-      ) {
+      if (syncInFlightRef.current) {
         return;
       }
 
       syncInFlightRef.current = true;
-      lastSyncAttemptAtRef.current = now;
       setExpoPushToken(pushToken);
 
       try {
