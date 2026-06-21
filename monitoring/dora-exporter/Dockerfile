@@ -7,10 +7,17 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY dora.py report.py app.py ./
+COPY dora.py report.py full_report.py metrics_report.py app.py ./
 
 # Matplotlib-Cache in beschreibbares Verzeichnis legen (Container läuft non-root-fähig).
 ENV MPLCONFIGDIR=/tmp/mpl
+
+# Non-root Benutzer anlegen und die beschreibbaren Verzeichnisse übergeben,
+# damit der State (/data) und der Matplotlib-Cache ohne root geschrieben werden können.
+RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /data /tmp/mpl \
+    && chown -R appuser:appuser /app /data /tmp/mpl
+USER appuser
 
 EXPOSE 9110
 
