@@ -33,7 +33,13 @@
       "expo-router",
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "scheme": "toolshare",
     "experiments": {

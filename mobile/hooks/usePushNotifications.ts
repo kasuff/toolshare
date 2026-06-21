@@ -30,13 +30,28 @@ export function usePushNotifications(token: string | null) {
   useEffect(() => {
     if (!token) return;
 
+    const syncPushToken = (pushToken: string) => {
+      setExpoPushToken(pushToken);
+      api.updateMyProfile({ expoPushToken: pushToken }, token).catch((error) => {
+        console.error("Failed to sync push token", error);
+      });
+    };
+
     registerForPushNotificationsAsync().then((pushToken) => {
       if (pushToken) {
-        setExpoPushToken(pushToken);
-        api.updateMyProfile({ expoPushToken: pushToken }, token).catch((error) => {
-          console.error("Failed to sync push token", error);
-        });
+        syncPushToken(pushToken);
       }
+    });
+
+    const pushTokenListener = Notifications.addPushTokenListener((devicePushToken) => {
+      registerForPushNotificationsAsync().then((pushToken) => {
+        if (pushToken) {
+          console.log("Expo push token refreshed:", pushToken);
+          syncPushToken(pushToken);
+        }
+      }).catch((error) => {
+        console.warn("Failed to refresh Expo push token", error, devicePushToken);
+      });
     });
 
     notificationListener.current = Notifications.addNotificationReceivedListener(
@@ -53,6 +68,7 @@ export function usePushNotifications(token: string | null) {
     );
 
     return () => {
+      pushTokenListener.remove();
       if (notificationListener.current) {
         notificationListener.current.remove();
       }
@@ -93,6 +109,10 @@ async function registerForPushNotificationsAsync() {
     }
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!projectId) {
+      console.warn("Missing EAS projectId – push token registration will fail.");
+      return null;
+    }
 
     try {
       token = (

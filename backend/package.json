@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:migrate": "prisma migrate deploy",
+    "test:push": "ts-node scripts/test-push.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

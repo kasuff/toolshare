@@ -38,7 +38,7 @@ export const usersRepository = {
     });
   },
 
-  updateProfile(id: string, data: { name?: string; address?: string; expoPushToken?: string }) {
+  updateProfile(id: string, data: { name?: string; address?: string; expoPushToken?: string | null }) {
     return prisma.user.update({
       where: { id },
       data,

@@ -6,7 +6,6 @@
     "mobile",
     "shared"
   ],
-  "comment:overrides": "Pin vulnerable transitive deps of the Expo dev/build toolchain (CLI, prebuild, config-plugins, dev-server, ngrok) to patched versions. Mirrors mobile/package.json so a root-level `npm audit` is clean too. These are build-time tools, not on-device runtime deps.",
   "overrides": {
     "postcss": "^8.5.10",
     "@expo/metro-config": {
@@ -25,5 +24,8 @@
     "tar": "^7.5.16",
     "uuid": "^11.1.1",
     "tmp": "^0.2.7"
+  },
+  "devDependencies": {
+    "expo": "~54.0.0"
   }
 }
