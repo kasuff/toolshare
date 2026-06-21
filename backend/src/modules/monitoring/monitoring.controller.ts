@@ -279,19 +279,37 @@ export const monitoringController = {
   doraReport: asyncHandler(async (req: Request, res: Response) => {
     const daysRaw = parseInt(String(req.query.days ?? "90"), 10);
     const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 730) : 90;
+    return proxyExporterPdf(res, "/report.pdf", { days: String(days) }, `toolshare-dora-${days}d.pdf`);
+  }),
 
-    const url = new URL("/report.pdf", env.doraExporterUrl);
-    url.searchParams.set("days", String(days));
-
-    const upstream = await fetch(url.toString(), { signal: AbortSignal.timeout(60000) });
-    if (!upstream.ok) {
-      return res.status(502).json({ error: "DORA-Exporter nicht erreichbar oder Report fehlgeschlagen." });
-    }
-
-    const filename = `toolshare-dora-${new Date().toISOString().slice(0, 10)}-${days}d.pdf`;
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    return res.send(buffer);
+  // GET /api/monitoring/report.pdf?days=30
+  // Gesamtbericht über ALLE Monitoring-Daten (System, HTTP, Business, DORA).
+  fullReport: asyncHandler(async (req: Request, res: Response) => {
+    const daysRaw = parseInt(String(req.query.days ?? "30"), 10);
+    const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 730) : 30;
+    return proxyExporterPdf(res, "/full-report.pdf", { days: String(days) }, `toolshare-gesamtbericht-${days}d.pdf`);
   })
 };
+
+// Holt ein PDF vom Reporting-Service (dora-exporter) und reicht es als Download
+// durch. Der Exporter-Port bleibt intern; die MANAGER-Auth greift über den Router.
+async function proxyExporterPdf(
+  res: Response,
+  path: string,
+  params: Record<string, string>,
+  fallbackName: string
+): Promise<Response> {
+  const url = new URL(path, env.doraExporterUrl);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+
+  const upstream = await fetch(url.toString(), { signal: AbortSignal.timeout(120000) });
+  if (!upstream.ok) {
+    return res.status(502).json({ error: "Report-Service nicht erreichbar oder Report fehlgeschlagen." });
+  }
+
+  const filename = `${fallbackName.replace(/\.pdf$/, "")}-${new Date().toISOString().slice(0, 10)}.pdf`;
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.send(buffer);
+}

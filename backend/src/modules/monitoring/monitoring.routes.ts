@@ -14,3 +14,4 @@ monitoringRouter.get("/logs", monitoringController.logs);
 monitoringRouter.get("/export", monitoringController.export);
 monitoringRouter.get("/dora", monitoringController.dora);
 monitoringRouter.get("/dora/report.pdf", monitoringController.doraReport);
+monitoringRouter.get("/report.pdf", monitoringController.fullReport);
