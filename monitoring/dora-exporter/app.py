@@ -32,6 +32,7 @@ from prometheus_client import (
 )
 
 import dora
+import full_report
 import metrics_report
 import report
 
@@ -192,6 +193,17 @@ def metrics():
 def report_pdf(days: int = Query(90, ge=1, le=730)):
     pdf = report.build_report(days)
     filename = f"toolshare-dora-{datetime.now():%Y%m%d}-{days}d.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/full-report.pdf")
+def full_report_pdf(days: int = Query(30, ge=1, le=730)):
+    pdf = full_report.build_full_report(days)
+    filename = f"toolshare-gesamtbericht-{datetime.now():%Y%m%d}-{days}d.pdf"
     return Response(
         content=pdf,
         media_type="application/pdf",
