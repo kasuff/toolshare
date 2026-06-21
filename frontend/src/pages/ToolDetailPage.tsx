@@ -584,7 +584,12 @@ export function ToolDetailPage({ token, currentUser }: Props) {
 
               <div className="booking-actions">
                 {isOwnTool ? (
-                  <button className="booking-button" onClick={() => void blockToolForOwnUse()} disabled={isSubmitting}>
+                  <button
+                    className="booking-button"
+                    onClick={() => void blockToolForOwnUse()}
+                    disabled={isSubmitting}
+                    aria-label={`Zeitraum für ${tool.name} blockieren`}
+                  >
                     {isSubmitting ? "Wird blockiert..." : "Zeitraum blockieren"}
                   </button>
                 ) : token ? (

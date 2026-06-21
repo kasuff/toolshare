@@ -2792,6 +2792,25 @@ td {
   flex-wrap: wrap;
 }
 
+.admin-user-table-scroll {
+  max-width: 100%;
+}
+
+.admin-user-table {
+  min-width: 44rem;
+}
+
+@media (max-width: 640px) {
+  .admin-tabs {
+    flex-wrap: wrap;
+  }
+
+  .admin-user-search input {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 .moderation-report-list {
   list-style: none;
   margin: 0;
@@ -3559,6 +3578,9 @@ td {
   .discover-hero {
     height: auto;
     min-height: 420px;
+    display: flex;
+    align-items: flex-end;
+    padding: var(--space-4);
     overflow: hidden;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
@@ -3576,11 +3598,13 @@ td {
   }
 
   .discover-hero-copy {
+    position: relative;
     top: auto;
-    right: var(--space-4);
-    bottom: var(--space-4);
-    left: var(--space-4);
-    width: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+    margin-top: 220px;
     padding: var(--space-5);
     transform: none;
   }
@@ -3604,6 +3628,7 @@ td {
   }
 
   .discover-hero-copy {
+    margin-top: 180px;
     padding: var(--space-4);
   }
 

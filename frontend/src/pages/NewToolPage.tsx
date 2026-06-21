@@ -140,9 +140,9 @@ export function NewToolPage({ token }: Props) {
             maxLength={100}
             className={showFieldError("name") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("name")}
-            aria-describedby={showFieldError("name") ? "new-tool-name-error" : undefined}
+            aria-describedby={`new-tool-name-hint${showFieldError("name") ? " new-tool-name-error" : ""}`}
           />
-          <small>Kurz und konkret, z.B. Akku-Bohrmaschine DeWalt 18V</small>
+          <small id="new-tool-name-hint">Kurz und konkret, z.B. Akku-Bohrmaschine DeWalt 18V</small>
           {showFieldError("name") && <p id="new-tool-name-error" className="field-error" role="alert">{formErrors.name}</p>}
         </label>
 
@@ -161,9 +161,9 @@ export function NewToolPage({ token }: Props) {
             rows={5}
             className={showFieldError("description") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("description")}
-            aria-describedby={showFieldError("description") ? "new-tool-description-error" : undefined}
+            aria-describedby={`new-tool-description-hint${showFieldError("description") ? " new-tool-description-error" : ""}`}
           />
-          <small>Zustand, Lieferumfang, besondere Hinweise. Schreib alles auf, was potenzielle Nutzer wissen sollten!</small>
+          <small id="new-tool-description-hint">Zustand, Lieferumfang, besondere Hinweise. Schreib alles auf, was potenzielle Nutzer wissen sollten!</small>
           {showFieldError("description") && <p id="new-tool-description-error" className="field-error" role="alert">{formErrors.description}</p>}
         </label>
 
@@ -177,15 +177,21 @@ export function NewToolPage({ token }: Props) {
           errorMessage={formErrors.category}
         />
 
-        <div className="tool-form-field new-tool-address-section">
-          <span>Abholort *</span>
-          <small>Gib die vollständige Adresse an, an der das Werkzeug abgeholt werden kann.</small>
+        <div
+          className="tool-form-field new-tool-address-section"
+          role="group"
+          aria-labelledby="new-tool-address-label"
+          aria-describedby="new-tool-address-hint"
+        >
+          <span id="new-tool-address-label">Abholort *</span>
+          <small id="new-tool-address-hint">Gib die vollständige Adresse an, an der das Werkzeug abgeholt werden kann.</small>
 
           <AddressInput
             value={pickupAddress}
             onChange={setPickupAddress}
             required
             hasError={showFieldError("pickupLocation")}
+            describedBy="new-tool-address-hint"
             errorMessageId="new-tool-location-error"
             onBlur={() => markFieldTouched("pickupLocation")}
           />
@@ -204,8 +210,9 @@ export function NewToolPage({ token }: Props) {
             maxLength={300}
             rows={3}
             placeholder="z.B. Klingeln bei Thomas, 4. Stock, Hinterhof links"
+            aria-describedby="new-tool-pickup-note-hint"
           />
-          <small>Optionaler Hinweis, der die Übergabe vor Ort erleichtert.</small>
+          <small id="new-tool-pickup-note-hint">Optionaler Hinweis, der die Übergabe vor Ort erleichtert.</small>
         </label>
 
         <div className="new-tool-actions">

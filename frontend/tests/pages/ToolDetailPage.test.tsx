@@ -275,7 +275,7 @@ describe("ToolDetailPage", () => {
     fireEvent.change(screen.getByLabelText("Startzeit Eigenbedarf"), { target: { value: "09:00" } });
     fireEvent.change(screen.getByLabelText("Enddatum Eigenbedarf"), { target: { value: "2026-07-06" } });
     fireEvent.change(screen.getByLabelText("Endzeit Eigenbedarf"), { target: { value: "12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
     await waitFor(() =>
       expect(createToolOwnerBlock).toHaveBeenCalledWith(
         { toolId: "t1", startIso: "2026-07-06T09:00", endIso: "2026-07-06T12:00" },
@@ -353,7 +353,7 @@ describe("ToolDetailPage", () => {
     fireEvent.change(screen.getByLabelText("Startzeit Eigenbedarf"), { target: { value: "09:00" } });
     fireEvent.change(screen.getByLabelText("Enddatum Eigenbedarf"), { target: { value: "2026-07-06" } });
     fireEvent.change(screen.getByLabelText("Endzeit Eigenbedarf"), { target: { value: "12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
 
     expect(createToolOwnerBlock).not.toHaveBeenCalled();
     expect(await screen.findByText(/bereits eine angenommene oder offene Buchung/i)).toBeInTheDocument();

@@ -197,9 +197,9 @@ export function NewWorkshopPage({ token }: Props) {
             maxLength={100}
             className={showFieldError("name") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("name")}
-            aria-describedby={showFieldError("name") ? "new-workshop-name-error" : undefined}
+            aria-describedby={`new-workshop-name-hint${showFieldError("name") ? " new-workshop-name-error" : ""}`}
           />
-          <small>Kurz und konkret, z.B. geräumige Garagen-Werkstatt.</small>
+          <small id="new-workshop-name-hint">Kurz und konkret, z.B. geräumige Garagen-Werkstatt.</small>
           {showFieldError("name") && <p id="new-workshop-name-error" className="field-error" role="alert">{formErrors.name}</p>}
         </label>
 
@@ -218,9 +218,9 @@ export function NewWorkshopPage({ token }: Props) {
             rows={5}
             className={showFieldError("description") ? "input-invalid" : undefined}
             aria-invalid={showFieldError("description")}
-            aria-describedby={showFieldError("description") ? "new-workshop-description-error" : undefined}
+            aria-describedby={`new-workshop-description-hint${showFieldError("description") ? " new-workshop-description-error" : ""}`}
           />
-          <small>Beschreibe Zustand, Nutzungsmöglichkeiten und Besonderheiten deiner Werkstatt.</small>
+          <small id="new-workshop-description-hint">Beschreibe Zustand, Nutzungsmöglichkeiten und Besonderheiten deiner Werkstatt.</small>
           {showFieldError("description") && <p id="new-workshop-description-error" className="field-error" role="alert">{formErrors.description}</p>}
         </label>
 
@@ -238,23 +238,34 @@ export function NewWorkshopPage({ token }: Props) {
           hint="Wähle optionale Zusatzmerkmale wie WLAN, Starkstrom oder einen Parkplatz."
         />
 
-        <div className="tool-form-field new-tool-address-section">
-          <span>Adresse *</span>
-          <small>Gib die vollständige Adresse an, an der sich die Werkstatt befindet.</small>
+        <div
+          className="tool-form-field new-tool-address-section"
+          role="group"
+          aria-labelledby="new-workshop-address-label"
+          aria-describedby="new-workshop-address-hint"
+        >
+          <span id="new-workshop-address-label">Adresse *</span>
+          <small id="new-workshop-address-hint">Gib die vollständige Adresse an, an der sich die Werkstatt befindet.</small>
 
           <AddressInput
             value={workshopAddress}
             onChange={setWorkshopAddress}
             required
             hasError={showFieldError("location")}
+            describedBy="new-workshop-address-hint"
             errorMessageId="new-workshop-location-error"
             onBlur={() => markFieldTouched("location")}
           />
           {showFieldError("location") && <p id="new-workshop-location-error" className="field-error" role="alert">{formErrors.location}</p>}
         </div>
 
-        <div className="tool-form-field workshop-capacity-field">
-          <span>Maximale Personenzahl *</span>
+        <div
+          className="tool-form-field workshop-capacity-field"
+          role="group"
+          aria-labelledby="new-workshop-capacity-label"
+          aria-describedby="new-workshop-capacity-hint"
+        >
+          <span id="new-workshop-capacity-label">Maximale Personenzahl *</span>
           <div className="capacity-input">
             <button
               type="button"
@@ -272,6 +283,7 @@ export function NewWorkshopPage({ token }: Props) {
               onChange={(event) => setMaxCapacity(Math.max(1, Number(event.target.value) || 1))}
               className="capacity-display"
               aria-label="Maximale Personenzahl"
+              aria-describedby="new-workshop-capacity-hint"
             />
             <button
               type="button"
@@ -282,7 +294,7 @@ export function NewWorkshopPage({ token }: Props) {
               <span className="material-symbols-outlined" aria-hidden="true">add</span>
             </button>
           </div>
-          <small>Wie viele Personen können gleichzeitig komfortabel in der Werkstatt arbeiten?</small>
+          <small id="new-workshop-capacity-hint">Wie viele Personen können gleichzeitig komfortabel in der Werkstatt arbeiten?</small>
         </div>
 
         <section className="workshop-availability-section" aria-labelledby="workshop-availability-title">
@@ -304,8 +316,8 @@ export function NewWorkshopPage({ token }: Props) {
             </div>
 
             <div className="workshop-slot-builder">
-              <div className="workshop-slot-date-group">
-                <strong>Startdaten</strong>
+              <div className="workshop-slot-date-group" role="group" aria-labelledby="new-workshop-slot-start-label">
+                <strong id="new-workshop-slot-start-label">Startdaten</strong>
                 <div className="booking-fields-row">
                   <div className="booking-field">
                     <span>Datum</span>
@@ -328,8 +340,8 @@ export function NewWorkshopPage({ token }: Props) {
                   </label>
                 </div>
               </div>
-              <div className="workshop-slot-date-group">
-                <strong>Enddaten</strong>
+              <div className="workshop-slot-date-group" role="group" aria-labelledby="new-workshop-slot-end-label">
+                <strong id="new-workshop-slot-end-label">Enddaten</strong>
                 <div className="booking-fields-row">
                   <div className="booking-field">
                     <span>Datum</span>
@@ -356,7 +368,12 @@ export function NewWorkshopPage({ token }: Props) {
             </div>
 
             <div className="workshop-slot-editor-actions">
-              <button type="button" className="btn btn-outline workshop-add-slot" onClick={addSlot}>
+              <button
+                type="button"
+                className="btn btn-outline workshop-add-slot"
+                onClick={addSlot}
+                aria-label="Eingegebenen Zeitraum für die Werkstatt blockieren"
+              >
                 <span className="material-symbols-outlined" aria-hidden="true">add</span>
                 Zeitraum blockieren
               </button>

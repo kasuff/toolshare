@@ -63,7 +63,9 @@ describe("Layout", () => {
       "/inbox"
     );
 
-    fireEvent.click(screen.getByLabelText("Profil-Menü öffnen"));
+    const profileSummary = screen.getByText("Profil-Menü öffnen").closest("summary");
+    expect(profileSummary).not.toBeNull();
+    fireEvent.click(profileSummary!);
     const offersLink = screen.getByRole("link", { name: "Meine Angebote" });
     const settingsLink = screen.getByRole("link", { name: "Einstellungen" });
     expect(offersLink).toHaveAttribute("href", "/offers");

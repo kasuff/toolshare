@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastViewport } from "../../src/components/ui";
@@ -158,6 +159,7 @@ describe("InboxPage", () => {
   });
 
   it("shows only the thread list on small screens until a chat is opened", async () => {
+    const user = userEvent.setup();
     mockMatchMedia(true);
     getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
 
@@ -174,7 +176,7 @@ describe("InboxPage", () => {
     expect(screen.queryByText("Ausleihanfrage")).not.toBeInTheDocument();
     expect(document.querySelector(".messenger-shell")).not.toHaveClass("messenger-shell--chat-open");
 
-    fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
+    await user.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
 
     expect(document.querySelector(".messenger-shell")).toHaveClass("messenger-shell--chat-open");
     expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
@@ -184,13 +186,28 @@ describe("InboxPage", () => {
     expect(screen.queryByText("Offen", { selector: ".status-pill" })).not.toBeInTheDocument();
     const backButton = screen.getByRole("button", { name: "Zurück zur Chatliste" });
     expect(backButton).toBeInTheDocument();
+    expect(backButton).toHaveFocus();
     expect(backButton.closest(".messenger-chat-header")).toBeTruthy();
     expect(backButton.closest(".inbox-messenger-title-row")).toBeNull();
   });
 
   it("returns to the thread list on small screens when back is pressed", async () => {
+    const user = userEvent.setup();
     mockMatchMedia(true);
-    getBookingsForUser.mockResolvedValueOnce([{ ...baseOpenBooking, pickupProposals: [] }]);
+    const secondBooking = {
+      ...baseOpenBooking,
+      id: "b2",
+      toolId: "tool-2",
+      toolName: "Zweiter Chat",
+      requesterName: "Anna Beispiel",
+      createdIso: "2026-05-04T08:00:00.000Z",
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    getBookingsForUser.mockResolvedValueOnce([
+      { ...baseOpenBooking, pickupProposals: [], timeslotProposals: [] },
+      secondBooking
+    ]);
 
     render(
       <ToastProvider>
@@ -201,15 +218,58 @@ describe("InboxPage", () => {
     );
 
     const threadList = await screen.findByLabelText("Konversationen");
-    fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
+    const threadButton = within(threadList).getByRole("button", { name: /Test-Bohrer/i });
+    await user.click(threadButton);
     expect(screen.getByText("Ausleihanfrage")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zurück zur Chatliste" })).toHaveFocus();
 
-    fireEvent.click(screen.getByRole("button", { name: "Zurück zur Chatliste" }));
+    await user.click(screen.getByRole("button", { name: "Zurück zur Chatliste" }));
 
     expect(screen.queryByText("Ausleihanfrage")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Nachrichten" })).toBeInTheDocument();
     expect(document.querySelector(".messenger-shell")).not.toHaveClass("messenger-shell--chat-open");
     expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
+    expect(threadButton).toHaveFocus();
+
+    await user.tab();
+    const secondThread = within(threadList).getByRole("button", { name: /Zweiter Chat/i });
+    expect(secondThread).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Zurück zur Chatliste" })).toHaveFocus();
+    expect(secondThread).toHaveAttribute("aria-current", "true");
+    expect(document.querySelector(".messenger-chat-header-text strong")).toHaveTextContent("Anna Beispiel");
+  });
+
+  it("keeps desktop focus on the selected thread", async () => {
+    const user = userEvent.setup();
+    const secondBooking = {
+      ...baseOpenBooking,
+      id: "b2",
+      toolId: "tool-2",
+      toolName: "Zweiter Chat",
+      createdIso: "2026-05-06T08:00:00.000Z",
+      pickupProposals: [],
+      timeslotProposals: []
+    };
+    getBookingsForUser.mockResolvedValueOnce([
+      { ...baseOpenBooking, pickupProposals: [], timeslotProposals: [] },
+      secondBooking
+    ]);
+
+    render(
+      <ToastProvider>
+        <MemoryRouter>
+          <InboxPage currentUser={currentUser} token="token-123" />
+        </MemoryRouter>
+      </ToastProvider>
+    );
+
+    const threadList = await screen.findByLabelText("Konversationen");
+    const secondThread = within(threadList).getByRole("button", { name: /Zweiter Chat/i });
+    await user.click(secondThread);
+
+    expect(secondThread).toHaveFocus();
+    expect(secondThread).toHaveAttribute("aria-current", "true");
   });
 
   it("shows unread chats with a small count badge instead of a colored thread", async () => {

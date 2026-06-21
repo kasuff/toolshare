@@ -13,8 +13,10 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
   const [error, setError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
+  const labelId = `${inputId}-label`;
+  const hintId = `${inputId}-hint`;
   const internalErrorId = `${inputId}-error`;
-  const descriptionIds = [describedBy, error ? internalErrorId : null].filter(Boolean).join(" ") || undefined;
+  const descriptionIds = [hint ? hintId : null, describedBy, error ? internalErrorId : null].filter(Boolean).join(" ") || undefined;
 
   const openFileDialog = () => {
     fileInputRef.current?.click();
@@ -60,15 +62,16 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
   };
 
   return (
-    <div className="photo-upload">
-      <strong>{label}</strong>
-      {hint && <p className="hint">{hint}</p>}
+    <div className="photo-upload" role="group" aria-labelledby={labelId} aria-describedby={descriptionIds}>
+      <strong id={labelId}>{label}</strong>
+      {hint && <p id={hintId} className="hint">{hint}</p>}
 
       {photos.length === 0 ? (
         <button
           type="button"
           onClick={openFileDialog}
           className="image-preview-container workshop-empty-photo-upload"
+          aria-label={`${label}: Bilddateien auswählen`}
           aria-describedby={descriptionIds}
         >
           <div className="image-placeholder">
@@ -109,6 +112,7 @@ export function WorkshopPhotoUpload({ photos, onPhotosChange, label, hint, maxPh
             type="button"
             onClick={openFileDialog}
             className="photo-upload-button"
+            aria-label="Weitere Werkstattfotos auswählen"
             aria-describedby={descriptionIds}
           >
             <div className="photo-placeholder">

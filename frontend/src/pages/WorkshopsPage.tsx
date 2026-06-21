@@ -1126,6 +1126,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
                           : bookWorkshop(selectedWorkshop.workshop.id))
                       }
                       disabled={!selectedWorkshopIsOwn && Boolean(token) && !selectedWorkshopDraftAvailable}
+                      aria-label={
+                        selectedWorkshopIsOwn
+                          ? `Zeitraum für ${selectedWorkshop.workshop.name} blockieren`
+                          : undefined
+                      }
                     >
                       {selectedWorkshopIsOwn ? "Zeitraum blockieren" : token ? "Anfrage senden" : "Jetzt einloggen"}
                     </button>

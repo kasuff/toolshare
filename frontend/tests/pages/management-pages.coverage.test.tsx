@@ -179,8 +179,8 @@ describe("management pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Zurücksetzen" }));
 
     expect(await screen.findByText("Tobias")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Moderator entfernen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Entsperren" }));
+    fireEvent.click(screen.getByRole("button", { name: "Moderatorrolle von Tobias entfernen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Murat entsperren" }));
 
     expect(updateUserRole).toHaveBeenCalledWith("u4", "NUTZER", "token-123");
     expect(updateUserSuspension).toHaveBeenCalledWith("u2", false, "token-123");
@@ -388,6 +388,7 @@ describe("management pages", () => {
 
     // Click open details
     const summary = await screen.findByText(/Abgeschlossene Meldungen anzeigen/);
+    expect(summary.closest("summary")).toHaveAttribute("id", "moderation-archive-summary");
     fireEvent.click(summary);
 
     // Initial limit is 10, so all 6 should be visible
@@ -395,7 +396,7 @@ describe("management pages", () => {
     expect(screen.getByText("Entscheidung 6")).toBeInTheDocument();
 
     // Select limit of 5
-    const select = screen.getByRole("combobox");
+    const select = screen.getByRole("combobox", { name: "Einträge anzeigen:" });
     fireEvent.change(select, { target: { value: "5" } });
 
     // decision 6 should no longer be visible because limit is 5
@@ -568,7 +569,7 @@ describe("management pages", () => {
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "09:00" } });
     fireEvent.change(screen.getByLabelText("Enddatum"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => {

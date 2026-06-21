@@ -163,6 +163,10 @@ export function InboxPage({ currentUser, token }: Props) {
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const draftSeededForThreadRef = useRef<Set<string>>(new Set());
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const threadButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const mobileBackButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileThreadToRestoreRef = useRef<string | null>(null);
+  const shouldFocusMobileChatRef = useRef(false);
   const [readMessageIds, setReadMessageIds] = useState<Set<string>>(new Set());
 
   const loadData = async () => {
@@ -287,6 +291,10 @@ export function InboxPage({ currentUser, token }: Props) {
         ? sortedRows.find((booking) => booking.id === requestedBookingId)
         : null;
       if (requestedBooking) {
+        if (isMobileInbox) {
+          mobileThreadToRestoreRef.current = requestedBooking.id;
+          shouldFocusMobileChatRef.current = true;
+        }
         setSelectedBookingId(requestedBooking.id);
         return;
       }
@@ -325,6 +333,20 @@ export function InboxPage({ currentUser, token }: Props) {
   );
   const selectedReqKey = selectedBooking ? requestMessageKey(selectedBooking.id) : "";
   const selectedReqUnread = Boolean(selectedReqIncoming && selectedBooking && !readMessageIds.has(selectedReqKey));
+
+  useLayoutEffect(() => {
+    if (!isMobileInbox) return;
+    if (selectedBookingId && shouldFocusMobileChatRef.current) {
+      shouldFocusMobileChatRef.current = false;
+      mobileBackButtonRef.current?.focus();
+      return;
+    }
+    if (!selectedBookingId && mobileThreadToRestoreRef.current) {
+      const threadId = mobileThreadToRestoreRef.current;
+      mobileThreadToRestoreRef.current = null;
+      threadButtonRefs.current.get(threadId)?.focus();
+    }
+  }, [isMobileInbox, selectedBookingId]);
 
   useEffect(() => {
     if (!selectedBookingId) return;
@@ -691,11 +713,22 @@ export function InboxPage({ currentUser, token }: Props) {
               );
               return (
                 <button
+                  ref={(element) => {
+                    if (element) {
+                      threadButtonRefs.current.set(booking.id, element);
+                    } else {
+                      threadButtonRefs.current.delete(booking.id);
+                    }
+                  }}
                   key={booking.id}
                   type="button"
                   className={`messenger-thread-item ${active ? "active" : ""}${threadUnread ? " messenger-thread-item--unread" : ""}`}
                   aria-current={active ? "true" : undefined}
                   onClick={() => {
+                    if (isMobileInbox) {
+                      mobileThreadToRestoreRef.current = booking.id;
+                      shouldFocusMobileChatRef.current = true;
+                    }
                     setSelectedBookingId(booking.id);
                     if (booking.type !== "SYSTEM_WARNING") {
                       markThreadRead(booking);
@@ -734,10 +767,14 @@ export function InboxPage({ currentUser, token }: Props) {
               >
                 {isMobileInbox && (
                   <button
+                    ref={mobileBackButtonRef}
                     type="button"
                     className="icon-button messenger-back-button"
                     aria-label="Zurück zur Chatliste"
-                    onClick={() => setSelectedBookingId(null)}
+                    onClick={() => {
+                      shouldFocusMobileChatRef.current = false;
+                      setSelectedBookingId(null);
+                    }}
                   >
                     <span className="material-symbols-outlined" aria-hidden="true">
                       arrow_back

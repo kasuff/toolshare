@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { WORKSHOP_EQUIPMENT } from "./workshop-equipment";
 
 interface WorkshopEquipmentSelectProps {
@@ -8,6 +9,8 @@ interface WorkshopEquipmentSelectProps {
 }
 
 export function WorkshopEquipmentSelect({ selected, onChange, label, hint }: WorkshopEquipmentSelectProps) {
+  const labelId = useId();
+  const hintId = useId();
   const toggleEquipment = (value: string) => {
     if (selected.includes(value)) {
       onChange(selected.filter((item) => item !== value));
@@ -17,9 +20,9 @@ export function WorkshopEquipmentSelect({ selected, onChange, label, hint }: Wor
   };
 
   return (
-    <div className="equipment-select">
-      <strong>{label}</strong>
-      {hint && <p className="hint">{hint}</p>}
+    <div className="equipment-select" role="group" aria-labelledby={labelId} aria-describedby={hint ? hintId : undefined}>
+      <strong id={labelId}>{label}</strong>
+      {hint && <p id={hintId} className="hint">{hint}</p>}
 
       <div className="equipment-grid">
         {WORKSHOP_EQUIPMENT.map((equipment) => (
@@ -32,7 +35,7 @@ export function WorkshopEquipmentSelect({ selected, onChange, label, hint }: Wor
               className="equipment-checkbox"
             />
             <div className="equipment-content">
-              <span className="material-symbols-outlined equipment-icon">{equipment.icon}</span>
+              <span className="material-symbols-outlined equipment-icon" aria-hidden="true">{equipment.icon}</span>
               <span className="equipment-label">{equipment.label}</span>
             </div>
           </label>

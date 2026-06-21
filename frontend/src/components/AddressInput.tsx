@@ -8,6 +8,7 @@ type Props = {
   initialSearchValue?: string;
   required?: boolean;
   hasError?: boolean;
+  describedBy?: string;
   errorMessageId?: string;
   onBlur?: () => void;
   compactManualLayout?: boolean;
@@ -19,6 +20,7 @@ export function AddressInput({
   initialSearchValue = "",
   required = false,
   hasError = false,
+  describedBy,
   errorMessageId,
   onBlur,
   compactManualLayout = false
@@ -30,6 +32,7 @@ export function AddressInput({
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const inputId = useId();
   const listboxId = `${inputId}-suggestions`;
+  const descriptionIds = [describedBy, hasError ? errorMessageId : null].filter(Boolean).join(" ") || undefined;
 
   useEffect(() => {
     setSearchValue(initialSearchValue);
@@ -120,7 +123,7 @@ export function AddressInput({
               autoComplete="street-address"
               className={hasError ? "input-invalid" : undefined}
               aria-invalid={hasError}
-              aria-describedby={hasError ? errorMessageId : undefined}
+              aria-describedby={descriptionIds}
               required={required && !isAddressComplete(value)}
               onKeyDown={handleSearchKeyDown}
             />
@@ -175,7 +178,7 @@ export function AddressInput({
                 autoComplete="address-line1"
                 required={required}
                 aria-invalid={hasError}
-                aria-describedby={hasError ? errorMessageId : undefined}
+                aria-describedby={descriptionIds}
               />
             </label>
             <label className="address-field address-field-house-number form-label">
@@ -188,7 +191,7 @@ export function AddressInput({
                 autoComplete="address-line2"
                 required={required}
                 aria-invalid={hasError}
-                aria-describedby={hasError ? errorMessageId : undefined}
+                aria-describedby={descriptionIds}
               />
             </label>
             <label className="address-field address-field-postal-code form-label">
@@ -201,7 +204,7 @@ export function AddressInput({
                 autoComplete="postal-code"
                 required={required}
                 aria-invalid={hasError}
-                aria-describedby={hasError ? errorMessageId : undefined}
+                aria-describedby={descriptionIds}
               />
             </label>
             <label className="address-field address-field-city form-label">
@@ -214,7 +217,7 @@ export function AddressInput({
                 autoComplete="address-level2"
                 required={required}
                 aria-invalid={hasError}
-                aria-describedby={hasError ? errorMessageId : undefined}
+                aria-describedby={descriptionIds}
               />
             </label>
             <label className="address-field address-field-country form-label">
@@ -225,6 +228,7 @@ export function AddressInput({
                 onBlur={onBlur}
                 placeholder="Land"
                 autoComplete="country-name"
+                aria-describedby={descriptionIds}
               />
             </label>
           </div>

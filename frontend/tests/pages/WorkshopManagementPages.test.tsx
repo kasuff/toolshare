@@ -114,7 +114,7 @@ describe("Workshop management pages", () => {
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "09:00" } });
     fireEvent.change(screen.getByLabelText("Enddatum"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
     fireEvent.click(screen.getByRole("button", { name: "Werkstatt einstellen" }));
 
     await waitFor(() => expect(createWorkshop).toHaveBeenCalledTimes(1));

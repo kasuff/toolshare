@@ -302,7 +302,12 @@ export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
               </Field>
             </div>
             <div className="row">
-              <button type="button" className="btn secondary" onClick={() => void addSlot()}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => void addSlot()}
+                aria-label={`Zeitraum für ${selectedWorkshop.workshop.name} blockieren`}
+              >
                 Zeitraum blockieren
               </button>
             </div>

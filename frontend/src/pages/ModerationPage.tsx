@@ -386,8 +386,8 @@ export function ModerationPage({ token }: Props) {
       </Surface>
 
       <Surface title="Archiv" subtitle="Abgeschlossene Meldungen mit dokumentierter Entscheidung.">
-        <details className="moderation-archive">
-          <summary>
+        <details className="moderation-archive" aria-labelledby="moderation-archive-summary">
+          <summary id="moderation-archive-summary">
             Abgeschlossene Meldungen anzeigen ({closedReports.length}
             {rejectedCount > 0 ? `, davon ${rejectedCount} verworfen` : ""})
           </summary>
@@ -396,8 +396,9 @@ export function ModerationPage({ token }: Props) {
           ) : (
             <>
               <div className="row archive-limit-row" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
-                <span className="hint">Einträge anzeigen:</span>
+                <label className="hint" htmlFor="moderation-archive-limit">Einträge anzeigen:</label>
                 <select
+                  id="moderation-archive-limit"
                   value={archiveLimit}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -412,11 +413,12 @@ export function ModerationPage({ token }: Props) {
                   <option value="all">Alle</option>
                 </select>
               </div>
-              <ul className="moderation-report-list">
+              <ul className="moderation-report-list" aria-label="Abgeschlossene Meldungen">
                 {displayedReports.map((report) => (
                   <li
                     key={report.id}
                     className={`inbox-item moderation-report moderation-report--closed${report.status === "REJECTED" ? " moderation-report--rejected" : ""}`}
+                    aria-label={`${targetTypeLabel[report.targetType]} ${report.targetLabel}, ${statusPresentation[report.status].label}`}
                   >
                     <ReportSummary report={report} showDecision />
                   </li>

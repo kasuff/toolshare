@@ -1,9 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AddressInput } from "../../src/components/AddressInput";
 import { ConfirmDialog } from "../../src/components/ConfirmDialog";
 import { KebabMenu } from "../../src/components/KebabMenu";
+import { Layout } from "../../src/components/Layout";
 import { api } from "../../src/services/api";
 import { EMPTY_ADDRESS } from "../../src/utils/address";
 
@@ -19,6 +21,26 @@ vi.mock("../../src/services/api", async () => {
 });
 
 describe("accessible interactions", () => {
+  it("offers the skip link first on the login route and focuses the main content", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/auth"]}>
+        <Routes>
+          <Route element={<Layout users={[]} onSwitchUser={() => undefined} onLogout={() => undefined} />}>
+            <Route path="auth" element={<form aria-label="Anmeldung"><input aria-label="E-Mail" /></form>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await user.tab();
+    const skipLink = screen.getByRole("link", { name: "Zum Hauptinhalt" });
+    expect(skipLink).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(document.getElementById("main-content")).toHaveFocus();
+  });
+
   it("selects address suggestions with arrow keys and Enter", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

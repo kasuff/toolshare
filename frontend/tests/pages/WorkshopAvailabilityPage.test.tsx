@@ -92,7 +92,7 @@ describe("WorkshopAvailabilityPage", () => {
 
     fireEvent.change(screen.getByLabelText("Startzeit"), { target: { value: "2026-06-01T10:00" } });
     fireEvent.change(screen.getByLabelText("Endzeit"), { target: { value: "2026-06-01T12:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Zeitraum blockieren" }));
+    fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
 
     await waitFor(() => expect(createWorkshopTimeslot).toHaveBeenCalledWith(
       "w1",
