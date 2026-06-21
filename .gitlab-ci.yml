@@ -138,7 +138,23 @@ frontend:test:
   script:
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
-    - npm run test -- --coverage
+    # Vitest occasionally segfaults (exit 139) on shared runners when V8 coverage
+    # instrumentation runs under load -- retry before failing the pipeline.
+    - |
+      ok=0
+      for attempt in 1 2 3; do
+        if npm run test -- --coverage; then
+          ok=1
+          break
+        fi
+        code=$?
+        if [ "$attempt" -eq 3 ] || [ "$code" -ne 139 ]; then
+          exit "$code"
+        fi
+        echo "vitest segfaulted (exit $code) -- retrying in 3s (attempt $attempt)"
+        sleep 3
+      done
+      [ "$ok" -eq 1 ]
     - node ../scripts/check-coverage.js coverage
   coverage: '/Coverage: \d+\.\d+%/'
   artifacts:
@@ -880,8 +896,8 @@ security:audit:
   allow_failure: true
   script:
     - (cd backend && npm audit --audit-level=moderate)
-    - (cd frontend && npm audit --audit-level=moderate)
-    - (cd mobile && npm audit --audit-level=high)
+    - (cd frontend && npm audit --workspaces=false --audit-level=moderate)
+    - (cd mobile && npm audit --workspaces=false --audit-level=high)
 
 semgrep-sast:
   stage: test
