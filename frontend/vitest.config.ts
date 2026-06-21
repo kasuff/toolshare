@@ -11,9 +11,8 @@ export default defineConfig({
     include: ['tests/**/*.{test,spec}.{ts,tsx}', 'src/tests/**/*.{test,spec}.{ts,tsx}'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    pool: 'forks',
+    pool: process.env.CI ? 'threads' : 'forks',
     maxWorkers: process.env.CI ? 1 : undefined,
-    singleFork: !!process.env.CI,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],
