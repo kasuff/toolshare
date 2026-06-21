@@ -11,6 +11,8 @@ import { ImageLightbox } from '../../../components/ImageLightbox';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '../../../hooks/useToast';
 import { FormErrorText } from '../../../components/FormErrorText';
+import { getErrorMessage } from '../../../utils/errors';
+import type { ComponentProps } from 'react';
 
 const MAX_WORKSHOP_PHOTOS = 3;
 const ADDRESS_VALIDATION_ERROR =
@@ -26,6 +28,7 @@ const WORKSHOP_EXTRAS = [
   { value: "werkstube", label: "Werkstube", icon: "construct-outline" },
   { value: "parkplatz", label: "Parkplatz", icon: "car-sport-outline" }
 ] as const;
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 
 
@@ -240,8 +243,8 @@ export default function NewWorkshopScreen() {
       }, token!);
 
       router.replace('/offers');
-    } catch (err: any) {
-      setApiError(err.message || 'Werkstatt konnte nicht angelegt werden.');
+    } catch (err) {
+      setApiError(getErrorMessage(err, 'Werkstatt konnte nicht angelegt werden.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -450,7 +453,7 @@ export default function NewWorkshopScreen() {
                   onPress={() => toggleExtra(extra.value)}
                 >
                   <Ionicons 
-                    name={extra.icon as any} 
+                    name={extra.icon as IoniconName} 
                     size={20} 
                     color={isSelected ? Colors.brand : Colors.textMuted} 
                     style={{ marginRight: 6 }}

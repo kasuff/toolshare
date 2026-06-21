@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, FlatList, RefreshControl, TextInput, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Tool, api, TOOL_CATEGORIES, pluralize } from '@toolshare/shared';
@@ -26,7 +26,7 @@ export default function ToolsScreen() {
   const { token } = useAuth();
   const router = useRouter();
 
-  const loadTools = async (query = search, cat = selectedCategory) => {
+  const loadTools = useCallback(async (query = search, cat = selectedCategory) => {
     if (!token) return;
     try {
       const data = await api.getTools({
@@ -40,11 +40,11 @@ export default function ToolsScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [token, search, selectedCategory]);
 
   useEffect(() => {
     loadTools(search, selectedCategory);
-  }, [token, selectedCategory]);
+  }, [loadTools, search, selectedCategory]);
 
   const handleSearchSubmit = () => {
     setIsLoading(true);

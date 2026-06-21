@@ -22,6 +22,7 @@ import {
 } from '../../utils/inboxProposals';
 import { parseLocalDateKey } from '../../utils/dateTime';
 import { ReportForm } from '../../components/ReportForm';
+import { getErrorMessage } from '../../utils/errors';
 
 interface ParsedWarning {
   reason: string;
@@ -131,7 +132,7 @@ export default function InboxScreen() {
   const [isReporting, setIsReporting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  const loadBookings = async () => {
+  const loadBookings = useCallback(async () => {
     if (!token) return;
     try {
       const bookingsData = await api.getBookingsForUser(token);
@@ -176,12 +177,12 @@ export default function InboxScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser?.id, currentUser?.name, token]);
 
   useFocusEffect(
     useCallback(() => {
       loadBookings();
-    }, [token])
+    }, [loadBookings])
   );
 
   useEffect(() => {
@@ -198,6 +199,7 @@ export default function InboxScreen() {
     selectedBooking?.pickupTimeIso,
     selectedBooking?.startIso,
     selectedBooking?.endIso,
+    selectedBooking,
   ]);
 
   useFocusEffect(
@@ -378,8 +380,8 @@ export default function InboxScreen() {
       setReportTargetUserId(null);
       setReportReason('');
       setReportDetails('');
-    } catch (err: any) {
-      Alert.alert('Fehler', err.message || 'Meldung fehlgeschlagen.');
+    } catch (err) {
+      Alert.alert('Fehler', getErrorMessage(err, 'Meldung fehlgeschlagen.'));
     } finally {
       setIsReporting(false);
     }

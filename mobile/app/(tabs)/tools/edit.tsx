@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { BackHandler } from 'react-native';
 import { useToast } from '../../../hooks/useToast';
 import { FormErrorText } from '../../../components/FormErrorText';
+import { getErrorMessage } from '../../../utils/errors';
 
 const ADDRESS_VALIDATION_ERROR =
   'Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.';
@@ -70,7 +71,7 @@ export default function EditToolScreen() {
         }
       }
       load();
-    }, [id, token])
+    }, [id, token, pushToast])
   );
 
   const uriToDataUrl = async (uri: string, mimeType: string): Promise<string | null> => {
@@ -185,8 +186,8 @@ export default function EditToolScreen() {
       }, token!);
 
       router.back();
-    } catch (err: any) {
-      setApiError(err.message || 'Werkzeug konnte nicht angelegt werden.');
+    } catch (err) {
+      setApiError(getErrorMessage(err, 'Werkzeug konnte nicht angelegt werden.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -206,8 +207,8 @@ export default function EditToolScreen() {
             try {
               await api.deleteTool(id!, token!);
               router.back();
-            } catch (err: any) {
-              setApiError(err.message || 'Werkzeug konnte nicht gelöscht werden.');
+            } catch (err) {
+              setApiError(getErrorMessage(err, 'Werkzeug konnte nicht gelöscht werden.'));
             } finally {setIsSubmitting(false);
             }
           }

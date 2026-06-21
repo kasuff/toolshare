@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from 'react';
+import { ComponentProps, useEffect, useState, useMemo, useCallback } from 'react';
 import { View, FlatList, RefreshControl, TextInput, Pressable } from 'react-native';
 import Slider from '@react-native-community/slider';
-const SliderComponent = Slider as any;
+const SliderComponent = Slider as unknown as React.ComponentType<ComponentProps<typeof Slider>>;
 import { useRouter } from 'expo-router';
-import { Workshop, api, pluralize, isDateRangeAvailable } from '@toolshare/shared';
+import { Workshop, WorkshopBookedRange, WorkshopSlot, api, pluralize, isDateRangeAvailable } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { WorkshopCard } from '../../../components/WorkshopCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
@@ -14,8 +14,8 @@ import { DateField } from '../../../components/DateTimeFields';
 
 interface WorkshopOffer {
   workshop: Workshop;
-  slots: any[];
-  bookedRanges?: any[];
+  slots: WorkshopSlot[];
+  bookedRanges?: WorkshopBookedRange[];
 }
 
 export default function WorkshopsScreen() {
@@ -34,7 +34,7 @@ export default function WorkshopsScreen() {
   const { token } = useAuth();
   const router = useRouter();
 
-  const loadWorkshops = async (query = search) => {
+  const loadWorkshops = useCallback(async (query = search) => {
     if (!token) return;
     try {
       const data = await api.getWorkshops({ q: query || undefined }, token);
@@ -45,11 +45,11 @@ export default function WorkshopsScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [token, search]);
 
   useEffect(() => {
     loadWorkshops(search);
-  }, [token]);
+  }, [loadWorkshops, search]);
 
   const handleSearchSubmit = () => {
     setIsLoading(true);

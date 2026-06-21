@@ -1,8 +1,9 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { User, api, onSessionExpired } from '@toolshare/shared';
 import { useRouter, useSegments } from 'expo-router';
 import { Platform } from 'react-native';
+import { getErrorMessage } from '../utils/errors';
 
 const TOKEN_KEY = 'toolshare_access_token';
 
@@ -48,6 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
 
+  const logout = useCallback(async () => {
+    await storage.deleteItem(TOKEN_KEY);
+    setToken(null);
+    setCurrentUser(undefined);
+    router.replace('/login');
+  }, [router]);
+
   useEffect(() => {
     async function loadSession() {
       try {
@@ -57,9 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(storedToken);
           setCurrentUser(user);
         }
-      } catch (e: any) {
+      } catch (e) {
         console.error('Failed to load session:', e);
-        if (e && e.message && e.message.includes('Netzwerkfehler')) {
+        if (getErrorMessage(e, '').includes('Netzwerkfehler')) {
           // Keep token for network errors, just set loaded
         } else {
           await storage.deleteItem(TOKEN_KEY);
@@ -76,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout();
     });
     return unsubscribe;
-  }, []);
+  }, [logout]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -88,20 +96,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else if (token && inAuthGroup) {
       router.replace('/tools');
     }
-  }, [token, isLoaded, segments]);
+  }, [token, isLoaded, segments, router]);
 
   const login = async (newToken: string) => {
     await storage.setItem(TOKEN_KEY, newToken);
     setToken(newToken);
     const user = await api.getCurrentUser(newToken);
     setCurrentUser(user);
-  };
-
-  const logout = async () => {
-    await storage.deleteItem(TOKEN_KEY);
-    setToken(null);
-    setCurrentUser(undefined);
-    router.replace('/login');
   };
 
   const updateProfile = async (input: { name?: string; address?: string }) => {

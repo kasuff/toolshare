@@ -12,6 +12,7 @@ import {
   parseAddress,
   toAddressPayload,
 } from '../../components/AddressInput';
+import { getErrorMessage } from '../../utils/errors';
 
 const ADDRESS_VALIDATION_ERROR =
   'Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.';
@@ -66,8 +67,8 @@ export default function ProfileScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setError(err.message || 'Passwort konnte nicht geändert werden.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Passwort konnte nicht geändert werden.'));
     } finally {
       setIsChangingPassword(false);
     }
@@ -124,8 +125,8 @@ export default function ProfileScreen() {
         setIsEditing(false);
         setSuccess('');
       }, 1000);
-    } catch (err: any) {
-      setError(err.message || 'Speichern fehlgeschlagen.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Speichern fehlgeschlagen.'));
     } finally {
       setIsSaving(false);
     }

@@ -11,6 +11,7 @@ import {
   NativeSyntheticEvent,
   Alert,
  } from 'react-native';
+import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
@@ -24,6 +25,8 @@ import { getDefaultDateRange, parseLocalDateKey, toLocalDateKey } from '../../..
 import { RatingsSection } from '../../../components/RatingsSection';
 import type { PublicRating } from '@toolshare/shared';
 import { ReportForm } from '../../../components/ReportForm';
+import { getErrorMessage } from '../../../utils/errors';
+import type { ComponentProps } from 'react';
 
 type CalendarDay = {
   key: string;
@@ -46,6 +49,7 @@ const WORKSHOP_EXTRAS = [
   { value: "werkstube", label: "Werkstube", icon: "construct-outline" },
   { value: "parkplatz", label: "Parkplatz", icon: "car-sport-outline" }
 ] as const;
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function rangeOverlapsDay(startIso: string, endIso: string, day: Date) {
   const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
@@ -278,8 +282,8 @@ export default function WorkshopDetailScreen() {
           router.replace('/inbox');
         }, 1500);
       }
-    } catch (err: any) {
-      setError(err.message || 'Buchung fehlgeschlagen');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Buchung fehlgeschlagen'));
     } finally {
       setIsSubmitting(false);
     }
@@ -302,8 +306,8 @@ export default function WorkshopDetailScreen() {
       setReportTarget(null);
       setReportReason('');
       setReportDetails('');
-    } catch (err: any) {
-      Alert.alert('Fehler', err.message || 'Fehler beim Senden der Meldung');
+    } catch (err) {
+      Alert.alert('Fehler', getErrorMessage(err, 'Fehler beim Senden der Meldung'));
     } finally {
       setIsReporting(false);
     }
@@ -420,7 +424,7 @@ export default function WorkshopDetailScreen() {
                     if (!extraDef) return null;
                     return (
                       <View key={extraVal} style={styles.extraChip}>
-                        <Ionicons name={extraDef.icon as any} size={16} color={Colors.text} style={{ marginRight: 6 }} />
+                        <Ionicons name={extraDef.icon as IoniconName} size={16} color={Colors.text} style={{ marginRight: 6 }} />
                         <ThemedText style={styles.extraChipText}>{extraDef.label}</ThemedText>
                       </View>
                     );
@@ -489,8 +493,8 @@ export default function WorkshopDetailScreen() {
                     return <View key={day.key} style={styles.dayCell} />;
                   }
 
-                  const dayStyle: any = [styles.dayCellBtn];
-                  const textStyle: any = [styles.dayText];
+                  const dayStyle: StyleProp<ViewStyle> = [styles.dayCellBtn];
+                  const textStyle: StyleProp<TextStyle> = [styles.dayText];
 
                   if (!day.available) {
                     dayStyle.push(styles.dayUnavailable);

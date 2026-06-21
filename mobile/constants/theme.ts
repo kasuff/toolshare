@@ -40,7 +40,7 @@ export function useThemeColors() {
   return scheme === 'dark' ? DarkColors : LightColors;
 }
 
-export function createThemedStyleSheet<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
+export function createThemedStyleSheet<T extends StyleSheet.NamedStyles<T>>(
   factory: (colors: typeof LightColors) => T
 ): () => T {
   return () => {

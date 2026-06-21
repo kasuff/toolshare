@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { View, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Pressable } from 'react-native';
+import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Tool, api, getPlaceholderImageForCategory, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
@@ -13,6 +14,7 @@ import { RatingsSection } from '../../../components/RatingsSection';
 import type { PublicRating } from '@toolshare/shared';
 import { ReportForm } from '../../../components/ReportForm';
 import { ImageLightbox } from '../../../components/ImageLightbox';
+import { getErrorMessage } from '../../../utils/errors';
 
 type BlockingPeriod = {
   startIso: string;
@@ -113,7 +115,7 @@ export default function ToolDetailScreen() {
   const [reportDetails, setReportDetails] = useState('');
   const [isReporting, setIsReporting] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!token || !id) return;
     try {
       const [toolsData, periodsData, toolRatings] = await Promise.all([
@@ -127,18 +129,18 @@ export default function ToolDetailScreen() {
         setBlockingPeriods(periodsData);
         setRatings(toolRatings);
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       setError('Fehler beim Laden der Werkzeugdaten');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, token]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [id, token])
+    }, [loadData])
   );
 
   const isAvailable = tool?.status === 'VERFUEGBAR';
@@ -217,8 +219,8 @@ export default function ToolDetailScreen() {
           router.replace('/inbox');
         }, 1500);
       }
-    } catch (err: any) {
-      setError(err.message || 'Aktion fehlgeschlagen.');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Aktion fehlgeschlagen.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -241,8 +243,8 @@ export default function ToolDetailScreen() {
       setReportTarget(null);
       setReportReason('');
       setReportDetails('');
-    } catch (err: any) {
-      Alert.alert('Fehler', err.message || 'Fehler beim Senden der Meldung');
+    } catch (err) {
+      Alert.alert('Fehler', getErrorMessage(err, 'Fehler beim Senden der Meldung'));
     } finally {
       setIsReporting(false);
     }
@@ -367,8 +369,8 @@ export default function ToolDetailScreen() {
                     return <View key={day.key} style={styles.dayCell} />;
                   }
 
-                  const dayStyle: any = [styles.dayCellBtn];
-                  const textStyle: any = [styles.dayText];
+                  const dayStyle: StyleProp<ViewStyle> = [styles.dayCellBtn];
+                  const textStyle: StyleProp<TextStyle> = [styles.dayText];
 
                   if (!day.available) {
                     dayStyle.push(styles.dayUnavailable);

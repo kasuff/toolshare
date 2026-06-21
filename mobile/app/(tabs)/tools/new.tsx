@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { BackHandler } from 'react-native';
 import { useToast } from '../../../hooks/useToast';
 import { FormErrorText } from '../../../components/FormErrorText';
+import { getErrorMessage } from '../../../utils/errors';
 
 const ADDRESS_VALIDATION_ERROR =
   'Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.';
@@ -174,8 +175,8 @@ export default function NewToolScreen() {
       }, token!);
 
       router.replace('/offers');
-    } catch (err: any) {
-      setApiError(err.message || 'Werkzeug konnte nicht angelegt werden.');
+    } catch (err) {
+      setApiError(getErrorMessage(err, 'Werkzeug konnte nicht angelegt werden.'));
     } finally {
       setIsSubmitting(false);
     }
