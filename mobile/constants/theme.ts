@@ -17,11 +17,11 @@ export const LightColors = {
 };
 
 export const DarkColors = {
-  brand: '#d14700',
-  brandStrong: '#ff6c1a',
+  brand: '#ff8533',
+  brandStrong: '#ffa366',
   brandSoft: '#2c1508',
   text: '#F3F4F6',
-  textMuted: '#9CA3AF',
+  textMuted: '#D1D5DB',
   surface: '#1F2937',
   surfaceSoft: '#111827',
   border: '#374151',
@@ -29,7 +29,7 @@ export const DarkColors = {
   danger: '#F87171',
   warning: '#FBBF24',
   bg: '#111827',
-  highlight: '#ff8c42'
+  highlight: '#ffb88c'
 };
 
 // Legacy fallback
