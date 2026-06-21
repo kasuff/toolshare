@@ -500,7 +500,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     }
   };
 
-  const ownedWorkshops = currentUser ? items.filter((item) => item.workshop.ownerId === currentUser.id) : [];
   const publicWorkshops = filteredItems;
   const selectedWorkshopDraft = selectedWorkshop
     ? bookingDraftsByWorkshop[selectedWorkshop.workshop.id] ?? getDefaultBookingDraft()
@@ -542,19 +541,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     ? items.filter((item) => item.workshop.ownerId === selectedWorkshop.workshop.ownerId).length
     : 0;
 
-  const ownedStats = currentUser
-    ? [
-        { label: "Eigene Werkstätten", value: ownedWorkshops.length },
-        { label: "Zeitfenster", value: ownedWorkshops.reduce((sum, item) => sum + item.slots.length, 0) },
-        {
-          label: "Durchschn. Kapazität",
-          value:
-            ownedWorkshops.length > 0
-              ? Math.round(ownedWorkshops.reduce((sum, item) => sum + item.workshop.maxCapacity, 0) / ownedWorkshops.length)
-              : 0
-        }
-      ]
-    : [];
 
   return (
     <section className={`stack search-page ${selectedWorkshop ? "has-workshop-detail" : ""}`.trim()}>
@@ -581,67 +567,6 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           <h1>Werkstätten</h1>
         </div>
       </div>
-
-      {false && currentUser && (
-        <Surface title="Meine Werkstätten" subtitle="Eigene Räume und Verfügbarkeiten auf einen Blick.">
-          {ownedWorkshops.length > 0 ? (
-            <div className="workshop-dashboard">
-              <div className="workshop-dashboard-stats">
-                {ownedStats.map((stat) => (
-                  <div key={stat.label} className="workshop-dashboard-stat">
-                    <span>{stat.label}</span>
-                    <strong>{stat.value}</strong>
-                  </div>
-                ))}
-              </div>
-
-              <div className="workshop-dashboard-grid">
-                {ownedWorkshops.map((item) => (
-                  <article
-                    key={item.workshop.id}
-                    className={`workshop-card ${selectedWorkshop?.workshop.id === item.workshop.id ? "selected" : ""}`}
-                  >
-                    <div className="workshop-card-media">
-                      <img src={item.workshop.imageUrls[0] ?? DEFAULT_PLACEHOLDER_IMAGE} alt={item.workshop.name} />
-                      <span className="workshop-card-badge">Aktiv</span>
-                    </div>
-                    <div className="workshop-card-content">
-                      <div className="workshop-card-heading">
-                        <h3>{item.workshop.name}</h3>
-                        <span className="workshop-card-rating">{pluralize(item.slots.length, "Slot", "Slots")}</span>
-                      </div>
-                      <p>
-                        {item.workshop.location} · {item.workshop.maxCapacity} Plätze
-                      </p>
-                      <div className="workshop-card-footer">
-                        <button type="button" className="btn" onClick={() => openWorkshop(item)}>
-                          Details anzeigen
-                        </button>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => navigate(`/workshops/${item.workshop.id}/edit`)}
-                        >
-                          Werkstatt bearbeiten
-                        </button>
-                        <button
-                          type="button"
-                          className="btn secondary"
-                          onClick={() => navigate("/workshops/availability")}
-                        >
-                          Verfügbarkeit verwalten
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <EmptyState title="Noch keine eigenen Werkstätten" text="Erstelle eine Werkstatt, um sie hier zu verwalten." />
-          )}
-        </Surface>
-      )}
 
       <Surface title="Suche und Filter" className="interactive">
         <div className="filter-toolbar">
@@ -722,15 +647,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           const ownerName = item.workshop.ownerName ?? "Unbekannt";
           const primaryImage = item.workshop.imageUrls[0];
           const cardImage = primaryImage || DEFAULT_PLACEHOLDER_IMAGE;
-          const availableSlotCount = item.slots.filter((slot) => !slot.blockedByOwner).length;
           return (
             <OfferCard
               key={item.workshop.id}
               name={item.workshop.name}
               description={item.workshop.description}
               imageUrl={cardImage}
-              badgeLabel={pluralize(availableSlotCount, "Slot", "Slots")}
-              badgeUnavailable={availableSlotCount === 0}
               meta={formatOfferDistance(distance)}
               ownerName={ownerName}
               onSelect={() => openWorkshop(item)}

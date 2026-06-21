@@ -5,9 +5,10 @@ import { ToastProvider } from "../../src/hooks/useToast";
 import { MyOffersPage } from "../../src/pages/MyOffersPage";
 import type { User } from "@toolshare/shared";
 
-const { getTools, getWorkshops } = vi.hoisted(() => ({
+const { getTools, getWorkshops, getBookingsForUser } = vi.hoisted(() => ({
   getTools: vi.fn(),
-  getWorkshops: vi.fn()
+  getWorkshops: vi.fn(),
+  getBookingsForUser: vi.fn()
 }));
 
 vi.mock("@toolshare/shared", async (importOriginal) => {
@@ -16,7 +17,9 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
-      getTools, getWorkshops
+      getTools,
+      getWorkshops,
+      getBookingsForUser
     }
   };
 });
@@ -43,6 +46,7 @@ function renderPage(props: { token?: string; currentUser?: User } = { token: "to
 describe("MyOffersPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    getBookingsForUser.mockResolvedValue([]);
   });
 
   it("lists only the signed-in user's offers with their statuses and detail links", async () => {
@@ -124,12 +128,59 @@ describe("MyOffersPage", () => {
       "href",
       "/tools/tool-own?manage=1"
     );
-    expect(screen.getByText("1 Slot")).toBeInTheDocument();
-    expect(screen.getByText("✓ Verfügbar")).toBeInTheDocument();
+    expect(screen.getByText("Verfügbar")).toBeInTheDocument();
+    expect(screen.getByText("Frei")).toBeInTheDocument();
+    expect(screen.queryByText("1 Slot")).not.toBeInTheDocument();
     expect(screen.queryByText("Fremder Hammer")).not.toBeInTheDocument();
     expect(screen.queryByText("Fremde Werkstatt")).not.toBeInTheDocument();
     expect(getTools).toHaveBeenCalledWith({ ownerId: "owner-1" }, "token-123");
     expect(getWorkshops).toHaveBeenCalledWith({ managerId: "owner-1" }, "token-123");
+    expect(getBookingsForUser).toHaveBeenCalledWith("token-123");
+  });
+
+  it("shows in-use status for workshops with an active confirmed booking", async () => {
+    vi.setSystemTime(new Date("2026-06-15T12:00:00.000Z"));
+
+    getTools.mockResolvedValueOnce([]);
+    getWorkshops.mockResolvedValueOnce([
+      {
+        workshop: {
+          id: "workshop-own",
+          ownerId: "owner-1",
+          ownerName: "Lea",
+          name: "Eigene Werkstatt",
+          description: "Voll ausgestattet",
+          location: "München",
+          maxCapacity: 4,
+          extras: [],
+          equipmentItems: [],
+          imageUrls: ["workshop.png"],
+          toolIds: []
+        },
+        slots: [],
+        tools: []
+      }
+    ]);
+    getBookingsForUser.mockResolvedValueOnce([
+      {
+        id: "booking-1",
+        type: "WORKSHOP",
+        requesterId: "guest-1",
+        providerId: "owner-1",
+        workshopId: "workshop-own",
+        startIso: "2026-06-15T10:00:00.000Z",
+        endIso: "2026-06-15T14:00:00.000Z",
+        status: "BESTAETIGT",
+        createdIso: "2026-06-10T10:00:00.000Z"
+      }
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText("In Nutzung")).toBeInTheDocument();
+    expect(screen.queryByText("Frei")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 
   it("shows the documented empty state when the user has no offers", async () => {
@@ -142,7 +193,7 @@ describe("MyOffersPage", () => {
     expect(screen.getByText("Du hast noch keine Werkzeuge oder Werkstätten angeboten.")).toBeInTheDocument();
   });
 
-  it("shows a partial empty state and unavailable status when only tools exist", async () => {
+  it("shows a partial empty state when only tools exist", async () => {
     getTools.mockResolvedValueOnce([
       {
         id: "tool-own",
@@ -159,7 +210,8 @@ describe("MyOffersPage", () => {
     renderPage();
 
     expect(await screen.findByText("Du hast noch keine Werkstatt angeboten.")).toBeInTheDocument();
-    expect(screen.getByText("✕ Nicht verfügbar")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Bohrmaschine/i })).toBeInTheDocument();
+    expect(screen.getByText("Ausgeliehen")).toBeInTheDocument();
   });
 
   it("prompts for login without loading data when rendered without a session", () => {
@@ -168,6 +220,7 @@ describe("MyOffersPage", () => {
     expect(screen.getByRole("heading", { name: "Bitte anmelden" })).toBeInTheDocument();
     expect(getTools).not.toHaveBeenCalled();
     expect(getWorkshops).not.toHaveBeenCalled();
+    expect(getBookingsForUser).not.toHaveBeenCalled();
   });
 
   it("shows a recoverable error state when loading fails", async () => {
