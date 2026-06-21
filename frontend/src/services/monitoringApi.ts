@@ -127,6 +127,16 @@ export const monitoringApi = {
     if (!res.ok) throw new Error(`PDF-Export fehlgeschlagen: ${res.statusText}`);
 
     await triggerDownload(res, `toolshare-dora-${days}d.pdf`);
+  },
+
+  // Lädt den Gesamtbericht (System + HTTP + Business + DORA) als PDF
+  async downloadFullReport(token: string, days: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/monitoring/report.pdf?days=${days}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Gesamtbericht fehlgeschlagen: ${res.statusText}`);
+
+    await triggerDownload(res, `toolshare-gesamtbericht-${days}d.pdf`);
   }
 };
 

@@ -468,6 +468,41 @@ function DoraSection({ token }: Props) {
   );
 }
 
+// ── Gesamtbericht-Button (alle Daten als PDF) ─────────────────────────────────
+
+function FullReportButton({ token }: Props) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const download = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      // 30 Tage: System, HTTP, Business und DORA in einem Dokument.
+      await monitoringApi.downloadFullReport(token, 30);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gesamtbericht fehlgeschlagen");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn mini"
+        disabled={busy}
+        onClick={() => void download()}
+        title="System, HTTP, Business und DORA der letzten 30 Tage als PDF"
+      >
+        {busy ? "Erstelle PDF…" : "Gesamtbericht (PDF)"}
+      </button>
+      {error && <span className="field-error" style={{ marginLeft: 8 }}>{error}</span>}
+    </>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const HISTORY_LEN = 20;
@@ -582,9 +617,12 @@ export function MonitoringSection({ token }: Props) {
             </button>
           ))}
         </nav>
-        <a href={grafanaDashboardUrl("toolshare-system")} target="_blank" rel="noreferrer" className="btn secondary mini">
-          Grafana ↗
-        </a>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          <FullReportButton token={token} />
+          <a href={grafanaDashboardUrl("toolshare-system")} target="_blank" rel="noreferrer" className="btn secondary mini">
+            Grafana ↗
+          </a>
+        </div>
       </div>
 
       {/* ── Übersicht ────────────────────────────────────────────────────── */}
