@@ -42,6 +42,15 @@ const EMPTY_SLOT: SlotEditorDraft = {
   blockedByOwner: false
 };
 
+const formatBlockedSlotDate = (value: string) =>
+  `${new Date(value).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  })} Uhr`;
+
 export function NewWorkshopPage({ token }: Props) {
   const { pushToast } = useToast();
   const navigate = useNavigate();
@@ -392,9 +401,9 @@ export function NewWorkshopPage({ token }: Props) {
                     <div className="workshop-slot-copy">
                       <span className="material-symbols-outlined" aria-hidden="true">schedule</span>
                       <span>
-                        <strong>{new Date(currentSlot.startIso).toLocaleString("de-DE")}</strong>
+                        <strong>{formatBlockedSlotDate(currentSlot.startIso)}</strong>
                         {" bis "}
-                        <strong>{new Date(currentSlot.endIso).toLocaleString("de-DE")}</strong>
+                        <strong>{formatBlockedSlotDate(currentSlot.endIso)}</strong>
                         {currentSlot.blockedByOwner && <span className="slot-badge">Blockiert</span>}
                       </span>
                     </div>
