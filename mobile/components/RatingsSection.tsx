@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { PublicRating } from '@toolshare/shared';
 import { Spacing, Radius, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';

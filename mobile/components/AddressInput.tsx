@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { api, AddressSuggestion } from '@toolshare/shared';
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TextInput, Pressable, Modal, ActivityIndicator } from 'react-native';
+import { View, TextInput, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { Ionicons } from '@expo/vector-icons';

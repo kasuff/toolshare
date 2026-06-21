@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Pressable } from 'react-native';
+import { View, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Tool, api, getPlaceholderImageForCategory, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { LoadingSpinner } from '../../../components/EmptyState';
-import { Colors, Spacing, Radius } from '../../../constants/theme';
+import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { DateField, TimeField } from '../../../components/DateTimeFields';
@@ -84,6 +84,8 @@ function getInitials(name: string) {
 }
 
 export default function ToolDetailScreen() {
+  const Colors = useThemeColors();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { token, currentUser } = useAuth();
@@ -529,10 +531,10 @@ export default function ToolDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   center: {
     flex: 1,
@@ -542,7 +544,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     height: 320,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
     position: 'relative',
   },
   image: {
@@ -562,7 +564,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.md,
     right: Spacing.md,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     borderRadius: 20,
     padding: Spacing.sm,
   },
@@ -578,27 +580,27 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   categoryBadge: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: Radius.sm,
     marginRight: Spacing.sm,
   },
   categoryText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
     fontSize: 12,
     textTransform: 'uppercase',
   },
   title: {
     fontSize: 24,
-    color: Colors.text,
+    color: colors.text,
   },
   section: {
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   sectionTitle: {
     fontSize: 18,
@@ -606,7 +608,7 @@ const styles = StyleSheet.create({
   },
   descriptionText: {
     lineHeight: 22,
-    color: Colors.text,
+    color: colors.text,
   },
   row: {
     flexDirection: 'row',
@@ -617,7 +619,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 15,
-    color: Colors.text,
+    color: colors.text,
   },
   locationNote: {
     fontSize: 13,
@@ -631,13 +633,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
   },
   avatarText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -660,9 +662,9 @@ const styles = StyleSheet.create({
   navBtn: {
     padding: Spacing.sm,
     marginLeft: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
   },
   monthContainer: {
@@ -681,7 +683,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     fontWeight: 'bold',
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   daysGrid: {
     flexDirection: 'row',
@@ -701,22 +703,22 @@ const styles = StyleSheet.create({
     marginVertical: 1,
   },
   dayAvailable: {
-    backgroundColor: '#DEF7EC',
+    backgroundColor: colors.success + '20',
   },
   dayUnavailable: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceSoft,
   },
   dayInRange: {
-    backgroundColor: '#31C48D',
+    backgroundColor: colors.success,
   },
   dayRangeExtreme: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
   },
   dayText: {
     fontSize: 14,
   },
   dayTextUnavailable: {
-    color: '#9CA3AF',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   dayTextInRange: {
@@ -742,11 +744,11 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   bookingCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginTop: Spacing.lg,
   },
   bookingTitle: {
@@ -770,21 +772,21 @@ const styles = StyleSheet.create({
   },
   miniLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: 2,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.sm,
     height: 40,
     paddingHorizontal: Spacing.sm,
     fontSize: 14,
-    color: Colors.text,
-    backgroundColor: Colors.bg,
+    color: colors.text,
+    backgroundColor: colors.bg,
   },
   submitButton: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     height: 46,
     borderRadius: Radius.md,
     justifyContent: 'center',
@@ -792,18 +794,18 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   submitButtonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
   disabledPanel: {
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     padding: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
   },
   disabledText: {
-    color: Colors.text,
+    color: colors.text,
     fontWeight: 'bold',
   },
   hintText: {
@@ -812,15 +814,15 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   errorText: {
-    color: Colors.danger,
+    color: colors.danger,
     textAlign: 'center',
     marginBottom: Spacing.sm,
     fontWeight: 'bold',
   },
   successText: {
-    color: Colors.success,
+    color: colors.success,
     textAlign: 'center',
     marginBottom: Spacing.sm,
     fontWeight: 'bold',
   }
-});
+}));

@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import {
+import { 
   View,
-  StyleSheet,
   TouchableOpacity,
   Platform,
   TextInput,
-} from 'react-native';
+ } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { Radius, Spacing, useThemeColors, createThemedStyleSheet } from '../constants/theme';
@@ -189,7 +188,6 @@ export function TimeField({
             mode="time"
             display="compact"
             onChange={handleChange}
-            is24Hour
             locale="de-DE"
             style={styles.absolutePicker}
           />

@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import {
+import { 
   View,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-} from 'react-native';
+ } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '@toolshare/shared';
 import { useAuth } from '../../hooks/useAuth';

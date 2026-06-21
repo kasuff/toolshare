@@ -1,4 +1,4 @@
-import { View, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Image, TouchableOpacity } from 'react-native';
 import { Workshop } from '@toolshare/shared';
 import { Radius, Spacing, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';

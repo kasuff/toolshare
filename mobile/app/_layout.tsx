@@ -1,6 +1,5 @@
 import { Slot } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
-import { Colors } from '../constants/theme';
+import { View } from 'react-native';
 import { LoadingSpinner } from '../components/EmptyState';
 import { setApiBaseUrl } from '@toolshare/shared';
 import { AuthProvider, useAuth } from '../hooks/useAuth';

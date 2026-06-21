@@ -1,12 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, TextInput, Pressable } from 'react-native';
+import { View, FlatList, RefreshControl, TextInput, Pressable } from 'react-native';
 import Slider from '@react-native-community/slider';
+const SliderComponent = Slider as any;
 import { useRouter } from 'expo-router';
 import { Workshop, api, pluralize, isDateRangeAvailable } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { WorkshopCard } from '../../../components/WorkshopCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
-import { Colors, Spacing, Radius } from '../../../constants/theme';
+import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { DateField } from '../../../components/DateTimeFields';
@@ -18,6 +19,8 @@ interface WorkshopOffer {
 }
 
 export default function WorkshopsScreen() {
+  const Colors = useThemeColors();
+  const styles = useStyles();
   const [workshops, setWorkshops] = useState<WorkshopOffer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -124,13 +127,13 @@ export default function WorkshopsScreen() {
                   {capacityStr}
                 </ThemedText>
               </View>
-              <Slider
+              <SliderComponent
                 style={{ width: '100%', height: 40 }}
                 minimumValue={1}
                 maximumValue={50}
                 step={1}
                 value={parseInt(capacityStr, 10) || 10}
-                onValueChange={(val) => setCapacityStr(val.toString())}
+                onValueChange={(val: number) => setCapacityStr(val.toString())}
                 minimumTrackTintColor={Colors.brand}
                 maximumTrackTintColor={Colors.border}
                 thumbTintColor={Colors.brand}
@@ -173,18 +176,18 @@ export default function WorkshopsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   filterContainer: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   searchRow: {
     flexDirection: 'row',
@@ -195,7 +198,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
     height: 44,
@@ -206,7 +209,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: '100%',
-    color: Colors.text,
+    color: colors.text,
     fontSize: 15,
   },
   clearButton: {
@@ -216,37 +219,37 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.md,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   filterToggleButtonActive: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
   },
   advancedFilters: {
     marginTop: Spacing.sm,
     padding: Spacing.md,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
     borderRadius: Radius.md,
     gap: Spacing.md,
   },
   filterLabel: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginBottom: Spacing.xs,
   },
   numericField: {
     flexDirection: 'column',
   },
   numericInput: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.sm,
     height: 44,
-    color: Colors.text,
+    color: colors.text,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   resultsHeader: {
     paddingHorizontal: Spacing.md,
@@ -255,10 +258,10 @@ const styles = StyleSheet.create({
   },
   resultsText: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   list: {
     padding: Spacing.md,
     paddingTop: 0,
   },
-});
+}));

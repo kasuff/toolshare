@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicator, Pressable } from 'react-native';
+import { View, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';

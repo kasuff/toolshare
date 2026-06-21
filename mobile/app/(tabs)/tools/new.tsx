@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Pressable } from 'react-native';
+import { View, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Pressable } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { api, TOOL_CATEGORIES, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
-import { Colors, Spacing, Radius } from '../../../constants/theme';
+import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from '../../../components/AddressInput';
@@ -17,6 +17,8 @@ const ADDRESS_VALIDATION_ERROR =
   'Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.';
 
 export default function NewToolScreen() {
+  const Colors = useThemeColors();
+  const styles = useStyles();
   const { token } = useAuth();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [name, setName] = useState('');
@@ -346,10 +348,10 @@ export default function NewToolScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
+    backgroundColor: colors.bg,
   },
   content: {
     padding: Spacing.md,
@@ -371,16 +373,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: Spacing.sm,
-    color: Colors.text,
+    color: colors.text,
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   textArea: {
     minHeight: 100,
@@ -406,12 +408,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.xs,
     right: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
   },
   imagePlaceholder: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderStyle: 'dashed',
     borderRadius: Radius.md,
     paddingVertical: Spacing.lg,
@@ -419,7 +421,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.xs,
     marginBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   imageActions: {
     gap: Spacing.sm,
@@ -429,20 +431,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.brandSoft,
+    borderColor: colors.brandSoft,
     borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 102, 0, 0.05)',
+    backgroundColor: colors.brandSoft,
     paddingVertical: Spacing.sm,
     gap: Spacing.xs,
   },
   imageButtonText: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
   },
   dropdownTrigger: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     padding: Spacing.md,
     flexDirection: 'row',
@@ -451,20 +453,20 @@ const styles = StyleSheet.create({
   },
   dropdownTriggerText: {
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   dropdownPlaceholderText: {
     fontSize: 16,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   dropdownList: {
     position: 'absolute',
     top: 80,
     left: 0,
     right: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     zIndex: 1000,
     elevation: 5,
@@ -479,21 +481,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.md,
     borderBottomWidth: 1,
-    borderColor: Colors.surfaceSoft,
+    borderColor: colors.surfaceSoft,
   },
   dropdownItemActive: {
-    backgroundColor: Colors.brandSoft,
+    backgroundColor: colors.brandSoft,
   },
   dropdownItemText: {
     fontSize: 16,
-    color: Colors.text,
+    color: colors.text,
   },
   dropdownItemTextActive: {
-    color: Colors.brand,
+    color: colors.brand,
     fontWeight: 'bold',
   },
   submitButton: {
-    backgroundColor: Colors.brand,
+    backgroundColor: colors.brand,
     padding: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
@@ -503,8 +505,8 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   submitButtonText: {
-    color: Colors.surface,
+    color: colors.surface,
     fontWeight: 'bold',
     fontSize: 16,
   },
-});
+}));

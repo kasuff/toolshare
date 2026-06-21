@@ -1,4 +1,4 @@
-import { Text, TextProps, StyleSheet } from 'react-native';
+import { Text, TextProps } from 'react-native';
 import { useThemeColors, createThemedStyleSheet } from '../constants/theme';
 
 interface ThemedTextProps extends TextProps {

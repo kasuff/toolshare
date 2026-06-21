@@ -1,4 +1,4 @@
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { useThemeColors, createThemedStyleSheet } from '../constants/theme';
 import { ThemedText } from './ThemedText';
 
