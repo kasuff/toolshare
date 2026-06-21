@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '@toolshare/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { ThemedText } from '../../components/ThemedText';
@@ -30,6 +31,8 @@ export default function LoginScreen() {
   const [address, setAddress] = useState<AddressFormFields>({ ...EMPTY_ADDRESS });
   const [password, setPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRepeatPassword, setShowRepeatPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,9 +99,11 @@ export default function LoginScreen() {
           </ThemedText>
 
           <View style={styles.form}>
+            <ThemedText style={styles.label}>E-Mail *</ThemedText>
             <TextInput
               style={styles.input}
-              placeholder="E-Mail *"
+              placeholder="E-Mail"
+              placeholderTextColor={Colors.textMuted}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -108,9 +113,11 @@ export default function LoginScreen() {
 
             {isRegister && (
               <>
+                <ThemedText style={styles.label}>Name *</ThemedText>
                 <TextInput
                   style={styles.input}
-                  placeholder="Name *"
+                  placeholder="Name"
+                  placeholderTextColor={Colors.textMuted}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -120,31 +127,63 @@ export default function LoginScreen() {
                 <AddressInput
                   value={address}
                   onChange={setAddress}
-                  label="Adresse *"
+                  label="Adresse"
                   required
                 />
               </>
             )}
 
-            <TextInput
-              style={styles.input}
-              placeholder={isRegister ? 'Passwort (mind. 8 Zeichen) *' : 'Passwort *'}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete={isRegister ? 'new-password' : 'password'}
-            />
+            <ThemedText style={styles.label}>
+              {isRegister ? 'Passwort (mind. 8 Zeichen) *' : 'Passwort *'}
+            </ThemedText>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder={isRegister ? 'Passwort (mind. 8 Zeichen)' : 'Passwort'}
+                placeholderTextColor={Colors.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoComplete={isRegister ? 'new-password' : 'password'}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+                accessibilityLabel={showPassword ? 'Passwort ausblenden' : 'Passwort anzeigen'}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={22}
+                  color={Colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
 
             {isRegister && (
               <>
-                <TextInput
-                  style={[styles.input, passwordsMismatch && styles.inputInvalid]}
-                  placeholder="Passwort wiederholen *"
-                  value={repeatPassword}
-                  onChangeText={setRepeatPassword}
-                  secureTextEntry
-                  autoComplete="new-password"
-                />
+                <ThemedText style={styles.label}>Passwort wiederholen *</ThemedText>
+                <View style={[styles.passwordContainer, passwordsMismatch && styles.inputInvalid]}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Passwort wiederholen"
+                    placeholderTextColor={Colors.textMuted}
+                    value={repeatPassword}
+                    onChangeText={setRepeatPassword}
+                    secureTextEntry={!showRepeatPassword}
+                    autoComplete="new-password"
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowRepeatPassword(!showRepeatPassword)}
+                    accessibilityLabel={showRepeatPassword ? 'Passwort ausblenden' : 'Passwort anzeigen'}
+                  >
+                    <Ionicons
+                      name={showRepeatPassword ? 'eye-off' : 'eye'}
+                      size={22}
+                      color={Colors.textMuted}
+                    />
+                  </TouchableOpacity>
+                </View>
 
                 {passwordsMismatch && (
                   <ThemedText style={styles.fieldError}>Passwörter stimmen nicht überein.</ThemedText>
@@ -227,6 +266,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   form: {},
+  label: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: Spacing.xs,
+    color: Colors.text,
+  },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,
@@ -236,6 +281,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text,
     backgroundColor: Colors.surface,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    marginBottom: Spacing.md,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: Spacing.md,
+    fontSize: 16,
+    color: Colors.text,
+  },
+  eyeButton: {
+    paddingHorizontal: Spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputInvalid: {
     borderColor: Colors.danger,

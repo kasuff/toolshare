@@ -567,20 +567,20 @@ export default function InboxScreen() {
                 style={[
                   styles.chatMessageRow,
                   selectedBooking.requesterId === currentUser.id
-                    ? styles.chatMessageRowIncoming
-                    : styles.chatMessageRowOutgoing,
+                    ? styles.chatMessageRowOutgoing
+                    : styles.chatMessageRowIncoming,
                 ]}
               >
-                {selectedBooking.requesterId === currentUser.id && (
+                {selectedBooking.requesterId !== currentUser.id && (
                   <View style={[styles.msgAvatar, styles.msgAvatarIncoming]}>
-                    <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
+                    <ThemedText style={styles.msgAvatarText}>{getInitials(counterpartName || 'Kontakt') || 'K'}</ThemedText>
                   </View>
                 )}
                 <View
                   style={
                     selectedBooking.requesterId === currentUser.id
-                      ? styles.messageMetaWrapIncoming
-                      : styles.messageMetaWrapOutgoing
+                      ? styles.messageMetaWrapOutgoing
+                      : styles.messageMetaWrapIncoming
                   }
                 >
                   <ThemedText type="muted" style={styles.messageMeta}>
@@ -589,7 +589,7 @@ export default function InboxScreen() {
                   <View
                     style={[
                       styles.messageBubble,
-                      selectedBooking.requesterId === currentUser.id ? styles.incomingBubble : styles.outgoingBubble,
+                      selectedBooking.requesterId === currentUser.id ? styles.outgoingBubble : styles.incomingBubble,
                     ]}
                   >
                     <View style={styles.messageIconRow}>
@@ -606,9 +606,9 @@ export default function InboxScreen() {
                     </View>
                   </View>
                 </View>
-                {selectedBooking.requesterId !== currentUser.id && (
+                {selectedBooking.requesterId === currentUser.id && (
                   <View style={[styles.msgAvatar, styles.msgAvatarOutgoing]}>
-                    <ThemedText style={styles.msgAvatarText}>{getInitials(counterpartName || 'Kontakt') || 'K'}</ThemedText>
+                    <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
                   </View>
                 )}
               </View>
@@ -623,19 +623,19 @@ export default function InboxScreen() {
                     key={proposal.id}
                     style={[
                       styles.chatMessageRow,
-                      fromOtherUser ? styles.chatMessageRowOutgoing : styles.chatMessageRowIncoming,
+                      fromOtherUser ? styles.chatMessageRowIncoming : styles.chatMessageRowOutgoing,
                     ]}
                   >
-                    {!fromOtherUser && (
+                    {fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarIncoming]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(senderName) || 'K'}</ThemedText>
                       </View>
                     )}
-                    <View style={fromOtherUser ? styles.messageMetaWrapOutgoing : styles.messageMetaWrapIncoming}>
+                    <View style={fromOtherUser ? styles.messageMetaWrapIncoming : styles.messageMetaWrapOutgoing}>
                       <ThemedText type="muted" style={styles.messageMeta}>
                         {fromOtherUser ? senderName : 'Du'} · {formatDateTime(proposal.createdIso)}
                       </ThemedText>
-                      <View style={[styles.messageBubble, fromOtherUser ? styles.outgoingBubble : styles.incomingBubble]}>
+                      <View style={[styles.messageBubble, fromOtherUser ? styles.incomingBubble : styles.outgoingBubble]}>
                         <View style={styles.messageIconRow}>
                           <Ionicons name="swap-horizontal-outline" size={20} color={Colors.brand} />
                           <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
@@ -652,7 +652,7 @@ export default function InboxScreen() {
                         </View>
                       </View>
                     </View>
-                    {fromOtherUser && (
+                    {!fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarOutgoing]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
                       </View>
@@ -671,19 +671,19 @@ export default function InboxScreen() {
                     key={proposal.id}
                     style={[
                       styles.chatMessageRow,
-                      fromOtherUser ? styles.chatMessageRowOutgoing : styles.chatMessageRowIncoming,
+                      fromOtherUser ? styles.chatMessageRowIncoming : styles.chatMessageRowOutgoing,
                     ]}
                   >
-                    {!fromOtherUser && (
+                    {fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarIncoming]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(senderName) || 'K'}</ThemedText>
                       </View>
                     )}
-                    <View style={fromOtherUser ? styles.messageMetaWrapOutgoing : styles.messageMetaWrapIncoming}>
+                    <View style={fromOtherUser ? styles.messageMetaWrapIncoming : styles.messageMetaWrapOutgoing}>
                       <ThemedText type="muted" style={styles.messageMeta}>
                         {fromOtherUser ? senderName : 'Du'} · {formatDateTime(proposal.createdIso)}
                       </ThemedText>
-                      <View style={[styles.messageBubble, fromOtherUser ? styles.outgoingBubble : styles.incomingBubble]}>
+                      <View style={[styles.messageBubble, fromOtherUser ? styles.incomingBubble : styles.outgoingBubble]}>
                         <View style={styles.messageIconRow}>
                           <Ionicons name="swap-horizontal-outline" size={20} color={Colors.brand} />
                           <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
@@ -700,7 +700,7 @@ export default function InboxScreen() {
                         </View>
                       </View>
                     </View>
-                    {fromOtherUser && (
+                    {!fromOtherUser && (
                       <View style={[styles.msgAvatar, styles.msgAvatarOutgoing]}>
                         <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
                       </View>
@@ -711,8 +711,12 @@ export default function InboxScreen() {
 
               {selectedBooking.status !== 'OFFEN' && (
                 <View style={styles.systemEventWrap}>
-                  <View style={[styles.messageBubble, styles.statusBubble]}>
-                    <View style={styles.messageIconRow}>
+                  <View style={[
+                    styles.messageBubble,
+                    styles.statusBubble,
+                    selectedBooking.status === 'ABGELEHNT' && { borderColor: Colors.danger }
+                  ]}>
+                    <View style={[styles.messageIconRow, { justifyContent: 'center', marginBottom: 0 }]}>
                       <Ionicons
                         name={
                           selectedBooking.status === 'BESTAETIGT'
@@ -724,7 +728,10 @@ export default function InboxScreen() {
                         size={20}
                         color={selectedBooking.status === 'ABGELEHNT' ? Colors.danger : Colors.success}
                       />
-                      <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
+                      <ThemedText type="defaultSemiBold" style={{
+                        marginLeft: Spacing.xs,
+                        color: selectedBooking.status === 'ABGELEHNT' ? Colors.danger : Colors.success
+                      }}>
                         {selectedBooking.status === 'BESTAETIGT'
                           ? 'Anfrage angenommen'
                           : selectedBooking.status === 'ABGELEHNT'

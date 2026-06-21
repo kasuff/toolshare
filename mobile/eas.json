@@ -12,11 +12,17 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://toolshare-app.duckdns.org/api"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://toolshare-app.duckdns.org/api"
+      },
       "android": {
         "buildType": "apk"
       }

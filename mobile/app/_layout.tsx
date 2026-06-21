@@ -42,6 +42,7 @@ function getApiUrl() {
 
 setApiBaseUrl(getApiUrl());
 
+import { StatusBar } from 'expo-status-bar';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function AppLayout() {
@@ -56,6 +57,7 @@ function AppLayout() {
     <View style={styles.container}>
       <Slot />
       <ToastViewport />
+      <StatusBar style="dark" />
     </View>
   );
 }
