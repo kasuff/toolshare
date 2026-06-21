@@ -217,7 +217,7 @@ describe("WorkshopsPage search filters", () => {
     });
   });
 
-  it("opens details, marks unavailable workshops with the design-system badge and starts bookings", async () => {
+  it("opens details, marks unavailable workshops and starts bookings", async () => {
     createWorkshopBooking.mockResolvedValueOnce({ id: "booking-new" });
     getWorkshops.mockResolvedValueOnce([
       {
@@ -242,7 +242,7 @@ describe("WorkshopsPage search filters", () => {
     renderPage();
 
     const blockedCard = (await screen.findByText("Blockierte Werkstatt")).closest("article")!;
-    expect(within(blockedCard).getByText("0 Slots")).toHaveClass("unavailable");
+    expect(within(blockedCard).queryByText("0 Slots")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Nähstube: Details anzeigen" }));
 

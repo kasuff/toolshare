@@ -15,8 +15,6 @@ describe("OfferCard", () => {
         <OfferCard
           name="Werkstatt ohne Bild"
           description="Beschreibung"
-          badgeLabel="0 Slots"
-          badgeUnavailable
           meta="München"
           ownerName=" "
           onSelect={onSelect}
@@ -26,6 +24,7 @@ describe("OfferCard", () => {
 
     const card = screen.getByRole("button", { name: /Werkstatt ohne Bild/i });
     expect(screen.getByTitle("Werkstatt ohne Bild")).toBeInTheDocument();
+    expect(screen.queryByText("0 Slots")).not.toBeInTheDocument();
 
     card.focus();
     await user.keyboard("{Escape}");

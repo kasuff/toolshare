@@ -722,15 +722,12 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           const ownerName = item.workshop.ownerName ?? "Unbekannt";
           const primaryImage = item.workshop.imageUrls[0];
           const cardImage = primaryImage || DEFAULT_PLACEHOLDER_IMAGE;
-          const availableSlotCount = item.slots.filter((slot) => !slot.blockedByOwner).length;
           return (
             <OfferCard
               key={item.workshop.id}
               name={item.workshop.name}
               description={item.workshop.description}
               imageUrl={cardImage}
-              badgeLabel={pluralize(availableSlotCount, "Slot", "Slots")}
-              badgeUnavailable={availableSlotCount === 0}
               meta={formatOfferDistance(distance)}
               ownerName={ownerName}
               onSelect={() => openWorkshop(item)}

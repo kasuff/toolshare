@@ -126,24 +126,19 @@ export function MyOffersPage({ token, currentUser }: Props) {
               <p className="my-offers-section-empty">Du hast noch keine Werkstatt angeboten.</p>
             ) : (
               <div className="cards">
-                {workshops.map(({ workshop, slots }) => {
-                  const availableSlotCount = slots.filter((slot) => !slot.blockedByOwner).length;
-                  return (
+                {workshops.map(({ workshop }) => (
                     <OfferCard
                       key={workshop.id}
                       to={{ pathname: `/workshops/${workshop.id}`, search: "?manage=1" }}
                       name={workshop.name}
                       description={workshop.description}
                       imageUrl={workshop.imageUrls[0]}
-                      badgeLabel={`${availableSlotCount} ${availableSlotCount === 1 ? "Slot" : "Slots"}`}
-                      badgeUnavailable={availableSlotCount === 0}
                       meta={formatOfferDistance(
                         distanceBetweenLocations(currentUser.address ?? "München Zentrum", workshop.location)
                       )}
                       ownerName={workshop.ownerName ?? currentUser.name}
                     />
-                  );
-                })}
+                ))}
               </div>
             )}
           </section>
@@ -161,8 +156,6 @@ export function MyOffersPage({ token, currentUser }: Props) {
                     name={tool.name}
                     description={tool.description}
                     imageUrl={tool.imageUrl}
-                    badgeLabel={tool.status === "VERFUEGBAR" ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
-                    badgeUnavailable={tool.status !== "VERFUEGBAR"}
                     meta={formatOfferDistance(
                       distanceBetweenLocations(currentUser.address ?? "München Zentrum", tool.pickupLocation)
                     )}

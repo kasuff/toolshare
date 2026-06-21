@@ -124,8 +124,8 @@ describe("MyOffersPage", () => {
       "href",
       "/tools/tool-own?manage=1"
     );
-    expect(screen.getByText("1 Slot")).toBeInTheDocument();
-    expect(screen.getByText("✓ Verfügbar")).toBeInTheDocument();
+    expect(screen.queryByText("1 Slot")).not.toBeInTheDocument();
+    expect(screen.queryByText("✓ Verfügbar")).not.toBeInTheDocument();
     expect(screen.queryByText("Fremder Hammer")).not.toBeInTheDocument();
     expect(screen.queryByText("Fremde Werkstatt")).not.toBeInTheDocument();
     expect(getTools).toHaveBeenCalledWith({ ownerId: "owner-1" }, "token-123");
@@ -142,7 +142,7 @@ describe("MyOffersPage", () => {
     expect(screen.getByText("Du hast noch keine Werkzeuge oder Werkstätten angeboten.")).toBeInTheDocument();
   });
 
-  it("shows a partial empty state and unavailable status when only tools exist", async () => {
+  it("shows a partial empty state when only tools exist", async () => {
     getTools.mockResolvedValueOnce([
       {
         id: "tool-own",
@@ -159,7 +159,8 @@ describe("MyOffersPage", () => {
     renderPage();
 
     expect(await screen.findByText("Du hast noch keine Werkstatt angeboten.")).toBeInTheDocument();
-    expect(screen.getByText("✕ Nicht verfügbar")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Bohrmaschine/i })).toBeInTheDocument();
+    expect(screen.queryByText("✕ Nicht verfügbar")).not.toBeInTheDocument();
   });
 
   it("prompts for login without loading data when rendered without a session", () => {

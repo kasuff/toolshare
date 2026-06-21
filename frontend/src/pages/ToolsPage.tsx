@@ -165,8 +165,6 @@ export function ToolsPage({ token, currentUser }: Props) {
               name={tool.name}
               description={tool.description}
               imageUrl={tool.imageUrl}
-              badgeLabel={tool.status === "VERFUEGBAR" ? "✓ Verfügbar" : "✕ Nicht verfügbar"}
-              badgeUnavailable={tool.status !== "VERFUEGBAR"}
               meta={formatOfferDistance(distance)}
               ownerName={ownerName}
             />

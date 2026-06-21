@@ -5,7 +5,7 @@ type Props = {
   name: string;
   description: string;
   imageUrl?: string;
-  badgeLabel: string;
+  badgeLabel?: string;
   badgeUnavailable?: boolean;
   meta: string;
   ownerName: string;
@@ -39,9 +39,11 @@ export function OfferCard({
   const content = (
     <>
       <div className="ds-workshop-card-media">
-        <span className={`ds-workshop-card-badge ${badgeUnavailable ? "unavailable" : ""}`.trim()}>
-          {badgeLabel}
-        </span>
+        {badgeLabel && (
+          <span className={`ds-workshop-card-badge ${badgeUnavailable ? "unavailable" : ""}`.trim()}>
+            {badgeLabel}
+          </span>
+        )}
         {imageUrl ? (
           <img className="ds-workshop-card-image" src={imageUrl} alt={name} />
         ) : (
