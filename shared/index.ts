@@ -1,5 +1,6 @@
 export * from './types/domain';
 export * from './services/api';
+export * from './contracts';
 export * from './utils/categories';
 export * from './utils/pluralize';
 export * from './utils/inboxMessageRead';

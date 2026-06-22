@@ -1,0 +1,120 @@
+openapi: 3.1.0
+info:
+  title: ToolShare API
+  version: 0.1.0
+  description: REST API contract for ToolShare (subset — tools & bookings).
+servers:
+  - url: http://localhost:4000/api
+paths:
+  /tools:
+    get:
+      summary: List tools
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+      responses:
+        "200":
+          description: Tool list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ToolResponse"
+    post:
+      summary: Create tool
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateToolRequest"
+      responses:
+        "201":
+          description: Created tool
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+  /tools/{id}:
+    get:
+      summary: Get tool by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Tool detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+  /bookings/tool:
+    post:
+      summary: Create tool booking
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateToolBookingRequest"
+      responses:
+        "201":
+          description: Booking created
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ToolResponse:
+      type: object
+      required: [id, ownerId, name, description, category, status, createdAt, updatedAt, owner]
+      properties:
+        id: { type: string, format: uuid }
+        ownerId: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        imageUrl: { type: string, nullable: true }
+        pickupLocation: { type: string, nullable: true }
+        pickupLocationNote: { type: string, nullable: true }
+        status: { type: string, enum: [AVAILABLE, REQUESTED, BORROWED] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateToolRequest:
+      type: object
+      required: [name, description, category, pickupLocation]
+      properties:
+        name: { type: string, minLength: 2 }
+        description: { type: string, minLength: 5 }
+        category: { type: string, minLength: 2 }
+        imageUrl: { type: string }
+        pickupLocation: { type: string, minLength: 5 }
+        pickupLocationNote: { type: string, maxLength: 300 }
+    CreateToolBookingRequest:
+      type: object
+      required: [toolId, startDate, endDate, pickupTime]
+      properties:
+        toolId: { type: string, format: uuid }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        pickupTime: { type: string, format: date-time }
+    ProblemDetails:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }

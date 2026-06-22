@@ -66,6 +66,12 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
       try {
         const payload = (await response.json()) as {
           message?: string;
+          detail?: string;
+          code?: string;
+          errors?: {
+            fieldErrors?: Record<string, string[] | undefined>;
+            formErrors?: string[];
+          };
           error?: {
             message?: string;
             code?: string;
@@ -75,24 +81,29 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
             };
           };
         };
-        if (payload.error?.message) {
+        if (payload.detail) {
+          message = payload.detail;
+        } else if (payload.error?.message) {
           message = payload.error.message;
         } else if (payload.message) {
           message = payload.message;
         }
-        if (payload.error?.code === "EMAIL_ALREADY_EXISTS") {
+        const code = payload.code ?? payload.error?.code;
+        if (code === "EMAIL_ALREADY_EXISTS") {
           message = "Diese E-Mail ist bereits registriert.";
         }
-        const fieldErrorEntries = payload.error?.details?.fieldErrors
-          ? Object.entries(payload.error.details.fieldErrors).filter(([, errors]) => Boolean(errors?.length))
+        const fieldErrors = payload.errors?.fieldErrors ?? payload.error?.details?.fieldErrors;
+        const formErrors = payload.errors?.formErrors ?? payload.error?.details?.formErrors;
+        const fieldErrorEntries = fieldErrors
+          ? Object.entries(fieldErrors).filter(([, errors]) => Boolean(errors?.length))
           : [];
         if (fieldErrorEntries.length > 0) {
           const [field, errors] = fieldErrorEntries[0];
           const rawError = errors?.[0] ?? "Ungültige Eingabe.";
           const translated = translateValidationMessage(rawError);
           message = field === "body" ? translated : `${field}: ${translated}`;
-        } else if (payload.error?.details?.formErrors?.length) {
-          message = translateValidationMessage(payload.error.details.formErrors[0]);
+        } else if (formErrors?.length) {
+          message = translateValidationMessage(formErrors[0]);
         }
       } catch {
         // keep fallback message
