@@ -1,12 +1,12 @@
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
-import { useToast } from "../hooks/useToast";
-import { api } from "@toolshare/shared";
+import { useWorkshops, workshopKeys } from "../hooks/queries/workshops.queries";
 import { distanceBetweenLocations, isDateRangeAvailable, isWithinRadius } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
 import { pluralize } from "@toolshare/shared";
@@ -21,14 +21,11 @@ type Props = {
 
 export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props = {}) {
   const { currentUser, token } = usePageAuth(propUser, propToken);
-  const { pushToast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { id: openWorkshopId } = useParams();
   const [searchParams] = useSearchParams();
 
-  const [items, setItems] = useState<WorkshopListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
   const [q, setQ] = useState("");
   const [toolFilter, setToolFilter] = useState("");
   const [borrowFrom, setBorrowFrom] = useState("");
@@ -38,17 +35,17 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string | null>(null);
 
   const defaultLocation = currentUser?.address ?? "München Zentrum";
+  const { data: rawItems = [], isLoading, isFetched } = useWorkshops({ q }, token);
 
-  useEffect(() => {
-    const run = async () => {
-      setIsLoading(true);
-      try {
-        const rawItems = await api.getWorkshops({ q }, token ?? "");
-        const mapped = rawItems.map(({ workshop, slots, bookedRanges, tools }) => ({
-          workshop,
-          slots,
-          bookedRanges,
-          tools: tools ?? workshop.equipmentItems.map((item) => ({
+  const items = useMemo<WorkshopListItem[]>(
+    () =>
+      rawItems.map(({ workshop, slots, bookedRanges, tools }) => ({
+        workshop,
+        slots,
+        bookedRanges,
+        tools:
+          tools ??
+          workshop.equipmentItems.map((item) => ({
             id: item.id,
             ownerId: workshop.ownerId,
             ownerName: workshop.ownerName,
@@ -59,21 +56,9 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
             status: "VERFUEGBAR" as const,
             selectable: true
           }))
-        }));
-        setItems(mapped);
-      } catch (error) {
-        if (token) {
-          pushToast(error instanceof Error ? error.message : "Werkstätten konnten nicht geladen werden.", "error");
-        } else {
-          setItems([]);
-        }
-      } finally {
-        setIsLoading(false);
-        setHasLoaded(true);
-      }
-    };
-    void run();
-  }, [q, token, pushToast]);
+      })),
+    [rawItems]
+  );
 
   const toolFilterOptions = useMemo(() => {
     const options = new Map<string, string>();
@@ -217,9 +202,9 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
               </div>
             </details>
           </Surface>
-          <div className={`cards ${!isLoading && hasLoaded && publicWorkshops.length === 0 ? "cards-empty" : ""}`}>
+          <div className={`cards ${!isLoading && isFetched && publicWorkshops.length === 0 ? "cards-empty" : ""}`}>
             {isLoading && <SkeletonCards />}
-            {!isLoading && hasLoaded && publicWorkshops.length === 0 && (
+            {!isLoading && isFetched && publicWorkshops.length === 0 && (
               <EmptyState title="Keine Werkstatt gefunden" text="Passe die Suche an oder prüfe später erneut." />
             )}
             {publicWorkshops.map((item) => {
@@ -250,10 +235,21 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
           token={token}
           onClose={closeWorkshop}
           onBlockSuccess={(workshopId, refreshed) => {
-            setItems((current) =>
-              current.map((entry) =>
-                entry.workshop.id === workshopId ? { ...entry, workshop: refreshed.workshop, slots: refreshed.slots } : entry
-              )
+            queryClient.setQueriesData(
+              { queryKey: workshopKeys.lists() },
+              (current: typeof rawItems | undefined) => {
+                if (!current) return current;
+                return current.map((entry) =>
+                  entry.workshop.id === workshopId
+                    ? {
+                        ...entry,
+                        workshop: refreshed.workshop,
+                        slots: refreshed.slots,
+                        tools: refreshed.tools ?? entry.tools
+                      }
+                    : entry
+                );
+              }
             );
           }}
           onDeleteSuccess={() => navigate("/offers")}

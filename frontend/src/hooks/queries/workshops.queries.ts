@@ -3,9 +3,45 @@ import { api } from "@toolshare/shared";
 
 export const workshopKeys = {
   all: ["workshops"] as const,
+  lists: () => [...workshopKeys.all, "list"] as const,
+  list: (filters: { q?: string; managerId?: string }) => [...workshopKeys.lists(), filters] as const,
   detail: (id: string) => [...workshopKeys.all, "detail", id] as const,
-  ratings: (id: string) => [...workshopKeys.all, "ratings", id] as const
+  ratings: (id: string) => [...workshopKeys.all, "ratings", id] as const,
+  myOffers: (userId: string) => [...workshopKeys.all, "my-offers", userId] as const
 };
+
+export function useWorkshops(
+  filters: { q?: string; managerId?: string },
+  token: string | null,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: workshopKeys.list(filters),
+    queryFn: () => api.getWorkshops(filters, token ?? ""),
+    enabled: options?.enabled ?? true
+  });
+}
+
+export function useMyOffers(userId: string | undefined, token: string | null) {
+  return useQuery({
+    queryKey: workshopKeys.myOffers(userId ?? ""),
+    enabled: Boolean(userId && token),
+    queryFn: async () => {
+      const [ownedTools, ownedWorkshops, userBookings] = await Promise.all([
+        api.getTools({ ownerId: userId! }, token!),
+        api.getWorkshops({ managerId: userId! }, token!),
+        api.getBookingsForUser(token!)
+      ]);
+      return {
+        tools: ownedTools.filter((tool) => tool.ownerId === userId),
+        workshops: ownedWorkshops
+          .filter((entry) => entry.workshop.ownerId === userId)
+          .map(({ workshop, slots }) => ({ workshop, slots })),
+        bookings: userBookings
+      };
+    }
+  });
+}
 
 export function useWorkshopRatings(workshopId: string) {
   return useQuery({
