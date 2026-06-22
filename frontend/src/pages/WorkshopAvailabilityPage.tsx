@@ -62,6 +62,67 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
     }
   }, [workshops, selectedWorkshop]);
 
+  const { mutate: addSlotMut } = useMutation({
+    mutationFn: async () => {
+      if (!selectedWorkshop || !token) throw new Error("Missing context");
+      await api.createWorkshopTimeslot(
+        selectedWorkshop.workshop.id,
+        {
+          startIso: draft.startIso,
+          endIso: draft.endIso,
+          blockedByOwner: true
+        },
+        token
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
+      setDraft({ startIso: "", endIso: "", blockedByOwner: true });
+      pushToast("Zeitraum blockiert.", "success");
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Zeitraum konnte nicht blockiert werden.", "error");
+    }
+  });
+
+  const { mutate: updateSlotMut } = useMutation({
+    mutationFn: async (updatePayload: { startIso?: string; endIso?: string; blockedByOwner?: boolean }) => {
+      if (!selectedWorkshop || !token || !editingSlotId) throw new Error("Missing context");
+      await api.updateWorkshopTimeslot(
+        selectedWorkshop.workshop.id,
+        editingSlotId,
+        updatePayload,
+        token
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
+      cancelEditing();
+      pushToast("Zeitfenster aktualisiert.", "success");
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
+    }
+  });
+
+  const { mutate: removeSlotMut } = useMutation({
+    mutationFn: async (slotId: string) => {
+      if (!selectedWorkshop || !token) throw new Error("Missing context");
+      await api.deleteWorkshopTimeslot(selectedWorkshop.workshop.id, slotId, token);
+      return slotId;
+    },
+    onSuccess: (slotId) => {
+      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
+      if (editingSlotId === slotId) {
+        cancelEditing();
+      }
+      pushToast("Zeitfenster entfernt.", "success");
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht entfernt werden.", "error");
+    }
+  });
+
   if (!token) {
     return (
       <section className="stack">
@@ -123,29 +184,6 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
     return true;
   };
 
-  const { mutate: addSlotMut } = useMutation({
-    mutationFn: async () => {
-      if (!selectedWorkshop || !token) throw new Error("Missing context");
-      await api.createWorkshopTimeslot(
-        selectedWorkshop.workshop.id,
-        {
-          startIso: draft.startIso,
-          endIso: draft.endIso,
-          blockedByOwner: true
-        },
-        token
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
-      setDraft({ startIso: "", endIso: "", blockedByOwner: true });
-      pushToast("Zeitraum blockiert.", "success");
-    },
-    onError: (error) => {
-      pushToast(error instanceof Error ? error.message : "Zeitraum konnte nicht blockiert werden.", "error");
-    }
-  });
-
   const addSlot = () => {
     if (!validateSlot(draft)) return;
     addSlotMut();
@@ -159,31 +197,6 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
       blockedByOwner: slot.blockedByOwner
     });
   };
-
-  const cancelEditing = () => {
-    setEditingSlotId(null);
-    setEditingDraft({ startIso: "", endIso: "", blockedByOwner: false });
-  };
-
-  const { mutate: updateSlotMut } = useMutation({
-    mutationFn: async (updatePayload: { startIso?: string; endIso?: string; blockedByOwner?: boolean }) => {
-      if (!selectedWorkshop || !token || !editingSlotId) throw new Error("Missing context");
-      await api.updateWorkshopTimeslot(
-        selectedWorkshop.workshop.id,
-        editingSlotId,
-        updatePayload,
-        token
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
-      cancelEditing();
-      pushToast("Zeitfenster aktualisiert.", "success");
-    },
-    onError: (error) => {
-      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
-    }
-  });
 
   const saveEditedSlot = () => {
     if (!editingSlotId) return;
@@ -212,24 +225,6 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
 
     updateSlotMut(updatePayload);
   };
-
-  const { mutate: removeSlotMut } = useMutation({
-    mutationFn: async (slotId: string) => {
-      if (!selectedWorkshop || !token) throw new Error("Missing context");
-      await api.deleteWorkshopTimeslot(selectedWorkshop.workshop.id, slotId, token);
-      return slotId;
-    },
-    onSuccess: (slotId) => {
-      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
-      if (editingSlotId === slotId) {
-        cancelEditing();
-      }
-      pushToast("Zeitfenster entfernt.", "success");
-    },
-    onError: (error) => {
-      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht entfernt werden.", "error");
-    }
-  });
 
   const blockedSlots = slots.filter((slot) => slot.blockedByOwner);
 

@@ -215,7 +215,7 @@ describe("management pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Suchen" }));
 
     decideSuspensionRequest.mockResolvedValue(undefined);
-    fireEvent.click(screen.getByRole("button", { name: "Sperrung annehmen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sperrung annehmen" }));
     await waitFor(() => {
       expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: true }, "token-123");
     });
@@ -229,8 +229,10 @@ describe("management pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Moderatorrolle von Tobias entfernen" }));
     fireEvent.click(screen.getByRole("button", { name: "Murat entsperren" }));
 
-    expect(updateUserRole).toHaveBeenCalledWith("u4", "NUTZER", "token-123");
-    expect(updateUserSuspension).toHaveBeenCalledWith("u2", false, "token-123");
+    await waitFor(() => {
+      expect(updateUserRole).toHaveBeenCalledWith("u4", "NUTZER", "token-123");
+      expect(updateUserSuspension).toHaveBeenCalledWith("u2", false, "token-123");
+    });
   });
 
   it("loads reports and rejects a moderation item", async () => {
@@ -495,7 +497,7 @@ describe("management pages", () => {
     fireEvent.click(summary);
 
     // Initial limit is 10, so all 6 should be visible
-    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(await screen.findByText("Entscheidung 1")).toBeInTheDocument();
     expect(screen.getByText("Entscheidung 6")).toBeInTheDocument();
 
     // Select limit of 5
@@ -679,7 +681,7 @@ describe("management pages", () => {
     fireEvent.click(summary);
 
     // Initial limit is 10, so all 6 should be visible
-    expect(screen.getByText("Entscheidung 1")).toBeInTheDocument();
+    expect(await screen.findByText("Entscheidung 1")).toBeInTheDocument();
     expect(screen.getByText("Entscheidung 6")).toBeInTheDocument();
 
     // Select limit of 5

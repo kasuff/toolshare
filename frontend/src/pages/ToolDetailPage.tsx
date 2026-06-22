@@ -10,7 +10,7 @@ import { api } from "@toolshare/shared";
 import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
-import type { PublicRating, Tool, User } from "@toolshare/shared";
+import type { User } from "@toolshare/shared";
 import { usePageAuth } from "../hooks/usePageAuth";
 
 type Props = {
