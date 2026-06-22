@@ -26,6 +26,12 @@ const scan = async (page: Page) => {
 };
 
 test.describe("Accessibility (axe, ganze Seiten)", () => {
+  // Wir scannen mit `prefers-reduced-motion: reduce` – so, wie es Nutzer mit
+  // aktivierter Systemeinstellung sehen. Das übt zugleich den Reduced-Motion-
+  // Pfad der App und macht den Scan unabhängig von laufenden Einblende-
+  // Animationen stabil.
+  test.use({ reducedMotion: "reduce" });
+
   test("Startseite ist barrierefrei", async ({ page }) => {
     await page.goto("/");
     expect((await scan(page)).violations).toEqual([]);
@@ -47,7 +53,10 @@ test.describe("Accessibility (axe, ganze Seiten)", () => {
     const tool = await createTool(api, users.anbieter.token, { name: `E2E A11y ${uniqueSuffix()}` });
     await api.dispose();
 
-    const ctx = await browser.newContext({ storageState: storageFileFor("anfrager") });
+    const ctx = await browser.newContext({
+      storageState: storageFileFor("anfrager"),
+      reducedMotion: "reduce",
+    });
     const page = await ctx.newPage();
     await page.goto(`/tools/${tool.id}`);
     await expect(page.getByRole("heading", { name: "Werkzeug buchen" })).toBeVisible();
@@ -56,7 +65,10 @@ test.describe("Accessibility (axe, ganze Seiten)", () => {
   });
 
   test("Inbox (eingeloggt) ist barrierefrei", async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: storageFileFor("anfrager") });
+    const ctx = await browser.newContext({
+      storageState: storageFileFor("anfrager"),
+      reducedMotion: "reduce",
+    });
     const page = await ctx.newPage();
     await page.goto("/inbox");
     expect((await scan(page)).violations).toEqual([]);

@@ -55,6 +55,15 @@ export default defineConfig({
       dependencies: ["setup"],
       grep: /@smoke/,
     },
+    {
+      // Cross-Browser-Absicherung über die Safari-/WebKit-Engine – ebenfalls nur
+      // auf den Smoke-Flows, um Engine-spezifische Regressionen zu fangen, ohne
+      // die ganze Suite mehrfach zu fahren.
+      name: "webkit-smoke",
+      use: { ...devices["Desktop Safari"] },
+      dependencies: ["setup"],
+      grep: /@smoke/,
+    },
   ],
   webServer: {
     command: "npm run dev",

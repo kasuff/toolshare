@@ -19,7 +19,7 @@ Playwright verwendet den laufenden Stack wieder und startet keinen zweiten Serve
 ```bash
 cd frontend
 
-npm run test:e2e            # alle Projekte (Desktop + Mobile-Smoke)
+npm run test:e2e            # alle Projekte (Desktop + Mobile-/WebKit-Smoke)
 npm run test:e2e -- --project=desktop-chromium
 npm run test:e2e:ui        # interaktiver UI-Modus
 npm run test:e2e:debug     # Debugger
@@ -28,6 +28,13 @@ npm run test:e2e:codegen   # Selektoren aufnehmen
 ```
 
 Überschreibbare URLs per Env: `E2E_BASE_URL`, `E2E_API_URL`.
+
+### Browser-Projekte
+
+- `desktop-chromium` – volle Suite (Chromium).
+- `mobile-chrome` – nur `@smoke`-Flows auf einem Mobile-Viewport (Pixel 7).
+- `webkit-smoke` – nur `@smoke`-Flows auf der Safari-/WebKit-Engine
+  (Cross-Browser-Absicherung). Benötigt einmalig `npx playwright install webkit`.
 
 ## Aufbau
 
@@ -54,7 +61,9 @@ e2e/
 `a11y.spec.ts` scannt ganze, real gerenderte Seiten mit `@axe-core/playwright`
 (WCAG 2.0/2.1/2.2, A & AA, inkl. Farbkontrast) und ergänzt die komponenten-
 basierten jest-axe-Tests der Vitest-Suite (die in jsdom z. B. Farbkontrast gar
-nicht auswerten können).
+nicht auswerten können). Der Scan läuft mit `prefers-reduced-motion: reduce`,
+prüft also auch den Reduced-Motion-Pfad und ist unabhängig von laufenden
+Einblende-Animationen.
 
 `.auth/` (Sessions) und `playwright-report/`, `test-results/` sind gitignored.
 

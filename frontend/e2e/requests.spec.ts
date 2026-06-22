@@ -26,34 +26,38 @@ test.describe("Ausleihe – Anfrage und Inbox-Entscheidung", () => {
     const start = futureDate(3);
     const end = futureDate(5);
 
-    // --- Anfrager: Anfrage über die Detailseite stellen ---
-    const anfragerCtx = await browser.newContext({ storageState: storageFileFor("anfrager") });
-    const anfrager = await anfragerCtx.newPage();
-    await anfrager.goto(`/tools/${tool.id}`);
+    await test.step("Anfrager stellt über die Detailseite eine Anfrage", async () => {
+      const anfragerCtx = await browser.newContext({ storageState: storageFileFor("anfrager") });
+      const anfrager = await anfragerCtx.newPage();
+      await anfrager.goto(`/tools/${tool.id}`);
 
-    await anfrager.getByLabel("Abholdatum").fill(start.display);
-    await anfrager.getByLabel("Abholzeit").fill("10:00");
-    await anfrager.getByLabel("Abgabedatum").fill(end.display);
-    await anfrager.getByLabel("Abgabezeit").fill("16:00");
+      await anfrager.getByLabel("Abholdatum").fill(start.display);
+      await anfrager.getByLabel("Abholzeit").fill("10:00");
+      await anfrager.getByLabel("Abgabedatum").fill(end.display);
+      await anfrager.getByLabel("Abgabezeit").fill("16:00");
 
-    await anfrager.getByRole("button", { name: "Anfrage senden" }).click();
+      await anfrager.getByRole("button", { name: "Anfrage senden" }).click();
 
-    await expect(anfrager.locator(".toast-popup")).toContainText("Ausleihanfrage erstellt.");
-    await expect(anfrager).toHaveURL(/\/inbox/);
-    await anfragerCtx.close();
+      await expect(anfrager.locator(".toast-popup")).toContainText("Ausleihanfrage erstellt.");
+      await expect(anfrager).toHaveURL(/\/inbox/);
+      await anfragerCtx.close();
+    });
 
-    // --- Anbieter: Anfrage in der Inbox akzeptieren ---
-    const anbieterCtx = await browser.newContext({ storageState: storageFileFor("anbieter") });
-    const anbieter = await anbieterCtx.newPage();
-    await anbieter.goto("/inbox");
+    await test.step("Anbieter akzeptiert die Anfrage in der Inbox", async () => {
+      const anbieterCtx = await browser.newContext({ storageState: storageFileFor("anbieter") });
+      const anbieter = await anbieterCtx.newPage();
+      await anbieter.goto("/inbox");
 
-    await anbieter.locator(".messenger-thread-item", { hasText: tool.name }).first().click();
-    await anbieter.getByRole("button", { name: "Akzeptieren" }).click();
+      await anbieter.locator(".messenger-thread-item", { hasText: tool.name }).first().click();
+      await anbieter.getByRole("button", { name: "Akzeptieren" }).click();
 
-    await expect(anbieter.getByText("Anfrage angenommen")).toBeVisible();
-    // Die Aktions-Buttons verschwinden, sobald die Anfrage nicht mehr offen ist.
-    await expect(anbieter.getByRole("button", { name: "Akzeptieren" })).toHaveCount(0);
-    await anbieterCtx.close();
+      // soft: beide Folgeerwartungen werden geprüft und gemeinsam berichtet,
+      // statt beim ersten Fehlschlag abzubrechen.
+      await expect.soft(anbieter.getByText("Anfrage angenommen")).toBeVisible();
+      // Die Aktions-Buttons verschwinden, sobald die Anfrage nicht mehr offen ist.
+      await expect.soft(anbieter.getByRole("button", { name: "Akzeptieren" })).toHaveCount(0);
+      await anbieterCtx.close();
+    });
   });
 
   test("Anbieter lehnt eine Anfrage ab", async ({ browser }) => {
