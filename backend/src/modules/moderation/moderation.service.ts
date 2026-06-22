@@ -1,11 +1,11 @@
 import { AppError } from "../../utils/app-error";
+import { enqueueBookingCancellationNotification } from "../../infrastructure/outbox/enqueue-user-notification";
 import { notificationsService } from "../notifications/notifications.service";
 import { ratingsService } from "../ratings/ratings.service";
 import { suspensionRepository } from "../users/suspension.repository";
 import { moderationRepository } from "./moderation.repository";
 import { toolsService } from "../tools/tools.service";
 import { workshopsService } from "../workshops/workshops.service";
-import { notificationsRepository } from "../notifications/notifications.repository";
 
 type ReportRow = Awaited<ReturnType<typeof moderationRepository.listOpenReports>>[number];
 type RatingRow = Awaited<ReturnType<typeof moderationRepository.findRatingsByIds>>[number];
@@ -238,10 +238,11 @@ export const moderationService = {
       const activeToolBookings = await moderationRepository.findActiveToolBookings(report.targetId);
       for (const booking of activeToolBookings) {
         await moderationRepository.rejectBooking(booking.id);
-        await notificationsRepository.create(
-          booking.userId,
-          `Deine Buchung für das Werkzeug "${tool.name}" wurde storniert, da das Angebot gelöscht wurde.`
-        );
+        await enqueueBookingCancellationNotification({
+          bookingId: booking.id,
+          userId: booking.userId,
+          inAppMessage: `Deine Buchung für das Werkzeug "${tool.name}" wurde storniert, da das Angebot gelöscht wurde.`
+        });
       }
 
       await toolsService.remove({
@@ -262,10 +263,11 @@ export const moderationService = {
       );
       for (const booking of activeWorkshopBookings) {
         await moderationRepository.rejectBooking(booking.id);
-        await notificationsRepository.create(
-          booking.userId,
-          `Deine Buchung für die Werkstatt "${workshop.name}" wurde storniert, da die Werkstatt gelöscht wurde.`
-        );
+        await enqueueBookingCancellationNotification({
+          bookingId: booking.id,
+          userId: booking.userId,
+          inAppMessage: `Deine Buchung für die Werkstatt "${workshop.name}" wurde storniert, da die Werkstatt gelöscht wurde.`
+        });
       }
 
       await workshopsService.remove({

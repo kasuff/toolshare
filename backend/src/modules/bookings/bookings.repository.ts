@@ -1,5 +1,6 @@
 import { BookingStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
+import { notificationOutboxService } from "../../infrastructure/outbox/notification-outbox.service";
 
 /** Buchungen in diesen Statusen blockieren Werkzeug-Zeiträume bzw. Werkstatt-Slots. */
 const BLOCKING_BOOKING_STATUSES: BookingStatus[] = ["PENDING", "ACCEPTED"];
@@ -187,6 +188,11 @@ export const bookingsRepository = {
         }
       });
 
+      await notificationOutboxService.scheduleToolBookingRequestNotification(tx, {
+        bookingId: booking.id,
+        ownerId: tool.ownerId
+      });
+
       return { booking, tool };
     });
   },
@@ -300,6 +306,14 @@ export const bookingsRepository = {
         });
       }
 
+      const providerId = workshop.managerId;
+      if (providerId !== input.userId) {
+        await notificationOutboxService.scheduleWorkshopBookingRequestNotification(tx, {
+          bookingId: booking.id,
+          providerId
+        });
+      }
+
       return tx.booking.findUnique({
         where: { id: booking.id },
         include: {
@@ -311,10 +325,33 @@ export const bookingsRepository = {
     });
   },
 
-  updateStatus(id: string, status: "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED") {
-    return prisma.booking.update({
-      where: { id },
-      data: { status }
+  updateStatus(
+    id: string,
+    status: "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED",
+    options?: { notifyUserId?: string; markToolAvailableId?: string }
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.booking.update({
+        where: { id },
+        data: { status }
+      });
+
+      if (options?.markToolAvailableId) {
+        await tx.tool.update({
+          where: { id: options.markToolAvailableId },
+          data: { status: "AVAILABLE" }
+        });
+      }
+
+      if (options?.notifyUserId) {
+        await notificationOutboxService.scheduleBookingStatusNotification(tx, {
+          bookingId: id,
+          userId: options.notifyUserId,
+          status
+        });
+      }
+
+      return updated;
     });
   },
 

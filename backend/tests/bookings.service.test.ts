@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
-import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
+import { enqueueProposalNotification } from "../src/infrastructure/outbox/enqueue-user-notification";
 import { toolsService } from "../src/modules/tools/tools.service";
 import { workshopsService } from "../src/modules/workshops/workshops.service";
 import { bookingsService } from "../src/modules/bookings/bookings.service";
@@ -37,10 +37,8 @@ vi.mock("../src/modules/bookings/bookings.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/notifications/notifications.repository", () => ({
-  notificationsRepository: {
-    create: vi.fn()
-  }
+vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
+  enqueueProposalNotification: vi.fn()
 }));
 
 vi.mock("../src/modules/system-rules/system-rules.service", () => ({
@@ -62,7 +60,7 @@ vi.mock("../src/modules/workshops/workshops.service", () => ({
 }));
 
 const mockedBookingsRepository = vi.mocked(bookingsRepository);
-const mockedNotificationsRepository = vi.mocked(notificationsRepository);
+const mockedEnqueueProposalNotification = vi.mocked(enqueueProposalNotification);
 const mockedSystemRulesService = vi.mocked(systemRulesService);
 const mockedToolsService = vi.mocked(toolsService);
 const mockedWorkshopsService = vi.mocked(workshopsService);
@@ -306,7 +304,6 @@ describe("bookingsService", () => {
 
     expect(mockedToolsService.getById).toHaveBeenCalledWith("t1");
     expect(mockedBookingsRepository.createToolBookingTransaction).toHaveBeenCalled();
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner-1", expect.stringContaining("Ausleihanfrage"));
     expect(result).toMatchObject({ id: "b1" });
   });
 
@@ -334,7 +331,6 @@ describe("bookingsService", () => {
       endDate: new Date(endDate),
       workshopToolIds: ["wt-1"]
     });
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("manager-1", expect.stringContaining("Werkstatt"));
     expect(result).toMatchObject({ id: "b2" });
   });
 
@@ -392,8 +388,10 @@ describe("bookingsService", () => {
       status: "ACCEPTED"
     });
 
-    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "ACCEPTED");
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("requester-1", expect.stringContaining("ACCEPTED"));
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "ACCEPTED", {
+      notifyUserId: "requester-1",
+      markToolAvailableId: undefined
+    });
     expect(result).toMatchObject({ id: "b1", status: "ACCEPTED" });
   });
 
@@ -406,7 +404,6 @@ describe("bookingsService", () => {
       tool: { id: "tool-1", ownerId: "owner-1" }
     } as any);
     mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
-    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
 
     const result = await bookingsService.updateBookingStatus({
       actorId: "owner-1",
@@ -415,9 +412,10 @@ describe("bookingsService", () => {
       status: "RETURNED"
     });
 
-    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "RETURNED");
-    expect(mockedBookingsRepository.markToolAvailable).toHaveBeenCalledWith("tool-1");
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("requester-1", expect.stringContaining("RETURNED"));
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "RETURNED", {
+      notifyUserId: "requester-1",
+      markToolAvailableId: "tool-1"
+    });
     expect(result).toMatchObject({ id: "b1", status: "RETURNED" });
   });
 
@@ -438,8 +436,10 @@ describe("bookingsService", () => {
       status: "RETURNED"
     });
 
-    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b2", "RETURNED");
-    expect(mockedBookingsRepository.markToolAvailable).not.toHaveBeenCalled();
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b2", "RETURNED", {
+      notifyUserId: "requester-1",
+      markToolAvailableId: undefined
+    });
     expect(result).toMatchObject({ id: "b2", status: "RETURNED" });
   });
 
@@ -478,8 +478,6 @@ describe("bookingsService", () => {
         endDate: "2026-07-01T12:00:00.000Z"
       })
     ).resolves.toMatchObject({ status: "ACCEPTED" });
-
-    expect(mockedNotificationsRepository.create).not.toHaveBeenCalled();
   });
 
   it("returns a booking conflict when an owner block overlaps a booking", async () => {
@@ -518,7 +516,6 @@ describe("bookingsService", () => {
       tool: { id: "tool-1", ownerId: "owner-1" }
     } as any);
     mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
-    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
 
     await expect(
       bookingsService.updateBookingStatus({

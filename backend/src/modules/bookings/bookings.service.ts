@@ -1,12 +1,11 @@
 import { AppError } from "../../utils/app-error";
+import { enqueueProposalNotification } from "../../infrastructure/outbox/enqueue-user-notification";
 import { bookingsRepository } from "./bookings.repository";
-import { notificationsRepository } from "../notifications/notifications.repository";
 import { systemRulesService } from "../system-rules/system-rules.service";
 import { toolsService } from "../tools/tools.service";
 import { workshopsService } from "../workshops/workshops.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 import { assertBookingCanBeCompleted } from "./bookings.completion";
-import { pushService } from "../notifications/push.service";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -123,8 +122,6 @@ export const bookingsService = {
       );
     }
 
-    await notificationsRepository.create(result.tool.ownerId, "Neue Ausleihanfrage für dein Werkzeug.");
-    await pushService.sendPushNotification(result.tool.ownerId, "Neue Anfrage", "Neue Ausleihanfrage für dein Werkzeug.");
     return result.booking;
   },
 
@@ -205,11 +202,6 @@ export const bookingsService = {
     if (result === null) {
       throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
     }
-    const providerId = result.workshop?.managerId ?? result.timeslot?.workshop?.managerId ?? null;
-    if (providerId && providerId !== input.requesterId) {
-      await notificationsRepository.create(providerId, "Neue Buchungsanfrage für deine Werkstatt.");
-      await pushService.sendPushNotification(providerId, "Neue Anfrage", "Neue Buchungsanfrage für deine Werkstatt.");
-    }
     return result;
   },
 
@@ -237,22 +229,14 @@ export const bookingsService = {
       throw new AppError("FORBIDDEN", "Only provider or moderation roles can update booking", 403);
     }
 
-    const updated = await bookingsRepository.updateStatus(input.bookingId, input.status);
-    if (input.status === "RETURNED" && booking.tool?.id) {
-      await bookingsRepository.markToolAvailable(booking.tool.id);
-    }
+    const notifyUserId =
+      booking.userId !== input.actorId ? booking.userId : undefined;
 
-    let notifyUserId: string | null = null;
-    if (input.status === "RETURNED") {
-      notifyUserId = booking.userId;
-    } else {
-      notifyUserId = booking.userId;
-    }
-    if (notifyUserId && notifyUserId !== input.actorId) {
-      await notificationsRepository.create(notifyUserId, `Deine Buchung wurde auf ${input.status} gesetzt.`);
-      await pushService.sendPushNotification(notifyUserId, "Buchungs-Update", `Deine Buchung wurde auf ${input.status} gesetzt.`);
-    }
-    return updated;
+    return bookingsRepository.updateStatus(input.bookingId, input.status, {
+      notifyUserId,
+      markToolAvailableId:
+        input.status === "RETURNED" && booking.tool?.id ? booking.tool.id : undefined
+    });
   },
 
   async createPickupProposal(input: {
@@ -324,8 +308,14 @@ export const bookingsService = {
     });
 
     const recipientId = isRequester ? providerId : booking.userId;
-    await notificationsRepository.create(recipientId, "Neuer Alternativvorschlag zu einer Ausleihanfrage.");
-    await pushService.sendPushNotification(recipientId, "Neuer Alternativvorschlag", "Neuer Alternativvorschlag zu einer Ausleihanfrage.");
+    await enqueueProposalNotification({
+      bookingId: booking.id,
+      userId: recipientId,
+      kind: "pickup-created",
+      inAppMessage: "Neuer Alternativvorschlag zu einer Ausleihanfrage.",
+      pushTitle: "Neuer Alternativvorschlag",
+      pushBody: "Neuer Alternativvorschlag zu einer Ausleihanfrage."
+    });
 
     return created;
   },
@@ -365,11 +355,14 @@ export const bookingsService = {
 
     if (input.decision === "DECLINE") {
       await bookingsRepository.declinePickupProposal(input.proposalId);
-      await notificationsRepository.create(
-        proposalRow.proposedByUserId,
-        "Dein Alternativvorschlag wurde abgelehnt."
-      );
-      await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag abgelehnt", "Dein Alternativvorschlag wurde abgelehnt.");
+      await enqueueProposalNotification({
+        bookingId: input.bookingId,
+        userId: proposalRow.proposedByUserId,
+        kind: "pickup-declined",
+        inAppMessage: "Dein Alternativvorschlag wurde abgelehnt.",
+        pushTitle: "Vorschlag abgelehnt",
+        pushBody: "Dein Alternativvorschlag wurde abgelehnt."
+      });
       return bookingsRepository.findPickupProposalById(input.proposalId);
     }
 
@@ -394,11 +387,14 @@ export const bookingsService = {
       endDate: proposedReturnTime
     });
 
-    await notificationsRepository.create(
-      proposalRow.proposedByUserId,
-      "Dein Alternativvorschlag wurde angenommen."
-    );
-    await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag angenommen", "Dein Alternativvorschlag wurde angenommen.");
+    await enqueueProposalNotification({
+      bookingId: input.bookingId,
+      userId: proposalRow.proposedByUserId,
+      kind: "pickup-accepted",
+      inAppMessage: "Dein Alternativvorschlag wurde angenommen.",
+      pushTitle: "Vorschlag angenommen",
+      pushBody: "Dein Alternativvorschlag wurde angenommen."
+    });
 
     return bookingsRepository.findPickupProposalById(input.proposalId);
   },
@@ -465,8 +461,14 @@ export const bookingsService = {
     });
 
     const recipientId = isRequester ? providerId : booking.userId;
-    await notificationsRepository.create(recipientId, "Neuer Alternativvorschlag für die Werkstattbuchung.");
-    await pushService.sendPushNotification(recipientId, "Neuer Alternativvorschlag", "Neuer Alternativvorschlag für die Werkstattbuchung.");
+    await enqueueProposalNotification({
+      bookingId: booking.id,
+      userId: recipientId,
+      kind: "timeslot-created",
+      inAppMessage: "Neuer Alternativvorschlag für die Werkstattbuchung.",
+      pushTitle: "Neuer Alternativvorschlag",
+      pushBody: "Neuer Alternativvorschlag für die Werkstattbuchung."
+    });
 
     return created;
   },
@@ -510,11 +512,14 @@ export const bookingsService = {
 
     if (input.decision === "DECLINE") {
       await bookingsRepository.declineTimeslotProposal(input.proposalId);
-      await notificationsRepository.create(
-        proposalRow.proposedByUserId,
-        "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt."
-      );
-      await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag abgelehnt", "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt.");
+      await enqueueProposalNotification({
+        bookingId: input.bookingId,
+        userId: proposalRow.proposedByUserId,
+        kind: "timeslot-declined",
+        inAppMessage: "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt.",
+        pushTitle: "Vorschlag abgelehnt",
+        pushBody: "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt."
+      });
       return bookingsRepository.findTimeslotProposalById(input.proposalId);
     }
 
@@ -534,11 +539,14 @@ export const bookingsService = {
       endDate: proposalRow.proposedEndDate
     });
 
-    await notificationsRepository.create(
-      proposalRow.proposedByUserId,
-      "Dein Alternativvorschlag zur Werkstattbuchung wurde angenommen."
-    );
-    await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag angenommen", "Dein Alternativvorschlag zur Werkstattbuchung wurde angenommen.");
+    await enqueueProposalNotification({
+      bookingId: input.bookingId,
+      userId: proposalRow.proposedByUserId,
+      kind: "timeslot-accepted",
+      inAppMessage: "Dein Alternativvorschlag zur Werkstattbuchung wurde angenommen.",
+      pushTitle: "Vorschlag angenommen",
+      pushBody: "Dein Alternativvorschlag zur Werkstattbuchung wurde angenommen."
+    });
 
     return bookingsRepository.findTimeslotProposalById(input.proposalId);
   }

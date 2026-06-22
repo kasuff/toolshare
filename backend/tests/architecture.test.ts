@@ -72,7 +72,10 @@ describe("Layered Architecture Constraints", () => {
       const imports = getImports(repo);
       imports.forEach((imp) => {
         if (imp.startsWith(".")) {
-          const isDisallowed = imp.includes(".controller") || imp.includes(".service") || imp.includes(".route");
+          const isDisallowed =
+            imp.includes(".controller") ||
+            imp.includes(".route") ||
+            (imp.includes(".service") && !imp.includes("/infrastructure/outbox/"));
           expect(isDisallowed).withContext(`Repository ${repo} imports unauthorized module: ${imp}`).toBe(false);
         }
       });

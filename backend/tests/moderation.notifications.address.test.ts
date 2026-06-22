@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { moderationRepository } from "../src/modules/moderation/moderation.repository";
 import { moderationService } from "../src/modules/moderation/moderation.service";
 import { suspensionRepository } from "../src/modules/users/suspension.repository";
+import { enqueueBookingCancellationNotification } from "../src/infrastructure/outbox/enqueue-user-notification";
 import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
 import { notificationsService } from "../src/modules/notifications/notifications.service";
 import { addressService } from "../src/modules/address/address.service";
@@ -32,6 +33,23 @@ vi.mock("../src/modules/users/suspension.repository", () => ({
     listManagerIds: vi.fn()
   }
 }));
+
+vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
+  enqueueBookingCancellationNotification: vi.fn(),
+  enqueueModerationNotification: vi.fn(),
+  newModerationNotificationKey: vi.fn(() => "moderation:key")
+}));
+
+vi.mock("../src/modules/notifications/notifications.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/modules/notifications/notifications.service")>();
+  return {
+    notificationsService: {
+      ...actual.notificationsService,
+      createWarning: vi.fn(),
+      notifyManagersSuspensionRequest: vi.fn()
+    }
+  };
+});
 
 vi.mock("../src/modules/notifications/notifications.repository", () => ({
   notificationsRepository: {
@@ -64,6 +82,8 @@ vi.mock("../src/modules/ratings/ratings.service", () => ({
 
 const mockedModerationRepository = vi.mocked(moderationRepository);
 const mockedNotificationsRepository = vi.mocked(notificationsRepository);
+const mockedNotificationsService = vi.mocked(notificationsService);
+const mockedEnqueueBookingCancellation = vi.mocked(enqueueBookingCancellationNotification);
 const mockedSuspensionRepository = vi.mocked(suspensionRepository);
 const mockedToolsService = vi.mocked(toolsService);
 const mockedWorkshopsService = vi.mocked(workshopsService);
@@ -192,7 +212,6 @@ describe("moderationService", () => {
   it("sends warning notification when moderation warns user", async () => {
     mockedModerationRepository.findById.mockResolvedValueOnce({ id: "r1" } as any);
     mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
-    mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);
 
     await moderationService.updateReportStatus({
       reportId: "r1",
@@ -202,9 +221,10 @@ describe("moderationService", () => {
       warningReason: "Unangemessene Sprache"
     });
 
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
+    expect(mockedNotificationsService.createWarning).toHaveBeenCalledWith(
       "user-2",
-      expect.stringContaining("Unangemessene Sprache")
+      "Unangemessene Sprache",
+      "Moderator"
     );
   });
 
@@ -217,7 +237,6 @@ describe("moderationService", () => {
     mockedModerationRepository.rejectBooking.mockResolvedValueOnce({} as any);
     mockedToolsService.remove.mockResolvedValueOnce(undefined as any);
     mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
-    mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);
 
     await moderationService.updateReportStatus({
       reportId: "r1",
@@ -233,13 +252,17 @@ describe("moderationService", () => {
       actorId: "mod-1",
       actorRole: "MODERATOR"
     });
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
-      "user-requester",
-      expect.stringContaining('Deine Buchung für das Werkzeug "Bohrer X" wurde storniert')
+    expect(mockedEnqueueBookingCancellation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookingId: "booking-1",
+        userId: "user-requester",
+        inAppMessage: expect.stringContaining('Deine Buchung für das Werkzeug "Bohrer X" wurde storniert')
+      })
     );
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
+    expect(mockedNotificationsService.createWarning).toHaveBeenCalledWith(
       "user-owner",
-      expect.stringContaining('Dein Angebot "Bohrer X" wurde gelöscht. Grund: Illegales Werkzeug')
+      expect.stringContaining('Dein Angebot "Bohrer X" wurde gelöscht. Grund: Illegales Werkzeug'),
+      "Moderator"
     );
   });
 
@@ -252,7 +275,6 @@ describe("moderationService", () => {
     mockedModerationRepository.rejectBooking.mockResolvedValueOnce({} as any);
     mockedWorkshopsService.remove.mockResolvedValueOnce(undefined as any);
     mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
-    mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);
 
     await moderationService.updateReportStatus({
       reportId: "r1",
@@ -268,13 +290,17 @@ describe("moderationService", () => {
       managerId: "user-manager",
       actorRole: "MODERATOR"
     });
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
-      "user-requester-ws",
-      expect.stringContaining('Deine Buchung für die Werkstatt "Maiks Werkstatt" wurde storniert')
+    expect(mockedEnqueueBookingCancellation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookingId: "booking-2",
+        userId: "user-requester-ws",
+        inAppMessage: expect.stringContaining('Deine Buchung für die Werkstatt "Maiks Werkstatt" wurde storniert')
+      })
     );
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
+    expect(mockedNotificationsService.createWarning).toHaveBeenCalledWith(
       "user-manager",
-      expect.stringContaining('Deine Werkstatt "Maiks Werkstatt" wurde gelöscht. Grund: Unordnung')
+      expect.stringContaining('Deine Werkstatt "Maiks Werkstatt" wurde gelöscht. Grund: Unordnung'),
+      "Moderator"
     );
   });
 });
