@@ -356,7 +356,7 @@ backend:build:
   stage: build
   # See frontend:build: pinned off floating node:20 (v20.20.2) whose x64 V8
   # build crashes tsc during emit ("Cannot read properties of undefined").
-  image: node:20.19
+  image: node:20.19-slim
   extends: .backend_cache
   needs:
     - backend:test
@@ -374,7 +374,18 @@ backend:build:
         sleep 3
       done
       [ "$ok" -eq 1 ]
-    - npm run build
+    # tsc occasionally crashes internally on shared runners (V8 JIT); retry before failing.
+    - |
+      ok=0
+      for attempt in 1 2 3; do
+        if npm run build; then
+          ok=1
+          break
+        fi
+        echo "npm run build failed (attempt $attempt) -- retrying in 3s"
+        sleep 3
+      done
+      [ "$ok" -eq 1 ]
 
 # === DEPLOY JOB ===
 
