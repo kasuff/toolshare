@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { api, type SystemSetting } from "@toolshare/shared";
+import { useMemo } from "react";
+import type { SystemSetting } from "@toolshare/shared";
+import { useSystemSettings } from "../hooks/queries/system.queries";
 
 type Props = {
   token: string;
@@ -11,26 +12,16 @@ type Props = {
 // Zeigt die plattformweiten Systemregeln als Info-Box an (z.B. für Werkzeug-Anbieter).
 // Die Werte werden live aus den Admin-Einstellungen geladen, damit Änderungen sofort sichtbar sind.
 export function SystemRulesInfo({ token, keys, title = "Plattformregeln" }: Props) {
-  const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const { data: settings = [] } = useSystemSettings(token);
 
-  useEffect(() => {
-    let active = true;
-    api
-      .getSystemSettings(token)
-      .then((all) => {
-        if (active) setSettings(all);
-      })
-      .catch(() => {
-        if (active) setSettings([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, [token]);
-
-  const visible = keys
-    ? keys.map((key) => settings.find((s) => s.key === key)).filter((s): s is SystemSetting => Boolean(s))
-    : settings;
+  const visible = useMemo(() => {
+    if (keys) {
+      return keys
+        .map((key) => settings.find((s) => s.key === key))
+        .filter((s): s is SystemSetting => Boolean(s));
+    }
+    return settings;
+  }, [keys, settings]);
 
   if (visible.length === 0) return null;
 

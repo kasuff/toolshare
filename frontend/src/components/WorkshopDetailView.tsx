@@ -1,5 +1,5 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { DetailTopBar } from './DetailTopBar';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DateInput } from './DateInput';
@@ -8,12 +8,17 @@ import { ReportFormPanel } from './ReportFormPanel';
 import { SystemRulesInfo } from './SystemRulesInfo';
 import { DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useToast } from '../hooks/useToast';
-import { api } from '@toolshare/shared';
+import {
+  useCreateWorkshopBooking,
+  useCreateWorkshopTimeslot,
+  useDeleteWorkshop,
+  useWorkshopRatings,
+} from '../hooks/queries/workshops.queries';
+import { useCreateReport } from '../hooks/queries/reports.mutations';
 import { isDateRangeAvailable } from '@toolshare/shared';
 import { pluralize } from '@toolshare/shared';
 import { useModalFocus } from '../hooks/useModalFocus';
 import type {
-  PublicRating,
   Tool,
   User,
   Workshop,
@@ -67,12 +72,17 @@ export function WorkshopDetailView({
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const workshopId = selectedWorkshop.workshop.id;
+  const { data: workshopRatings = [] } = useWorkshopRatings(workshopId);
+  const createWorkshopBooking = useCreateWorkshopBooking(token ?? '');
+  const createWorkshopTimeslot = useCreateWorkshopTimeslot(token ?? '');
+  const deleteWorkshop = useDeleteWorkshop(token ?? '');
+  const createReport = useCreateReport(token ?? '');
 
   const imageViewerRef = useRef<HTMLDivElement>(null);
   const imageViewerCloseRef = useRef<HTMLButtonElement>(null);
 
 
-  const [workshopRatings, setWorkshopRatings] = useState<PublicRating[]>([]);
   const [bookingDraft, setBookingDraft] = useState<BookingDraft>(getDefaultBookingDraft());
   const [isSelectingRangeEnd, setIsSelectingRangeEnd] = useState(false);
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
@@ -88,13 +98,6 @@ export function WorkshopDetailView({
   const [isDeleting, setIsDeleting] = useState(false);
 
 
-
-  useEffect(() => {
-    void api
-      .getRatingsForWorkshop(selectedWorkshop.workshop.id)
-      .then(setWorkshopRatings)
-      .catch(() => setWorkshopRatings([]));
-  }, [selectedWorkshop.workshop.id]);
 
   const closeWorkshop = onClose;
 
@@ -186,10 +189,12 @@ export function WorkshopDetailView({
     }
 
     try {
-      const createdBooking = await api.createWorkshopBooking(
-        { workshopId, startIso, endIso, workshopToolIds: [] },
-        token
-      );
+      const createdBooking = await createWorkshopBooking.mutateAsync({
+        workshopId,
+        startIso,
+        endIso,
+        workshopToolIds: []
+      });
       pushToast('Werkstattbuchung erstellt.', 'success');
       setBookingDraft(getDefaultBookingDraft());
       navigate('/inbox', { state: { bookingId: createdBooking.id } });
@@ -212,12 +217,12 @@ export function WorkshopDetailView({
       return;
     }
     try {
-      await api.createWorkshopTimeslot(
+      const refreshed = await createWorkshopTimeslot.mutateAsync({
         workshopId,
-        { startIso, endIso, blockedByOwner: true },
-        token
-      );
-      const refreshed = await api.getWorkshopById(workshopId, token);
+        startIso,
+        endIso,
+        blockedByOwner: true
+      });
       onBlockSuccess(workshopId, refreshed);
       pushToast('Werkstatt wurde für deinen Eigenbedarf blockiert.', 'success');
     } catch (error) {
@@ -232,7 +237,7 @@ export function WorkshopDetailView({
     if (!token) return;
     setIsDeleting(true);
     try {
-      await api.deleteWorkshop(selectedWorkshop.workshop.id, token);
+      await deleteWorkshop.mutateAsync(selectedWorkshop.workshop.id);
       pushToast('Werkstatt endgültig gelöscht.', 'success');
       setShowDeleteDialog(false);
       onDeleteSuccess();
@@ -259,15 +264,12 @@ export function WorkshopDetailView({
     if (reportReason.trim().length < 5) return;
     setIsReporting(true);
     try {
-      await api.createReport(
-        {
-          targetType: 'WORKSHOP',
-          targetId: workshopId,
-          reason: reportReason.trim(),
-          details: reportDetails.trim() || undefined,
-        },
-        token!
-      );
+      await createReport.mutateAsync({
+        targetType: 'WORKSHOP',
+        targetId: workshopId,
+        reason: reportReason.trim(),
+        details: reportDetails.trim() || undefined,
+      });
       closeReportForm();
       pushToast('Werkstatt wurde gemeldet.', 'success');
     } catch (error) {

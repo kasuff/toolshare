@@ -18,8 +18,8 @@ export default defineConfig({
     include: ['tests/**/*.{test,spec}.{ts,tsx}', 'src/tests/**/*.{test,spec}.{ts,tsx}'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    pool: process.env.CI ? 'threads' : 'forks',
-    maxWorkers: process.env.CI ? 1 : undefined,
+    pool: "forks",
+    maxWorkers: 1,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],
@@ -38,6 +38,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
+      '@testing-library/react': path.resolve(__dirname, './tests/testing-library.tsx'),
+      '@testing-library/react-original': path.resolve(__dirname, '../node_modules/@testing-library/react'),
       react: reactRoot,
       'react-dom': reactDomRoot,
       'react/jsx-runtime': path.join(reactRoot, 'jsx-runtime'),

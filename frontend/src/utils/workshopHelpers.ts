@@ -1,4 +1,4 @@
-import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
+import { WORKSHOP_EQUIPMENT } from "../constants/workshop-equipment";
 import { TOOL_CATEGORIES } from "@toolshare/shared";
 import type { Workshop, WorkshopSlot, WorkshopBookedRange } from "@toolshare/shared";
 import { isDayUnavailable } from "@toolshare/shared";

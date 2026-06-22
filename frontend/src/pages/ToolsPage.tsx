@@ -1,11 +1,10 @@
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
-import { useToast } from "../hooks/useToast";
-import {  api  } from "@toolshare/shared";
+import { useTools } from "../hooks/queries/tools.queries";
 import {  TOOL_CATEGORIES  } from "@toolshare/shared";
 import { distanceBetweenLocations, isWithinRadius } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
@@ -31,32 +30,14 @@ type Props = {
 
 export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {}) {
   const { currentUser, token } = usePageAuth(propUser, propToken);
-  const { pushToast } = useToast();
   const defaultLocation = currentUser?.address ?? "München Zentrum";
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [borrowFrom, setBorrowFrom] = useState("");
   const [borrowUntil, setBorrowUntil] = useState("");
   const [radiusKm, setRadiusKm] = useState(5);
-  const [tools, setTools] = useState<Awaited<ReturnType<typeof api.getTools>>>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
 
-  useEffect(() => {
-    const run = async () => {
-      setIsLoading(true);
-      try {
-        const next = await api.getTools({ q }, token ?? "");
-        setTools(next);
-      } catch (error) {
-        pushToast(error instanceof Error ? error.message : "Werkzeuge konnten nicht geladen werden.", "error");
-      } finally {
-        setIsLoading(false);
-        setHasLoaded(true);
-      }
-    };
-    void run();
-  }, [q, token, pushToast]);
+  const { data: tools = [], isLoading, isFetched } = useTools({ q }, token);
 
   const candidateTools = useMemo(() => {
     return tools
@@ -152,9 +133,9 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
           </div>
         </details>
       </Surface>
-      <div className={`cards ${!isLoading && hasLoaded && filteredTools.length === 0 ? "cards-empty" : ""}`}>
+      <div className={`cards ${!isLoading && isFetched && filteredTools.length === 0 ? "cards-empty" : ""}`}>
         {isLoading && <SkeletonCards />}
-        {!isLoading && hasLoaded && filteredTools.length === 0 && (
+        {!isLoading && isFetched && filteredTools.length === 0 && (
           <EmptyState title="Kein Werkzeug gefunden" text="Passe Suche oder Kategorie an, um passende Werkzeuge zu finden." />
         )}
         {filteredTools.map((tool) => {

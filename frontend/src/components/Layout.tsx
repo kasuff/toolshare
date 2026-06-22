@@ -1,7 +1,6 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import type {  User  } from "@toolshare/shared";
-import {  api  } from "@toolshare/shared";
+import type { User } from "@toolshare/shared";
 import { useInboxStore } from "../store/inboxStore";
 import { RoleSwitcher } from "./RoleSwitcher";
 

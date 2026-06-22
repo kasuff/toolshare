@@ -1,8 +1,21 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { ToolsPage } from "../../src/pages/ToolsPage";
+import { createTestQueryClient } from "../testUtils";
+
+function renderToolsPage(ui: React.ReactElement) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <MemoryRouter>{ui}</MemoryRouter>
+      </ToastProvider>
+    </QueryClientProvider>
+  );
+}
 
 const { getTools } = vi.hoisted(() => ({
   getTools: vi.fn()
@@ -21,6 +34,10 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
 });
 
 describe("ToolsPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders tool cards as detail links and no longer shows inline booking controls", async () => {
     getTools.mockResolvedValueOnce([
       {
@@ -35,13 +52,7 @@ describe("ToolsPage", () => {
       }
     ]);
 
-    render(
-      <ToastProvider>
-        <MemoryRouter>
-          <ToolsPage token="token-123" />
-        </MemoryRouter>
-      </ToastProvider>
-    );
+    renderToolsPage(<ToolsPage token="token-123" />);
 
     const toolLink = await screen.findByRole("link", { name: /Akkuschrauber Bosch/i });
     expect(toolLink).toHaveAttribute("href", "/tools/t1");
@@ -77,13 +88,7 @@ describe("ToolsPage", () => {
         }
       ]);
 
-    render(
-      <ToastProvider>
-        <MemoryRouter>
-          <ToolsPage />
-        </MemoryRouter>
-      </ToastProvider>
-    );
+    renderToolsPage(<ToolsPage />);
 
     expect(await screen.findByText(/Du kannst als Gast stöbern/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bitte anmelden" })).toBeInTheDocument();

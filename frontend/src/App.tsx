@@ -7,6 +7,7 @@ import { GlobalProgressBar } from "./components/GlobalProgressBar";
 import { ToastViewport } from "./components/ui";
 import { ToastProvider, useToast } from "./hooks/useToast";
 import { useAuthStore } from "./store/authStore";
+import { useInboxStore } from "./store/inboxStore";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ToolsPage } from "./pages/ToolsPage";
 import { ToolDetailPage } from "./pages/ToolDetailPage";
@@ -305,6 +306,7 @@ function AppWithProviders() {
 
   const handleLogout = () => {
     logout();
+    useInboxStore.getState().clear();
   };
 
   return (

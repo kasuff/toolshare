@@ -239,6 +239,15 @@ backend:architecture:
     - npm ci --workspaces=false --prefer-offline --cache .npm
     - npx vitest run tests/architecture.test.ts
 
+frontend:architecture:
+  stage: test
+  image: node:20.19-slim
+  extends: .frontend_cache
+  script:
+    - cd frontend
+    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - npx vitest run tests/architecture.test.ts
+
 backend:test:
   stage: test
   image: node:20.19   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
