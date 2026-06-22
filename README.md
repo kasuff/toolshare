@@ -135,10 +135,12 @@ Architektur liegt im Doku-Repo; im Code gelten lesbarer Code und sinnvolle Komme
 
 ## Architekturrichtlinien
 
-- **State Management:** Globaler Zustand (z.B. Authentifizierung sowie ungelesene Nachrichten/Inbox) wird mit `zustand` zentral und effizient verwaltet. Dies beseitigt Prop-Drilling und umständliche DOM-Events zur komponentenübergreifenden Kommunikation.
+- **State Management:** Client-State (`authStore`, `inboxStore`) mit Zustand; Server-State (Tools, …) mit TanStack Query in `hooks/queries/`. Siehe ADR-010/014 im Doku-Repo.
+- **Frontend-Schichten:** API (`@toolshare/shared`) → Hooks → UI. Erzwungen durch `frontend/tests/architecture.test.ts` (CI: `frontend:architecture`).
 - **Single Responsibility Principle (SRP):** Große Komponenten werden konsequent in wiederverwendbare UI-Komponenten und fachliche Helper-Funktionen aufgeteilt.
 - **Fehlerbehandlung:** Zentrales Error-Handling durch React Error Boundaries fängt unerwartete Fehler in Frontend und Mobile sicher ab.
-- **Architekturtests:** Automatisierte Architektur-Tests in der CI-Pipeline (via `vitest`) stellen sicher, dass die Layered Architecture (Controller -> Service -> Model) im Backend strikt eingehalten wird.
+- **Architekturtests:** Backend (`backend/tests/architecture.test.ts`) und Frontend (`frontend/tests/architecture.test.ts`) in der CI-Pipeline (vitest).
+- **Geocoding:** `GeocodingService`-Abstraktion mit Redis-Cache und Nominatim-Rate-Limiter — siehe ADR-011.
 
 ---
 
