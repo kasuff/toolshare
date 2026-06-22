@@ -29,7 +29,7 @@ export function createGeocodingService(): GeocodingService {
   const acquireRateLimit = createNominatimRateLimiter(env.nominatimMinIntervalMs);
   const nominatim = new NominatimGeocodingAdapter(acquireRateLimit);
   const cache = getCacheStore({
-    cacheBackend: env.cacheBackend,
+    cacheBackend: env.cacheBackend as "memory" | "redis",
     redisUrl: env.redisUrl
   });
   return new CachedGeocodingService(nominatim, cache, env.geocodingCacheTtlSeconds);

@@ -34,7 +34,11 @@ export async function enqueueModerationNotification(input: {
   aggregateId?: string;
 }) {
   await prisma.$transaction(async (tx) => {
-    await notificationOutboxService.scheduleModerationNotification(tx, input);
+    await notificationOutboxService.scheduleModerationNotification(tx, {
+      ...input,
+      pushTitle: input.pushTitle ?? "ToolShare",
+      pushBody: input.pushBody ?? input.inAppMessage
+    });
   });
 }
 

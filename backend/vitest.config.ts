@@ -1,6 +1,19 @@
 import { defineConfig } from "vitest/config";
+import path from "node:path";
 
 export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: "@toolshare/shared/contracts",
+        replacement: path.resolve(__dirname, "../shared/contracts")
+      },
+      {
+        find: "@toolshare/shared",
+        replacement: path.resolve(__dirname, "../shared/index.ts")
+      }
+    ]
+  },
   test: {
     environment: "node",
     setupFiles: ["./tests/setup.ts"],

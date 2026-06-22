@@ -2,10 +2,32 @@ openapi: 3.1.0
 info:
   title: ToolShare API
   version: 0.1.0
-  description: REST API contract for ToolShare (subset — tools & bookings).
+  description: REST API contract for ToolShare (subset — auth, tools & bookings).
 servers:
   - url: http://localhost:4000/api
 paths:
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: JWT tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokensResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
   /tools:
     get:
       summary: List tools
@@ -69,6 +91,18 @@ paths:
       responses:
         "201":
           description: Booking created
+        "409":
+          description: Booking conflict (overlapping reservation)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              example:
+                type: urn:toolshare:problem:booking_conflict
+                title: BOOKING CONFLICT
+                status: 409
+                detail: Im gewählten Zeitraum ist bereits eine Buchung vorhanden.
+                code: BOOKING_CONFLICT
 components:
   securitySchemes:
     bearerAuth:
@@ -76,6 +110,18 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+    AuthTokensResponse:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
     ToolResponse:
       type: object
       required: [id, ownerId, name, description, category, status, createdAt, updatedAt, owner]
@@ -118,3 +164,4 @@ components:
         status: { type: integer }
         detail: { type: string }
         code: { type: string }
+        requestId: { type: string }

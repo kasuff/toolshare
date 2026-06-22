@@ -239,11 +239,31 @@ describe("toolsRepository", () => {
         pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
         pickupLocationNote: "4. Stock",
         status: "AVAILABLE"
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            isSuspended: true
+          }
+        }
       }
     });
     expect(mocks.toolUpdate).toHaveBeenCalledWith({
       where: { id: "t2" },
-      data: { name: "Neu" }
+      data: { name: "Neu" },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            isSuspended: true
+          }
+        }
+      }
     });
     expect(mocks.toolDelete).toHaveBeenCalledWith({ where: { id: "t2" } });
     expect(created).toEqual({ id: "t2" });

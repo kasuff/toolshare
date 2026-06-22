@@ -25,7 +25,7 @@ export type ToolEntity = {
   pickupLocationNote: string | null;
   status: ToolStatus;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
   owner: ToolOwnerEntity;
   bookings?: ToolBookingRangeEntity[];
 };

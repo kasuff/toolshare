@@ -145,6 +145,16 @@ export const toolsRepository = {
         pickupLocation: input.pickupLocation,
         pickupLocationNote: input.pickupLocationNote,
         status: "AVAILABLE"
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            isSuspended: true
+          }
+        }
       }
     });
   },
@@ -163,7 +173,17 @@ export const toolsRepository = {
   ) {
     return prisma.tool.update({
       where: { id },
-      data: input
+      data: input,
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            isSuspended: true
+          }
+        }
+      }
     });
   },
 

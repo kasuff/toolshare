@@ -1,25 +1,9 @@
 import { z } from "zod";
-
-/** Zod's .datetime() ist streng (z. B. nur mit Z); Browser/Inputs liefern oft parsebare Strings ohne Offset. */
-const flexibleIsoDateTime = z
-  .string()
-  .min(1)
-  .transform((s, ctx) => {
-    const d = new Date(s.trim());
-    if (Number.isNaN(d.getTime())) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ungültiges Datum oder Uhrzeit." });
-      return z.NEVER;
-    }
-    return d.toISOString();
-  });
+import { createToolBookingBodySchema } from "@toolshare/shared/contracts/request/bookings.schema";
+import { flexibleIsoDateTime } from "@toolshare/shared/contracts/request/datetime.schema";
 
 export const createToolBookingSchema = z.object({
-  body: z.object({
-    toolId: z.string().uuid(),
-    startDate: z.string().datetime(),
-    endDate: z.string().datetime(),
-    pickupTime: z.string().datetime()
-  }),
+  body: createToolBookingBodySchema,
   params: z.object({}),
   query: z.object({})
 });
@@ -39,8 +23,6 @@ export const createWorkshopBookingSchema = z.object({
     workshopId: z.string().uuid(),
     startDate: flexibleIsoDateTime,
     endDate: flexibleIsoDateTime,
-    // Werkzeugauswahl bei der Buchung ist nicht mehr nötig: Eine Werkstatt wird ohnehin
-    // nur von einer Person gleichzeitig gebucht. Optional bleibt das Feld abwärtskompatibel.
     workshopToolIds: z.array(z.string().uuid()).optional().default([])
   }),
   params: z.object({}),

@@ -17,11 +17,9 @@ export type ToolResponse = {
     id: string;
     startDate: string;
     endDate: string;
-    status: ToolBookingRangeResponse["status"];
+    status: "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED";
   }>;
 };
-
-type ToolBookingRangeResponse = NonNullable<ToolResponse["bookings"]>[number];
 
 export function toToolResponse(tool: ToolEntity): ToolResponse {
   return {
@@ -35,7 +33,7 @@ export function toToolResponse(tool: ToolEntity): ToolResponse {
     pickupLocationNote: tool.pickupLocationNote,
     status: tool.status,
     createdAt: tool.createdAt.toISOString(),
-    updatedAt: tool.updatedAt.toISOString(),
+    updatedAt: (tool.updatedAt ?? tool.createdAt).toISOString(),
     owner: tool.owner,
     bookings: tool.bookings?.map((booking) => ({
       id: booking.id,
