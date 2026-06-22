@@ -116,7 +116,7 @@ export type CreatedWorkshop = {
 export async function createWorkshop(
   request: APIRequestContext,
   token: string,
-  overrides: Partial<{ name: string; maxCapacity: number; location: string }> = {},
+  overrides: Partial<{ name: string; maxCapacity: number; location: string; imageUrls: string[] }> = {},
 ): Promise<CreatedWorkshop> {
   const suffix = uniqueSuffix();
   const res = await request.post(`${API_URL}/workshops`, {
@@ -128,7 +128,7 @@ export async function createWorkshop(
       maxCapacity: overrides.maxCapacity ?? 1,
       extras: [],
       workshopTools: [],
-      imageUrls: [],
+      imageUrls: overrides.imageUrls ?? [],
     },
   });
   expect(res.ok(), `createWorkshop fehlgeschlagen: ${res.status()} ${await res.text()}`).toBeTruthy();

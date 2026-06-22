@@ -44,12 +44,16 @@ e2e/
 ├── fixtures/
 │   ├── data.ts      eindeutige Testdaten (Nutzer, Adressen, Datumshelfer, Manager-Creds)
 │   ├── api.ts       API-Helfer (Register/Login/Tools/Workshops/Rolle) + storageState
+│   ├── forms.ts     UI-Form-Helfer (Adress-Mock, manuelle Adresse, Foto-Upload)
 │   └── roles.ts     Pfade & Zugriff auf vorbereitete Rollen-Sessions
 ├── setup/
 │   └── global.setup.ts   legt Rollen an und schreibt .auth/*.json
 ├── smoke.spec.ts        Phase 1: Startseite, Gast, Login, Mobile-Nav (@smoke)
 ├── auth.spec.ts         Login, Registrierung (Adress-Mock), Logout
 ├── tools.spec.ts        Werkzeugsuche und -detail (Gast)
+├── create.spec.ts       Werkzeug + Werkstatt über die UI anlegen
+├── manage.spec.ts       Werkzeug/Werkstatt bearbeiten + löschen (Anbieter)
+├── offers.spec.ts       Meine Angebote + Profil (Name speichern, Passwort ändern)
 ├── requests.spec.ts     Phase 2: Ausleihanfrage + Inbox-Entscheidung (Akzeptieren/Ablehnen)
 ├── workshops.spec.ts    Phase 2: Werkstattbuchung + Konflikt (blockierter Zeitraum)
 ├── admin.spec.ts        Admin: Nutzerverwaltung (Rolle/Sperre) + Zugriffsschutz
