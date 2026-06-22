@@ -17,7 +17,7 @@ import { readUsers, storageFileFor } from "./fixtures/roles";
  * ausgeklammert, damit der Scan stabil strukturelle A11y-Regressionen abfängt
  * (fehlende Labels/Rollen/Alt-Texte/Headings etc.).
  */
-const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 const scan = (page: Page) =>
   new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["color-contrast"]).analyze();
