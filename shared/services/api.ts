@@ -254,6 +254,17 @@ const roleMap: Record<BackendRole, User["role"]> = {
   MANAGER: "ADMIN"
 };
 
+function mapPublicUser(user: BackendUser): User {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    address: user.address,
+    role: roleMap[user.role],
+    isSuspended: user.isSuspended ?? false
+  };
+}
+
 const toolStatusMap: Record<BackendToolStatus, Tool["status"]> = {
   AVAILABLE: "VERFUEGBAR",
   REQUESTED: "AUSGELIEHEN",
@@ -587,14 +598,7 @@ export const api = {
 
   async getCurrentUser(token: string): Promise<User> {
     const user = await request<BackendUser>("/users/me", undefined, token);
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      address: user.address,
-      role: roleMap[user.role],
-      isSuspended: user.isSuspended ?? false
-    };
+    return mapPublicUser(user);
   },
 
   async listUsers(
@@ -609,18 +613,12 @@ export const api = {
 
     const query = params.toString();
     const users = await request<BackendUser[]>(query ? `/users?${query}` : "/users", undefined, token);
-    return users.map((user) => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: roleMap[user.role],
-      isSuspended: user.isSuspended
-    }));
+    return users.map(mapPublicUser);
   },
 
-  async updateUserRole(userId: string, role: "NUTZER" | "MODERATOR" | "ADMIN", token: string) {
+  async updateUserRole(userId: string, role: "NUTZER" | "MODERATOR" | "ADMIN", token: string): Promise<User> {
     const backendRole: BackendRole = role === "ADMIN" ? "MANAGER" : role === "MODERATOR" ? "MODERATOR" : "USER";
-    await request(
+    const user = await request<BackendUser>(
       `/users/${userId}/role`,
       {
         method: "PATCH",
@@ -628,10 +626,11 @@ export const api = {
       },
       token
     );
+    return mapPublicUser(user);
   },
 
-  async updateUserSuspension(userId: string, isSuspended: boolean, token: string) {
-    await request(
+  async updateUserSuspension(userId: string, isSuspended: boolean, token: string): Promise<User> {
+    const user = await request<BackendUser>(
       `/users/${userId}/suspension`,
       {
         method: "PATCH",
@@ -639,6 +638,7 @@ export const api = {
       },
       token
     );
+    return mapPublicUser(user);
   },
 
   async updateMyProfile(
@@ -654,14 +654,7 @@ export const api = {
       token
     );
 
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      address: user.address,
-      role: roleMap[user.role],
-      isSuspended: user.isSuspended
-    };
+    return mapPublicUser(user);
   },
 
   async getTools(

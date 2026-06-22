@@ -58,8 +58,12 @@ describe("api coverage", () => {
         return responseJson([{ id: "u3", email: "bob@example.com", name: "Bob", role: "USER", isSuspended: false }]);
       }
 
-      if (url.endsWith("/users/u1/role") || url.endsWith("/users/u1/suspension")) {
-        return responseNoContent();
+      if (url.endsWith("/users/u1/role")) {
+        return responseJson({ id: "u1", email: "lea@example.com", name: "Lea", role: "MODERATOR", isSuspended: false });
+      }
+
+      if (url.endsWith("/users/u1/suspension")) {
+        return responseJson({ id: "u1", email: "lea@example.com", name: "Lea", role: "MODERATOR", isSuspended: true });
       }
 
       throw new Error(`Unexpected request ${url}`);

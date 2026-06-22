@@ -178,8 +178,8 @@ describe("management pages", () => {
       }
       return [moderatorUser, suspendedUser];
     });
-    updateUserRole.mockResolvedValue(undefined);
-    updateUserSuspension.mockResolvedValue(undefined);
+    updateUserRole.mockResolvedValue({ ...moderatorUser, role: "NUTZER" });
+    updateUserSuspension.mockResolvedValue({ ...suspendedUser, isSuspended: false });
 
     render(
       <MemoryRouter>
@@ -201,7 +201,18 @@ describe("management pages", () => {
     fireEvent.change(screen.getByLabelText("Nutzer suchen"), { target: { value: "mur" } });
     fireEvent.click(screen.getByRole("button", { name: "Suchen" }));
 
-    decideSuspensionRequest.mockResolvedValue(undefined);
+    decideSuspensionRequest.mockResolvedValue({
+      id: "sr1",
+      userId: "u2",
+      requestedById: "u4",
+      reportId: "r9",
+      reason: "Wiederholte Verstoesse",
+      status: "APPROVED",
+      createdAt: "2026-05-05T11:00:00.000Z",
+      user: { id: "u2", name: "Murat", email: "murat@toolshare.local", isSuspended: true },
+      requestedBy: { id: "u4", name: "Tobias" },
+      report: { id: "r9", reason: "Beleidigung", targetType: "USER", targetId: "u2" }
+    });
     fireEvent.click(screen.getByRole("button", { name: "Sperrung annehmen" }));
     await waitFor(() => {
       expect(decideSuspensionRequest).toHaveBeenCalledWith("sr1", { approve: true }, "token-123");

@@ -95,12 +95,16 @@ export function AdminPage({ currentUser, token }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, appliedSearch]);
 
+  const syncUserRow = (updated: Pick<User, "id"> & Partial<Omit<User, "id">>) => {
+    setUsers((prev) => prev.map((user) => (user.id === updated.id ? { ...user, ...updated } : user)));
+  };
+
   const updateRole = async (userId: string, role: "MODERATOR" | "NUTZER") => {
     if (!token) return;
     setBusyUserId(userId);
     try {
-      await api.updateUserRole(userId, role, token);
-      await loadData(appliedSearch);
+      const updated = await api.updateUserRole(userId, role, token);
+      syncUserRow(updated);
       pushToast(role === "MODERATOR" ? "Nutzer ist jetzt Moderator." : "Moderator-Rolle wurde entfernt.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Rolle konnte nicht aktualisiert werden.", "error");
@@ -113,8 +117,8 @@ export function AdminPage({ currentUser, token }: Props) {
     if (!token) return;
     setBusyUserId(userId);
     try {
-      await api.updateUserSuspension(userId, nextIsSuspended, token);
-      await loadData(appliedSearch);
+      const updated = await api.updateUserSuspension(userId, nextIsSuspended, token);
+      syncUserRow(updated);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Sperrstatus konnte nicht aktualisiert werden.", "error");
     } finally {
@@ -126,8 +130,20 @@ export function AdminPage({ currentUser, token }: Props) {
     if (!token) return;
     setBusyRequestId(requestId);
     try {
-      await api.decideSuspensionRequest(requestId, { approve }, token);
-      await loadData(appliedSearch);
+      const result = await api.decideSuspensionRequest(requestId, { approve }, token);
+      setSuspensionRequests((prev) => prev.filter((item) => item.id !== requestId));
+      if (approve) {
+        syncUserRow({
+          id: result.userId,
+          name: result.user.name,
+          email: result.user.email,
+          isSuspended: result.user.isSuspended
+        });
+      }
+      setMetrics((prev) => ({
+        ...prev,
+        openSuspensionRequests: Math.max(0, prev.openSuspensionRequests - 1)
+      }));
       pushToast(approve ? "Sperrung wurde durchgeführt." : "Sperranfrage abgelehnt.", "success");
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Sperranfrage konnte nicht bearbeitet werden.", "error");
