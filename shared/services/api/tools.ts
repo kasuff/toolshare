@@ -1,7 +1,7 @@
 import type { Booking, Tool } from "../../types/domain";
-import type { BackendBooking, BackendTool } from "./types";
+import type { BackendBooking, BackendTool, BackendRating } from "./types";
 import { request } from "./client";
-import { mapBooking, mapTool } from "./mappers";
+import { mapBooking, mapTool, mapPublicRating } from "./mappers";
 
 export const toolsApi = {
   async getTools(

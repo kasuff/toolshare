@@ -231,7 +231,7 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
         <WorkshopDetailView
           selectedWorkshop={selectedWorkshop}
           selectedWorkshopOwnerOfferCount={items.filter(i => i.workshop.ownerId === selectedWorkshop.workshop.ownerId).length}
-          currentUser={currentUser}
+          currentUser={currentUser ?? undefined}
           token={token}
           onClose={closeWorkshop}
           onBlockSuccess={(workshopId, refreshed) => {
@@ -244,8 +244,7 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
                     ? {
                         ...entry,
                         workshop: refreshed.workshop,
-                        slots: refreshed.slots,
-                        tools: refreshed.tools ?? entry.tools
+                        slots: refreshed.slots
                       }
                     : entry
                 );

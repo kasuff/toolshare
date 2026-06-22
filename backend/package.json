@@ -13,6 +13,7 @@
     "test": "prisma generate && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:contracts": "vitest run tests/contracts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "test:push": "ts-node scripts/test-push.ts"
@@ -20,6 +21,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",
     "@prisma/client": "^5.22.0",
+    "@toolshare/shared": "file:../shared",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

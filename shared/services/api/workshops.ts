@@ -1,8 +1,8 @@
 import { DEFAULT_PLACEHOLDER_IMAGE } from "../../utils/categories";
 import type { Tool, Workshop, WorkshopBookedRange, WorkshopSlot } from "../../types/domain";
-import type { BackendBooking, BackendWorkshop, BackendWorkshopTimeslot } from "./types";
+import type { BackendBooking, BackendWorkshop, BackendWorkshopTimeslot, BackendRating } from "./types";
 import { request } from "./client";
-import { mapBooking, mapWorkshop, mapWorkshopBookedRanges, mapWorkshopSlot } from "./mappers";
+import { mapBooking, mapWorkshop, mapWorkshopBookedRanges, mapWorkshopSlot, mapPublicRating } from "./mappers";
 import { toolStatusMap } from "./mappers/roles";
 
 export const workshopsApi = {

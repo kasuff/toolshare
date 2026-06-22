@@ -39,7 +39,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
       '@testing-library/react': path.resolve(__dirname, './tests/testing-library.tsx'),
-      '@testing-library/react-original': path.resolve(__dirname, '../node_modules/@testing-library/react'),
+      '@testing-library/react-original': path.resolve(__dirname, './node_modules/@testing-library/react'),
       react: reactRoot,
       'react-dom': reactDomRoot,
       'react/jsx-runtime': path.join(reactRoot, 'jsx-runtime'),
