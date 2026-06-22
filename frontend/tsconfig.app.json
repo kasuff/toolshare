@@ -22,7 +22,8 @@
     // type resolution to the frontend's own v18 copy.
     "paths": {
       "react": ["./node_modules/@types/react"],
-      "react-dom": ["./node_modules/@types/react-dom"]
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "zod": ["./node_modules/zod"]
     }
   },
   "include": ["src"]

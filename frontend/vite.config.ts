@@ -17,6 +17,7 @@ export default defineConfig({
       "react-dom": reactDomRoot,
       "react/jsx-runtime": path.join(reactRoot, "jsx-runtime"),
       "react/jsx-dev-runtime": path.join(reactRoot, "jsx-dev-runtime"),
+      zod: path.resolve(__dirname, "node_modules/zod"),
     },
     dedupe: ["react", "react-dom"],
   },

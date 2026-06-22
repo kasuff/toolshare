@@ -11,6 +11,10 @@ export default defineConfig({
       {
         find: "@toolshare/shared",
         replacement: path.resolve(__dirname, "../shared/index.ts")
+      },
+      {
+        find: "zod",
+        replacement: path.resolve(__dirname, "node_modules/zod")
       }
     ]
   },

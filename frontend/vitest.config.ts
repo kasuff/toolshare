@@ -38,6 +38,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
+      zod: path.resolve(__dirname, './node_modules/zod'),
       '@testing-library/react': path.resolve(__dirname, './tests/testing-library.tsx'),
       '@testing-library/react-original': path.resolve(__dirname, './node_modules/@testing-library/react'),
       react: reactRoot,

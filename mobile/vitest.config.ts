@@ -27,6 +27,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
+      zod: path.resolve(__dirname, 'node_modules/zod'),
     },
   },
 });

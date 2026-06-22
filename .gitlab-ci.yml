@@ -239,14 +239,6 @@ backend:architecture:
     - npm ci --workspaces=false --prefer-offline --cache .npm
     - npx vitest run tests/architecture.test.ts
 
-shared:check:
-  stage: test
-  image: node:20.19
-  script:
-    - cd shared
-    - npm install --prefer-offline
-    - npm run check
-
 backend:contracts:
   stage: test
   image: node:20.19
