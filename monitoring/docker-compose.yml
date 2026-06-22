@@ -237,9 +237,14 @@ services:
       # "gitlab_incidents"  = GitLab-Issues vom Typ incident
       OUTAGE_SOURCE: ${DORA_OUTAGE_SOURCE:-prometheus_alerts}
       OUTAGE_ALERT_SEVERITY: ${DORA_OUTAGE_SEVERITY:-critical}
+      # Nur echte Availability-Alerts zählen als Ausfall (schließt z. B. das
+      # dauerhaft feuernde DiskSpaceCritical aus). Komma-Liste; leer = alle.
+      OUTAGE_ALERTNAMES: ${DORA_OUTAGE_ALERTNAMES:-BackendDown,InstanceDown}
       PROMETHEUS_URL: http://prometheus:9090
       # ── Berechnung ─────────────────────────────────────────────────────────
       DORA_WINDOW_DAYS: ${DORA_WINDOW_DAYS:-30}
+      # Ein Deployment gilt als "failed", wenn binnen dieser Stunden ein Ausfall folgt.
+      DORA_FAILURE_CORRELATION_HOURS: ${DORA_FAILURE_CORRELATION_HOURS:-2}
       COLLECT_INTERVAL_SECONDS: ${DORA_COLLECT_INTERVAL:-300}
       DORA_STATE_PATH: /data/state.json
     volumes:

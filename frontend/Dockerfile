@@ -1,21 +1,27 @@
+# syntax=docker/dockerfile:1
 FROM node:20-bookworm-slim AS dev
 WORKDIR /app
 
-COPY package*.json ./
-COPY frontend/package*.json ./frontend/
-COPY shared/package*.json ./shared/
-RUN npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+# Alles als non-root "node" (uid 1000) ausführen: /app dem User übergeben und
+# dann USER wechseln. So sind node_modules (npm ci) und Quelltext direkt
+# node-owned – Vite kann seine Temp-Config (vite.config.ts.timestamp-*.mjs) und
+# den .vite-Optimizer-Cache schreiben, OHNE dass wir hinterher ein teures
+# "chown -R /app" brauchen (das sonst ~470 MB node_modules in eine neue Layer
+# kopiert und bei jedem Code-Rebuild erneut läuft).
+RUN chown node:node /app
+USER node
 
-COPY . .
+COPY --chown=node:node package*.json ./
+COPY --chown=node:node frontend/package*.json ./frontend/
+COPY --chown=node:node shared/package*.json ./shared/
+# Cache-Mount für ~/.npm → heruntergeladene Pakete werden über Builds hinweg
+# wiederverwendet, falls sich package-lock.json ändert.
+RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 \
+    npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
 
-# The files above are copied as root. Hand ownership to the non-privileged
-# "node" user so Vite can write its bundled config (vite.config.ts.timestamp-*.mjs)
-# and other temp files into /app/frontend without hitting EACCES.
-RUN chown -R node:node /app
+COPY --chown=node:node . .
 
 EXPOSE 3000
-# Drop root: the node image ships a non-privileged "node" user (uid 1000).
-USER node
 CMD ["npm", "run", "dev", "--workspace=frontend", "--", "--host", "0.0.0.0", "--port", "3000"]
 
 FROM node:20-bookworm-slim AS build

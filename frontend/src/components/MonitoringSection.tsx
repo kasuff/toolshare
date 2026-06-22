@@ -362,6 +362,12 @@ function DoraSection({ token }: Props) {
   };
 
   const cfrPct = data?.changeFailureRate != null ? data.changeFailureRate * 100 : null;
+  // Zähler der Change Failure Rate: Deployments, denen ein Ausfall folgte (= cfr × Deployments).
+  // Das ist die für die CFR relevante Zahl – nicht die rohe Ausfall-Anzahl (die gehört zu TTR).
+  const failedDeploys =
+    data?.changeFailureRate != null && data.deploymentsInWindow != null
+      ? Math.round(data.changeFailureRate * data.deploymentsInWindow)
+      : null;
 
   return (
     <div className="stack">
@@ -405,13 +411,21 @@ function DoraSection({ token }: Props) {
             <DoraCard
               label="Change Failure Rate"
               value={cfrPct != null ? `${cfrPct.toFixed(1)} %` : "–"}
-              sub={data.failuresInWindow != null ? `${data.failuresInWindow} Ausfälle im Fenster` : undefined}
+              sub={
+                failedDeploys != null && data.deploymentsInWindow != null
+                  ? `${failedDeploys} von ${data.deploymentsInWindow} Deployments mit Ausfall`
+                  : undefined
+              }
               tone={cfrPct == null ? "neutral" : cfrPct > 30 ? "danger" : cfrPct > 15 ? "warning" : "success"}
             />
             <DoraCard
               label="Time to Restore Service"
               value={fmtDuration(data.timeToRestoreSeconds)}
-              sub="Median der Ausfalldauer"
+              sub={
+                data.failuresInWindow != null
+                  ? `Median aus ${data.failuresInWindow} Ausfällen`
+                  : "Median der Ausfalldauer"
+              }
               tone={
                 data.timeToRestoreSeconds == null
                   ? "neutral"

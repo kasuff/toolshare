@@ -111,7 +111,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         { "expr": "dora_deployment_frequency_per_day", "legendFormat": "rollierend (Fenster)", "refId": "A" },
-        { "expr": "increase(dora_deployments[7d]) / 7", "legendFormat": "Deploys/Tag (7d-increase)", "refId": "B" }
+        { "expr": "increase(dora_deployments_total[7d]) / 7", "legendFormat": "Deploys/Tag (7d-increase)", "refId": "B" }
       ],
       "fieldConfig": {
         "defaults": { "unit": "short", "decimals": 2, "custom": { "lineWidth": 2, "fillOpacity": 12 } }
@@ -124,8 +124,7 @@
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "dora_change_failure_rate", "legendFormat": "rollierend (Fenster)", "refId": "A" },
-        { "expr": "clamp_min(increase(dora_failures[30d]), 0) / clamp_min(increase(dora_deployments[30d]), 1)", "legendFormat": "30d-increase", "refId": "B" }
+        { "expr": "dora_change_failure_rate", "legendFormat": "Change Failure Rate (deploy-korreliert)", "refId": "A" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -157,7 +156,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         { "expr": "dora_time_to_restore_seconds", "legendFormat": "TTR (Median, Fenster)", "refId": "A" },
-        { "expr": "clamp_min(increase(dora_restore_seconds[30d]), 0) / clamp_min(increase(dora_restored_incidents[30d]), 1)", "legendFormat": "MTTR (30d-increase)", "refId": "B" }
+        { "expr": "clamp_min(increase(dora_restore_seconds_total[30d]), 0) / clamp_min(increase(dora_restored_incidents_total[30d]), 1)", "legendFormat": "MTTR (30d-increase)", "refId": "B" }
       ],
       "fieldConfig": {
         "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 12 } }

@@ -20,7 +20,7 @@ import logging
 import math
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from statistics import median
 from typing import Optional
 
@@ -45,6 +45,16 @@ PROMETHEUS_URL = _env("PROMETHEUS_URL", "http://prometheus:9090").rstrip("/")
 
 OUTAGE_SOURCE = _env("OUTAGE_SOURCE", "prometheus_alerts")
 OUTAGE_ALERT_SEVERITY = _env("OUTAGE_ALERT_SEVERITY", "critical")
+
+# Nur diese Alertnamen gelten als echte Availability-Ausfälle (zählen für CFR und
+# Time-to-Restore). Damit werden dauerhaft feuernde Infra-/Kapazitäts-Alerts wie
+# DiskSpaceCritical ausgeschlossen, die keinen Deployment-Ausfall darstellen.
+# Komma-Liste; leer = keine Filterung (alle kritischen Alerts).
+OUTAGE_ALERTNAMES = _env("OUTAGE_ALERTNAMES", "BackendDown,InstanceDown")
+
+# Korrelationsfenster: Ein Deployment gilt als "failed", wenn innerhalb dieser
+# Zeit nach dem Deploy-Ende ein Ausfall beginnt (DORA Change Failure Rate).
+FAILURE_CORRELATION_SECONDS = float(_env("DORA_FAILURE_CORRELATION_HOURS", "2")) * 3600
 
 HTTP_TIMEOUT = float(_env("DORA_HTTP_TIMEOUT", "30"))
 
@@ -156,15 +166,21 @@ def fetch_deployments(start: datetime, end: datetime) -> list[Deployment]:
                 break
             page = int(next_page)
 
+        # Echte DORA-Lead-Time: pro Deployment den ältesten Commit nehmen, der seit
+        # dem vorherigen Deployment neu dazukam (statt nur des deployten HEAD-Commits).
+        _assign_dora_lead_times(out, client)
+
     log.info("GitLab: %d Deployments in [%s, %s]", len(out), start.date(), end.date())
     return out
 
 
 def _lead_time(deployment: dict, finished_dt: datetime) -> Optional[float]:
-    """Lead Time = Deploy-Ende − Commit-Zeitpunkt des deployten Stands.
+    """Fallback-Lead-Time = Deploy-Ende − Commit-Zeitpunkt des deployten HEAD-Stands.
 
-    Der Commit-Zeitpunkt steckt bereits in der Deployment-Antwort unter
-    deployable.commit.created_at – kein zusätzlicher API-Call nötig.
+    Wird genutzt, solange die echte DORA-Lead-Time (ältester neu deployter Commit)
+    nicht bestimmbar ist – z. B. für das erste Deployment im Fenster (kein Vorgänger)
+    oder wenn der GitLab-Compare-Call fehlschlägt. Der Commit-Zeitpunkt steckt bereits
+    in der Deployment-Antwort unter deployable.commit.created_at (kein Extra-Call).
     """
     deployable = deployment.get("deployable") or {}
     commit = deployable.get("commit") or {}
@@ -177,6 +193,51 @@ def _lead_time(deployment: dict, finished_dt: datetime) -> Optional[float]:
         return None
     delta = (finished_dt - commit_dt).total_seconds()
     return delta if delta >= 0 else None
+
+
+def _assign_dora_lead_times(deployments: list[Deployment], client: httpx.Client) -> None:
+    """Setzt lead_time_seconds = Deploy-Ende − ältester neu deployter Commit.
+
+    DORA definiert Lead Time for Changes als Zeit vom Commit einer Änderung bis zu
+    deren Auslieferung in Produktion. Wir bestimmen pro Deployment die Commits, die
+    gegenüber dem vorherigen Deployment hinzukamen (GitLab Compare-API), und nehmen
+    den ältesten davon. Bei fehlendem Vorgänger/Fehler bleibt der Fallback aus
+    _lead_time() (HEAD-Commit-Alter) erhalten.
+    """
+    for i, dep in enumerate(deployments):
+        if i == 0 or not dep.sha:
+            continue  # kein Vorgänger → Fallback behalten
+        prev_sha = deployments[i - 1].sha
+        if not prev_sha or prev_sha == dep.sha:
+            continue
+        try:
+            commit_times = _commits_between(client, prev_sha, dep.sha)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Compare %s..%s fehlgeschlagen, nutze Fallback-Lead-Time: %s",
+                        prev_sha[:8], dep.sha[:8], exc)
+            continue
+        if not commit_times:
+            continue  # keine neuen Commits → Fallback behalten
+        delta = (dep.finished_at - min(commit_times)).total_seconds()
+        if delta >= 0:
+            dep.lead_time_seconds = delta
+
+
+def _commits_between(client: httpx.Client, from_sha: str, to_sha: str) -> list[datetime]:
+    """Commit-Zeitpunkte der Commits, die in to_sha, aber nicht in from_sha enthalten sind."""
+    url = f"{GITLAB_URL}/api/v4/projects/{_project_path()}/repository/compare"
+    resp = client.get(url, params={"from": from_sha, "to": to_sha})
+    resp.raise_for_status()
+    times: list[datetime] = []
+    for c in resp.json().get("commits", []):
+        created = c.get("created_at") or c.get("committed_date")
+        if not created:
+            continue
+        try:
+            times.append(_parse_iso(created))
+        except ValueError:
+            continue
+    return times
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -202,7 +263,9 @@ def _fetch_outages_prometheus(start: datetime, end: datetime) -> list[Outage]:
     MAX_POINTS = 10_000
     span_seconds = max(end.timestamp() - start.timestamp(), 1)
     step = max(60, math.ceil(span_seconds / MAX_POINTS))
-    query = f'max(ALERTS{{alertstate="firing",severity="{OUTAGE_ALERT_SEVERITY}"}})'
+    names = [n.strip() for n in OUTAGE_ALERTNAMES.split(",") if n.strip()]
+    name_filter = f',alertname=~"{"|".join(names)}"' if names else ""
+    query = f'max(ALERTS{{alertstate="firing",severity="{OUTAGE_ALERT_SEVERITY}"{name_filter}}})'
     url = f"{PROMETHEUS_URL}/api/v1/query_range"
     params = {
         "query": query,
@@ -311,7 +374,17 @@ def compute(deployments: list[Deployment], outages: list[Outage], window_days: i
     lead_median = median(lead_values) if lead_values else None
 
     n_fail = len(outages)
-    cfr = (n_fail / n_dep) if n_dep else None
+    # Change Failure Rate (DORA): Anteil der Deployments, denen innerhalb des
+    # Korrelationsfensters ein Ausfall folgte. Dadurch ist jeder gezählte Fehler
+    # genau einem Deployment zugeordnet und der Wert liegt per Konstruktion in
+    # [0, 1] – kein künstliches Deckeln nötig.
+    horizon = timedelta(seconds=FAILURE_CORRELATION_SECONDS)
+    failed_deploys = sum(
+        1
+        for d in deployments
+        if any(d.finished_at <= o.start <= d.finished_at + horizon for o in outages)
+    )
+    cfr = (failed_deploys / n_dep) if n_dep else None
 
     restore_values = [o.duration_seconds for o in outages if o.resolved]
     ttr_median = median(restore_values) if restore_values else None
