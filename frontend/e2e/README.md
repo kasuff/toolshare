@@ -47,8 +47,15 @@ e2e/
 ├── admin.spec.ts        Admin: Nutzerverwaltung (Rolle/Sperre) + Zugriffsschutz
 ├── moderation.spec.ts   Moderation: Bereich sichtbar + Zugriffsschutz
 ├── clock.spec.ts        Phase 3: Clock-Mocking (deterministische Default-Daten)
-└── network.spec.ts      Phase 3: Network-Mocking (erzwungener Backend-Fehler)
+├── network.spec.ts      Phase 3: Network-Mocking (erzwungener Backend-Fehler)
+└── a11y.spec.ts         Phase 3: Accessibility-Scan ganzer Seiten (axe)
 ```
+
+`a11y.spec.ts` scannt ganze, real gerenderte Seiten mit `@axe-core/playwright`
+(WCAG 2.0/2.1 A & AA) und ergänzt die komponentenbasierten jest-axe-Tests der
+Vitest-Suite. Die bekannte Kontrast-Schuld (`color-contrast` auf Karten) ist
+dort dokumentiert ausgeklammert, damit strukturelle A11y-Regressionen stabil
+auffallen.
 
 `.auth/` (Sessions) und `playwright-report/`, `test-results/` sind gitignored.
 
