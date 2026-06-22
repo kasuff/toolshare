@@ -128,11 +128,7 @@ workflow:
         })();
       '
 
-.shared_deps:
-  script:
-    - cd shared
-    - npm install --prefer-offline
-
+# === FRONTEND JOBS ===
 
 frontend:lint:
   stage: lint
@@ -141,7 +137,6 @@ frontend:lint:
   cache:
     policy: pull-push   # lint runs first -> it seeds the shared npm cache
   script:
-    - !reference [.shared_deps, script]
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
     - npm run lint -- -f html -o ../frontend-lint-report.html || true
@@ -162,7 +157,6 @@ frontend:test:
   variables:
     NODE_OPTIONS: "--max-old-space-size=2048"   # headroom so the test fork is not OOM-killed
   script:
-    - !reference [.shared_deps, script]
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
     # Vitest occasionally segfaults (exit 139) on shared runners when V8 coverage
@@ -206,7 +200,6 @@ frontend:accessibility:
     - apt-get install -y --no-install-recommends chromium
     - rm -rf /var/lib/apt/lists/*
   script:
-    - !reference [.shared_deps, script]
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
     - npm run build
@@ -268,7 +261,6 @@ frontend:architecture:
   image: node:20.19-slim
   extends: .frontend_cache
   script:
-    - !reference [.shared_deps, script]
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
     - npx vitest run tests/architecture.test.ts
@@ -338,7 +330,6 @@ mobile:test:
   variables:
     NODE_OPTIONS: "--max-old-space-size=2048"
   script:
-    - !reference [.shared_deps, script]
     - !reference [.mobile_install, script]
     - npm run test -- --coverage
     - node ../scripts/check-coverage.js coverage
@@ -364,7 +355,6 @@ frontend:build:
   image: node:20.19-alpine
   extends: .frontend_cache
   script:
-    - !reference [.shared_deps, script]
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
     - npm run build
