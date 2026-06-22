@@ -9,18 +9,21 @@ import { readUsers, storageFileFor } from "./fixtures/roles";
  *
  * axe scannt hier ganze, real gerenderte Seiten im Browser (echtes CSS,
  * Routing, eingeloggte Zustände) und ergänzt damit die isolierten
- * Komponenten-Checks der Vitest-Suite.
- *
- * Hinweis zu `color-contrast`: Auf den Karten gibt es ein bekanntes
- * Kontrast-Defizit (oranges "Details"-Label, ~4.36:1 statt 4.5:1). Das ist
- * bestehende Design-Schuld, wird separat behandelt und hier bewusst
- * ausgeklammert, damit der Scan stabil strukturelle A11y-Regressionen abfängt
- * (fehlende Labels/Rollen/Alt-Texte/Headings etc.).
+ * Komponenten-Checks der Vitest-Suite. Geprüft wird gegen WCAG 2.0/2.1/2.2,
+ * Level A und AA – inklusive Farbkontrast.
  */
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-const scan = (page: Page) =>
-  new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["color-contrast"]).analyze();
+// Animationen/Transitions vor dem Scan abschalten, damit der Endzustand
+// gemessen wird. Sonst sampelt axe ggf. mitten in der Karten-Einblendung
+// (Opacity < 1), wo der Farbkontrast kurzzeitig einbricht.
+const FREEZE_ANIMATIONS =
+  "*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition:none!important;}";
+
+const scan = async (page: Page) => {
+  await page.addStyleTag({ content: FREEZE_ANIMATIONS });
+  return new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+};
 
 test.describe("Accessibility (axe, ganze Seiten)", () => {
   test("Startseite ist barrierefrei", async ({ page }) => {

@@ -52,10 +52,9 @@ e2e/
 ```
 
 `a11y.spec.ts` scannt ganze, real gerenderte Seiten mit `@axe-core/playwright`
-(WCAG 2.0/2.1 A & AA) und ergänzt die komponentenbasierten jest-axe-Tests der
-Vitest-Suite. Die bekannte Kontrast-Schuld (`color-contrast` auf Karten) ist
-dort dokumentiert ausgeklammert, damit strukturelle A11y-Regressionen stabil
-auffallen.
+(WCAG 2.0/2.1/2.2, A & AA, inkl. Farbkontrast) und ergänzt die komponenten-
+basierten jest-axe-Tests der Vitest-Suite (die in jsdom z. B. Farbkontrast gar
+nicht auswerten können).
 
 `.auth/` (Sessions) und `playwright-report/`, `test-results/` sind gitignored.
 
