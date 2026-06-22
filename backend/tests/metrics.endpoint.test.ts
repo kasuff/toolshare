@@ -17,6 +17,8 @@ vi.mock("../src/utils/metrics", () => ({
   userLoginsTotal: { inc: vi.fn() },
   bookingsCreatedTotal: { inc: vi.fn() },
   toolsListedGauge: { set: vi.fn() },
+  outboxPendingGauge: { set: vi.fn() },
+  outboxDeadLetterGauge: { set: vi.fn() },
   collectDefaultMetrics: vi.fn()
 }));
 

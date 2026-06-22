@@ -35,8 +35,16 @@ function translateValidationMessage(raw: string): string {
   return raw;
 }
 
+function createRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
   const finishActivity = beginRequestActivity();
+  const requestId = createRequestId();
   try {
     let response: Response;
     try {
@@ -44,6 +52,7 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
         ...init,
         headers: {
           "Content-Type": "application/json",
+          "x-request-id": requestId,
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(init?.headers ?? {})
         }

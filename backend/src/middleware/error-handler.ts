@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
+import { logger } from "../config/logger";
 import { AppError } from "../utils/app-error";
 
 const userFriendlyMessageByCode: Record<string, string> = {
@@ -132,6 +133,7 @@ type ProblemBody = {
   status: number;
   detail: string;
   code: string;
+  requestId?: string;
   errors?: {
     fieldErrors?: Record<string, string[] | undefined>;
     formErrors?: string[];
@@ -140,6 +142,9 @@ type ProblemBody = {
 
 const sendProblem = (res: Response, body: ProblemBody) => {
   res.setHeader("Content-Type", "application/problem+json");
+  if (body.requestId) {
+    res.setHeader("x-request-id", body.requestId);
+  }
   return res.status(body.status).json(body);
 };
 
@@ -161,10 +166,12 @@ const getMessageForAppError = (error: AppError): string => {
 
 export const errorHandler = (
   error: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
+  const requestId = req.requestId;
+
   if (error instanceof AppError) {
     const detail = getMessageForAppError(error);
     return sendProblem(res, {
@@ -172,7 +179,8 @@ export const errorHandler = (
       title: error.code.replaceAll("_", " "),
       status: error.status,
       detail,
-      code: error.code
+      code: error.code,
+      requestId
     });
   }
 
@@ -184,6 +192,7 @@ export const errorHandler = (
       status: 400,
       detail: userFriendlyMessageByCode.VALIDATION_ERROR,
       code: "VALIDATION_ERROR",
+      requestId,
       errors: flattened
     });
   }
@@ -192,8 +201,7 @@ export const errorHandler = (
     process.env.NODE_ENV !== "production" || process.env.SHOW_INTERNAL_ERRORS === "true";
 
   if (exposeInternalDetails) {
-    // eslint-disable-next-line no-console
-    console.error("[INTERNAL_SERVER_ERROR]", error);
+    logger.error({ err: error, requestId }, "Internal server error");
   }
 
   const internalMessage =
@@ -206,6 +214,7 @@ export const errorHandler = (
     title: "INTERNAL SERVER ERROR",
     status: 500,
     detail: internalMessage,
-    code: "INTERNAL_SERVER_ERROR"
+    code: "INTERNAL_SERVER_ERROR",
+    requestId
   });
 };
