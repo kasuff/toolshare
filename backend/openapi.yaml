@@ -164,4 +164,3 @@ components:
         status: { type: integer }
         detail: { type: string }
         code: { type: string }
-        requestId: { type: string }

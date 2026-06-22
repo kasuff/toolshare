@@ -30,8 +30,7 @@ describe("bookings contracts", () => {
       title: "BOOKING CONFLICT",
       status: 409,
       detail: "Im gewählten Zeitraum ist bereits eine Buchung vorhanden.",
-      code: "BOOKING_CONFLICT",
-      requestId: "req-abc-123"
+      code: "BOOKING_CONFLICT"
     });
     expect(problem.code).toBe("BOOKING_CONFLICT");
   });

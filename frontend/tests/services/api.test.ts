@@ -209,12 +209,11 @@ describe("api service", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/bookings/tool",
-      expect.objectContaining({
-        headers: expect.objectContaining({
+      {
+        headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer token-123",
-          "x-request-id": expect.any(String)
-        }),
+          Authorization: "Bearer token-123"
+        },
         method: "POST",
         body: JSON.stringify({
           toolId: "t1",
@@ -222,7 +221,7 @@ describe("api service", () => {
           endDate: new Date("2026-05-07T10:00").toISOString(),
           pickupTime: new Date("2026-05-06T09:00").toISOString()
         })
-      })
+      }
     );
     expect(booking).toMatchObject({
       id: "b1",
@@ -243,18 +242,17 @@ describe("api service", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/bookings/b1/pickup-proposals",
-      expect.objectContaining({
-        headers: expect.objectContaining({
+      {
+        headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer token-123",
-          "x-request-id": expect.any(String)
-        }),
+          Authorization: "Bearer token-123"
+        },
         method: "POST",
         body: JSON.stringify({
           pickupTime: "2026-05-06T12:00:00.000Z",
           returnTime: "2026-05-07T14:00:00.000Z"
         })
-      })
+      }
     );
   });
 

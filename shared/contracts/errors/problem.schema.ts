@@ -6,7 +6,6 @@ export const problemDetailsSchema = z.object({
   status: z.number().int(),
   detail: z.string(),
   code: z.string().optional(),
-  requestId: z.string().optional(),
   errors: z
     .object({
       fieldErrors: z.record(z.array(z.string())).optional(),
