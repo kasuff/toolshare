@@ -21,6 +21,7 @@ cd frontend
 
 npm run test:e2e            # alle Projekte (Desktop + Mobile-/WebKit-Smoke)
 npm run test:e2e -- --project=desktop-chromium
+npm run test:e2e:mobile    # nur Mobile-Viewport (@smoke, inkl. Mobile-Nav)
 npm run test:e2e:ui        # interaktiver UI-Modus
 npm run test:e2e:debug     # Debugger
 npm run test:e2e:report    # letzten HTML-Report öffnen
