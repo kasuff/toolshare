@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toolsRepository } from "../src/modules/tools/tools.repository";
 import { toolsService } from "../src/modules/tools/tools.service";
+import type { ToolEntity } from "../src/modules/tools/tools.entity";
+
+vi.mock("../src/config/services", () => ({
+  getImageStorageService: () => ({
+    uploadImage: vi.fn(async (file: Buffer, mimeType: string) => `data:${mimeType};base64,${file.toString("base64")}`),
+    deleteImage: vi.fn()
+  })
+}));
 
 vi.mock("../src/modules/tools/tools.repository", () => ({
   toolsRepository: {
@@ -19,13 +27,29 @@ vi.mock("../src/modules/tools/tools.repository", () => ({
 
 const mockedToolsRepository = vi.mocked(toolsRepository);
 
+const sampleTool = (overrides: Partial<ToolEntity> = {}): ToolEntity => ({
+  id: "t1",
+  ownerId: "owner-1",
+  name: "Bohrer",
+  description: "desc",
+  category: "Elektro",
+  imageUrl: null,
+  pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+  pickupLocationNote: null,
+  status: "AVAILABLE",
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  owner: { id: "owner-1", name: "Owner", role: "USER", isSuspended: false },
+  ...overrides
+});
+
 describe("toolsService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("lists tools using repository filters", async () => {
-    mockedToolsRepository.list.mockResolvedValueOnce([{ id: "t1" }] as any);
+    mockedToolsRepository.list.mockResolvedValueOnce([sampleTool()] as any);
 
     const result = await toolsService.list({ search: "bohr", category: "elektro" });
 
@@ -34,11 +58,11 @@ describe("toolsService", () => {
       category: "elektro",
       excludeSuspendedOwners: true
     });
-    expect(result).toEqual([{ id: "t1" }]);
+    expect(result).toMatchObject([{ id: "t1", name: "Bohrer" }]);
   });
 
   it("returns tool by id with merged active booking ranges", async () => {
-    mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", owner: { isSuspended: false } } as any);
+    mockedToolsRepository.findById.mockResolvedValueOnce(sampleTool() as any);
     mockedToolsRepository.findActiveBookingRanges.mockResolvedValueOnce([
       { id: "b1", startDate: new Date(), endDate: new Date(), status: "ACCEPTED" }
     ] as any);
@@ -141,7 +165,7 @@ describe("toolsService", () => {
   });
 
   it("creates tools", async () => {
-    mockedToolsRepository.create.mockResolvedValueOnce({ id: "t2" } as any);
+    mockedToolsRepository.create.mockResolvedValueOnce(sampleTool({ id: "t2" }) as any);
 
     const result = await toolsService.create({
       ownerId: "u1",
@@ -158,7 +182,7 @@ describe("toolsService", () => {
 
   it("updates tools as owner", async () => {
     mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-    mockedToolsRepository.update.mockResolvedValueOnce({ id: "t1", name: "Neu" } as any);
+    mockedToolsRepository.update.mockResolvedValueOnce(sampleTool({ id: "t1", name: "Neu" }) as any);
 
     const result = await toolsService.update({
       toolId: "t1",
@@ -186,7 +210,7 @@ describe("toolsService", () => {
 
   it("allows moderators to update tools", async () => {
     mockedToolsRepository.findById.mockResolvedValueOnce({ id: "t1", ownerId: "owner-1" } as any);
-    mockedToolsRepository.update.mockResolvedValueOnce({ id: "t1", status: "BORROWED" } as any);
+    mockedToolsRepository.update.mockResolvedValueOnce(sampleTool({ id: "t1", status: "BORROWED" }) as any);
 
     const result = await toolsService.update({
       toolId: "t1",
