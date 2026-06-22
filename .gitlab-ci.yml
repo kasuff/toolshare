@@ -132,7 +132,7 @@ workflow:
 
 frontend:lint:
   stage: lint
-  image: node:20.19-alpine   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
+  image: node:20.19-slim
   extends: .frontend_cache
   cache:
     policy: pull-push   # lint runs first -> it seeds the shared npm cache
