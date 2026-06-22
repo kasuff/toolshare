@@ -33,9 +33,13 @@ services:
       JWT_SECRET: dev-secret-change-in-production
       PORT: 4000
       CORS_ORIGIN: http://localhost:3000
+      REDIS_URL: redis://redis:6379
+      CACHE_BACKEND: redis
       MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: sh -c "npx prisma db push --accept-data-loss && npm run dev"
     volumes:
@@ -55,6 +59,16 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U toolshare"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - toolshare-network
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
