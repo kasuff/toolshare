@@ -153,9 +153,10 @@ frontend:test:
   # core-dumps workers ("Illegal instruction" in Runtime_CompileOptimized).
   image: node:20.19-slim
   extends: .frontend_cache
-  timeout: 15m
+  # V8 coverage on shared runners can stall for several minutes under load; 15m was too tight.
+  timeout: 30m
   variables:
-    NODE_OPTIONS: "--max-old-space-size=2048"   # headroom so the test fork is not OOM-killed
+    NODE_OPTIONS: "--max-old-space-size=4096"   # headroom so the test fork is not OOM-killed
   script:
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm

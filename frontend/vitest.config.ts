@@ -16,13 +16,15 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.{test,spec}.{ts,tsx}', 'src/tests/**/*.{test,spec}.{ts,tsx}'],
+    // axe checks run in the dedicated frontend:accessibility CI job (test:a11y).
+    exclude: ['tests/accessibility/a11y.test.tsx'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
     pool: "forks",
     maxWorkers: 1,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],
+      reporter: ['text', 'json', 'cobertura', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'node_modules/',
