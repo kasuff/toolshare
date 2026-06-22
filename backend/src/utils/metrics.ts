@@ -67,15 +67,3 @@ export const activeUsersGauge = new Gauge({
   help: "Anzahl Benutzer mit einem Request in den letzten 5 Minuten",
   registers: [metricsRegistry]
 });
-
-export const outboxPendingGauge = new Gauge({
-  name: "toolshare_outbox_pending_total",
-  help: "Ausstehende Outbox-Events (noch nicht verarbeitet)",
-  registers: [metricsRegistry]
-});
-
-export const outboxDeadLetterGauge = new Gauge({
-  name: "toolshare_outbox_dead_letter_total",
-  help: "Outbox-Events mit erschöpften Retries",
-  registers: [metricsRegistry]
-});
