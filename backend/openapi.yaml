@@ -106,6 +106,20 @@ paths:
         "200":
           description: Tool list
   /tools/{id}:
+    get:
+      summary: Get tool by ID
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Tool details
+        "404":
+          description: Not found
     patch:
       summary: Update tool
       security:
@@ -147,6 +161,77 @@ paths:
       responses:
         "200":
           description: Updated tool
+    delete:
+      summary: Delete tool
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: Deleted tool
+  /tools/{id}/blocking-periods:
+    get:
+      summary: List blocking periods for tool
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Blocking periods list
+  /tools/{id}/owner-blocks:
+    get:
+      summary: List owner blocks for tool
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Owner blocks list
+  /tools/{id}/owner-blocks/{bookingId}:
+    delete:
+      summary: Delete owner block for tool
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: bookingId
+          in: path
+      responses:
+        "204":
+          description: Deleted owner block
+  /bookings/me:
+    get:
+      summary: List my bookings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: My bookings list
   /bookings/tool:
     post:
       summary: Create tool booking
@@ -180,6 +265,198 @@ paths:
           description: Booking created
         "409":
           description: Conflict
+  /bookings/tool-owner-block:
+    post:
+      summary: Create tool owner block
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                toolId:
+                  type: string
+                  format: uuid
+                startDate:
+                  type: string
+                  minLength: 1
+                endDate:
+                  type: string
+                  minLength: 1
+              required:
+                - toolId
+                - startDate
+                - endDate
+      responses:
+        "201":
+          description: Owner block created
+        "409":
+          description: Conflict
+  /bookings/workshop:
+    post:
+      summary: Create workshop booking
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workshopId:
+                  type: string
+                  format: uuid
+                startDate:
+                  type: string
+                  minLength: 1
+                endDate:
+                  type: string
+                  minLength: 1
+                workshopToolIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  default: []
+              required:
+                - workshopId
+                - startDate
+                - endDate
+      responses:
+        "201":
+          description: Workshop booking created
+        "409":
+          description: Conflict
+  /bookings/{id}/pickup-proposals:
+    post:
+      summary: Create pickup proposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pickupTime:
+                  type: string
+                  minLength: 1
+                returnTime:
+                  type: string
+                  minLength: 1
+              required:
+                - pickupTime
+                - returnTime
+      responses:
+        "201":
+          description: Pickup proposal created
+  /bookings/{id}/pickup-proposals/{proposalId}:
+    patch:
+      summary: Respond to pickup proposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: proposalId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                    - ACCEPT
+                    - DECLINE
+              required:
+                - decision
+      responses:
+        "200":
+          description: Responded to pickup proposal
+  /bookings/{id}/timeslot-proposals:
+    post:
+      summary: Create timeslot proposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startDate:
+                  type: string
+                  minLength: 1
+                endDate:
+                  type: string
+                  minLength: 1
+              required:
+                - startDate
+                - endDate
+      responses:
+        "201":
+          description: Timeslot proposal created
+  /bookings/{id}/timeslot-proposals/{proposalId}:
+    patch:
+      summary: Respond to timeslot proposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: proposalId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                    - ACCEPT
+                    - DECLINE
+              required:
+                - decision
+      responses:
+        "200":
+          description: Responded to timeslot proposal
   /bookings/{id}/status:
     patch:
       summary: Update booking status

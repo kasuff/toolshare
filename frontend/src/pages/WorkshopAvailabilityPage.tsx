@@ -37,7 +37,7 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
   const sortSlots = (items: WorkshopSlot[]) =>
     [...items].sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
 
-  const { data: workshops = [], isLoading } = useQuery({
+  const { data: workshops = [], isLoading, isError } = useQuery({
     queryKey: ["workshops", "owned", token],
     queryFn: async () => {
       if (!token || !currentUser) throw new Error("Missing auth");
@@ -46,6 +46,12 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
     },
     enabled: !!token && !!currentUser
   });
+
+  useEffect(() => {
+    if (isError) {
+      pushToast("Werkstätten konnten nicht geladen werden.", "error");
+    }
+  }, [isError, pushToast]);
 
   useEffect(() => {
     if (workshops.length > 0) {
@@ -187,6 +193,11 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
   const addSlot = () => {
     if (!validateSlot(draft)) return;
     addSlotMut();
+  };
+
+  const cancelEditing = () => {
+    setEditingSlotId(null);
+    setEditingDraft({ startIso: "", endIso: "", blockedByOwner: false });
   };
 
   const startEditing = (slot: WorkshopSlot) => {
