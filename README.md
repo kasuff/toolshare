@@ -133,6 +133,15 @@ Architektur liegt im Doku-Repo; im Code gelten lesbarer Code und sinnvolle Komme
 
 ---
 
+## Architekturrichtlinien
+
+- **State Management:** Globaler Zustand (z.B. Authentifizierung sowie ungelesene Nachrichten/Inbox) wird mit `zustand` zentral und effizient verwaltet. Dies beseitigt Prop-Drilling und umständliche DOM-Events zur komponentenübergreifenden Kommunikation.
+- **Single Responsibility Principle (SRP):** Große Komponenten werden konsequent in wiederverwendbare UI-Komponenten und fachliche Helper-Funktionen aufgeteilt.
+- **Fehlerbehandlung:** Zentrales Error-Handling durch React Error Boundaries fängt unerwartete Fehler in Frontend und Mobile sicher ab.
+- **Architekturtests:** Automatisierte Architektur-Tests in der CI-Pipeline (via `vitest`) stellen sicher, dass die Layered Architecture (Controller -> Service -> Model) im Backend strikt eingehalten wird.
+
+---
+
 ## Team
 
 SE2 – Team 06 | Hochschule München | SS 2026

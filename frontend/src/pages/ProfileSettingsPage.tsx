@@ -12,13 +12,18 @@ import { useToast } from "../hooks/useToast";
 import {  api  } from "@toolshare/shared";
 import type {  User  } from "@toolshare/shared";
 
-type Props = {
-  currentUser?: User;
-  token?: string;
-  onSave: (input: { name?: string; address?: string }) => Promise<User>;
-};
+import { usePageAuth } from "../hooks/usePageAuth";
 
-export function ProfileSettingsPage({ currentUser, token, onSave }: Props) {
+export function ProfileSettingsPage({
+  onSave,
+  currentUser: propUser,
+  token: propToken
+}: {
+  onSave: (input: { name?: string; address?: string }) => Promise<User>;
+  currentUser?: User;
+  token?: string | null;
+}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const [name, setName] = useState(currentUser?.name ?? "");
   const [address, setAddress] = useState<AddressFormFields>(() => parseAddress(currentUser?.address));

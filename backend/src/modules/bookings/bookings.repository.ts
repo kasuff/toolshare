@@ -323,5 +323,191 @@ export const bookingsRepository = {
       where: { id: toolId },
       data: { status: "AVAILABLE" }
     });
+  },
+
+  findToolBookingOverlap(excludeBookingId: string, toolId: string, start: Date, end: Date) {
+    return prisma.booking.findFirst({
+      where: {
+        id: { not: excludeBookingId },
+        toolId,
+        status: { in: BLOCKING_BOOKING_STATUSES },
+        startDate: { lt: end },
+        endDate: { gt: start }
+      }
+    });
+  },
+
+  runPickupProposalCreation(input: {
+    bookingId: string;
+    proposedByUserId: string;
+    proposedPickupTime: Date;
+    proposedReturnTime: Date;
+    previousPickupTime: Date | null;
+    previousReturnTime: Date | null;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      await bookingsRepository.declinePendingPickupProposals(tx, input.bookingId);
+      return bookingsRepository.createPickupProposal(tx, input);
+    });
+  },
+
+  findPickupProposalWithBooking(proposalId: string, bookingId: string) {
+    return prisma.bookingPickupProposal.findFirst({
+      where: { id: proposalId, bookingId },
+      include: {
+        booking: {
+          include: {
+            tool: true,
+            timeslot: { include: { workshop: true } }
+          }
+        }
+      }
+    });
+  },
+
+  declinePickupProposal(proposalId: string) {
+    return prisma.bookingPickupProposal.update({
+      where: { id: proposalId },
+      data: { status: "DECLINED" }
+    });
+  },
+
+  findPickupProposalById(proposalId: string) {
+    return prisma.bookingPickupProposal.findUnique({
+      where: { id: proposalId },
+      include: { proposedBy: { select: { id: true, name: true } } }
+    });
+  },
+
+  acceptPickupProposalTransaction(input: {
+    bookingId: string;
+    proposalId: string;
+    pickupTime: Date;
+    startDate: Date;
+    endDate: Date;
+  }) {
+    return prisma.$transaction([
+      prisma.bookingPickupProposal.updateMany({
+        where: {
+          bookingId: input.bookingId,
+          status: "PENDING",
+          id: { not: input.proposalId }
+        },
+        data: { status: "DECLINED" }
+      }),
+      prisma.bookingPickupProposal.update({
+        where: { id: input.proposalId },
+        data: { status: "ACCEPTED" }
+      }),
+      prisma.booking.update({
+        where: { id: input.bookingId },
+        data: {
+          status: "ACCEPTED",
+          pickupTime: input.pickupTime,
+          startDate: input.startDate,
+          endDate: input.endDate
+        }
+      })
+    ]);
+  },
+
+  runTimeslotProposalCreation(input: {
+    bookingId: string;
+    proposedByUserId: string;
+    proposedStartDate: Date;
+    proposedEndDate: Date;
+    previousStartDate: Date | null;
+    previousEndDate: Date | null;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      await bookingsRepository.declinePendingTimeslotProposals(tx, input.bookingId);
+      return bookingsRepository.createTimeslotProposal(tx, input);
+    });
+  },
+
+  findTimeslotProposalWithBooking(proposalId: string, bookingId: string) {
+    return prisma.bookingTimeslotProposal.findFirst({
+      where: { id: proposalId, bookingId },
+      include: {
+        proposedBy: { select: { id: true, name: true } },
+        booking: {
+          include: {
+            tool: true,
+            workshop: true,
+            selectedTools: { include: { workshopTool: true } },
+            timeslot: { include: { workshop: true } }
+          }
+        }
+      }
+    });
+  },
+
+  declineTimeslotProposal(proposalId: string) {
+    return prisma.bookingTimeslotProposal.update({
+      where: { id: proposalId },
+      data: { status: "DECLINED" }
+    });
+  },
+
+  findTimeslotProposalById(proposalId: string) {
+    return prisma.bookingTimeslotProposal.findUnique({
+      where: { id: proposalId },
+      include: { proposedBy: { select: { id: true, name: true } } }
+    });
+  },
+
+  acceptTimeslotProposalTransaction(input: {
+    bookingId: string;
+    proposalId: string;
+    workshopId: string;
+    startDate: Date;
+    endDate: Date;
+  }) {
+    return prisma.$transaction([
+      prisma.bookingTimeslotProposal.updateMany({
+        where: {
+          bookingId: input.bookingId,
+          status: "PENDING",
+          id: { not: input.proposalId }
+        },
+        data: { status: "DECLINED" }
+      }),
+      prisma.bookingTimeslotProposal.update({
+        where: { id: input.proposalId },
+        data: { status: "ACCEPTED" }
+      }),
+      prisma.booking.update({
+        where: { id: input.bookingId },
+        data: {
+          status: "ACCEPTED",
+          workshopId: input.workshopId,
+          startDate: input.startDate,
+          endDate: input.endDate
+        }
+      })
+    ]);
+  },
+
+  findOverlappingBlockedWorkshopSlot(workshopId: string, start: Date, end: Date) {
+    return prisma.timeSlot.findFirst({
+      where: {
+        workshopId,
+        blockedByOwner: true,
+        startTime: { lt: end },
+        endTime: { gt: start }
+      }
+    });
+  },
+
+  findWorkshopBookingOverlap(excludeBookingId: string, workshopId: string, start: Date, end: Date) {
+    return prisma.booking.findFirst({
+      where: {
+        id: { not: excludeBookingId },
+        OR: [{ workshopId }, { timeslot: { workshopId } }],
+        status: { in: BLOCKING_BOOKING_STATUSES },
+        startDate: { lt: end },
+        endDate: { gt: start }
+      }
+    });
   }
 };

@@ -5,15 +5,17 @@ import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api, type SuspensionRequestItem, type SystemSetting } from "@toolshare/shared";
 import type { User } from "@toolshare/shared";
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type AdminTab = "management" | "monitoring" | "rules";
 
 type Props = {
   currentUser?: User;
-  token?: string;
+  token?: string | null;
 };
 
-export function AdminPage({ currentUser, token }: Props) {
+export function AdminPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const [adminTab, setAdminTab] = useState<AdminTab>("management");
   const [users, setUsers] = useState<User[]>([]);

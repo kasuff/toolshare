@@ -1,5 +1,4 @@
 import { AppError } from "../../utils/app-error";
-import { prisma } from "../../config/prisma";
 import { bookingsRepository } from "./bookings.repository";
 import { notificationsRepository } from "../notifications/notifications.repository";
 import { systemRulesService } from "../system-rules/system-rules.service";
@@ -8,8 +7,6 @@ import { workshopsService } from "../workshops/workshops.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 import { assertBookingCanBeCompleted } from "./bookings.completion";
 import { pushService } from "../notifications/push.service";
-
-const BLOCKING_BOOKING_STATUSES: Array<"PENDING" | "ACCEPTED"> = ["PENDING", "ACCEPTED"];
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -301,15 +298,12 @@ export const bookingsService = {
     }
 
     if (booking.toolId) {
-      const conflict = await prisma.booking.findFirst({
-        where: {
-          id: { not: booking.id },
-          toolId: booking.toolId,
-          status: { in: BLOCKING_BOOKING_STATUSES },
-          startDate: { lt: returnTime },
-          endDate: { gt: pickup }
-        }
-      });
+      const conflict = await bookingsRepository.findToolBookingOverlap(
+        booking.id,
+        booking.toolId,
+        pickup,
+        returnTime
+      );
       if (conflict) {
         throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
       }
@@ -320,16 +314,13 @@ export const bookingsService = {
     const latestPending = proposalsAsc.filter((proposal) => proposal.status === "PENDING").at(-1);
     const previousReturnTime = latestPending?.proposedReturnTime ?? booking.endDate;
 
-    const created = await prisma.$transaction(async (tx) => {
-      await bookingsRepository.declinePendingPickupProposals(tx, booking.id);
-      return bookingsRepository.createPickupProposal(tx, {
-        bookingId: booking.id,
-        proposedByUserId: input.actorId,
-        proposedPickupTime: pickup,
-        proposedReturnTime: returnTime,
-        previousPickupTime,
-        previousReturnTime
-      });
+    const created = await bookingsRepository.runPickupProposalCreation({
+      bookingId: booking.id,
+      proposedByUserId: input.actorId,
+      proposedPickupTime: pickup,
+      proposedReturnTime: returnTime,
+      previousPickupTime,
+      previousReturnTime
     });
 
     const recipientId = isRequester ? providerId : booking.userId;
@@ -345,17 +336,10 @@ export const bookingsService = {
     proposalId: string;
     decision: "ACCEPT" | "DECLINE";
   }) {
-    const proposalRow = await prisma.bookingPickupProposal.findFirst({
-      where: { id: input.proposalId, bookingId: input.bookingId },
-      include: {
-        booking: {
-          include: {
-            tool: true,
-            timeslot: { include: { workshop: true } }
-          }
-        }
-      }
-    });
+    const proposalRow = await bookingsRepository.findPickupProposalWithBooking(
+      input.proposalId,
+      input.bookingId
+    );
 
     if (!proposalRow) {
       throw new AppError("PROPOSAL_NOT_FOUND", "Proposal not found", 404);
@@ -380,60 +364,35 @@ export const bookingsService = {
     }
 
     if (input.decision === "DECLINE") {
-      await prisma.bookingPickupProposal.update({
-        where: { id: input.proposalId },
-        data: { status: "DECLINED" }
-      });
+      await bookingsRepository.declinePickupProposal(input.proposalId);
       await notificationsRepository.create(
         proposalRow.proposedByUserId,
         "Dein Alternativvorschlag wurde abgelehnt."
       );
       await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag abgelehnt", "Dein Alternativvorschlag wurde abgelehnt.");
-      return prisma.bookingPickupProposal.findUnique({
-        where: { id: input.proposalId },
-        include: { proposedBy: { select: { id: true, name: true } } }
-      });
+      return bookingsRepository.findPickupProposalById(input.proposalId);
     }
 
     const proposedReturnTime = proposalRow.proposedReturnTime ?? booking.endDate;
     if (booking.tool?.id) {
-      const conflict = await prisma.booking.findFirst({
-        where: {
-          id: { not: booking.id },
-          toolId: booking.tool.id,
-          status: { in: BLOCKING_BOOKING_STATUSES },
-          startDate: { lt: proposedReturnTime },
-          endDate: { gt: proposalRow.proposedPickupTime }
-        }
-      });
+      const conflict = await bookingsRepository.findToolBookingOverlap(
+        booking.id,
+        booking.tool.id,
+        proposalRow.proposedPickupTime,
+        proposedReturnTime
+      );
       if (conflict) {
         throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
       }
     }
 
-    await prisma.$transaction([
-      prisma.bookingPickupProposal.updateMany({
-        where: {
-          bookingId: input.bookingId,
-          status: "PENDING",
-          id: { not: input.proposalId }
-        },
-        data: { status: "DECLINED" }
-      }),
-      prisma.bookingPickupProposal.update({
-        where: { id: input.proposalId },
-        data: { status: "ACCEPTED" }
-      }),
-      prisma.booking.update({
-        where: { id: input.bookingId },
-        data: {
-          status: "ACCEPTED",
-          pickupTime: proposalRow.proposedPickupTime,
-          startDate: proposalRow.proposedPickupTime,
-          endDate: proposedReturnTime
-        }
-      })
-    ]);
+    await bookingsRepository.acceptPickupProposalTransaction({
+      bookingId: input.bookingId,
+      proposalId: input.proposalId,
+      pickupTime: proposalRow.proposedPickupTime,
+      startDate: proposalRow.proposedPickupTime,
+      endDate: proposedReturnTime
+    });
 
     await notificationsRepository.create(
       proposalRow.proposedByUserId,
@@ -441,10 +400,7 @@ export const bookingsService = {
     );
     await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag angenommen", "Dein Alternativvorschlag wurde angenommen.");
 
-    return prisma.bookingPickupProposal.findUnique({
-      where: { id: input.proposalId },
-      include: { proposedBy: { select: { id: true, name: true } } }
-    });
+    return bookingsRepository.findPickupProposalById(input.proposalId);
   },
 
   async createTimeslotProposal(input: {
@@ -499,16 +455,13 @@ export const bookingsService = {
     const previousStartDate = latestPending?.proposedStartDate ?? booking.startDate;
     const previousEndDate = latestPending?.proposedEndDate ?? booking.endDate;
 
-    const created = await prisma.$transaction(async (tx) => {
-      await bookingsRepository.declinePendingTimeslotProposals(tx, booking.id);
-      return bookingsRepository.createTimeslotProposal(tx, {
-        bookingId: booking.id,
-        proposedByUserId: input.actorId,
-        proposedStartDate,
-        proposedEndDate,
-        previousStartDate,
-        previousEndDate
-      });
+    const created = await bookingsRepository.runTimeslotProposalCreation({
+      bookingId: booking.id,
+      proposedByUserId: input.actorId,
+      proposedStartDate,
+      proposedEndDate,
+      previousStartDate,
+      previousEndDate
     });
 
     const recipientId = isRequester ? providerId : booking.userId;
@@ -524,20 +477,10 @@ export const bookingsService = {
     proposalId: string;
     decision: "ACCEPT" | "DECLINE";
   }) {
-    const proposalRow = await prisma.bookingTimeslotProposal.findFirst({
-      where: { id: input.proposalId, bookingId: input.bookingId },
-      include: {
-        proposedBy: { select: { id: true, name: true } },
-        booking: {
-          include: {
-            tool: true,
-            workshop: true,
-            selectedTools: { include: { workshopTool: true } },
-            timeslot: { include: { workshop: true } }
-          }
-        }
-      }
-    });
+    const proposalRow = await bookingsRepository.findTimeslotProposalWithBooking(
+      input.proposalId,
+      input.bookingId
+    );
 
     if (!proposalRow) {
       throw new AppError("PROPOSAL_NOT_FOUND", "Proposal not found", 404);
@@ -566,19 +509,13 @@ export const bookingsService = {
     }
 
     if (input.decision === "DECLINE") {
-      await prisma.bookingTimeslotProposal.update({
-        where: { id: input.proposalId },
-        data: { status: "DECLINED" }
-      });
+      await bookingsRepository.declineTimeslotProposal(input.proposalId);
       await notificationsRepository.create(
         proposalRow.proposedByUserId,
         "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt."
       );
       await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag abgelehnt", "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt.");
-      return prisma.bookingTimeslotProposal.findUnique({
-        where: { id: input.proposalId },
-        include: { proposedBy: { select: { id: true, name: true } } }
-      });
+      return bookingsRepository.findTimeslotProposalById(input.proposalId);
     }
 
     await ensureWorkshopProposalCanUseRange(
@@ -589,29 +526,13 @@ export const bookingsService = {
       proposalRow.proposedEndDate
     );
 
-    await prisma.$transaction([
-      prisma.bookingTimeslotProposal.updateMany({
-        where: {
-          bookingId: input.bookingId,
-          status: "PENDING",
-          id: { not: input.proposalId }
-        },
-        data: { status: "DECLINED" }
-      }),
-      prisma.bookingTimeslotProposal.update({
-        where: { id: input.proposalId },
-        data: { status: "ACCEPTED" }
-      }),
-      prisma.booking.update({
-        where: { id: input.bookingId },
-        data: {
-          status: "ACCEPTED",
-          workshopId,
-          startDate: proposalRow.proposedStartDate,
-          endDate: proposalRow.proposedEndDate
-        }
-      })
-    ]);
+    await bookingsRepository.acceptTimeslotProposalTransaction({
+      bookingId: input.bookingId,
+      proposalId: input.proposalId,
+      workshopId,
+      startDate: proposalRow.proposedStartDate,
+      endDate: proposalRow.proposedEndDate
+    });
 
     await notificationsRepository.create(
       proposalRow.proposedByUserId,
@@ -619,10 +540,7 @@ export const bookingsService = {
     );
     await pushService.sendPushNotification(proposalRow.proposedByUserId, "Vorschlag angenommen", "Dein Alternativvorschlag zur Werkstattbuchung wurde angenommen.");
 
-    return prisma.bookingTimeslotProposal.findUnique({
-      where: { id: input.proposalId },
-      include: { proposedBy: { select: { id: true, name: true } } }
-    });
+    return bookingsRepository.findTimeslotProposalById(input.proposalId);
   }
 };
 
@@ -634,27 +552,21 @@ async function ensureWorkshopProposalCanUseRange(
   endDate: Date
 ) {
   // Eine Werkstatt ist standardmäßig verfügbar. Nur vom Anbieter blockierte Zeiten sperren den Zeitraum.
-  const overlappingBlockedSlot = await prisma.timeSlot.findFirst({
-    where: {
-      workshopId,
-      blockedByOwner: true,
-      startTime: { lt: endDate },
-      endTime: { gt: startDate }
-    }
-  });
+  const overlappingBlockedSlot = await bookingsRepository.findOverlappingBlockedWorkshopSlot(
+    workshopId,
+    startDate,
+    endDate
+  );
   if (overlappingBlockedSlot) {
     throw new AppError("TIMESLOT_BLOCKED", "Timeslot is blocked by workshop owner", 409);
   }
 
-  const existingBooking = await prisma.booking.findFirst({
-    where: {
-      id: { not: bookingId },
-      OR: [{ workshopId }, { timeslot: { workshopId } }],
-      status: { in: BLOCKING_BOOKING_STATUSES },
-      startDate: { lt: endDate },
-      endDate: { gt: startDate }
-    }
-  });
+  const existingBooking = await bookingsRepository.findWorkshopBookingOverlap(
+    bookingId,
+    workshopId,
+    startDate,
+    endDate
+  );
   if (existingBooking) {
     throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
   }

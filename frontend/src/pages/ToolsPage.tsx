@@ -11,11 +11,7 @@ import { distanceBetweenLocations, isWithinRadius } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
 import {  pluralize  } from "@toolshare/shared";
 import type {  User  } from "@toolshare/shared";
-
-type Props = {
-  token?: string;
-  currentUser?: User;
-};
+import { usePageAuth } from "../hooks/usePageAuth";
 
 function categoryMatches(toolCategory: string, selectedCategory: string) {
   if (!selectedCategory) return true;
@@ -28,7 +24,13 @@ function categoryMatches(toolCategory: string, selectedCategory: string) {
   );
 }
 
-export function ToolsPage({ token, currentUser }: Props) {
+type Props = {
+  currentUser?: User;
+  token?: string | null;
+};
+
+export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const defaultLocation = currentUser?.address ?? "München Zentrum";
   const [q, setQ] = useState("");

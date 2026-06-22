@@ -6,6 +6,7 @@ import { ModerationPage } from "../../src/pages/ModerationPage";
 import { NewToolPage } from "../../src/pages/NewToolPage";
 import { NewWorkshopPage } from "../../src/pages/NewWorkshopPage";
 import type { User } from "@toolshare/shared";
+import { useAuthStore } from "../../src/store/authStore";
 
 const {
   pushToast,
@@ -137,9 +138,21 @@ describe("management pages", () => {
     vi.clearAllMocks();
     vi.stubGlobal("FileReader", FileReaderMock as unknown as typeof FileReader);
     getSystemSettings.mockResolvedValue([]);
+    useAuthStore.setState({
+      currentUser: adminUser,
+      token: "token-123",
+      isLoading: false,
+      error: null
+    });
   });
 
   it("guards admin access when no token is available", () => {
+    useAuthStore.setState({
+      currentUser: null,
+      token: null,
+      isLoading: false,
+      error: null
+    });
     render(
       <MemoryRouter>
         <AdminPage currentUser={adminUser} token={undefined} />
@@ -866,9 +879,15 @@ describe("management pages", () => {
   });
 
   it("shows login required on the new tool page without token", () => {
+    useAuthStore.setState({
+      currentUser: null,
+      token: null,
+      isLoading: false,
+      error: null
+    });
     render(
       <MemoryRouter>
-        <NewToolPage token={undefined} />
+        <NewToolPage />
       </MemoryRouter>
     );
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { usePageAuth } from "../hooks/usePageAuth";
 import { OfferCard } from "../components/OfferCard";
 import { EmptyState, GuestBanner, SkeletonCards } from "../components/ui";
 import { useToast } from "../hooks/useToast";
@@ -13,17 +14,18 @@ import {
   isWorkshopCurrentlyInUse
 } from "../utils/offerStatus";
 
-type Props = {
-  token?: string;
-  currentUser?: User;
-};
-
 type WorkshopOffer = {
   workshop: Workshop;
   slots: WorkshopSlot[];
 };
 
-export function MyOffersPage({ token, currentUser }: Props) {
+type Props = {
+  currentUser?: User;
+  token?: string | null;
+};
+
+export function MyOffersPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const [tools, setTools] = useState<Tool[]>([]);
   const [workshops, setWorkshops] = useState<WorkshopOffer[]>([]);

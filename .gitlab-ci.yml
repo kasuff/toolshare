@@ -230,6 +230,15 @@ backend:lint:
     paths:
       - backend-lint-report.html
 
+backend:architecture:
+  stage: test
+  image: node:20.19
+  extends: .backend_cache
+  script:
+    - cd backend
+    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - npx vitest run tests/architecture.test.ts
+
 backend:test:
   stage: test
   image: node:20.19   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes

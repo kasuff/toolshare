@@ -4,11 +4,7 @@ import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "@toolshare/shared";
 import type { User, Workshop, WorkshopSlot } from "@toolshare/shared";
-
-type Props = {
-  currentUser?: User;
-  token?: string;
-};
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type WorkshopWithSlots = {
   workshop: Workshop;
@@ -21,7 +17,13 @@ type SlotDraft = {
   blockedByOwner: boolean;
 };
 
-export function WorkshopAvailabilityPage({ token, currentUser }: Props) {
+type Props = {
+  currentUser?: User;
+  token?: string | null;
+};
+
+export function WorkshopAvailabilityPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const [workshops, setWorkshops] = useState<WorkshopWithSlots[]>([]);
   const [selectedWorkshop, setSelectedWorkshop] = useState<WorkshopWithSlots | null>(null);

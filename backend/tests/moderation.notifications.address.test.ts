@@ -8,7 +8,6 @@ import { addressService } from "../src/modules/address/address.service";
 import { toolsService } from "../src/modules/tools/tools.service";
 import { workshopsService } from "../src/modules/workshops/workshops.service";
 import { ratingsService } from "../src/modules/ratings/ratings.service";
-import { prisma } from "../src/config/prisma";
 
 vi.mock("../src/modules/moderation/moderation.repository", () => ({
   moderationRepository: {
@@ -20,7 +19,10 @@ vi.mock("../src/modules/moderation/moderation.repository", () => ({
     findToolsByIds: vi.fn(),
     findWorkshopsByIds: vi.fn(),
     findUsersByIds: vi.fn(),
-    findRatingsByIds: vi.fn()
+    findRatingsByIds: vi.fn(),
+    findActiveToolBookings: vi.fn(),
+    findActiveWorkshopBookings: vi.fn(),
+    rejectBooking: vi.fn()
   }
 }));
 
@@ -60,22 +62,12 @@ vi.mock("../src/modules/ratings/ratings.service", () => ({
   }
 }));
 
-vi.mock("../src/config/prisma", () => ({
-  prisma: {
-    booking: {
-      findMany: vi.fn(),
-      update: vi.fn()
-    }
-  }
-}));
-
 const mockedModerationRepository = vi.mocked(moderationRepository);
 const mockedNotificationsRepository = vi.mocked(notificationsRepository);
 const mockedSuspensionRepository = vi.mocked(suspensionRepository);
 const mockedToolsService = vi.mocked(toolsService);
 const mockedWorkshopsService = vi.mocked(workshopsService);
 const mockedRatingsService = vi.mocked(ratingsService);
-const mockedPrisma = vi.mocked(prisma);
 
 describe("moderationService", () => {
   beforeEach(() => {
@@ -219,10 +211,10 @@ describe("moderationService", () => {
   it("deletes a tool and warns owner when deleteTool is true", async () => {
     mockedModerationRepository.findById.mockResolvedValueOnce({ id: "r1", targetId: "tool-1", targetType: "TOOL" } as any);
     mockedToolsService.getById.mockResolvedValueOnce({ id: "tool-1", name: "Bohrer X", ownerId: "user-owner" } as any);
-    mockedPrisma.booking.findMany.mockResolvedValueOnce([
+    mockedModerationRepository.findActiveToolBookings.mockResolvedValueOnce([
       { id: "booking-1", userId: "user-requester" }
     ] as any);
-    mockedPrisma.booking.update.mockResolvedValueOnce({} as any);
+    mockedModerationRepository.rejectBooking.mockResolvedValueOnce({} as any);
     mockedToolsService.remove.mockResolvedValueOnce(undefined as any);
     mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
     mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);
@@ -254,10 +246,10 @@ describe("moderationService", () => {
   it("deletes a workshop and warns manager when deleteWorkshop is true", async () => {
     mockedModerationRepository.findById.mockResolvedValueOnce({ id: "r1", targetId: "ws-1", targetType: "WORKSHOP" } as any);
     mockedWorkshopsService.getById.mockResolvedValueOnce({ id: "ws-1", name: "Maiks Werkstatt", managerId: "user-manager" } as any);
-    mockedPrisma.booking.findMany.mockResolvedValueOnce([
+    mockedModerationRepository.findActiveWorkshopBookings.mockResolvedValueOnce([
       { id: "booking-2", userId: "user-requester-ws" }
     ] as any);
-    mockedPrisma.booking.update.mockResolvedValueOnce({} as any);
+    mockedModerationRepository.rejectBooking.mockResolvedValueOnce({} as any);
     mockedWorkshopsService.remove.mockResolvedValueOnce(undefined as any);
     mockedModerationRepository.updateStatus.mockResolvedValueOnce({ id: "r1", status: "RESOLVED" } as any);
     mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);

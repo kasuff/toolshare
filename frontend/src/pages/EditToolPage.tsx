@@ -15,13 +15,15 @@ import { useToast } from "../hooks/useToast";
 import {  api  } from "@toolshare/shared";
 import {  DEFAULT_PLACEHOLDER_IMAGE  } from "@toolshare/shared";
 import type {  User  } from "@toolshare/shared";
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type Props = {
   currentUser?: User;
-  token?: string;
+  token?: string | null;
 };
 
-export function EditToolPage({ currentUser, token }: Props) {
+export function EditToolPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { pushToast } = useToast();

@@ -3,11 +3,9 @@ import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api, type ModerationReport } from "@toolshare/shared";
+import type { User } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
-
-type Props = {
-  token?: string;
-};
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type DialogMode = "warn" | "suspend" | "delete" | "deleteRating" | null;
 
@@ -354,7 +352,8 @@ function ReportActions({
   );
 }
 
-export function ModerationPage({ token }: Props) {
+export function ModerationPage({ token: propToken }: { token?: string | null } = {}) {
+  const { token } = usePageAuth(undefined, propToken);
   const { pushToast } = useToast();
   const [reports, setReports] = useState<ModerationReport[]>([]);
   const [closedReports, setClosedReports] = useState<ModerationReport[]>([]);

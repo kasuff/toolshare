@@ -5,7 +5,6 @@ import { suspensionRepository } from "../users/suspension.repository";
 import { moderationRepository } from "./moderation.repository";
 import { toolsService } from "../tools/tools.service";
 import { workshopsService } from "../workshops/workshops.service";
-import { prisma } from "../../config/prisma";
 import { notificationsRepository } from "../notifications/notifications.repository";
 
 type ReportRow = Awaited<ReturnType<typeof moderationRepository.listOpenReports>>[number];
@@ -236,17 +235,9 @@ export const moderationService = {
       customWarningMsg = `Dein Angebot "${tool.name}" wurde gelöscht. Grund: ${input.warningReason}`;
 
       // Cancel and notify active bookings first
-      const activeToolBookings = await prisma.booking.findMany({
-        where: {
-          toolId: report.targetId,
-          status: { in: ["PENDING", "ACCEPTED"] }
-        }
-      });
+      const activeToolBookings = await moderationRepository.findActiveToolBookings(report.targetId);
       for (const booking of activeToolBookings) {
-        await prisma.booking.update({
-          where: { id: booking.id },
-          data: { status: "REJECTED" }
-        });
+        await moderationRepository.rejectBooking(booking.id);
         await notificationsRepository.create(
           booking.userId,
           `Deine Buchung für das Werkzeug "${tool.name}" wurde storniert, da das Angebot gelöscht wurde.`
@@ -266,19 +257,11 @@ export const moderationService = {
       customWarningMsg = `Deine Werkstatt "${workshop.name}" wurde gelöscht. Grund: ${input.warningReason}`;
 
       // Cancel and notify active bookings first
-      const activeWorkshopBookings = await prisma.booking.findMany({
-        where: {
-          timeslot: {
-            workshopId: report.targetId
-          },
-          status: { in: ["PENDING", "ACCEPTED"] }
-        }
-      });
+      const activeWorkshopBookings = await moderationRepository.findActiveWorkshopBookings(
+        report.targetId
+      );
       for (const booking of activeWorkshopBookings) {
-        await prisma.booking.update({
-          where: { id: booking.id },
-          data: { status: "REJECTED" }
-        });
+        await moderationRepository.rejectBooking(booking.id);
         await notificationsRepository.create(
           booking.userId,
           `Deine Buchung für die Werkstatt "${workshop.name}" wurde storniert, da die Werkstatt gelöscht wurde.`

@@ -10,10 +10,11 @@ import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
 import type { PublicRating, Tool, User } from "@toolshare/shared";
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type Props = {
-  token?: string;
   currentUser?: User;
+  token?: string | null;
 };
 
 type CalendarDay = {
@@ -120,7 +121,8 @@ function getInitials(name: string) {
     .join("");
 }
 
-export function ToolDetailPage({ token, currentUser }: Props) {
+export function ToolDetailPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -515,7 +517,7 @@ export function ToolDetailPage({ token, currentUser }: Props) {
             </div>
           </section>
 
-          <RatingsSection ratings={ratings} token={token} canReport={!isOwnTool} />
+          <RatingsSection ratings={ratings} token={token ?? undefined} canReport={!isOwnTool} />
         </div>
 
         <aside className={`playtomic-booking-panel tool-detail-booking ${!canChooseDates ? "unavailable" : ""}`.trim()}>

@@ -12,11 +12,7 @@ import { useToast } from "../hooks/useToast";
 import {  api  } from "@toolshare/shared";
 import {  pluralize  } from "@toolshare/shared";
 import type {  User  } from "@toolshare/shared";
-
-type Props = {
-  currentUser?: User;
-  token?: string;
-};
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type SlotDraft = {
   startIso: string;
@@ -51,7 +47,13 @@ const formatBlockedSlotDate = (value: string) =>
     minute: "2-digit"
   })} Uhr`;
 
-export function NewWorkshopPage({ token }: Props) {
+type Props = {
+  currentUser?: User;
+  token?: string | null;
+};
+
+export function NewWorkshopPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);

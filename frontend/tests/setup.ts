@@ -1,6 +1,30 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { beforeEach } from "vitest";
+
+beforeEach(async () => {
+  const { useAuthStore } = await import("../src/store/authStore");
+  const { useInboxStore } = await import("../src/store/inboxStore");
+
+  useAuthStore.setState({
+    token: null,
+    currentUser: null,
+    isLoading: false,
+    error: null
+  });
+
+  useInboxStore.setState({
+    bookings: [],
+    notifications: [],
+    ratingsGiven: [],
+    ratingsReceived: [],
+    readMessageIds: new Set(),
+    isLoading: false,
+    error: null,
+    unreadCount: 0
+  });
+});
 
 const createStoragePolyfill = () => {
   const store = new Map<string, string>();

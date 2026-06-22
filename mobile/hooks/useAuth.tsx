@@ -1,11 +1,11 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { User, api, onSessionExpired } from '@toolshare/shared';
+import { User, api, onSessionExpired, ACCESS_TOKEN_STORAGE_KEY } from '@toolshare/shared';
 import { useRouter, useSegments } from 'expo-router';
 import { Platform } from 'react-native';
 import { getErrorMessage } from '../utils/errors';
 
-const TOKEN_KEY = 'toolshare_access_token';
+const TOKEN_KEY = ACCESS_TOKEN_STORAGE_KEY;
 
 // Web fallback for SecureStore since browsers do not have keychains
 const storage = {

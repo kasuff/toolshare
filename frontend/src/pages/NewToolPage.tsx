@@ -10,15 +10,17 @@ import { useToast } from "../hooks/useToast";
 import {  api  } from "@toolshare/shared";
 import {  DEFAULT_PLACEHOLDER_IMAGE  } from "@toolshare/shared";
 import type {  User  } from "@toolshare/shared";
-
-type Props = {
-  currentUser?: User;
-  token?: string;
-};
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type ToolFormField = "name" | "description" | "category" | "pickupLocation";
 
-export function NewToolPage({ token }: Props) {
+type Props = {
+  currentUser?: User;
+  token?: string | null;
+};
+
+export function NewToolPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
