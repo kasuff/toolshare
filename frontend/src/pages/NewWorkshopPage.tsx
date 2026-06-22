@@ -53,7 +53,7 @@ type Props = {
 };
 
 export function NewWorkshopPage({ currentUser: propUser, token: propToken }: Props = {}) {
-  const { currentUser, token } = usePageAuth(propUser, propToken);
+  const { token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);

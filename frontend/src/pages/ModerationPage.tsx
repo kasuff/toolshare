@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api, type ModerationReport } from "@toolshare/shared";
-import type { User } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
 import { usePageAuth } from "../hooks/usePageAuth";
 

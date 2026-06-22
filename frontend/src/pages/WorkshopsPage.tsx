@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";

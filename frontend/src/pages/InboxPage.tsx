@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { DateInput } from "../components/DateInput";
 import { KebabMenu } from "../components/KebabMenu";
@@ -25,7 +25,6 @@ import type {
   Booking,
   BookingStatus,
   BookingType,
-  Notification,
   PickupProposal,
   Rating,
   TimeslotProposal,
@@ -34,30 +33,21 @@ import type {
 import { useInboxStore } from "../store/inboxStore";
 import { usePageAuth } from "../hooks/usePageAuth";
 import {
-  bookingHasUnreadForUser,
-  collectAllMessageKeys,
-  inboxReadSeedKey,
-  loadReadMessageIds,
   proposalMessageKey,
   ratingMessageKey,
   requestMessageKey,
-  saveReadMessageIds,
 } from "../utils/inboxMessageRead";
 import { canProviderCompleteBooking } from "../utils/bookingCompletion";
 import {
   BookingRow,
   parseSuspensionMessage,
   parseWarningMessage,
-  formatShortClockOrDate,
-  formatShortDateTime,
   getLastActivityMs,
-  getThreadPreview,
   counterparty,
   bookingTypeLabel,
   formatDateTime,
   getPendingPickupProposal,
   getPendingTimeslotProposal,
-  splitIsoToLocalParts,
   toToolRangeDraft,
   combineLocalDateTimeToIso,
   toWorkshopDraft,
@@ -72,16 +62,6 @@ type Props = {
   currentUser?: User;
   token?: string;
 };
-
-
-
-interface ParsedWarning {
-  reason: string;
-  moderator: string;
-  hint: string;
-}
-
-
 
 function isInboxSystemNotification(message: string): boolean {
   return (

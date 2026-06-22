@@ -50,7 +50,7 @@ function recalculateUnreadCount(
     ])
   );
 
-  let count = countUnreadInboxThreads(bookings, userId, readMessageIds, ratingsByBookingId);
+  const count = countUnreadInboxThreads(bookings, userId, readMessageIds, ratingsByBookingId);
   const unreadNotifications = notifications.filter(
     (n) =>
       !n.read &&

@@ -20,7 +20,7 @@ type Props = {
 };
 
 export function NewToolPage({ currentUser: propUser, token: propToken }: Props = {}) {
-  const { currentUser, token } = usePageAuth(propUser, propToken);
+  const { token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
