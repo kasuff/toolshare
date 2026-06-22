@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AddressInput } from "../components/AddressInput";
 import {
   EMPTY_ADDRESS,
@@ -12,9 +13,9 @@ import { CategorySelect } from "../components/CategorySelect";
 import { ImageUpload } from "../components/ImageUpload";
 import { Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import {  api  } from "@toolshare/shared";
-import {  DEFAULT_PLACEHOLDER_IMAGE  } from "@toolshare/shared";
-import type {  User  } from "@toolshare/shared";
+import { api } from "@toolshare/shared";
+import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
+import type { User } from "@toolshare/shared";
 import { usePageAuth } from "../hooks/usePageAuth";
 
 type Props = {
@@ -27,8 +28,8 @@ export function EditToolPage({ currentUser: propUser, token: propToken }: Props 
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { pushToast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -39,38 +40,74 @@ export function EditToolPage({ currentUser: propUser, token: propToken }: Props 
   const [addressSearchValue, setAddressSearchValue] = useState("");
   const [pickupLocationNote, setPickupLocationNote] = useState("");
 
+  const { data: tool, isLoading, isError, error } = useQuery({
+    queryKey: ["tool", id, "edit", token],
+    queryFn: async () => {
+      if (!id || !token || !currentUser) throw new Error("Missing auth/id");
+      const tools = await api.getTools({ ownerId: currentUser.id }, token);
+      const foundTool = tools.find((entry) => entry.id === id);
+      if (!foundTool || foundTool.ownerId !== currentUser.id) {
+        throw new Error("Dieses Werkzeug kann nur vom Anbieter bearbeitet werden.");
+      }
+      return foundTool;
+    },
+    enabled: !!id && !!token && !!currentUser,
+    retry: false
+  });
+
   useEffect(() => {
-    const load = async () => {
-      if (!id || !token || !currentUser) {
-        setLoading(false);
-        return;
+    if (tool) {
+      setName(tool.name);
+      setDescription(tool.description);
+      setCategory(tool.category);
+      setImageUrl(tool.imageUrl || null);
+      const parsedPickupAddress = parseAddress(tool.pickupLocation);
+      setAddressSearchValue(tool.pickupLocation ?? "");
+      setPickupAddress(parsedPickupAddress);
+      setOriginalPickupAddress(parsedPickupAddress);
+      setOriginalPickupLocation(tool.pickupLocation ?? "");
+      setPickupLocationNote(tool.pickupLocationNote ?? "");
+    }
+  }, [tool]);
+
+  useEffect(() => {
+    if (isError) {
+      pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht geladen werden.", "error");
+      navigate("/offers");
+    }
+  }, [isError, error, navigate, pushToast]);
+
+  const { mutate: updateToolMut, isPending: saving } = useMutation({
+    mutationFn: async ({ address, addressWasChanged }: { address: string; addressWasChanged: boolean }) => {
+      if (!id || !token) throw new Error("Missing context");
+      const validation = addressWasChanged
+        ? await api.validateAddress(address)
+        : { isValid: true, normalizedAddress: originalPickupLocation };
+      if (!validation.isValid) {
+        throw new Error("Adresse konnte nicht verifiziert werden.");
       }
-      try {
-        const tools = await api.getTools({ ownerId: currentUser.id }, token);
-        const tool = tools.find((entry) => entry.id === id);
-        if (!tool || tool.ownerId !== currentUser.id) {
-          pushToast("Dieses Werkzeug kann nur vom Anbieter bearbeitet werden.", "error");
-          navigate("/offers");
-          return;
-        }
-        setName(tool.name);
-        setDescription(tool.description);
-        setCategory(tool.category);
-        setImageUrl(tool.imageUrl || null);
-        const parsedPickupAddress = parseAddress(tool.pickupLocation);
-        setAddressSearchValue(tool.pickupLocation ?? "");
-        setPickupAddress(parsedPickupAddress);
-        setOriginalPickupAddress(parsedPickupAddress);
-        setOriginalPickupLocation(tool.pickupLocation ?? "");
-        setPickupLocationNote(tool.pickupLocationNote ?? "");
-      } catch (error) {
-        pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht geladen werden.", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, [currentUser, id, navigate, pushToast, token]);
+      await api.updateTool(
+        id,
+        {
+          name: name.trim(),
+          description: description.trim(),
+          category,
+          imageUrl: imageUrl || DEFAULT_PLACEHOLDER_IMAGE,
+          pickupLocation: validation.normalizedAddress?.trim() || address,
+          pickupLocationNote: pickupLocationNote.trim() || undefined
+        },
+        token
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tool", id] });
+      pushToast("Werkzeug aktualisiert.", "success");
+      navigate(`/tools/${id}?manage=1`);
+    },
+    onError: (e) => {
+      pushToast(e instanceof Error ? e.message : "Werkzeug konnte nicht aktualisiert werden.", "error");
+    }
+  });
 
   if (!token) {
     return (
@@ -83,11 +120,11 @@ export function EditToolPage({ currentUser: propUser, token: propToken }: Props 
     );
   }
 
-  if (loading) {
+  if (isLoading || !tool) {
     return <section className="stack"><h1>Werkzeug bearbeiten</h1><p>Laden...</p></section>;
   }
 
-  const onSubmit = async (event: FormEvent) => {
+  const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!id || saving) return;
     const addressWasChanged =
@@ -105,37 +142,11 @@ export function EditToolPage({ currentUser: propUser, token: propToken }: Props 
       return;
     }
 
-    setSaving(true);
-    try {
-      const address = addressWasChanged
-        ? toAddressPayload(pickupAddress)
-        : originalPickupLocation;
-      const validation = addressWasChanged
-        ? await api.validateAddress(address)
-        : { isValid: true, normalizedAddress: originalPickupLocation };
-      if (!validation.isValid) {
-        pushToast("Adresse konnte nicht verifiziert werden.", "error");
-        return;
-      }
-      await api.updateTool(
-        id,
-        {
-          name: name.trim(),
-          description: description.trim(),
-          category,
-          imageUrl: imageUrl || DEFAULT_PLACEHOLDER_IMAGE,
-          pickupLocation: validation.normalizedAddress?.trim() || address,
-          pickupLocationNote: pickupLocationNote.trim() || undefined
-        },
-        token
-      );
-      pushToast("Werkzeug aktualisiert.", "success");
-      navigate(`/tools/${id}?manage=1`);
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht aktualisiert werden.", "error");
-    } finally {
-      setSaving(false);
-    }
+    const address = addressWasChanged
+      ? toAddressPayload(pickupAddress)
+      : originalPickupLocation;
+
+    updateToolMut({ address, addressWasChanged });
   };
 
   return (

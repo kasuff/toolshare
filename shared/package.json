@@ -7,12 +7,15 @@
   "exports": {
     ".": "./index.ts",
     "./contracts": "./contracts/index.ts",
-    "./contracts/*": "./contracts/*"
+    "./contracts/request/*": "./contracts/request/*.ts",
+    "./contracts/response/*": "./contracts/response/*.ts",
+    "./contracts/errors/*": "./contracts/errors/*.ts"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {

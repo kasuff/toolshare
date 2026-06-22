@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const reactRoot = path.dirname(require.resolve('react/package.json'));
 const reactDomRoot = path.dirname(require.resolve('react-dom/package.json'));
+const zodRoot = path.dirname(require.resolve('zod/package.json'));
 
 export default defineConfig({
   plugins: [react()],
@@ -40,7 +41,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
-      zod: path.resolve(__dirname, './node_modules/zod'),
+      zod: zodRoot,
       '@testing-library/react': path.resolve(__dirname, './tests/testing-library.tsx'),
       '@testing-library/react-original': path.resolve(__dirname, './node_modules/@testing-library/react'),
       react: reactRoot,

@@ -1,11 +1,8 @@
 import { z } from "zod";
+import { createRatingBodySchema } from "@toolshare/shared/contracts/request/ratings.schema";
 
 export const createRatingSchema = z.object({
-  body: z.object({
-    bookingId: z.string().uuid(),
-    score: z.number().int().min(1).max(5),
-    comment: z.string().max(1500).optional()
-  }),
+  body: createRatingBodySchema,
   params: z.object({}),
   query: z.object({})
 });

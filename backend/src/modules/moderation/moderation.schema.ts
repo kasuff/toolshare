@@ -1,30 +1,17 @@
 import { z } from "zod";
+import {
+  createReportBodySchema,
+  updateReportBodySchema
+} from "@toolshare/shared/contracts/request/moderation.schema";
 
 export const createReportSchema = z.object({
-  body: z.object({
-    targetType: z.enum(["TOOL", "WORKSHOP", "USER", "RATING"]),
-    targetId: z.string().uuid(),
-    bookingId: z.string().uuid().optional(),
-    reason: z.string().min(5),
-    details: z.string().max(1500).optional(),
-    conversationContext: z.string().max(10000).optional()
-  }),
+  body: createReportBodySchema,
   params: z.object({}),
   query: z.object({})
 });
 
 export const updateReportSchema = z.object({
-  body: z.object({
-    status: z.enum(["IN_REVIEW", "RESOLVED", "REJECTED"]),
-    decisionNote: z.string().min(3).max(1500).optional(),
-    warnUserId: z.string().uuid().optional(),
-    warningReason: z.string().min(3).max(600).optional(),
-    requestSuspensionUserId: z.string().uuid().optional(),
-    suspensionReason: z.string().min(3).max(600).optional(),
-    deleteTool: z.boolean().optional(),
-    deleteWorkshop: z.boolean().optional(),
-    deleteRating: z.boolean().optional()
-  }),
+  body: updateReportBodySchema,
   params: z.object({
     id: z.string().uuid()
   }),

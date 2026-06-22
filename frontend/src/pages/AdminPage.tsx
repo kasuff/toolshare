@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MonitoringSection } from "../components/MonitoringSection";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import { api, type SuspensionRequestItem, type SystemSetting } from "@toolshare/shared";
+import { api, type SuspensionRequestItem, type SystemSetting, type BackendMetrics } from "@toolshare/shared";
 import type { User } from "@toolshare/shared";
 import { usePageAuth } from "../hooks/usePageAuth";
 
@@ -17,57 +18,56 @@ type Props = {
 export function AdminPage({ currentUser: propUser, token: propToken }: Props = {}) {
   const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
+  const queryClient = useQueryClient();
   const [adminTab, setAdminTab] = useState<AdminTab>("management");
-  const [users, setUsers] = useState<User[]>([]);
-  const [suspensionRequests, setSuspensionRequests] = useState<SuspensionRequestItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [busyUserId, setBusyUserId] = useState<string | null>(null);
-  const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
-  const [savingSettingKey, setSavingSettingKey] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState({
-    users: 0,
-    tools: 0,
-    workshops: 0,
-    openBookings: 0,
-    openReports: 0,
-    openSuspensionRequests: 0
-  });
 
-  const loadData = async (search: string) => {
-    if (!token) return;
-    setIsLoading(true);
-    try {
-      const [nextUsers, nextMetrics, nextSuspensionRequests, nextSettings] = await Promise.all([
-        api.listUsers(token, { search: search || undefined }),
+  type DashboardData = {
+    users: User[];
+    metrics: BackendMetrics;
+    suspensionRequests: SuspensionRequestItem[];
+    settings: SystemSetting[];
+  };
+
+  const { data, isLoading } = useQuery<DashboardData>({
+    queryKey: ["admin", "dashboard", token, appliedSearch],
+    queryFn: async () => {
+      if (!token) throw new Error("No token");
+      const [users, metrics, suspensionRequests, settings] = await Promise.all([
+        api.listUsers(token, { search: appliedSearch || undefined }),
         api.getMetrics(token),
         api.listSuspensionRequests(token),
         api.getSystemSettings(token)
       ]);
-      setUsers(nextUsers);
-      setMetrics({
-        users: nextMetrics.users,
-        tools: nextMetrics.tools,
-        workshops: nextMetrics.workshops,
-        openBookings: nextMetrics.openBookings,
-        openReports: nextMetrics.openReports,
-        openSuspensionRequests: nextMetrics.openSuspensionRequests ?? 0
-      });
-      setSuspensionRequests(nextSuspensionRequests);
-      setSettings(nextSettings);
-      setDraftValues(Object.fromEntries(nextSettings.map((s) => [s.key, String(s.value)])));
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Admin-Daten konnten nicht geladen werden.", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return { users, metrics, suspensionRequests, settings };
+    },
+    enabled: !!token
+  });
 
-  const saveSetting = async (setting: SystemSetting) => {
-    if (!token) return;
+  useEffect(() => {
+    if (data?.settings) {
+      setDraftValues(Object.fromEntries(data.settings.map((s) => [s.key, String(s.value)])));
+    }
+  }, [data?.settings]);
+
+  const { mutate: saveSettingMut, isPending: isSavingSetting } = useMutation({
+    mutationFn: async ({ setting, value }: { setting: SystemSetting; value: number }) => {
+      if (!token) throw new Error("No token");
+      return api.updateSystemSetting(setting.key, value, token);
+    },
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+      setDraftValues((prev) => ({ ...prev, [updated.key]: String(updated.value) }));
+      pushToast("Einstellung wurde gespeichert.", "success");
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Einstellung konnte nicht gespeichert werden.", "error");
+    }
+  });
+
+  const saveSetting = (setting: SystemSetting) => {
     const raw = draftValues[setting.key];
     const value = Number(raw);
     if (raw === undefined || raw === "" || !Number.isInteger(value)) {
@@ -78,65 +78,51 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
       pushToast(`Wert muss zwischen ${setting.min} und ${setting.max} liegen.`, "error");
       return;
     }
-    setSavingSettingKey(setting.key);
-    try {
-      const updated = await api.updateSystemSetting(setting.key, value, token);
-      setSettings((prev) => prev.map((s) => (s.key === updated.key ? updated : s)));
-      setDraftValues((prev) => ({ ...prev, [updated.key]: String(updated.value) }));
-      pushToast("Einstellung wurde gespeichert.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Einstellung konnte nicht gespeichert werden.", "error");
-    } finally {
-      setSavingSettingKey(null);
-    }
+    saveSettingMut({ setting, value });
   };
 
-  useEffect(() => {
-    if (!token) return;
-    void loadData(appliedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, appliedSearch]);
-
-  const updateRole = async (userId: string, role: "MODERATOR" | "NUTZER") => {
-    if (!token) return;
-    setBusyUserId(userId);
-    try {
+  const { mutate: updateRoleMut, isPending: isUpdatingRole } = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: "MODERATOR" | "NUTZER" }) => {
+      if (!token) throw new Error("No token");
       await api.updateUserRole(userId, role, token);
-      await loadData(appliedSearch);
+      return role;
+    },
+    onSuccess: (role) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
       pushToast(role === "MODERATOR" ? "Nutzer ist jetzt Moderator." : "Moderator-Rolle wurde entfernt.", "success");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Rolle konnte nicht aktualisiert werden.", "error");
-    } finally {
-      setBusyUserId(null);
     }
-  };
+  });
 
-  const updateSuspension = async (userId: string, nextIsSuspended: boolean) => {
-    if (!token) return;
-    setBusyUserId(userId);
-    try {
-      await api.updateUserSuspension(userId, nextIsSuspended, token);
-      await loadData(appliedSearch);
-    } catch (error) {
+  const { mutate: updateSuspensionMut, isPending: isUpdatingSuspension } = useMutation({
+    mutationFn: async ({ userId, isSuspended }: { userId: string; isSuspended: boolean }) => {
+      if (!token) throw new Error("No token");
+      await api.updateUserSuspension(userId, isSuspended, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Sperrstatus konnte nicht aktualisiert werden.", "error");
-    } finally {
-      setBusyUserId(null);
     }
-  };
+  });
 
-  const decideSuspensionRequest = async (requestId: string, approve: boolean) => {
-    if (!token) return;
-    setBusyRequestId(requestId);
-    try {
+  const { mutate: decideSuspensionMut, isPending: isDecidingSuspension } = useMutation({
+    mutationFn: async ({ requestId, approve }: { requestId: string; approve: boolean }) => {
+      if (!token) throw new Error("No token");
       await api.decideSuspensionRequest(requestId, { approve }, token);
-      await loadData(appliedSearch);
+      return approve;
+    },
+    onSuccess: (approve) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
       pushToast(approve ? "Sperrung wurde durchgeführt." : "Sperranfrage abgelehnt.", "success");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Sperranfrage konnte nicht bearbeitet werden.", "error");
-    } finally {
-      setBusyRequestId(null);
     }
-  };
+  });
 
   const onSearchSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -211,10 +197,10 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
           title="Systemregeln"
           subtitle="Diese Werte gelten plattformweit. Nur die Zahl ist anpassbar – Änderungen werden sofort übernommen."
         >
-          {isLoading && settings.length === 0 && <p className="hint">Lade Systemregeln...</p>}
-          {settings.length > 0 && (
+          {isLoading && !data && <p className="hint">Lade Systemregeln...</p>}
+          {data?.settings && data.settings.length > 0 && (
             <ul className="system-settings-list">
-              {settings.map((setting) => {
+              {data.settings.map((setting) => {
                 const draft = draftValues[setting.key] ?? String(setting.value);
                 const isDirty = draft !== String(setting.value);
                 return (
@@ -237,8 +223,8 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
                       <button
                         type="button"
                         className="btn mini"
-                        disabled={!isDirty || savingSettingKey === setting.key}
-                        onClick={() => void saveSetting(setting)}
+                        disabled={!isDirty || isSavingSetting}
+                        onClick={() => saveSetting(setting)}
                       >
                         Speichern
                       </button>
@@ -259,12 +245,12 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
       {tabNav}
       <Surface title="Systemnutzung" subtitle="Schnellüberblick über die aktuelle Plattformaktivität.">
         <ul className="meta-list">
-          <li>Nutzer: {metrics.users}</li>
-          <li>Werkzeuge: {metrics.tools}</li>
-          <li>Werkstätten: {metrics.workshops}</li>
-          <li>Offene Buchungen: {metrics.openBookings}</li>
-          <li>Offene Meldungen: {metrics.openReports}</li>
-          <li>Offene Sperranfragen: {metrics.openSuspensionRequests}</li>
+          <li>Nutzer: {data?.metrics?.users ?? 0}</li>
+          <li>Werkzeuge: {data?.metrics?.tools ?? 0}</li>
+          <li>Werkstätten: {data?.metrics?.workshops ?? 0}</li>
+          <li>Offene Buchungen: {data?.metrics?.openBookings ?? 0}</li>
+          <li>Offene Meldungen: {data?.metrics?.openReports ?? 0}</li>
+          <li>Offene Sperranfragen: {data?.metrics?.openSuspensionRequests ?? 0}</li>
         </ul>
       </Surface>
 
@@ -272,11 +258,11 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
         title="Sperranfragen"
         subtitle="Von Moderatoren angeforderte Kontosperrungen – hier annehmen oder ablehnen."
       >
-        {suspensionRequests.length === 0 ? (
+        {!data?.suspensionRequests?.length ? (
           <EmptyState title="Keine offenen Sperranfragen" text="Derzeit liegt keine Sperranfrage zur Entscheidung vor." />
         ) : (
           <ul className="moderation-report-list">
-            {suspensionRequests.map((request) => (
+            {data.suspensionRequests.map((request) => (
               <li key={request.id} className="inbox-item moderation-report">
                 <p>
                   <strong>{request.user.name}</strong> ({request.user.email})
@@ -296,16 +282,16 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
                   <button
                     type="button"
                     className="btn mini"
-                    disabled={busyRequestId === request.id}
-                    onClick={() => void decideSuspensionRequest(request.id, true)}
+                    disabled={isDecidingSuspension}
+                    onClick={() => decideSuspensionMut({ requestId: request.id, approve: true })}
                   >
                     Sperrung annehmen
                   </button>
                   <button
                     type="button"
                     className="btn secondary mini"
-                    disabled={busyRequestId === request.id}
-                    onClick={() => void decideSuspensionRequest(request.id, false)}
+                    disabled={isDecidingSuspension}
+                    onClick={() => decideSuspensionMut({ requestId: request.id, approve: false })}
                   >
                     Ablehnen
                   </button>
@@ -335,14 +321,14 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
         </form>
 
         {isLoading && <p className="hint">Lade Nutzerdaten...</p>}
-        {!isLoading && users.length === 0 && (
+        {!isLoading && !data?.users?.length && (
           <EmptyState
             title="Keine Nutzer gefunden"
             text={appliedSearch ? "Zu deiner Suche gibt es keine Treffer." : "Derzeit sind keine Nutzerdaten verfügbar."}
           />
         )}
 
-        {!isLoading && users.length > 0 && (
+        {!isLoading && data?.users && data.users.length > 0 && (
           <div className="table-scroll admin-user-table-scroll">
             <table className="admin-user-table">
               <caption className="visually-hidden">
@@ -357,7 +343,7 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
+                {data.users.map((user) => (
                   <tr key={user.id}>
                     <th scope="row">
                       <div className="admin-user-meta">
@@ -379,8 +365,8 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
                         <button
                           type="button"
                           className="btn secondary mini"
-                          onClick={() => updateRole(user.id, user.role === "MODERATOR" ? "NUTZER" : "MODERATOR")}
-                          disabled={busyUserId === user.id || user.role === "ADMIN"}
+                          onClick={() => updateRoleMut({ userId: user.id, role: user.role === "MODERATOR" ? "NUTZER" : "MODERATOR" })}
+                          disabled={isUpdatingRole || user.role === "ADMIN"}
                           aria-label={
                             user.role === "MODERATOR"
                               ? `Moderatorrolle von ${user.name} entfernen`
@@ -392,8 +378,8 @@ export function AdminPage({ currentUser: propUser, token: propToken }: Props = {
                         <button
                           type="button"
                           className={`btn mini ${user.isSuspended ? "secondary" : ""}`.trim()}
-                          onClick={() => updateSuspension(user.id, !user.isSuspended)}
-                          disabled={busyUserId === user.id || user.role === "ADMIN" || user.id === currentUser?.id}
+                          onClick={() => updateSuspensionMut({ userId: user.id, isSuspended: !user.isSuspended })}
+                          disabled={isUpdatingSuspension || user.role === "ADMIN" || user.id === currentUser?.id}
                           aria-label={`${user.name} ${user.isSuspended ? "entsperren" : "sperren"}`}
                         >
                           {user.isSuspended ? "Entsperren" : "Sperren"}

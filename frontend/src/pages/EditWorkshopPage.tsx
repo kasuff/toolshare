@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AddressInput } from "../components/AddressInput";
 import {
   EMPTY_ADDRESS,
@@ -13,8 +14,8 @@ import { WorkshopEquipmentSelect } from "../components/WorkshopEquipmentSelect";
 import { WorkshopPhotoUpload } from "../components/WorkshopPhotoUpload";
 import { WorkshopToolsInput, type WorkshopToolDraftItem } from "../components/WorkshopToolsInput";
 import { useToast } from "../hooks/useToast";
-import {  api  } from "@toolshare/shared";
-import type {  User, WorkshopSlot  } from "@toolshare/shared";
+import { api } from "@toolshare/shared";
+import type { User, WorkshopSlot } from "@toolshare/shared";
 import { usePageAuth } from "../hooks/usePageAuth";
 
 type Props = {
@@ -27,9 +28,7 @@ export function EditWorkshopPage({ currentUser: propUser, token: propToken }: Pr
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   const [name, setName] = useState("");
   const [workshopAddress, setWorkshopAddress] = useState({ ...EMPTY_ADDRESS });
@@ -46,26 +45,31 @@ export function EditWorkshopPage({ currentUser: propUser, token: propToken }: Pr
   const [slotEnd, setSlotEnd] = useState("");
   const [slotBlocked, setSlotBlocked] = useState(false);
 
-  useEffect(() => {
-    const run = async () => {
-      if (!token || !id) {
-        setLoading(false);
-        return;
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["workshop", id, "edit", token],
+    queryFn: async () => {
+      if (!id || !token || !currentUser) throw new Error("Missing auth/id");
+      const detail = await api.getWorkshopById(id, token);
+      if (detail.workshop.ownerId !== currentUser.id) {
+        throw new Error("Diese Werkstatt kann nur vom Anbieter bearbeitet werden.");
       }
+      return detail;
+    },
+    enabled: !!id && !!token && !!currentUser,
+    retry: false
+  });
 
-      try {
-        const detail = await api.getWorkshopById(id, token);
-        if (currentUser && detail.workshop.ownerId !== currentUser.id) {
-          pushToast("Diese Werkstatt kann nur vom Anbieter bearbeitet werden.", "error");
-          navigate("/workshops");
-          return;
-        }
-
-        setName(detail.workshop.name);
-        setAddressSearchValue(detail.workshop.location);
-        setOriginalLocation(detail.workshop.location);
-        const addressValidation = await api.validateAddress(detail.workshop.location);
-        const parsedWorkshopAddress = addressValidation.normalizedParts
+  useEffect(() => {
+    if (data) {
+      const { workshop, slots: loadedSlots } = data;
+      setName(workshop.name);
+      setAddressSearchValue(workshop.location);
+      setOriginalLocation(workshop.location);
+      
+      const doValidate = async () => {
+        try {
+          const addressValidation = await api.validateAddress(workshop.location);
+          const parsedWorkshopAddress = addressValidation.normalizedParts
             ? {
                 street: addressValidation.normalizedParts.street,
                 houseNumber: addressValidation.normalizedParts.houseNumber,
@@ -73,29 +77,169 @@ export function EditWorkshopPage({ currentUser: propUser, token: propToken }: Pr
                 city: addressValidation.normalizedParts.city,
                 country: addressValidation.normalizedParts.country || "Deutschland"
               }
-            : parseAddress(detail.workshop.location);
-        setWorkshopAddress(parsedWorkshopAddress);
-        setOriginalWorkshopAddress(parsedWorkshopAddress);
-        setMaxCapacity(detail.workshop.maxCapacity);
-        setExtras(detail.workshop.extras);
-        setEquipmentItems(
-          detail.workshop.equipmentItems.map((item) => ({
-            name: item.name,
-            category: item.category
-          }))
-        );
-        setPhotos(detail.workshop.imageUrls);
-        setDescription(detail.workshop.description);
-        setSlots(detail.slots);
-      } catch (error) {
-        pushToast(error instanceof Error ? error.message : "Werkstatt konnte nicht geladen werden.", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
+            : parseAddress(workshop.location);
+          setWorkshopAddress(parsedWorkshopAddress);
+          setOriginalWorkshopAddress(parsedWorkshopAddress);
+        } catch {
+          const parsed = parseAddress(workshop.location);
+          setWorkshopAddress(parsed);
+          setOriginalWorkshopAddress(parsed);
+        }
+      };
+      void doValidate();
+      
+      setMaxCapacity(workshop.maxCapacity);
+      setExtras(workshop.extras);
+      setEquipmentItems(
+        workshop.equipmentItems.map((item) => ({
+          name: item.name,
+          category: item.category
+        }))
+      );
+      setPhotos(workshop.imageUrls);
+      setDescription(workshop.description);
+      setSlots(loadedSlots);
+    }
+  }, [data]);
 
-    void run();
-  }, [token, id, currentUser, navigate, pushToast]);
+  useEffect(() => {
+    if (isError) {
+      pushToast(error instanceof Error ? error.message : "Werkstatt konnte nicht geladen werden.", "error");
+      navigate("/workshops");
+    }
+  }, [isError, error, navigate, pushToast]);
+
+  const { mutate: updateWorkshopMut, isPending: saving } = useMutation({
+    mutationFn: async ({ location, addressWasChanged }: { location: string; addressWasChanged: boolean }) => {
+      if (!id || !token) throw new Error("Missing context");
+      const validation = addressWasChanged
+        ? await api.validateAddress(location)
+        : { isValid: true, normalizedAddress: originalLocation };
+      if (!validation.isValid) {
+        throw new Error("Adresse konnte nicht verifiziert werden. Bitte wählen Sie eine vorgeschlagene Adresse.");
+      }
+      await api.updateWorkshop(
+        id,
+        {
+          name,
+          description,
+          location: validation.normalizedAddress?.trim() || location,
+          maxCapacity,
+          extras,
+          equipmentItems,
+          imageUrls: photos
+        },
+        token
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workshop", id] });
+      pushToast("Werkstatt aktualisiert.", "success");
+      navigate(`/workshops/${id}?manage=1`);
+    },
+    onError: (e) => {
+      pushToast(e instanceof Error ? e.message : "Werkstatt konnte nicht aktualisiert werden.", "error");
+    }
+  });
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (saving) return;
+
+    const addressWasChanged =
+      !originalWorkshopAddress ||
+      Object.keys(workshopAddress).some(
+        (key) =>
+          workshopAddress[key as keyof AddressFormFields] !==
+          originalWorkshopAddress[key as keyof AddressFormFields]
+      );
+    const hasValidLocation =
+      isAddressComplete(workshopAddress) ||
+      (!addressWasChanged && originalLocation.trim().length >= 5);
+
+    if (!name.trim() || description.trim().length < 5 || !hasValidLocation) {
+      return;
+    }
+    if (maxCapacity < 1) {
+      pushToast("Die maximale Personenzahl muss mindestens 1 sein.", "error");
+      return;
+    }
+    if (photos.length === 0 || slots.length === 0) {
+      return;
+    }
+
+    const location = addressWasChanged
+      ? toAddressPayload(workshopAddress)
+      : originalLocation;
+
+    updateWorkshopMut({ location, addressWasChanged });
+  };
+
+  const { mutate: addSlotMut } = useMutation({
+    mutationFn: async () => {
+      if (!id || !token) throw new Error("Missing context");
+      return api.createWorkshopTimeslot(
+        id,
+        { startIso: slotStart, endIso: slotEnd, blockedByOwner: slotBlocked },
+        token
+      );
+    },
+    onSuccess: (created) => {
+      setSlots((current) => [...current, created]);
+      setSlotStart("");
+      setSlotEnd("");
+      setSlotBlocked(false);
+      queryClient.invalidateQueries({ queryKey: ["workshop", id] });
+      pushToast("Zeitfenster hinzugefügt.", "success");
+    },
+    onError: (e) => {
+      pushToast(e instanceof Error ? e.message : "Zeitfenster konnte nicht gespeichert werden.", "error");
+    }
+  });
+
+  const addSlot = () => {
+    if (!id || !slotStart || !slotEnd) return;
+    if (new Date(slotStart) >= new Date(slotEnd)) {
+      pushToast("Die Endzeit muss nach der Startzeit liegen.", "error");
+      return;
+    }
+    addSlotMut();
+  };
+
+  const { mutate: toggleSlotMut } = useMutation({
+    mutationFn: async (slot: WorkshopSlot) => {
+      if (!id || !token) throw new Error("Missing context");
+      return api.updateWorkshopTimeslot(
+        id,
+        slot.id,
+        { blockedByOwner: !slot.blockedByOwner },
+        token
+      );
+    },
+    onSuccess: (updated) => {
+      setSlots((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
+      queryClient.invalidateQueries({ queryKey: ["workshop", id] });
+    },
+    onError: (e) => {
+      pushToast(e instanceof Error ? e.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
+    }
+  });
+
+  const { mutate: removeSlotMut } = useMutation({
+    mutationFn: async (slotId: string) => {
+      if (!id || !token) throw new Error("Missing context");
+      await api.deleteWorkshopTimeslot(id, slotId, token);
+      return slotId;
+    },
+    onSuccess: (slotId) => {
+      setSlots((current) => current.filter((entry) => entry.id !== slotId));
+      queryClient.invalidateQueries({ queryKey: ["workshop", id] });
+      pushToast("Zeitfenster entfernt.", "success");
+    },
+    onError: (e) => {
+      pushToast(e instanceof Error ? e.message : "Zeitfenster konnte nicht entfernt werden.", "error");
+    }
+  });
 
   if (!token) {
     return (
@@ -112,7 +256,7 @@ export function EditWorkshopPage({ currentUser: propUser, token: propToken }: Pr
     );
   }
 
-  if (loading) {
+  if (isLoading || !data) {
     return (
       <section className="stack">
         <h1>Werkstatt bearbeiten</h1>
@@ -123,148 +267,11 @@ export function EditWorkshopPage({ currentUser: propUser, token: propToken }: Pr
     );
   }
 
-  if (!id) {
-    return (
-      <section className="stack">
-        <h1>Werkstatt bearbeiten</h1>
-        <Surface title="Werkstatt nicht gefunden">
-          <p>Die angeforderte Werkstatt konnte nicht geöffnet werden.</p>
-          <div className="row">
-            <Link to="/workshops" className="btn secondary">
-              Zurück zu Werkstätten
-            </Link>
-          </div>
-        </Surface>
-      </section>
-    );
-  }
-
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (saving) return;
-
-    const addressWasChanged =
-      !originalWorkshopAddress ||
-      Object.keys(workshopAddress).some(
-        (key) =>
-          workshopAddress[key as keyof AddressFormFields] !==
-          originalWorkshopAddress[key as keyof AddressFormFields]
-      );
-    const hasValidLocation =
-      isAddressComplete(workshopAddress) ||
-      (!addressWasChanged && originalLocation.trim().length >= 5);
-
-    if (!name.trim()) {
-      return;
-    }
-    if (description.trim().length < 5) {
-      return;
-    }
-    if (!hasValidLocation) {
-      return;
-    }
-    if (maxCapacity < 1) {
-      pushToast("Die maximale Personenzahl muss mindestens 1 sein.", "error");
-      return;
-    }
-    if (photos.length === 0) {
-      return;
-    }
-    if (slots.length === 0) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const location = addressWasChanged
-        ? toAddressPayload(workshopAddress)
-        : originalLocation;
-      const validation = addressWasChanged
-        ? await api.validateAddress(location)
-        : { isValid: true, normalizedAddress: originalLocation };
-      if (!validation.isValid) {
-        pushToast("Adresse konnte nicht verifiziert werden. Bitte wählen Sie eine vorgeschlagene Adresse.", "error");
-        return;
-      }
-
-      await api.updateWorkshop(
-        id,
-        {
-          name,
-          description,
-          location: validation.normalizedAddress?.trim() || location,
-          maxCapacity,
-          extras,
-          equipmentItems,
-          imageUrls: photos
-        },
-        token
-      );
-
-      pushToast("Werkstatt aktualisiert.", "success");
-      navigate(`/workshops/${id}?manage=1`);
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Werkstatt konnte nicht aktualisiert werden.", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addSlot = async () => {
-    if (!id || !slotStart || !slotEnd) {
-      return;
-    }
-    if (new Date(slotStart) >= new Date(slotEnd)) {
-      pushToast("Die Endzeit muss nach der Startzeit liegen.", "error");
-      return;
-    }
-    try {
-      const created = await api.createWorkshopTimeslot(
-        id,
-        { startIso: slotStart, endIso: slotEnd, blockedByOwner: slotBlocked },
-        token
-      );
-      setSlots((current) => [...current, created]);
-      setSlotStart("");
-      setSlotEnd("");
-      setSlotBlocked(false);
-      pushToast("Zeitfenster hinzugefügt.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht gespeichert werden.", "error");
-    }
-  };
-
-  const toggleSlot = async (slot: WorkshopSlot) => {
-    if (!id) return;
-    try {
-      const updated = await api.updateWorkshopTimeslot(
-        id,
-        slot.id,
-        { blockedByOwner: !slot.blockedByOwner },
-        token
-      );
-      setSlots((current) => current.map((entry) => (entry.id === slot.id ? updated : entry)));
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
-    }
-  };
-
-  const removeSlot = async (slotId: string) => {
-    if (!id) return;
-    try {
-      await api.deleteWorkshopTimeslot(id, slotId, token);
-      setSlots((current) => current.filter((entry) => entry.id !== slotId));
-      pushToast("Zeitfenster entfernt.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht entfernt werden.", "error");
-    }
-  };
-
   return (
     <section className="new-tool-page new-workshop-page">
       <h1>Werkstatt bearbeiten</h1>
       <p className="subtitle">Aktualisiere Name, Standort, Ausstattung, Extras und Fotos deiner Werkstatt.</p>
-        <form className="new-tool-form new-workshop-form" onSubmit={(event) => void onSubmit(event)} noValidate>
+        <form className="new-tool-form new-workshop-form" onSubmit={onSubmit} noValidate>
           <p className="required-note">Pflichtfelder werden mit einem * markiert!</p>
           <WorkshopPhotoUpload
             photos={photos}
@@ -361,7 +368,7 @@ export function EditWorkshopPage({ currentUser: propUser, token: propToken }: Pr
                 <input aria-label="Zeitraum blockieren" type="checkbox" checked={slotBlocked} onChange={(event) => setSlotBlocked(event.target.checked)} />
                 <span><strong>Zeitraum blockieren</strong><small>Für Wartung oder Eigenbedarf</small></span>
               </label>
-              <button type="button" className="btn btn-outline" onClick={() => void addSlot()}>
+              <button type="button" className="btn btn-outline" onClick={addSlot}>
                 Zeitfenster hinzufügen
               </button>
             </div>
@@ -375,10 +382,10 @@ export function EditWorkshopPage({ currentUser: propUser, token: propToken }: Pr
                     {slot.blockedByOwner && <span className="slot-badge">Blockiert</span>}
                   </div>
                   <div className="row slot-actions">
-                    <button type="button" className="btn secondary" onClick={() => void toggleSlot(slot)}>
+                    <button type="button" className="btn secondary" onClick={() => toggleSlotMut(slot)}>
                       {slot.blockedByOwner ? "Freigeben" : "Blockieren"}
                     </button>
-                    <button type="button" className="btn ghost danger" onClick={() => void removeSlot(slot.id)}>
+                    <button type="button" className="btn ghost danger" onClick={() => removeSlotMut(slot.id)}>
                       Entfernen
                     </button>
                   </div>

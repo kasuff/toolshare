@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api } from "@toolshare/shared";
-import type { User, Workshop, WorkshopSlot } from "@toolshare/shared";
+import type { User, WorkshopSlot } from "@toolshare/shared";
 import { usePageAuth } from "../hooks/usePageAuth";
 
 type WorkshopWithSlots = {
-  workshop: Workshop;
+  workshop: import("@toolshare/shared").Workshop;
   slots: WorkshopSlot[];
 };
 
@@ -25,42 +26,41 @@ type Props = {
 export function WorkshopAvailabilityPage({ currentUser: propUser, token: propToken }: Props = {}) {
   const { currentUser, token } = usePageAuth(propUser, propToken);
   const { pushToast } = useToast();
-  const [workshops, setWorkshops] = useState<WorkshopWithSlots[]>([]);
+  const queryClient = useQueryClient();
+
   const [selectedWorkshop, setSelectedWorkshop] = useState<WorkshopWithSlots | null>(null);
   const [slots, setSlots] = useState<WorkshopSlot[]>([]);
   const [draft, setDraft] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: true });
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<SlotDraft>({ startIso: "", endIso: "", blockedByOwner: false });
-  const [loading, setLoading] = useState(true);
 
   const sortSlots = (items: WorkshopSlot[]) =>
     [...items].sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
 
+  const { data: workshops = [], isLoading } = useQuery({
+    queryKey: ["workshops", "owned", token],
+    queryFn: async () => {
+      if (!token || !currentUser) throw new Error("Missing auth");
+      const allWorkshops = await api.getWorkshops({}, token);
+      return allWorkshops.filter((entry) => entry.workshop.ownerId === currentUser.id);
+    },
+    enabled: !!token && !!currentUser
+  });
+
   useEffect(() => {
-    const fetchWorkshops = async () => {
-      if (!token || !currentUser) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const allWorkshops = await api.getWorkshops({}, token);
-        const ownedWorkshops = allWorkshops.filter((entry) => entry.workshop.ownerId === currentUser.id);
-        setWorkshops(ownedWorkshops);
-
-        if (ownedWorkshops.length > 0) {
-          setSelectedWorkshop(ownedWorkshops[0]);
-          setSlots(sortSlots(ownedWorkshops[0].slots || []));
+    if (workshops.length > 0) {
+      if (!selectedWorkshop) {
+        setSelectedWorkshop(workshops[0]);
+        setSlots(sortSlots(workshops[0].slots || []));
+      } else {
+        const updated = workshops.find((w) => w.workshop.id === selectedWorkshop.workshop.id);
+        if (updated) {
+          setSelectedWorkshop(updated);
+          setSlots(sortSlots(updated.slots || []));
         }
-      } catch {
-        pushToast("Werkstätten konnten nicht geladen werden.", "error");
-      } finally {
-        setLoading(false);
       }
-    };
-
-    void fetchWorkshops();
-  }, [token, currentUser, pushToast]);
+    }
+  }, [workshops, selectedWorkshop]);
 
   if (!token) {
     return (
@@ -77,7 +77,7 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <section className="stack">
         <h1>Verfügbarkeit verwalten</h1>
@@ -107,45 +107,9 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
   const handleSelectWorkshop = (workshop: WorkshopWithSlots) => {
     setSelectedWorkshop(workshop);
     setSlots(sortSlots(workshop.slots || []));
-    setDraft({ startIso: "", endIso: "", blockedByOwner: false });
+    setDraft({ startIso: "", endIso: "", blockedByOwner: true });
     setEditingSlotId(null);
     setEditingDraft({ startIso: "", endIso: "", blockedByOwner: false });
-  };
-
-  const applySlotsUpdate = (nextSlots: WorkshopSlot[]) => {
-    const sorted = sortSlots(nextSlots);
-    setSlots(sorted);
-    if (!selectedWorkshop) return;
-
-    setWorkshops((prev) =>
-      prev.map((entry) =>
-        entry.workshop.id === selectedWorkshop.workshop.id
-          ? {
-              ...entry,
-              slots: sorted
-            }
-          : entry
-      )
-    );
-    setSelectedWorkshop((prev) =>
-      prev
-        ? {
-            ...prev,
-            slots: sorted
-          }
-        : prev
-    );
-  };
-
-  const refreshWorkshopState = async (workshopId: string) => {
-    if (!token || !currentUser) return;
-    const allWorkshops = await api.getWorkshops({}, token);
-    const ownedWorkshops = allWorkshops.filter((entry) => entry.workshop.ownerId === currentUser.id);
-    setWorkshops(ownedWorkshops);
-
-    const refreshedWorkshop = ownedWorkshops.find((entry) => entry.workshop.id === workshopId) ?? null;
-    setSelectedWorkshop(refreshedWorkshop);
-    setSlots(sortSlots(refreshedWorkshop?.slots ?? []));
   };
 
   const validateSlot = (candidate: SlotDraft) => {
@@ -159,13 +123,9 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
     return true;
   };
 
-  const addSlot = async () => {
-    if (!selectedWorkshop || !token) {
-      return;
-    }
-    if (!validateSlot(draft)) return;
-
-    try {
+  const { mutate: addSlotMut } = useMutation({
+    mutationFn: async () => {
+      if (!selectedWorkshop || !token) throw new Error("Missing context");
       await api.createWorkshopTimeslot(
         selectedWorkshop.workshop.id,
         {
@@ -175,12 +135,20 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
         },
         token
       );
-      await refreshWorkshopState(selectedWorkshop.workshop.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
       setDraft({ startIso: "", endIso: "", blockedByOwner: true });
       pushToast("Zeitraum blockiert.", "success");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Zeitraum konnte nicht blockiert werden.", "error");
     }
+  });
+
+  const addSlot = () => {
+    if (!validateSlot(draft)) return;
+    addSlotMut();
   };
 
   const startEditing = (slot: WorkshopSlot) => {
@@ -197,10 +165,28 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
     setEditingDraft({ startIso: "", endIso: "", blockedByOwner: false });
   };
 
-  const saveEditedSlot = async () => {
-    if (!selectedWorkshop || !token || !editingSlotId) {
-      return;
+  const { mutate: updateSlotMut } = useMutation({
+    mutationFn: async (updatePayload: { startIso?: string; endIso?: string; blockedByOwner?: boolean }) => {
+      if (!selectedWorkshop || !token || !editingSlotId) throw new Error("Missing context");
+      await api.updateWorkshopTimeslot(
+        selectedWorkshop.workshop.id,
+        editingSlotId,
+        updatePayload,
+        token
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
+      cancelEditing();
+      pushToast("Zeitfenster aktualisiert.", "success");
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
     }
+  });
+
+  const saveEditedSlot = () => {
+    if (!editingSlotId) return;
     if (!validateSlot(editingDraft)) return;
 
     const existingSlot = slots.find((slot) => slot.id === editingSlotId);
@@ -224,34 +210,26 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
       return;
     }
 
-    try {
-      const updated = await api.updateWorkshopTimeslot(
-        selectedWorkshop.workshop.id,
-        editingSlotId,
-        updatePayload,
-        token
-      );
-      applySlotsUpdate(slots.map((slot) => (slot.id === editingSlotId ? updated : slot)));
-      cancelEditing();
-      pushToast("Zeitfenster aktualisiert.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht aktualisiert werden.", "error");
-    }
+    updateSlotMut(updatePayload);
   };
 
-  const removeSlot = async (slotId: string) => {
-    if (!selectedWorkshop || !token) return;
-    try {
+  const { mutate: removeSlotMut } = useMutation({
+    mutationFn: async (slotId: string) => {
+      if (!selectedWorkshop || !token) throw new Error("Missing context");
       await api.deleteWorkshopTimeslot(selectedWorkshop.workshop.id, slotId, token);
-      applySlotsUpdate(slots.filter((slot) => slot.id !== slotId));
+      return slotId;
+    },
+    onSuccess: (slotId) => {
+      queryClient.invalidateQueries({ queryKey: ["workshops", "owned"] });
       if (editingSlotId === slotId) {
         cancelEditing();
       }
       pushToast("Zeitfenster entfernt.", "success");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Zeitfenster konnte nicht entfernt werden.", "error");
     }
-  };
+  });
 
   const blockedSlots = slots.filter((slot) => slot.blockedByOwner);
 
@@ -307,7 +285,7 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
               <button
                 type="button"
                 className="btn secondary"
-                onClick={() => void addSlot()}
+                onClick={addSlot}
                 aria-label={`Zeitraum für ${selectedWorkshop.workshop.name} blockieren`}
               >
                 Zeitraum blockieren
@@ -342,7 +320,7 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
                               </Field>
                             </div>
                             <div className="row slot-edit-actions">
-                              <button type="button" onClick={() => void saveEditedSlot()}>
+                              <button type="button" onClick={saveEditedSlot}>
                                 Änderungen speichern
                               </button>
                               <button type="button" className="btn secondary" onClick={cancelEditing}>
@@ -362,7 +340,7 @@ export function WorkshopAvailabilityPage({ currentUser: propUser, token: propTok
                               <button type="button" className="btn secondary" onClick={() => startEditing(slot)}>
                                 Bearbeiten
                               </button>
-                              <button type="button" className="btn ghost danger" onClick={() => void removeSlot(slot.id)}>
+                              <button type="button" className="btn ghost danger" onClick={() => removeSlotMut(slot.id)}>
                                 Freigeben
                               </button>
                             </div>

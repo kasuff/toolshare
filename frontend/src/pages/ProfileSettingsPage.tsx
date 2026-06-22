@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { AddressInput } from "../components/AddressInput";
 import {
   isAddressComplete,
@@ -9,8 +10,8 @@ import {
 } from "../utils/address";
 import { Field, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
-import {  api  } from "@toolshare/shared";
-import type {  User  } from "@toolshare/shared";
+import { api } from "@toolshare/shared";
+import type { User } from "@toolshare/shared";
 
 import { usePageAuth } from "../hooks/usePageAuth";
 
@@ -27,12 +28,10 @@ export function ProfileSettingsPage({
   const { pushToast } = useToast();
   const [name, setName] = useState(currentUser?.name ?? "");
   const [address, setAddress] = useState<AddressFormFields>(() => parseAddress(currentUser?.address));
-  const [isSaving, setIsSaving] = useState(false);
   const [isPasswordFormOpen, setIsPasswordFormOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const resetPasswordForm = () => {
     setCurrentPassword("");
@@ -45,7 +44,50 @@ export function ProfileSettingsPage({
     resetPasswordForm();
   };
 
-  const onChangePassword = async (event: FormEvent) => {
+  const { data: validatedAddress } = useQuery({
+    queryKey: ["validateAddress", currentUser?.address],
+    queryFn: async () => {
+      if (!currentUser?.address) return null;
+      const validation = await api.validateAddress(currentUser.address);
+      if (!validation.normalizedParts) return null;
+      return {
+        street: validation.normalizedParts.street,
+        houseNumber: validation.normalizedParts.houseNumber,
+        postalCode: validation.normalizedParts.postalCode,
+        city: validation.normalizedParts.city,
+        country: validation.normalizedParts.country || "Deutschland"
+      };
+    },
+    enabled: !!currentUser?.address,
+    staleTime: Infinity
+  });
+
+  useEffect(() => {
+    setName(currentUser?.name ?? "");
+    setAddress(parseAddress(currentUser?.address));
+  }, [currentUser?.id, currentUser?.name, currentUser?.address]);
+
+  useEffect(() => {
+    if (validatedAddress) {
+      setAddress(validatedAddress);
+    }
+  }, [validatedAddress]);
+
+  const { mutate: changePasswordMut, isPending: isChangingPassword } = useMutation({
+    mutationFn: async () => {
+      if (!token) throw new Error("Missing auth");
+      await api.changePassword(currentPassword, newPassword, token);
+    },
+    onSuccess: () => {
+      pushToast("Passwort wurde geändert.", "success");
+      closePasswordForm();
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Passwort konnte nicht geändert werden.", "error");
+    }
+  });
+
+  const onChangePassword = (event: FormEvent) => {
     event.preventDefault();
     if (!token) return;
 
@@ -66,37 +108,39 @@ export function ProfileSettingsPage({
       return;
     }
 
-    setIsChangingPassword(true);
-    try {
-      await api.changePassword(currentPassword, newPassword, token);
-      pushToast("Passwort wurde geändert.", "success");
-      closePasswordForm();
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Passwort konnte nicht geändert werden.", "error");
-    } finally {
-      setIsChangingPassword(false);
-    }
+    changePasswordMut();
   };
 
-  useEffect(() => {
-    setName(currentUser?.name ?? "");
-    setAddress(parseAddress(currentUser?.address));
-  }, [currentUser?.id, currentUser?.name, currentUser?.address]);
+  const { mutate: saveProfileMut, isPending: isSaving } = useMutation({
+    mutationFn: async ({ nextName, nextAddress }: { nextName: string; nextAddress: string }) => {
+      const validation = await api.validateAddress(nextAddress);
+      if (!validation.isValid) {
+        throw new Error("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.");
+      }
+      return onSave({ name: nextName, address: nextAddress });
+    },
+    onSuccess: () => {
+      pushToast("Profil gespeichert.", "success");
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Profil konnte nicht gespeichert werden.", "error");
+    }
+  });
 
-  useEffect(() => {
-    if (!currentUser?.address) return;
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    const nextName = name.trim();
+    const nextAddress = toAddressPayload(address);
 
-    void api.validateAddress(currentUser.address).then((validation) => {
-      if (!validation.normalizedParts) return;
-      setAddress({
-        street: validation.normalizedParts.street,
-        houseNumber: validation.normalizedParts.houseNumber,
-        postalCode: validation.normalizedParts.postalCode,
-        city: validation.normalizedParts.city,
-        country: validation.normalizedParts.country || "Deutschland"
-      });
-    });
-  }, [currentUser?.address]);
+    if (nextName.length < 2) {
+      return;
+    }
+    if (!isAddressComplete(address)) {
+      return;
+    }
+
+    saveProfileMut({ nextName, nextAddress });
+  };
 
   if (!currentUser) {
     return (
@@ -112,34 +156,6 @@ export function ProfileSettingsPage({
       </section>
     );
   }
-
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    const nextName = name.trim();
-    const nextAddress = toAddressPayload(address);
-
-    if (nextName.length < 2) {
-      return;
-    }
-    if (!isAddressComplete(address)) {
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const validation = await api.validateAddress(nextAddress);
-      if (!validation.isValid) {
-        pushToast("Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.", "error");
-        return;
-      }
-      await onSave({ name: nextName, address: nextAddress });
-      pushToast("Profil gespeichert.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Profil konnte nicht gespeichert werden.", "error");
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   return (
     <section className="profile-settings-page">

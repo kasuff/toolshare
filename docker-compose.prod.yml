@@ -16,7 +16,8 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       target: prod
     ports:
       - "4000:4000"

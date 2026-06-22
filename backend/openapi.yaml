@@ -1,166 +1,212 @@
 openapi: 3.1.0
 info:
-  title: ToolShare API
   version: 0.1.0
-  description: REST API contract for ToolShare (subset — auth, tools & bookings).
+  title: ToolShare API
+  description: REST API contract for ToolShare (subset — auth, tools & bookings)
 servers:
   - url: http://localhost:4000/api
-paths:
-  /auth/login:
-    post:
-      summary: Login
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
-      responses:
-        "200":
-          description: JWT tokens
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthTokensResponse"
-        "401":
-          description: Invalid credentials
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
-  /tools:
-    get:
-      summary: List tools
-      parameters:
-        - in: query
-          name: search
-          schema: { type: string }
-        - in: query
-          name: category
-          schema: { type: string }
-      responses:
-        "200":
-          description: Tool list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ToolResponse"
-    post:
-      summary: Create tool
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateToolRequest"
-      responses:
-        "201":
-          description: Created tool
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ToolResponse"
-  /tools/{id}:
-    get:
-      summary: Get tool by id
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "200":
-          description: Tool detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ToolResponse"
-  /bookings/tool:
-    post:
-      summary: Create tool booking
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateToolBookingRequest"
-      responses:
-        "201":
-          description: Booking created
-        "409":
-          description: Booking conflict (overlapping reservation)
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
-              example:
-                type: urn:toolshare:problem:booking_conflict
-                title: BOOKING CONFLICT
-                status: 409
-                detail: Im gewählten Zeitraum ist bereits eine Buchung vorhanden.
-                code: BOOKING_CONFLICT
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-  schemas:
-    LoginRequest:
-      type: object
-      required: [email, password]
-      properties:
-        email: { type: string, format: email }
-        password: { type: string, minLength: 8 }
-    AuthTokensResponse:
-      type: object
-      required: [accessToken, refreshToken]
-      properties:
-        accessToken: { type: string }
-        refreshToken: { type: string }
-    ToolResponse:
-      type: object
-      required: [id, ownerId, name, description, category, status, createdAt, updatedAt, owner]
-      properties:
-        id: { type: string, format: uuid }
-        ownerId: { type: string, format: uuid }
-        name: { type: string }
-        description: { type: string }
-        category: { type: string }
-        imageUrl: { type: string, nullable: true }
-        pickupLocation: { type: string, nullable: true }
-        pickupLocationNote: { type: string, nullable: true }
-        status: { type: string, enum: [AVAILABLE, REQUESTED, BORROWED] }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-    CreateToolRequest:
-      type: object
-      required: [name, description, category, pickupLocation]
-      properties:
-        name: { type: string, minLength: 2 }
-        description: { type: string, minLength: 5 }
-        category: { type: string, minLength: 2 }
-        imageUrl: { type: string }
-        pickupLocation: { type: string, minLength: 5 }
-        pickupLocationNote: { type: string, maxLength: 300 }
-    CreateToolBookingRequest:
-      type: object
-      required: [toolId, startDate, endDate, pickupTime]
-      properties:
-        toolId: { type: string, format: uuid }
-        startDate: { type: string, format: date-time }
-        endDate: { type: string, format: date-time }
-        pickupTime: { type: string, format: date-time }
-    ProblemDetails:
-      type: object
-      required: [type, title, status, detail]
-      properties:
-        type: { type: string }
-        title: { type: string }
-        status: { type: integer }
-        detail: { type: string }
-        code: { type: string }
+  schemas: {}
+  parameters: {}
+paths:
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+              required:
+                - email
+                - password
+      responses:
+        "200":
+          description: JWT tokens
+  /tools:
+    post:
+      summary: Create tool
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                description:
+                  type: string
+                  minLength: 5
+                category:
+                  type: string
+                  minLength: 2
+                imageUrl:
+                  type: string
+                  minLength: 1
+                pickupLocation:
+                  type: string
+                  minLength: 5
+                pickupLocationNote:
+                  type: string
+                  maxLength: 300
+              required:
+                - name
+                - description
+                - category
+                - pickupLocation
+      responses:
+        "201":
+          description: Created tool
+    get:
+      summary: List tools
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: false
+          name: category
+          in: query
+        - schema:
+            type: string
+            enum: &a1
+              - AVAILABLE
+              - REQUESTED
+              - BORROWED
+          required: false
+          name: status
+          in: query
+        - schema:
+            type: string
+            format: uuid
+          required: false
+          name: ownerId
+          in: query
+        - schema:
+            type: string
+            minLength: 1
+          required: false
+          name: search
+          in: query
+      responses:
+        "200":
+          description: Tool list
+  /tools/{id}:
+    patch:
+      summary: Update tool
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                description:
+                  type: string
+                  minLength: 5
+                category:
+                  type: string
+                  minLength: 2
+                imageUrl:
+                  type: string
+                  minLength: 1
+                pickupLocation:
+                  type: string
+                  minLength: 5
+                pickupLocationNote:
+                  type: string
+                  maxLength: 300
+                status:
+                  type: string
+                  enum: *a1
+      responses:
+        "200":
+          description: Updated tool
+  /bookings/tool:
+    post:
+      summary: Create tool booking
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                toolId:
+                  type: string
+                  format: uuid
+                startDate:
+                  type: string
+                  minLength: 1
+                endDate:
+                  type: string
+                  minLength: 1
+                pickupTime:
+                  type: string
+                  minLength: 1
+              required:
+                - toolId
+                - startDate
+                - endDate
+                - pickupTime
+      responses:
+        "201":
+          description: Booking created
+        "409":
+          description: Conflict
+  /bookings/{id}/status:
+    patch:
+      summary: Update booking status
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - ACCEPTED
+                    - REJECTED
+                    - RETURNED
+              required:
+                - status
+      responses:
+        "200":
+          description: Status updated
+webhooks: {}

@@ -1,11 +1,12 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DateInput } from "../components/DateInput";
 import { DetailTopBar } from "../components/DetailTopBar";
 import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
-import {  api  } from "@toolshare/shared";
+import { api } from "@toolshare/shared";
 import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
@@ -127,13 +128,9 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { pushToast } = useToast();
+  const queryClient = useQueryClient();
   const defaults = useMemo(getDefaultDates, []);
 
-  const [tool, setTool] = useState<Tool | null>(null);
-  const [blockingPeriods, setBlockingPeriods] = useState<BlockingPeriod[]>([]);
-  const [ownerBlocks, setOwnerBlocks] = useState<OwnerBlock[]>([]);
-  const [deletingBlockId, setDeletingBlockId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [startTime, setStartTime] = useState("10:00");
   const [endDate, setEndDate] = useState(defaults.endDate);
@@ -141,56 +138,54 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
   const [isSelectingRangeEnd, setIsSelectingRangeEnd] = useState(false);
   const [isImageOpen, setIsImageOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
-  const [isReporting, setIsReporting] = useState(false);
-  const [ratings, setRatings] = useState<PublicRating[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+
   const imageViewerRef = useRef<HTMLDivElement>(null);
   const imageViewerCloseRef = useRef<HTMLButtonElement>(null);
   const closeImageViewer = useCallback(() => setIsImageOpen(false), []);
   useModalFocus(imageViewerRef, closeImageViewer, imageViewerCloseRef, isImageOpen);
 
-  useEffect(() => {
-    const loadTool = async () => {
-      if (!id) return;
-      setIsLoading(true);
-      try {
-        const [tools, periods, toolRatings] = await Promise.all([
-          api.getTools({}, token ?? ""),
-          api.getToolBlockingPeriods(id),
-          api.getRatingsForTool(id)
-        ]);
-        const foundTool = tools.find((entry) => entry.id === id);
-        if (foundTool) {
-          setTool(foundTool);
-          setBlockingPeriods(periods);
-          setRatings(toolRatings);
-          if (token && currentUser?.id === foundTool.ownerId) {
-            try {
-              setOwnerBlocks(await api.getToolOwnerBlocks(id, token));
-            } catch {
-              setOwnerBlocks([]);
-            }
-          } else {
-            setOwnerBlocks([]);
-          }
-        } else {
-          pushToast("Werkzeug nicht gefunden.", "error");
-          navigate("/tools");
-        }
-      } catch (error) {
-        pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht geladen werden.", "error");
-        navigate("/tools");
-      } finally {
-        setIsLoading(false);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["tool", id, token, currentUser?.id],
+    queryFn: async () => {
+      if (!id) throw new Error("No ID");
+      const [tools, periods, toolRatings] = await Promise.all([
+        api.getTools({}, token ?? ""),
+        api.getToolBlockingPeriods(id),
+        api.getRatingsForTool(id)
+      ]);
+      const foundTool = tools.find((entry) => entry.id === id);
+      if (!foundTool) {
+        throw new Error("Werkzeug nicht gefunden.");
       }
-    };
-    void loadTool();
-  }, [id, token, navigate, pushToast, currentUser?.id]);
+      let blocks: OwnerBlock[] = [];
+      if (token && currentUser?.id === foundTool.ownerId) {
+        try {
+          blocks = await api.getToolOwnerBlocks(id, token);
+        } catch {
+          // ignore
+        }
+      }
+      return { tool: foundTool, blockingPeriods: periods, ratings: toolRatings, ownerBlocks: blocks };
+    },
+    enabled: !!id,
+    retry: false
+  });
+
+  useEffect(() => {
+    if (isError) {
+      pushToast("Werkzeug konnte nicht geladen werden.", "error");
+      navigate("/tools");
+    }
+  }, [isError, navigate, pushToast]);
+
+  const tool = data?.tool;
+  const blockingPeriods = data?.blockingPeriods ?? [];
+  const ownerBlocks = data?.ownerBlocks ?? [];
+  const ratings = data?.ratings ?? [];
 
   const isAvailable = tool?.status === "VERFUEGBAR";
   const isOwnTool = Boolean(tool && currentUser?.id === tool.ownerId);
@@ -236,25 +231,10 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
     setIsImageOpen(true);
   };
 
-  const requestTool = async () => {
-    if (!tool) return;
-    if (!startDate || !startTime || !endDate || !endTime) {
-      return;
-    }
-    if (!token) {
-      navigate("/auth", { state: { redirectHint: "Bitte melde dich an, um eine Ausleihe anzufragen." } });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const startIso = `${startDate}T${startTime}`;
-      const endIso = `${endDate}T${endTime}`;
-      if (new Date(endIso) <= new Date(startIso)) {
-        throw new Error("Der gewählte Zeitraum ist ungültig. Bitte eine spätere Abgabe wählen.");
-      }
-
-      const createdBooking = await api.createToolRequest(
+  const { mutate: requestToolMut, isPending: isRequestingTool } = useMutation({
+    mutationFn: async ({ startIso, endIso }: { startIso: string; endIso: string }) => {
+      if (!tool || !token) throw new Error("Missing context");
+      return api.createToolRequest(
         {
           toolId: tool.id,
           startIso,
@@ -263,20 +243,49 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
         },
         token
       );
+    },
+    onSuccess: (createdBooking) => {
       pushToast("Ausleihanfrage erstellt.", "success");
       navigate("/inbox", { state: { bookingId: createdBooking.id } });
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Anfrage konnte nicht erstellt werden.", "error");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  });
 
-  const blockToolForOwnUse = async () => {
-    if (!tool || !token) return;
+  const requestTool = () => {
     if (!startDate || !startTime || !endDate || !endTime) {
       return;
     }
+    if (!token) {
+      navigate("/auth", { state: { redirectHint: "Bitte melde dich an, um eine Ausleihe anzufragen." } });
+      return;
+    }
+    const startIso = `${startDate}T${startTime}`;
+    const endIso = `${endDate}T${endTime}`;
+    if (new Date(endIso) <= new Date(startIso)) {
+      pushToast("Der gewählte Zeitraum ist ungültig. Bitte eine spätere Abgabe wählen.", "error");
+      return;
+    }
+    requestToolMut({ startIso, endIso });
+  };
+
+  const { mutate: blockToolMut, isPending: isBlockingTool } = useMutation({
+    mutationFn: async ({ startIso, endIso }: { startIso: string; endIso: string }) => {
+      if (!tool || !token) throw new Error("Missing context");
+      await api.createToolOwnerBlock({ toolId: tool.id, startIso, endIso }, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tool", id] });
+      pushToast("Werkzeug wurde für deinen Eigenbedarf blockiert.", "success");
+    },
+    onError: (error) => {
+      pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht blockiert werden.", "error");
+    }
+  });
+
+  const blockToolForOwnUse = () => {
+    if (!startDate || !startTime || !endDate || !endTime) return;
     const startIso = `${startDate}T${startTime}`;
     const endIso = `${endDate}T${endTime}`;
     if (new Date(endIso) <= new Date(startIso)) {
@@ -287,56 +296,37 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
       pushToast("Im gewählten Zeitraum ist bereits eine angenommene oder offene Buchung vorhanden.", "error");
       return;
     }
-    setIsSubmitting(true);
-    try {
-      await api.createToolOwnerBlock({ toolId: tool.id, startIso, endIso }, token);
-      setBlockingPeriods((current) => [...current, { startIso, endIso }]);
-      // Liste der eigenen Blockaden aktualisieren, damit die neue Blockade entfernbar ist.
-      try {
-        setOwnerBlocks(await api.getToolOwnerBlocks(tool.id, token));
-      } catch {
-        /* Liste bleibt unverändert, falls das Nachladen fehlschlägt */
-      }
-      pushToast("Werkzeug wurde für deinen Eigenbedarf blockiert.", "success");
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht blockiert werden.", "error");
-    } finally {
-      setIsSubmitting(false);
-    }
+    blockToolMut({ startIso, endIso });
   };
 
-  const removeOwnerBlock = async (block: OwnerBlock) => {
-    if (!tool || !token) return;
-    setDeletingBlockId(block.id);
-    try {
-      await api.deleteToolOwnerBlock(tool.id, block.id, token);
-      setOwnerBlocks((current) => current.filter((entry) => entry.id !== block.id));
-      // Kalender-Sperrzeiten frisch laden, damit der freigegebene Zeitraum wieder buchbar ist.
-      try {
-        setBlockingPeriods(await api.getToolBlockingPeriods(tool.id));
-      } catch {
-        /* Sperrzeiten bleiben unverändert, falls das Nachladen fehlschlägt */
-      }
+  const { mutate: removeOwnerBlockMut, isPending: isRemovingBlock, variables: removingBlockVars } = useMutation({
+    mutationFn: async (blockId: string) => {
+      if (!tool || !token) throw new Error("Missing context");
+      await api.deleteToolOwnerBlock(tool.id, blockId, token);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tool", id] });
       pushToast("Blockierung wurde aufgehoben.", "success");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Blockierung konnte nicht aufgehoben werden.", "error");
-    } finally {
-      setDeletingBlockId(null);
     }
-  };
+  });
 
-  const deleteTool = async () => {
-    if (!tool || !token) return;
-    setIsDeleting(true);
-    try {
+  const { mutate: deleteToolMut, isPending: isDeleting } = useMutation({
+    mutationFn: async () => {
+      if (!tool || !token) throw new Error("Missing context");
       await api.deleteTool(tool.id, token);
+    },
+    onSuccess: () => {
       pushToast("Werkzeug endgültig gelöscht.", "success");
       navigate("/offers");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Werkzeug konnte nicht gelöscht werden.", "error");
-      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
-  };
+  });
 
   const closeReportForm = () => {
     setShowReportForm(false);
@@ -352,13 +342,9 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
     setShowReportForm(true);
   };
 
-  const reportTool = async () => {
-    if (!tool) return;
-    if (reportReason.trim().length < 5) {
-      return;
-    }
-    setIsReporting(true);
-    try {
+  const { mutate: reportToolMut, isPending: isReporting } = useMutation({
+    mutationFn: async () => {
+      if (!tool || !token) throw new Error("Missing context");
       await api.createReport(
         {
           targetType: "TOOL",
@@ -366,23 +352,25 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
           reason: reportReason.trim(),
           details: reportDetails.trim() || undefined
         },
-        token!
+        token
       );
+    },
+    onSuccess: () => {
       closeReportForm();
       pushToast("Meldung wurde erfasst.", "success");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Meldung konnte nicht gesendet werden.", "error");
-    } finally {
-      setIsReporting(false);
     }
+  });
+
+  const reportTool = () => {
+    if (reportReason.trim().length < 5) return;
+    reportToolMut();
   };
 
-  if (isLoading) {
+  if (isLoading || !tool) {
     return <section className="stack"><p>Laden...</p></section>;
-  }
-
-  if (!tool) {
-    return <section className="stack"><p>Werkzeug nicht gefunden.</p></section>;
   }
 
   const providerName = tool.ownerName ?? "Unbekannt";
@@ -405,7 +393,7 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
           submitLabel="Werkzeug melden"
           onReasonChange={setReportReason}
           onDetailsChange={setReportDetails}
-          onSubmit={() => void reportTool()}
+          onSubmit={reportTool}
           onCancel={closeReportForm}
         />
       )}
@@ -588,15 +576,15 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
                 {isOwnTool ? (
                   <button
                     className="booking-button"
-                    onClick={() => void blockToolForOwnUse()}
-                    disabled={isSubmitting}
+                    onClick={blockToolForOwnUse}
+                    disabled={isBlockingTool}
                     aria-label={`Zeitraum für ${tool.name} blockieren`}
                   >
-                    {isSubmitting ? "Wird blockiert..." : "Zeitraum blockieren"}
+                    {isBlockingTool ? "Wird blockiert..." : "Zeitraum blockieren"}
                   </button>
                 ) : token ? (
-                  <button className="booking-button" onClick={() => void requestTool()} disabled={isSubmitting}>
-                    {isSubmitting ? "Wird versendet..." : "Anfrage senden"}
+                  <button className="booking-button" onClick={requestTool} disabled={isRequestingTool}>
+                    {isRequestingTool ? "Wird versendet..." : "Anfrage senden"}
                   </button>
                 ) : (
                   <Link
@@ -627,11 +615,11 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
                         <button
                           type="button"
                           className="owner-blocks-remove"
-                          onClick={() => void removeOwnerBlock(block)}
-                          disabled={deletingBlockId === block.id}
+                          onClick={() => removeOwnerBlockMut(block.id)}
+                          disabled={isRemovingBlock && removingBlockVars === block.id}
                           aria-label="Blockierung aufheben"
                         >
-                          {deletingBlockId === block.id ? "Wird entfernt..." : "Entfernen"}
+                          {isRemovingBlock && removingBlockVars === block.id ? "Wird entfernt..." : "Entfernen"}
                         </button>
                       </li>
                     ))}
@@ -666,7 +654,7 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
           confirmLabel="Werkzeug endgültig löschen"
           isBusy={isDeleting}
           onCancel={() => setShowDeleteDialog(false)}
-          onConfirm={() => void deleteTool()}
+          onConfirm={() => deleteToolMut()}
         />
       )}
 

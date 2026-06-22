@@ -8,3 +8,4 @@ export * from './auth/session';
 export * from './services/sessionEvents';
 export * from './services/requestActivity';
 export * from './utils/searchFilters';
+export { z } from 'zod';

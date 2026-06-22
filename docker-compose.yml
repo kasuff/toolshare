@@ -24,7 +24,8 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       target: dev
     ports:
       - "4000:4000"
@@ -41,10 +42,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: sh -c "npx prisma db push --accept-data-loss && npm run dev"
+    command: sh -c "npx prisma db push --accept-data-loss --skip-generate && npm run dev"
     volumes:
       - ./backend/src:/app/src
       - ./backend/prisma:/app/prisma
+      - ./shared:/shared
+      - shared_node_modules:/shared/node_modules
     networks:
       - toolshare-network
 
@@ -77,6 +80,7 @@ services:
 
 volumes:
   pgdata:
+  shared_node_modules:
 
 networks:
   toolshare-network:
