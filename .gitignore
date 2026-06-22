@@ -36,6 +36,14 @@ coverage/
 lighthouse-results/
 frontend/src/**/*.js
 
+# Playwright / E2E
+frontend/e2e/.auth/
+frontend/playwright-report/
+frontend/test-results/
+frontend/playwright-junit.xml
+frontend/blob-report/
+frontend/playwright/.cache/
+
 # Docker
 .docker/
 
