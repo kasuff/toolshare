@@ -115,6 +115,35 @@ echo "Starting app stack..."
 $COMPOSE -f "$COMPOSE_FILE" up -d --remove-orphans
 wait_for_containers "$COMPOSE_FILE"
 
+# 2b) monitoring/.env aus CI/CD-Variablen erzeugen, damit Pipeline- UND
+#     manuelle (server-seitige) Deploys dieselbe Quelle nutzen. Läuft nur in
+#     der CI ($CI ist von GitLab gesetzt) und schreibt jeden Key nur, wenn ein
+#     Wert vorhanden ist → bestehende, von Hand gepflegte Werte in
+#     monitoring/.env (z. B. PROMETHEUS_RETENTION) bleiben unangetastet.
+if [ -n "${CI:-}" ]; then
+	MON_ENV="$REPO_ROOT/monitoring/.env"
+	touch "$MON_ENV"
+
+	set_env() {
+		key="$1"
+		val="$2"
+		[ -n "$val" ] || return 0
+		tmp="$(mktemp)"
+		# bestehende Zeile für den Key entfernen, dann neuen Wert anhängen
+		grep -v "^${key}=" "$MON_ENV" >"$tmp" 2>/dev/null || true
+		printf '%s=%s\n' "$key" "$val" >>"$tmp"
+		mv "$tmp" "$MON_ENV"
+	}
+
+	echo "Refreshing monitoring/.env from CI variables..."
+	set_env GITLAB_URL "${GITLAB_URL:-$CI_SERVER_URL}"
+	set_env GITLAB_PROJECT "${GITLAB_PROJECT:-$CI_PROJECT_PATH}"
+	set_env GITLAB_TOKEN "${GITLAB_TOKEN:-}"
+	set_env GITLAB_PRODUCTION_ENV "${GITLAB_PRODUCTION_ENV:-}"
+	set_env GRAFANA_ADMIN_PASSWORD "${GRAFANA_ADMIN_PASSWORD:-}"
+	set_env DORA_OUTAGE_SOURCE "${DORA_OUTAGE_SOURCE:-}"
+fi
+
 # 3) Ensure the monitoring stack is up. It runs as an independent compose
 #    project on the same external network, so it is brought up separately and
 #    is unaffected by an app build/health failure above.
