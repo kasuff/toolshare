@@ -13,7 +13,7 @@ import { WORKSHOP_EQUIPMENT } from "../components/workshop-equipment";
 import {  DEFAULT_PLACEHOLDER_IMAGE, TOOL_CATEGORIES  } from "@toolshare/shared";
 import { useToast } from "../hooks/useToast";
 import {  api  } from "@toolshare/shared";
-import { distanceBetweenLocations, isDateRangeAvailable, isDayUnavailable, isWithinRadius } from "@toolshare/shared";
+import { distanceBetweenPoints, isDateRangeAvailable, isDayUnavailable, isPointWithinRadius, type GeoPoint } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
 import { pluralize } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
@@ -146,8 +146,13 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   const [maxCapacityFilter, setMaxCapacityFilter] = useState(10);
   const [borrowFrom, setBorrowFrom] = useState("");
   const [borrowUntil, setBorrowUntil] = useState("");
-  const [radiusKm, setRadiusKm] = useState(5);
+  const [radiusKm, setRadiusKm] = useState(15);
   const defaultLocation = currentUser?.address ?? "München Zentrum";
+  const originPoint: GeoPoint = {
+    latitude: currentUser?.latitude,
+    longitude: currentUser?.longitude,
+    location: defaultLocation
+  };
   const [items, setItems] = useState<WorkshopListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -232,8 +237,30 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   }, [borrowFrom, borrowUntil, items, maxCapacityFilter, toolFilter]);
 
   const filteredItems = useMemo(() => {
-    return candidateItems.filter((item) => isWithinRadius(defaultLocation, item.workshop.location, radiusKm));
-  }, [candidateItems, defaultLocation, radiusKm]);
+    return candidateItems
+      .map((item) => ({
+        item,
+        distance: distanceBetweenPoints(originPoint, {
+          latitude: item.workshop.latitude,
+          longitude: item.workshop.longitude,
+          location: item.workshop.location
+        })
+      }))
+      .filter(({ item }) =>
+        isPointWithinRadius(
+          originPoint,
+          {
+            latitude: item.workshop.latitude,
+            longitude: item.workshop.longitude,
+            location: item.workshop.location
+          },
+          radiusKm
+        )
+      )
+      .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+      .map((entry) => entry.item);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateItems, currentUser?.latitude, currentUser?.longitude, defaultLocation, radiusKm]);
 
   const selectedWorkshop = useMemo(() => {
     const workshopId = selectedWorkshopId ?? openWorkshopId;
@@ -259,7 +286,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
   }, [selectedWorkshop?.workshop.id]);
 
   const hasActiveFilters = Boolean(
-    q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== 10 || radiusKm !== 5
+    q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== 10 || radiusKm !== 15
   );
 
   const resetFilters = () => {
@@ -268,7 +295,7 @@ export function WorkshopsPage({ token, currentUser }: Props) {
     setBorrowFrom("");
     setBorrowUntil("");
     setMaxCapacityFilter(10);
-    setRadiusKm(5);
+    setRadiusKm(15);
   };
 
   const openWorkshop = (workshop: WorkshopListItem) => {
@@ -607,10 +634,14 @@ export function WorkshopsPage({ token, currentUser }: Props) {
             </div>
             <SearchRadiusMap
               centerAddress={defaultLocation}
+              centerLatitude={currentUser?.latitude}
+              centerLongitude={currentUser?.longitude}
               points={candidateItems.map((item) => ({
                 id: item.workshop.id,
                 label: item.workshop.name,
-                location: item.workshop.location
+                location: item.workshop.location,
+                latitude: item.workshop.latitude,
+                longitude: item.workshop.longitude
               }))}
               radiusKm={radiusKm}
               onRadiusChange={setRadiusKm}
@@ -626,7 +657,11 @@ export function WorkshopsPage({ token, currentUser }: Props) {
           <EmptyState title="Keine Werkstatt gefunden" text="Passe die Suche an oder prüfe später erneut." />
         )}
         {publicWorkshops.map((item) => {
-          const distance = distanceBetweenLocations(defaultLocation, item.workshop.location);
+          const distance = distanceBetweenPoints(originPoint, {
+            latitude: item.workshop.latitude,
+            longitude: item.workshop.longitude,
+            location: item.workshop.location
+          });
           const ownerName = item.workshop.ownerName ?? "Unbekannt";
           const primaryImage = item.workshop.imageUrls[0];
           const cardImage = primaryImage || DEFAULT_PLACEHOLDER_IMAGE;

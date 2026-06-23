@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { env } from "../../config/env";
 import { AppError } from "../../utils/app-error";
+import { addressService } from "../address/address.service";
 import { authRepository } from "./auth.repository";
 
 const SALT_ROUNDS = 12;
@@ -45,11 +46,14 @@ export const authService = {
     }
 
     const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+    const coordinates = await addressService.geocode(input.address);
     const user = await authRepository.createUser({
       email: input.email,
       passwordHash,
       name: input.name,
       address: input.address,
+      latitude: coordinates?.latitude ?? null,
+      longitude: coordinates?.longitude ?? null,
       role: "USER"
     });
 

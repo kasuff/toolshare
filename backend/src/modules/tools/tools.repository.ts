@@ -134,6 +134,8 @@ export const toolsRepository = {
     imageUrl?: string;
     pickupLocation: string;
     pickupLocationNote?: string;
+    pickupLat?: number | null;
+    pickupLon?: number | null;
   }) {
     return prisma.tool.create({
       data: {
@@ -144,6 +146,8 @@ export const toolsRepository = {
         imageUrl: input.imageUrl,
         pickupLocation: input.pickupLocation,
         pickupLocationNote: input.pickupLocationNote,
+        pickupLat: input.pickupLat,
+        pickupLon: input.pickupLon,
         status: "AVAILABLE"
       }
     });
@@ -158,6 +162,8 @@ export const toolsRepository = {
       imageUrl?: string;
       pickupLocation?: string;
       pickupLocationNote?: string;
+      pickupLat?: number | null;
+      pickupLon?: number | null;
       status?: "AVAILABLE" | "REQUESTED" | "BORROWED";
     }
   ) {

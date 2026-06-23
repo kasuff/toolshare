@@ -1,14 +1,19 @@
 import type { CSSProperties } from "react";
-import { coordinatesForLocation, distanceInKm, type Coordinates } from "@toolshare/shared";
+import { coordinatesForLocation, coordinatesForPoint, distanceInKm, type Coordinates } from "@toolshare/shared";
 
 type SearchMapPoint = {
   id: string;
   label: string;
   location?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type SearchRadiusMapProps = {
   centerAddress: string;
+  /** Echte Koordinaten des Mittelpunkts (z. B. der Heimadresse); Fallback ist centerAddress. */
+  centerLatitude?: number | null;
+  centerLongitude?: number | null;
   points: SearchMapPoint[];
   radiusKm: number;
   onRadiusChange: (value: number) => void;
@@ -69,12 +74,26 @@ function tileGrid(center: Coordinates, zoom: number) {
   );
 }
 
-export function SearchRadiusMap({ centerAddress, points, radiusKm, onRadiusChange, sliderId }: SearchRadiusMapProps) {
-  const center = coordinatesForLocation(centerAddress) ?? coordinatesForLocation("München Zentrum")!;
+export function SearchRadiusMap({
+  centerAddress,
+  centerLatitude,
+  centerLongitude,
+  points,
+  radiusKm,
+  onRadiusChange,
+  sliderId
+}: SearchRadiusMapProps) {
+  const center =
+    coordinatesForPoint({ latitude: centerLatitude, longitude: centerLongitude, location: centerAddress }) ??
+    coordinatesForLocation("München Zentrum")!;
   const zoom = chooseZoom(center, radiusKm);
   const visiblePoints = points
     .map((point) => {
-      const coordinates = coordinatesForLocation(point.location);
+      const coordinates = coordinatesForPoint({
+        latitude: point.latitude,
+        longitude: point.longitude,
+        location: point.location
+      });
       if (!coordinates) return null;
       return {
         ...point,
@@ -114,9 +133,9 @@ export function SearchRadiusMap({ centerAddress, points, radiusKm, onRadiusChang
           className="radius-slider"
           type="range"
           min={1}
-          max={5}
+          max={30}
           value={radiusKm}
-          style={{ "--range-progress": `${((radiusKm - 1) / 4) * 100}%` } as CSSProperties}
+          style={{ "--range-progress": `${((radiusKm - 1) / 29) * 100}%` } as CSSProperties}
           onChange={(event) => onRadiusChange(Number(event.target.value))}
         />
       </div>

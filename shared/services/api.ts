@@ -30,6 +30,8 @@ type BackendUser = {
   email: string;
   name: string;
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   avatarUrl?: string | null;
   role: BackendRole;
   isSuspended: boolean;
@@ -115,6 +117,8 @@ export type AddressSuggestion = {
   postalCode: string;
   city: string;
   country: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type AuthPayload = {
@@ -140,6 +144,8 @@ type BackendTool = {
   imageUrl?: string | null;
   pickupLocation?: string | null;
   pickupLocationNote?: string | null;
+  pickupLat?: number | null;
+  pickupLon?: number | null;
   status: BackendToolStatus;
   bookings?: BackendWorkshopBookedRange[];
 };
@@ -151,6 +157,8 @@ type BackendWorkshop = {
   name: string;
   description: string;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
   maxCapacity: number;
   equipment?: string[];
   extras?: string[];
@@ -387,6 +395,8 @@ function mapTool(tool: BackendTool): Tool {
     imageUrl: normalizePlaceholderImage(tool.imageUrl),
     pickupLocation: tool.pickupLocation ?? "",
     pickupLocationNote: tool.pickupLocationNote ?? undefined,
+    pickupLat: tool.pickupLat ?? undefined,
+    pickupLon: tool.pickupLon ?? undefined,
     bookedRanges: mapWorkshopBookedRanges(tool.bookings)
   };
 }
@@ -400,6 +410,8 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
     name: workshop.name,
     description: workshop.description,
     location: workshop.location,
+    latitude: workshop.latitude ?? undefined,
+    longitude: workshop.longitude ?? undefined,
     maxCapacity: workshop.maxCapacity,
     extras,
     equipmentItems: (workshop.workshopTools ?? []).map((tool) => ({
@@ -592,6 +604,8 @@ export const api = {
       name: user.name,
       email: user.email,
       address: user.address,
+      latitude: user.latitude ?? undefined,
+      longitude: user.longitude ?? undefined,
       role: roleMap[user.role],
       isSuspended: user.isSuspended ?? false
     };
@@ -659,6 +673,8 @@ export const api = {
       name: user.name,
       email: user.email,
       address: user.address,
+      latitude: user.latitude ?? undefined,
+      longitude: user.longitude ?? undefined,
       role: roleMap[user.role],
       isSuspended: user.isSuspended
     };

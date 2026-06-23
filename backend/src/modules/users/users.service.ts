@@ -1,4 +1,5 @@
 import { AppError } from "../../utils/app-error";
+import { addressService } from "../address/address.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { usersRepository } from "./users.repository";
 
@@ -29,9 +30,15 @@ export const usersService = {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
 
+    // Bei geänderter Adresse die Koordinaten neu bestimmen.
+    const geo = input.address !== undefined ? await addressService.geocode(input.address) : null;
+
     return usersRepository.updateProfile(input.userId, {
       name: input.name,
       address: input.address,
+      ...(input.address !== undefined
+        ? { latitude: geo?.latitude ?? null, longitude: geo?.longitude ?? null }
+        : {}),
       expoPushToken: input.expoPushToken
     });
   },

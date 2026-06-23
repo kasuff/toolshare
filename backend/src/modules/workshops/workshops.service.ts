@@ -1,4 +1,5 @@
 import { AppError } from "../../utils/app-error";
+import { addressService } from "../address/address.service";
 import { workshopsRepository } from "./workshops.repository";
 
 export const workshopsService = {
@@ -23,7 +24,7 @@ export const workshopsService = {
     return { ...workshop, bookings };
   },
 
-  create(input: {
+  async create(input: {
     managerId: string;
     name: string;
     description: string;
@@ -33,8 +34,11 @@ export const workshopsService = {
     workshopTools?: Array<{ name: string; category: string }>;
     imageUrls?: string[];
   }) {
+    const coordinates = await addressService.geocode(input.location);
     return workshopsRepository.create({
       ...input,
+      latitude: coordinates?.latitude ?? null,
+      longitude: coordinates?.longitude ?? null,
       extras: input.extras ?? [],
       workshopTools: input.workshopTools ?? [],
       imageUrls: input.imageUrls ?? []
@@ -65,7 +69,16 @@ export const workshopsService = {
       throw new AppError("FORBIDDEN", "Only the workshop manager can update this workshop", 403);
     }
 
-    return workshopsRepository.update(input.workshopId, input.data);
+    // Bei geänderter Adresse die Koordinaten neu bestimmen.
+    const geo =
+      input.data.location !== undefined ? await addressService.geocode(input.data.location) : null;
+
+    return workshopsRepository.update(input.workshopId, {
+      ...input.data,
+      ...(input.data.location !== undefined
+        ? { latitude: geo?.latitude ?? null, longitude: geo?.longitude ?? null }
+        : {})
+    });
   },
 
   async remove(input: {

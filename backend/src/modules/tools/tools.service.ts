@@ -1,4 +1,5 @@
 import { AppError } from "../../utils/app-error";
+import { addressService } from "../address/address.service";
 import { toolsRepository } from "./tools.repository";
 
 const canModerate = (role: "USER" | "MODERATOR" | "MANAGER") => {
@@ -67,7 +68,7 @@ export const toolsService = {
     }
   },
 
-  create(input: {
+  async create(input: {
     ownerId: string;
     name: string;
     description: string;
@@ -76,7 +77,12 @@ export const toolsService = {
     pickupLocation: string;
     pickupLocationNote?: string;
   }) {
-    return toolsRepository.create(input);
+    const coordinates = await addressService.geocode(input.pickupLocation);
+    return toolsRepository.create({
+      ...input,
+      pickupLat: coordinates?.latitude ?? null,
+      pickupLon: coordinates?.longitude ?? null
+    });
   },
 
   async update(input: {
@@ -103,7 +109,18 @@ export const toolsService = {
       throw new AppError("FORBIDDEN", "Only owner or moderation roles can update this tool", 403);
     }
 
-    return toolsRepository.update(input.toolId, input.data);
+    // Bei geänderter Abholadresse die Koordinaten neu bestimmen.
+    const geo =
+      input.data.pickupLocation !== undefined
+        ? await addressService.geocode(input.data.pickupLocation)
+        : null;
+
+    return toolsRepository.update(input.toolId, {
+      ...input.data,
+      ...(input.data.pickupLocation !== undefined
+        ? { pickupLat: geo?.latitude ?? null, pickupLon: geo?.longitude ?? null }
+        : {})
+    });
   },
 
   async remove(input: {

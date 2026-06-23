@@ -68,6 +68,37 @@ export function isWithinRadius(origin: string, target: string | undefined, radiu
   return distance <= radiusKm;
 }
 
+/**
+ * Ein Ort mit optionalen, vorab geocodierten Koordinaten und einer Adresse
+ * als Fallback. Wenn echte Koordinaten vorliegen, werden diese verwendet –
+ * sonst wird die Adresse grob über bekannte Muster aufgelöst.
+ */
+export type GeoPoint = {
+  latitude?: number | null;
+  longitude?: number | null;
+  location?: string | null;
+};
+
+export function coordinatesForPoint(point: GeoPoint): Coordinates | null {
+  if (typeof point.latitude === "number" && typeof point.longitude === "number") {
+    return { lat: point.latitude, lon: point.longitude };
+  }
+  return coordinatesForLocation(point.location ?? undefined);
+}
+
+export function distanceBetweenPoints(origin: GeoPoint, target: GeoPoint): number | null {
+  const originCoordinates = coordinatesForPoint(origin);
+  const targetCoordinates = coordinatesForPoint(target);
+  if (!originCoordinates || !targetCoordinates) return null;
+  return distanceInKm(originCoordinates, targetCoordinates);
+}
+
+export function isPointWithinRadius(origin: GeoPoint, target: GeoPoint, radiusKm: number): boolean {
+  const distance = distanceBetweenPoints(origin, target);
+  if (distance === null) return false;
+  return distance <= radiusKm;
+}
+
 function startsBeforeOrAt(slotStart: string, filterEnd?: string) {
   if (!filterEnd) return true;
   return new Date(slotStart).getTime() <= new Date(`${filterEnd}T23:59`).getTime();

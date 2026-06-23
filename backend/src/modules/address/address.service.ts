@@ -11,6 +11,8 @@ type NominatimAddressParts = {
 
 type NominatimSearchResult = {
   display_name: string;
+  lat?: string;
+  lon?: string;
   address?: NominatimAddressParts;
 };
 
@@ -21,6 +23,13 @@ type StructuredAddressSuggestion = {
   postalCode: string;
   city: string;
   country: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+export type GeoCoordinates = {
+  latitude: number;
+  longitude: number;
 };
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
@@ -52,6 +61,12 @@ async function searchAddress(query: string, limit: number): Promise<NominatimSea
   return Array.isArray(payload) ? payload : [];
 }
 
+function parseCoordinate(value?: string): number | null {
+  if (value === undefined) return null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function toStructuredSuggestion(result: NominatimSearchResult): StructuredAddressSuggestion {
   const parts = result.address ?? {};
   return {
@@ -60,7 +75,9 @@ function toStructuredSuggestion(result: NominatimSearchResult): StructuredAddres
     houseNumber: parts.house_number ?? "",
     postalCode: parts.postcode ?? "",
     city: parts.city ?? parts.town ?? parts.village ?? parts.municipality ?? "",
-    country: parts.country ?? "Deutschland"
+    country: parts.country ?? "Deutschland",
+    latitude: parseCoordinate(result.lat),
+    longitude: parseCoordinate(result.lon)
   };
 }
 
@@ -78,5 +95,27 @@ export const addressService = {
       normalizedAddress: topResult?.display_name ?? null,
       normalizedParts: topResult ? toStructuredSuggestion(topResult) : null
     };
+  },
+
+  /**
+   * Liefert die Koordinaten zur besten Treffer-Adresse oder null, wenn die
+   * Adresse nicht geocodiert werden kann bzw. der Dienst nicht erreichbar ist.
+   * Wird beim Anlegen/Bearbeiten von Werkzeugen, Werkstätten und Profilen
+   * genutzt, damit echte Entfernungen berechnet werden können.
+   */
+  async geocode(query: string): Promise<GeoCoordinates | null> {
+    const normalized = query.trim();
+    if (normalized.length < 5) return null;
+    try {
+      const results = await searchAddress(normalized, 1);
+      const top = results[0];
+      const latitude = parseCoordinate(top?.lat);
+      const longitude = parseCoordinate(top?.lon);
+      if (latitude === null || longitude === null) return null;
+      return { latitude, longitude };
+    } catch {
+      // Geocoding darf das Anlegen/Speichern nie blockieren.
+      return null;
+    }
   }
 };
