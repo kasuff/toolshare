@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -15,6 +15,9 @@ export function useModalFocus(
   initialFocusRef?: RefObject<HTMLElement>,
   enabled = true
 ) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!enabled) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -31,7 +34,7 @@ export function useModalFocus(
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -63,5 +66,5 @@ export function useModalFocus(
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
     };
-  }, [containerRef, enabled, initialFocusRef, onClose]);
+  }, [containerRef, enabled, initialFocusRef]);
 }
