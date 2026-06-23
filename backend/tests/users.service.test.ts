@@ -44,12 +44,18 @@ describe("usersService profile endpoints", () => {
     const result = await usersService.listUsers({ role: "USER", search: "lea" });
 
     expect(mockedUsersRepository.listPublic).toHaveBeenCalledWith({ role: "USER", search: "lea" });
-    expect(result).toEqual([sampleUser]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "user-1", email: "user@example.com", role: "USER" });
+    expect(typeof result[0].createdAt).toBe("string");
   });
 
   it("returns profile and rejects missing users", async () => {
     mockedUsersRepository.findByIdPublic.mockResolvedValueOnce(sampleUser as any);
-    await expect(usersService.getMyProfile("user-1")).resolves.toEqual(sampleUser);
+    await expect(usersService.getMyProfile("user-1")).resolves.toMatchObject({
+      id: "user-1",
+      email: "user@example.com",
+      name: "User"
+    });
 
     mockedUsersRepository.findByIdPublic.mockResolvedValueOnce(null);
     await expect(usersService.getById("missing")).rejects.toMatchObject({ code: "USER_NOT_FOUND", status: 404 });

@@ -2,13 +2,19 @@ import { AppError } from "../../utils/app-error";
 import { getImageStorageService } from "../../config/services";
 import { resolveImageUrls } from "../../ports/image-storage.service";
 import { workshopsRepository } from "./workshops.repository";
+import {
+  toWorkshopResponse,
+  toWorkshopResponseList,
+  toWorkshopTimeslotResponse
+} from "./workshops.presenter";
 
 export const workshopsService = {
-  list(filters: { managerId?: string; location?: string; search?: string }) {
-    return workshopsRepository.list({
+  async list(filters: { managerId?: string; location?: string; search?: string }) {
+    const workshops = await workshopsRepository.list({
       ...filters,
       excludeSuspendedManagers: !filters.managerId
     });
+    return toWorkshopResponseList(workshops);
   },
 
   async getById(id: string) {
@@ -22,7 +28,7 @@ export const workshopsService = {
     // Belegte Zeiträume separat laden, damit auch Altbuchungen via timeslotId
     // (nicht nur direkter workshopId-FK) im Kalender als belegt erscheinen.
     const bookings = await workshopsRepository.findActiveBookingRanges(id);
-    return { ...workshop, bookings };
+    return toWorkshopResponse({ ...workshop, bookings });
   },
 
   async create(input: {
@@ -37,12 +43,13 @@ export const workshopsService = {
   }) {
     const storage = getImageStorageService();
     const imageUrls = (await resolveImageUrls(storage, input.imageUrls)) ?? [];
-    return workshopsRepository.create({
+    const created = await workshopsRepository.create({
       ...input,
       extras: input.extras ?? [],
       workshopTools: input.workshopTools ?? [],
       imageUrls
     });
+    return toWorkshopResponse(created);
   },
 
   async update(input: {
@@ -75,10 +82,11 @@ export const workshopsService = {
         ? (await resolveImageUrls(storage, input.data.imageUrls)) ?? []
         : undefined;
 
-    return workshopsRepository.update(input.workshopId, {
+    const updated = await workshopsRepository.update(input.workshopId, {
       ...input.data,
       ...(imageUrls !== undefined ? { imageUrls } : {})
     });
+    return toWorkshopResponse(updated);
   },
 
   async remove(input: {
@@ -145,7 +153,7 @@ export const workshopsService = {
         throw new AppError("ACTIVE_BOOKING_EXISTS", "Affected timeslot has active bookings and cannot be blocked", 409);
       }
 
-      return blockedInsert;
+      return toWorkshopTimeslotResponse(blockedInsert);
     }
 
     const overlap = await workshopsRepository.findOverlappingTimeslot(
@@ -157,12 +165,13 @@ export const workshopsService = {
       throw new AppError("TIMESLOT_CONFLICT", "Timeslot overlaps with an existing slot", 409);
     }
 
-    return workshopsRepository.createTimeslot({
+    const created = await workshopsRepository.createTimeslot({
       workshopId: input.workshopId,
       startTime,
       endTime,
       blockedByOwner
     });
+    return toWorkshopTimeslotResponse(created);
   },
 
   async updateTimeslot(input: {
@@ -221,11 +230,12 @@ export const workshopsService = {
       }
     }
 
-    return workshopsRepository.updateTimeslot(input.timeslotId, {
+    const updated = await workshopsRepository.updateTimeslot(input.timeslotId, {
       startTime: input.startTime ? nextStart : undefined,
       endTime: input.endTime ? nextEnd : undefined,
       blockedByOwner: input.blockedByOwner
     });
+    return toWorkshopTimeslotResponse(updated);
   },
 
   async removeTimeslot(input: {

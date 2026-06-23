@@ -20,23 +20,12 @@ export const toolsController = {
 
   listBlockingPeriods: asyncHandler(async (req: Request, res: Response) => {
     const periods = await toolsService.listBlockingPeriods(req.params.id);
-    res.status(200).json(
-      periods.map((period) => ({
-        startDate: period.startDate.toISOString(),
-        endDate: period.endDate.toISOString()
-      }))
-    );
+    res.status(200).json(periods);
   }),
 
   listOwnerBlocks: asyncHandler(async (req: Request, res: Response) => {
     const blocks = await toolsService.listOwnerBlocks(req.params.id, req.authUser!.userId);
-    res.status(200).json(
-      blocks.map((block) => ({
-        id: block.id,
-        startDate: block.startDate.toISOString(),
-        endDate: block.endDate.toISOString()
-      }))
-    );
+    res.status(200).json(blocks);
   }),
 
   deleteOwnerBlock: asyncHandler(async (req: Request, res: Response) => {

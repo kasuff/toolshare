@@ -7,22 +7,32 @@ import {
   type SystemSetting,
   type SystemSettingKey
 } from "./system-settings.config";
+import {
+  toSystemSettingResponse,
+  toSystemSettingResponseList
+} from "./system-rules.presenter";
+
+// Liefert die durchgesetzten Einstellungen mit aufgelöstem Wert
+// (gespeicherter Wert oder Default) als interne Entity inkl. enforced/defaultValue.
+async function resolveSettings(): Promise<SystemSetting[]> {
+  const stored = await systemRulesRepository.findAllValues();
+  return ENFORCED_SETTING_DEFS.map((def) => ({
+    ...def,
+    value: stored.get(def.key) ?? def.defaultValue
+  }));
+}
 
 export const systemRulesService = {
-  // Liefert die durchgesetzten Einstellungen mit aufgelöstem Wert
-  // (gespeicherter Wert oder Default). Nicht durchgesetzte Regeln werden
-  // bewusst nicht ausgeliefert – sie sollen nicht angezeigt/editiert werden.
-  async listSettings(): Promise<SystemSetting[]> {
-    const stored = await systemRulesRepository.findAllValues();
-    return ENFORCED_SETTING_DEFS.map((def) => ({
-      ...def,
-      value: stored.get(def.key) ?? def.defaultValue
-    }));
+  // Nicht durchgesetzte Regeln werden bewusst nicht ausgeliefert –
+  // sie sollen nicht angezeigt/editiert werden.
+  async listSettings() {
+    const settings = await resolveSettings();
+    return toSystemSettingResponseList(settings);
   },
 
   // Aufgelöste Werte als Map (key -> value) für die Durchsetzung in der Geschäftslogik.
   async getValues(): Promise<Record<SystemSettingKey, number>> {
-    const settings = await this.listSettings();
+    const settings = await resolveSettings();
     return settings.reduce(
       (acc, setting) => {
         acc[setting.key] = setting.value;
@@ -32,7 +42,7 @@ export const systemRulesService = {
     );
   },
 
-  async updateSetting(key: string, value: number): Promise<SystemSetting> {
+  async updateSetting(key: string, value: number) {
     if (!isEnforcedSettingKey(key)) {
       throw new AppError("SETTING_NOT_FOUND", "System setting not found", 404);
     }
@@ -45,6 +55,6 @@ export const systemRulesService = {
       );
     }
     const row = await systemRulesRepository.upsert(key, value);
-    return { ...def, value: row.value };
+    return toSystemSettingResponse({ ...def, value: row.value });
   }
 };

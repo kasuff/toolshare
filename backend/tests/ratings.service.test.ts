@@ -35,7 +35,8 @@ describe("ratingsService", () => {
 
     const result = await ratingsService.listReceived("u1");
 
-    expect(result).toEqual([{ id: "r1" }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("r1");
   });
 
   it("lists given ratings", async () => {
@@ -43,7 +44,8 @@ describe("ratingsService", () => {
 
     const result = await ratingsService.listGiven("u1");
 
-    expect(result).toEqual([{ id: "r2" }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("r2");
   });
 
   it("rejects missing bookings", async () => {
@@ -190,8 +192,10 @@ describe("ratingsService", () => {
     mockedRatingsRepository.listForTool.mockResolvedValueOnce([{ id: "r-tool" }] as any);
     mockedRatingsRepository.listForWorkshop.mockResolvedValueOnce([{ id: "r-workshop" }] as any);
 
-    await expect(ratingsService.listForTool("tool-1")).resolves.toEqual([{ id: "r-tool" }]);
-    await expect(ratingsService.listForWorkshop("workshop-1")).resolves.toEqual([{ id: "r-workshop" }]);
+    await expect(ratingsService.listForTool("tool-1")).resolves.toMatchObject([{ id: "r-tool" }]);
+    await expect(ratingsService.listForWorkshop("workshop-1")).resolves.toMatchObject([
+      { id: "r-workshop" }
+    ]);
   });
 
   it("rejects hide when rating is missing", async () => {

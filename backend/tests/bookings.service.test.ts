@@ -205,7 +205,8 @@ describe("bookingsService", () => {
     const result = await bookingsService.listForUserContext("u1");
 
     expect(mockedBookingsRepository.listForUserContext).toHaveBeenCalledWith("u1");
-    expect(result).toEqual([{ id: "b1" }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("b1");
   });
 
   it("rejects tool booking when tool does not exist", async () => {

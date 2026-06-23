@@ -3,6 +3,7 @@ import jwt, { SignOptions } from "jsonwebtoken";
 import { env } from "../../config/env";
 import { AppError } from "../../utils/app-error";
 import { authRepository } from "./auth.repository";
+import { toAuthResponse, toRefreshResponse } from "./auth.presenter";
 
 const SALT_ROUNDS = 12;
 
@@ -23,13 +24,27 @@ const signRefreshToken = (payload: TokenPayload) => {
   });
 };
 
-const buildAuthPayload = (user: { id: string; email: string; role: TokenPayload["role"]; name: string }) => {
+const buildAuthPayload = (user: {
+  id: string;
+  email: string;
+  role: TokenPayload["role"];
+  name: string;
+  address?: string;
+  isSuspended?: boolean;
+}) => {
   const payload: TokenPayload = { userId: user.id, role: user.role };
-  return {
-    user: { id: user.id, email: user.email, role: user.role, name: user.name },
+  return toAuthResponse({
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      address: user.address,
+      isSuspended: user.isSuspended
+    },
     accessToken: signAccessToken(payload),
     refreshToken: signRefreshToken(payload)
-  };
+  });
 };
 
 export const authService = {
@@ -109,10 +124,10 @@ export const authService = {
         throw new AppError("ACCOUNT_SUSPENDED", "Konto ist gesperrt.", 403);
       }
 
-      return {
+      return toRefreshResponse({
         accessToken: signAccessToken({ userId: payload.userId, role: user.role }),
         refreshToken: signRefreshToken({ userId: payload.userId, role: user.role })
-      };
+      });
     } catch (error: unknown) {
       if (error instanceof AppError) {
         throw error;
