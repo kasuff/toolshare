@@ -2,6 +2,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Express } from "express";
 import type { PrismaClient } from "@prisma/client";
+import { isoDaysFromNow } from "./helpers/booking-dates";
 
 let app: Express;
 let prisma: PrismaClient;
@@ -17,7 +18,7 @@ async function registerAndLogin(appInstance: Express, email: string, password: s
   return login.body.accessToken as string;
 }
 
-describe.skip("Booking conflict handling (tool + workshop)", () => {
+describe("Booking conflict handling (tool + workshop)", () => {
   const seed = Date.now();
   const ownerEmail = `booking-owner-${seed}@example.com`;
   const requesterEmail = `booking-requester-${seed}@example.com`;
@@ -29,6 +30,8 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
   let toolId: string;
   let workshopId: string;
   let workshopToolId: string;
+  let workshopSlotStart: string;
+  let workshopSlotEnd: string;
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??= "postgresql://toolshare:toolshare@localhost:5432/toolshare";
@@ -79,12 +82,16 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
       });
     expect(workshopResponse.status).toBe(201);
 
+    // Innerhalb der echten Systemregeln: min. 12h Vorlauf, max. 60 Tage Vorausbuchung.
+    workshopSlotStart = isoDaysFromNow(35, 9);
+    workshopSlotEnd = isoDaysFromNow(35, 17);
+
     const slotResponse = await request(app)
       .post(`/api/workshops/${workshopResponse.body.id as string}/timeslots`)
       .set("Authorization", `Bearer ${ownerToken}`)
       .send({
-        startTime: "2026-08-01T09:00:00.000Z",
-        endTime: "2026-08-01T17:00:00.000Z"
+        startTime: workshopSlotStart,
+        endTime: workshopSlotEnd
       });
     expect(slotResponse.status).toBe(201);
     workshopId = workshopResponse.body.id as string;
@@ -136,9 +143,9 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
       .set("Authorization", `Bearer ${requesterToken}`)
       .send({
         toolId,
-        startDate: "2026-06-01T10:00:00.000Z",
-        endDate: "2026-06-05T18:00:00.000Z",
-        pickupTime: "2026-06-01T14:00:00.000Z"
+        startDate: isoDaysFromNow(3),
+        endDate: isoDaysFromNow(7, 18),
+        pickupTime: isoDaysFromNow(3, 14)
       });
 
     expect(first.status).toBe(201);
@@ -148,18 +155,16 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
       .set("Authorization", `Bearer ${secondRequesterToken}`)
       .send({
         toolId,
-        startDate: "2026-06-03T10:00:00.000Z",
-        endDate: "2026-06-07T18:00:00.000Z",
-        pickupTime: "2026-06-03T14:00:00.000Z"
+        startDate: isoDaysFromNow(5),
+        endDate: isoDaysFromNow(9, 18),
+        pickupTime: isoDaysFromNow(5, 14)
       });
 
     expect(conflict.status).toBe(409);
     expect(conflict.body).toMatchObject({
-      error: {
-        code: "BOOKING_CONFLICT",
-        status: 409,
-        message: "Im gewaehlten Zeitraum ist bereits eine Buchung vorhanden."
-      }
+      code: "BOOKING_CONFLICT",
+      status: 409,
+      detail: "Im gewählten Zeitraum ist bereits eine Buchung vorhanden."
     });
 
     const nonOverlap = await request(app)
@@ -167,9 +172,9 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
       .set("Authorization", `Bearer ${secondRequesterToken}`)
       .send({
         toolId,
-        startDate: "2026-07-01T10:00:00.000Z",
-        endDate: "2026-07-05T18:00:00.000Z",
-        pickupTime: "2026-07-01T14:00:00.000Z"
+        startDate: isoDaysFromNow(40),
+        endDate: isoDaysFromNow(44, 18),
+        pickupTime: isoDaysFromNow(40, 14)
       });
 
     expect(nonOverlap.status).toBe(201);
@@ -181,8 +186,8 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
       .set("Authorization", `Bearer ${requesterToken}`)
       .send({
         workshopId,
-        startDate: "2026-08-01T09:00:00.000Z",
-        endDate: "2026-08-01T17:00:00.000Z",
+        startDate: workshopSlotStart,
+        endDate: workshopSlotEnd,
         workshopToolIds: [workshopToolId]
       });
 
@@ -193,18 +198,16 @@ describe.skip("Booking conflict handling (tool + workshop)", () => {
       .set("Authorization", `Bearer ${secondRequesterToken}`)
       .send({
         workshopId,
-        startDate: "2026-08-01T12:00:00.000Z",
-        endDate: "2026-08-01T15:00:00.000Z",
+        startDate: isoDaysFromNow(35, 12),
+        endDate: isoDaysFromNow(35, 15),
         workshopToolIds: [workshopToolId]
       });
 
     expect(conflict.status).toBe(409);
     expect(conflict.body).toMatchObject({
-      error: {
-        code: "BOOKING_CONFLICT",
-        status: 409,
-        message: "Im gewaehlten Zeitraum ist bereits eine Buchung vorhanden."
-      }
+      code: "BOOKING_CONFLICT",
+      status: 409,
+      detail: "Im gewählten Zeitraum ist bereits eine Buchung vorhanden."
     });
   });
 });
