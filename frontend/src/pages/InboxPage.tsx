@@ -962,7 +962,6 @@ export function InboxPage({ currentUser, token }: Props) {
                         secondLabel="Rückgabe"
                         secondValue={formatDateTime(proposal.proposedReturnIso ?? selectedBooking.endIso)}
                         unread={fromOtherUser && proposal.status === "PENDING" && !readMessageIds.has(key)}
-                        onClick={fromOtherUser ? () => markIncomingRead(key) : undefined}
                       />
                     </MessengerRow>
                   );
@@ -992,7 +991,6 @@ export function InboxPage({ currentUser, token }: Props) {
                         secondLabel="Bis"
                         secondValue={formatDateTime(proposal.proposedEndIso)}
                         unread={fromOtherUser && proposal.status === "PENDING" && !readMessageIds.has(key)}
-                        onClick={fromOtherUser ? () => markIncomingRead(key) : undefined}
                       />
                     </MessengerRow>
                   );
