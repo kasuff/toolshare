@@ -3,7 +3,7 @@ import { View, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
 import { useAuth } from '../../hooks/useAuth';
-import { api, SystemSetting } from '@toolshare/shared';
+import { api } from '@toolshare/shared';
 import { Ionicons } from '@expo/vector-icons';
 import {
   AddressInput,
@@ -29,16 +29,9 @@ export default function ProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [systemRules, setSystemRules] = useState<SystemSetting[]>([]);
   const [success, setSuccess] = useState('');
   const colors = useThemeColors();
   const styles = useStyles();
-
-  useEffect(() => {
-    if (token) {
-      api.getSystemSettings(token).then(setSystemRules).catch(console.error);
-    }
-  }, [token]);
 
   const handleChangePassword = async () => {
     setError('');
@@ -175,18 +168,6 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
-
-          {systemRules.length > 0 && (
-            <View style={styles.card}>
-              <ThemedText type="defaultSemiBold" style={styles.editCardTitle}>Systemregeln</ThemedText>
-              {systemRules.map(rule => (
-                <View key={rule.key} style={styles.ruleRow}>
-                  <ThemedText style={{flex: 1}}>{rule.label}</ThemedText>
-                  <ThemedText type="defaultSemiBold">{rule.value} {rule.unit}</ThemedText>
-                </View>
-              ))}
-            </View>
-          )}
 
           <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
             <Ionicons name="create-outline" size={20} color={colors.surface} style={styles.btnIcon} />
@@ -461,13 +442,6 @@ const useStyles = createThemedStyleSheet((colors) => ({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: Spacing.md,
-  },
-  ruleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   linkRow: {
     flexDirection: 'row',
