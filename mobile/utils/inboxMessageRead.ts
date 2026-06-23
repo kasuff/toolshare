@@ -1,4 +1,4 @@
-import type { Booking } from "@toolshare/shared";
+import type { Booking, Rating } from "@toolshare/shared";
 import {
   collectAllMessageKeys,
   collectIncomingMessageKeys,
@@ -48,13 +48,17 @@ export async function saveReadMessageIds(userId: string, ids: Set<string>): Prom
 
 export async function seedReadMessagesIfNeeded(
   userId: string,
-  bookings: Booking[]
+  bookings: Booking[],
+  ratings: Rating[] = []
 ): Promise<Set<string> | null> {
   try {
     const seeded = await storage.getItem(inboxReadSeedKey(userId));
     if (seeded) return null;
 
     const keys = collectAllMessageKeys(bookings);
+    for (const r of ratings) {
+      keys.push(ratingMessageKey(r.bookingId, r.id));
+    }
     const merged = new Set(await loadReadMessageIds(userId));
     for (const key of keys) {
       merged.add(key);
@@ -67,9 +71,16 @@ export async function seedReadMessagesIfNeeded(
   }
 }
 
-export async function markThreadReadForUser(userId: string, booking: Booking): Promise<Set<string> | null> {
+export async function markThreadReadForUser(
+  userId: string,
+  booking: Booking,
+  rating?: Rating | null
+): Promise<Set<string> | null> {
   const currentReadIds = await loadReadMessageIds(userId);
   const incomingKeys = collectIncomingMessageKeys(booking, userId);
+  if (rating && rating.toUserId === userId && rating.status === "SICHTBAR") {
+    incomingKeys.push(ratingMessageKey(booking.id, rating.id));
+  }
   if (incomingKeys.length === 0) {
     return null;
   }

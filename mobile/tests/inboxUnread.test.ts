@@ -82,6 +82,12 @@ describe('isInboxThreadUnread', () => {
     expect(isInboxThreadUnread(booking(), 'provider', new Set())).toBe(true);
     expect(isInboxThreadUnread(booking(), 'provider', new Set(['req:b1']))).toBe(false);
   });
+
+  it('delegates to the per-user unread check for normal bookings with ratings', () => {
+    const r: Rating = { id: 'r1', bookingId: 'b1', fromUserId: 'requester', toUserId: 'provider', score: 5, comment: 'gut', status: 'SICHTBAR', createdIso: '2026-06-01T10:00:00.000Z' };
+    expect(isInboxThreadUnread(booking(), 'provider', new Set(), r)).toBe(true);
+    expect(isInboxThreadUnread(booking(), 'provider', new Set(['req:b1', 'rating:b1:r1']), r)).toBe(false);
+  });
 });
 
 describe('countUnreadInboxItems', () => {

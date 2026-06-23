@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
 import { api, Booking, Rating } from '@toolshare/shared';
 import { RatingFormPanel } from '../../components/RatingFormPanel';
+import { StarRatingDisplay } from '../../components/StarRatingInput';
 import { useAuth } from '../../hooks/useAuth';
 import { EmptyState, LoadingSpinner } from '../../components/EmptyState';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,7 +88,7 @@ function formatDateTime(iso: string) {
   });
 }
 
-function getLastActivityMs(booking: Booking): number {
+function getLastActivityMs(booking: Booking, rating?: Rating | null): number {
   const createdMs = booking.createdIso ? new Date(booking.createdIso).getTime() : 0;
   let latest = Number.isNaN(createdMs) ? 0 : createdMs;
   for (const proposal of booking.pickupProposals ?? []) {
@@ -98,8 +99,61 @@ function getLastActivityMs(booking: Booking): number {
     const ms = new Date(proposal.createdIso).getTime();
     if (!Number.isNaN(ms)) latest = Math.max(latest, ms);
   }
+  if (rating?.createdIso && rating.status === 'SICHTBAR') {
+    const ms = new Date(rating.createdIso).getTime();
+    if (!Number.isNaN(ms)) latest = Math.max(latest, ms);
+  }
   return latest;
 }
+
+function formatShortClockOrDate(iso: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  if (sameDay) {
+    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  }
+  return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth()+1).toString().padStart(2, '0')}`;
+}
+
+function getThreadPreview(row: Booking, currentUserId: string, rating?: Rating | null): string {
+  if (row.type === 'SYSTEM_WARNING') {
+    if (row.systemWarningText?.startsWith('SPERRUNG:')) {
+      return parseSuspensionMessage(row.systemWarningText).reason;
+    }
+    const parsed = parseWarningMessage(row.systemWarningText ?? '');
+    return parsed.reason;
+  }
+  const latestPickup = row.pickupProposals && row.pickupProposals.length > 0 ? row.pickupProposals[row.pickupProposals.length - 1] : null;
+  const latestTimeslot = row.timeslotProposals && row.timeslotProposals.length > 0 ? row.timeslotProposals[row.timeslotProposals.length - 1] : null;
+  const latestPickupMs = latestPickup ? new Date(latestPickup.createdIso).getTime() : 0;
+  const latestTimeslotMs = latestTimeslot ? new Date(latestTimeslot.createdIso).getTime() : 0;
+  const ratingMs = rating && rating.status === 'SICHTBAR' && rating.createdIso ? new Date(rating.createdIso).getTime() : 0;
+  const latestActivityMs = Math.max(latestPickupMs, latestTimeslotMs, ratingMs);
+
+  if (rating && rating.status === 'SICHTBAR' && ratingMs >= latestActivityMs) {
+    if (rating.fromUserId === currentUserId) return `Du: ${rating.score} von 5 Sternen`;
+    return `Bewertung · ${rating.score} von 5 Sternen`;
+  }
+  if (latestPickup && latestPickupMs >= latestTimeslotMs) {
+    const short = formatDateTime(latestPickup.proposedPickupIso);
+    if (latestPickup.proposedById === currentUserId) return `Du: Alternativ ${short}`;
+    return `Alternativvorschlag · ${short}`;
+  }
+  if (latestTimeslot) {
+    const short = formatDateTime(latestTimeslot.proposedStartIso);
+    if (latestTimeslot.proposedById === currentUserId) return `Du: Alternativzeit ${short}`;
+    return `Alternativzeit · ${short}`;
+  }
+  if (row.requesterId === currentUserId) {
+    return row.type === 'WORKSHOP' ? 'Du hast eine Werkstatt angefragt' : 'Du hast eine Ausleihe angefragt';
+  }
+  return row.type === 'WORKSHOP'
+    ? `${row.requesterName ?? 'Jemand'} möchte „${row.toolName ?? 'deine Werkstatt'}“ buchen`
+    : `${row.requesterName ?? 'Jemand'} möchte „${row.toolName ?? 'dein Angebot'}“ ausleihen`;
+}
+
 
 function isBookingRateable(booking: Booking) {
   if (booking.status === "ABGELEHNT" || booking.status === "OFFEN") {
@@ -138,7 +192,8 @@ export default function InboxScreen() {
   const [pickupDraft, setPickupDraft] = useState<DraftToolRangeParts | null>(null);
   const [workshopDraft, setWorkshopDraft] = useState<DraftWorkshopRangeParts | null>(null);
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
-  const { readIds, markThreadRead, isStorageLoaded } = useInboxReadMessages(bookings, isLoading);
+  const allRatings = useMemo(() => [...ratingsGiven, ...ratingsReceived], [ratingsGiven, ratingsReceived]);
+  const { readIds, markThreadRead, isStorageLoaded } = useInboxReadMessages(bookings, allRatings, isLoading);
   
   // Report states
   const [reportTargetUserId, setReportTargetUserId] = useState<string | null>(null);
@@ -149,19 +204,30 @@ export default function InboxScreen() {
 
   // Rating states
   const [ratingsGiven, setRatingsGiven] = useState<Rating[]>([]);
+  const [ratingsReceived, setRatingsReceived] = useState<Rating[]>([]);
   const [showRatingForm, setShowRatingForm] = useState(false);
   const [ratingScore, setRatingScore] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
+  const ratingsByBookingId = useMemo(() => {
+    const map = new Map<string, Rating>();
+    for (const r of ratingsGiven) map.set(r.bookingId, r);
+    for (const r of ratingsReceived) map.set(r.bookingId, r);
+    return map;
+  }, [ratingsGiven, ratingsReceived]);
+
+  const selectedBookingRating = selectedBooking ? ratingsByBookingId.get(selectedBooking.id) ?? null : null;
+
   const loadBookings = useCallback(async () => {
     if (!token || !currentUser?.id) return;
     try {
       setLoadError(null);
-      const [bookingsData, notificationsData, ratingsData] = await Promise.all([
+      const [bookingsData, notificationsData, ratingsGivenData, ratingsReceivedData] = await Promise.all([
         api.getBookingsForUser(token),
         api.getNotifications(token),
-        api.getRatingsGiven(token).catch(() => [])
+        api.getRatingsGiven(token).catch(() => []),
+        api.getRatingsReceived(token).catch(() => [])
       ]);
       
       const systemNotifications = notificationsData
@@ -192,13 +258,21 @@ export default function InboxScreen() {
           } as Booking;
         });
 
+      const localRatingsByBookingId = new Map<string, Rating>();
+      for (const r of ratingsGivenData) localRatingsByBookingId.set(r.bookingId, r);
+      for (const r of ratingsReceivedData) localRatingsByBookingId.set(r.bookingId, r);
+
       const combined = [...bookingsData, ...systemNotifications];
-      combined.sort((a, b) => getLastActivityMs(b) - getLastActivityMs(a));
+      combined.sort((a, b) => 
+        getLastActivityMs(b, localRatingsByBookingId.get(b.id)) - 
+        getLastActivityMs(a, localRatingsByBookingId.get(a.id))
+      );
       
       setBookings(combined);
-      setRatingsGiven(ratingsData);
+      setRatingsGiven(ratingsGivenData);
+      setRatingsReceived(ratingsReceivedData);
       setSelectedBooking((prev) => (prev ? combined.find((b) => b.id === prev.id) ?? prev : null));
-      const unreadCount = await countUnreadInboxItems(bookingsData, notificationsData, currentUser.id);
+      const unreadCount = await countUnreadInboxItems(bookingsData, notificationsData, currentUser.id, ratingsReceivedData);
       notifyInboxBadgeRefresh(unreadCount);
     } catch (e) {
       console.error(e);
@@ -271,7 +345,7 @@ export default function InboxScreen() {
         console.error('Fehler beim Markieren als gelesen:', e);
       }
     } else {
-      await markThreadRead(booking);
+      await markThreadRead(booking, ratingsByBookingId.get(booking.id));
     }
   };
 
@@ -824,6 +898,51 @@ export default function InboxScreen() {
                   </View>
                 </View>
               )}
+
+              {selectedBookingRating && selectedBookingRating.status === 'SICHTBAR' && (() => {
+                const fromOtherUser = selectedBookingRating.fromUserId !== currentUser.id;
+                const senderName = fromOtherUser
+                  ? (selectedBookingRating.fromUserName ?? counterpartName ?? 'Kontakt')
+                  : (currentUser.name || 'Du');
+                return (
+                  <View
+                    style={[
+                      styles.chatMessageRow,
+                      fromOtherUser ? styles.chatMessageRowIncoming : styles.chatMessageRowOutgoing,
+                    ]}
+                  >
+                    {fromOtherUser && (
+                      <View style={[styles.msgAvatar, styles.msgAvatarIncoming]}>
+                        <ThemedText style={styles.msgAvatarText}>{getInitials(senderName) || 'K'}</ThemedText>
+                      </View>
+                    )}
+                    <View style={fromOtherUser ? styles.messageMetaWrapIncoming : styles.messageMetaWrapOutgoing}>
+                      <ThemedText type="muted" style={styles.messageMeta}>
+                        {fromOtherUser ? senderName : 'Du'} · {formatDateTime(selectedBookingRating.createdIso)}
+                      </ThemedText>
+                      <View style={[styles.messageBubble, fromOtherUser ? styles.incomingBubble : styles.outgoingBubble]}>
+                        <View style={styles.messageIconRow}>
+                          <Ionicons name="star" size={20} color={Colors.highlight || '#FFC107'} />
+                          <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
+                            Bewertung
+                          </ThemedText>
+                        </View>
+                        <View style={{ marginTop: Spacing.xs, marginBottom: Spacing.xs }}>
+                          <StarRatingDisplay score={selectedBookingRating.score} size={18} />
+                        </View>
+                        {selectedBookingRating.comment ? (
+                          <ThemedText style={{ marginTop: Spacing.xs }}>{selectedBookingRating.comment}</ThemedText>
+                        ) : null}
+                      </View>
+                    </View>
+                    {!fromOtherUser && (
+                      <View style={[styles.msgAvatar, styles.msgAvatarOutgoing]}>
+                        <ThemedText style={styles.msgAvatarText}>{getInitials(currentUser.name || 'Du') || 'D'}</ThemedText>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
             </>
           )}
 
@@ -1048,7 +1167,8 @@ export default function InboxScreen() {
         const isOwner = booking.providerId === currentUser.id;
         const counterpartName = isSystemWarning ? booking.providerName : (isOwner ? booking.requesterName : booking.providerName);
         const toolName = booking.toolName || (booking.type === 'WORKSHOP' ? 'Werkstatt' : 'Werkzeug');
-        const isUnreadAction = isInboxThreadUnread(booking, currentUser.id, readIds);
+        const rating = ratingsByBookingId.get(booking.id);
+        const isUnreadAction = isInboxThreadUnread(booking, currentUser.id, readIds, rating);
 
         return (
           <TouchableOpacity 
@@ -1067,11 +1187,15 @@ export default function InboxScreen() {
             <View style={styles.threadContent}>
               <View style={styles.threadTopRow}>
                 <ThemedText type="defaultSemiBold" style={{fontSize: 15}}>{counterpartName || 'Unbekannt'}</ThemedText>
-                <ThemedText type="muted" style={{fontSize: 12}}>{formatDateShort(booking.createdIso)}</ThemedText>
+                <ThemedText type="muted" style={{fontSize: 12}}>
+                  {formatShortClockOrDate(
+                    new Date(getLastActivityMs(booking, rating)).toISOString()
+                  )}
+                </ThemedText>
               </View>
               <ThemedText style={{fontSize: 14, marginTop: 2}} numberOfLines={1}>{toolName}</ThemedText>
-              <ThemedText type="muted" style={{fontSize: 13, marginTop: 2}}>
-                {isSystemWarning ? 'System-Meldung' : `Status: ${booking.status === 'OFFEN' ? 'Ausstehend' : booking.status === 'BESTAETIGT' ? 'Bestätigt' : booking.status === 'ABGELEHNT' ? 'Abgelehnt' : 'Abgeschlossen'}`}
+              <ThemedText type="muted" style={{fontSize: 13, marginTop: 2}} numberOfLines={1}>
+                {getThreadPreview(booking, currentUser.id, rating)}
               </ThemedText>
             </View>
             {isUnreadAction && <View style={styles.unreadDot} />}

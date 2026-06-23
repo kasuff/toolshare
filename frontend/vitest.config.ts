@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const reactRoot = path.dirname(require.resolve('react/package.json'));
 const reactDomRoot = path.dirname(require.resolve('react-dom/package.json'));
 const zodRoot = path.dirname(require.resolve('zod/package.json'));
+const testingLibraryReactRoot = path.dirname(require.resolve('@testing-library/react/package.json'));
 
 export default defineConfig({
   plugins: [react()],
@@ -43,7 +44,7 @@ export default defineConfig({
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
       zod: zodRoot,
       '@testing-library/react': path.resolve(__dirname, './tests/testing-library.tsx'),
-      '@testing-library/react-original': path.resolve(__dirname, './node_modules/@testing-library/react'),
+      '@testing-library/react-original': testingLibraryReactRoot,
       react: reactRoot,
       'react-dom': reactDomRoot,
       'react/jsx-runtime': path.join(reactRoot, 'jsx-runtime'),
