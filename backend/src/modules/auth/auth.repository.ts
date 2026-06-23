@@ -35,6 +35,8 @@ export const authRepository = {
     passwordHash: string;
     name: string;
     address: string;
+    latitude?: number | null;
+    longitude?: number | null;
     role: "USER" | "MODERATOR" | "MANAGER";
   }) {
     return prisma.user.create({ data: input });

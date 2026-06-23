@@ -5,6 +5,8 @@ const publicUserSelect = {
   email: true,
   name: true,
   address: true,
+  latitude: true,
+  longitude: true,
   role: true,
   isSuspended: true,
   expoPushToken: true,
@@ -38,7 +40,16 @@ export const usersRepository = {
     });
   },
 
-  updateProfile(id: string, data: { name?: string; address?: string; expoPushToken?: string | null }) {
+  updateProfile(
+    id: string,
+    data: {
+      name?: string;
+      address?: string;
+      latitude?: number | null;
+      longitude?: number | null;
+      expoPushToken?: string | null;
+    }
+  ) {
     return prisma.user.update({
       where: { id },
       data,

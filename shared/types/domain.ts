@@ -39,6 +39,9 @@ export interface User {
   name: string;
   email: string;
   address?: string;
+  /** Geocodierte Koordinaten der Adresse – für echte Entfernungsberechnung. */
+  latitude?: number;
+  longitude?: number;
   role: Role;
   isSuspended: boolean;
   expoPushToken?: string | null;
@@ -54,6 +57,9 @@ export interface Tool {
   imageUrl: string;
   pickupLocation?: string;
   pickupLocationNote?: string;
+  /** Geocodierte Koordinaten des Abholorts – für echte Entfernungsberechnung. */
+  pickupLat?: number;
+  pickupLon?: number;
   status: ToolStatus;
   /** Belegte Zeiträume (aktive Buchungen) – für die Kalenderansicht. */
   bookedRanges?: WorkshopBookedRange[];
@@ -86,6 +92,9 @@ export interface Workshop {
   name: string;
   description: string;
   location: string;
+  /** Geocodierte Koordinaten der Werkstatt-Adresse – für echte Entfernungsberechnung. */
+  latitude?: number;
+  longitude?: number;
   maxCapacity: number;
   extras: string[];
   equipmentItems: WorkshopToolItem[];

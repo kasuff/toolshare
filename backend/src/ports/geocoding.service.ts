@@ -13,7 +13,13 @@ export type AddressValidationResult = {
   normalizedParts: AddressSuggestion | null;
 };
 
+export type GeoCoordinates = {
+  latitude: number;
+  longitude: number;
+};
+
 export interface GeocodingService {
   suggest(query: string): Promise<AddressSuggestion[]>;
   validate(query: string): Promise<AddressValidationResult>;
+  geocode(query: string): Promise<GeoCoordinates | null>;
 }

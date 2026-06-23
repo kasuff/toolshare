@@ -11,6 +11,8 @@ export const usersApi = {
       name: user.name,
       email: user.email,
       address: user.address,
+      latitude: user.latitude ?? undefined,
+      longitude: user.longitude ?? undefined,
       role: roleMap[user.role],
       isSuspended: user.isSuspended ?? false
     };
@@ -78,6 +80,8 @@ export const usersApi = {
       name: user.name,
       email: user.email,
       address: user.address,
+      latitude: user.latitude ?? undefined,
+      longitude: user.longitude ?? undefined,
       role: roleMap[user.role],
       isSuspended: user.isSuspended
     };

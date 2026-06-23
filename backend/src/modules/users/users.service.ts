@@ -1,4 +1,5 @@
 import { AppError } from "../../utils/app-error";
+import { addressService } from "../address/address.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { usersRepository } from "./users.repository";
 import { toAdminMetricsResponse, toUserResponse, toUserResponseList } from "./users.presenter";
@@ -31,9 +32,14 @@ export const usersService = {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
 
+    const geo = input.address !== undefined ? await addressService.geocode(input.address) : null;
+
     const updated = await usersRepository.updateProfile(input.userId, {
       name: input.name,
       address: input.address,
+      ...(input.address !== undefined
+        ? { latitude: geo?.latitude ?? null, longitude: geo?.longitude ?? null }
+        : {}),
       expoPushToken: input.expoPushToken
     });
     return toUserResponse(updated);

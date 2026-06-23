@@ -1,6 +1,7 @@
 import type {
   AddressSuggestion,
   AddressValidationResult,
+  GeoCoordinates,
   GeocodingService
 } from "../../ports/geocoding.service";
 
@@ -17,15 +18,27 @@ type NominatimAddressParts = {
 
 type NominatimSearchResult = {
   display_name: string;
+  lat?: string;
+  lon?: string;
   address?: NominatimAddressParts;
 };
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
+// Hard limit for external geocoding calls. Without a timeout a hanging
+// Nominatim request can block the handler for minutes, stacking up requests
+// and exhausting memory on VMs without swap.
+const NOMINATIM_TIMEOUT_MS = 5000;
 const REQUEST_HEADERS = {
   "User-Agent": "toolshare-address-validation/1.0 (se2-project)",
   Accept: "application/json",
   "Accept-Language": "de"
 };
+
+function parseCoordinate(value?: string): number | null {
+  if (value === undefined) return null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 function toStructuredSuggestion(result: NominatimSearchResult): AddressSuggestion {
   const parts = result.address ?? {};
@@ -57,6 +70,19 @@ export class NominatimGeocodingAdapter implements GeocodingService {
     };
   }
 
+  async geocode(query: string): Promise<GeoCoordinates | null> {
+    try {
+      const results = await this.searchAddress(query, 1);
+      const top = results[0];
+      const latitude = parseCoordinate(top?.lat);
+      const longitude = parseCoordinate(top?.lon);
+      if (latitude === null || longitude === null) return null;
+      return { latitude, longitude };
+    } catch {
+      return null;
+    }
+  }
+
   private async searchAddress(query: string, limit: number): Promise<NominatimSearchResult[]> {
     await this.acquireRateLimit();
 
@@ -70,7 +96,8 @@ export class NominatimGeocodingAdapter implements GeocodingService {
 
     const response = await fetch(`${NOMINATIM_BASE_URL}?${params.toString()}`, {
       method: "GET",
-      headers: REQUEST_HEADERS
+      headers: REQUEST_HEADERS,
+      signal: AbortSignal.timeout(NOMINATIM_TIMEOUT_MS)
     });
 
     if (!response.ok) {

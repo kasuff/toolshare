@@ -1,6 +1,7 @@
 import { AppError } from "../../utils/app-error";
 import { getImageStorageService } from "../../config/services";
 import { resolveImageReference } from "../../ports/image-storage.service";
+import { addressService } from "../address/address.service";
 import { toolsRepository } from "./tools.repository";
 import {
   toToolBlockingPeriodResponseList,
@@ -89,7 +90,13 @@ export const toolsService = {
   }) {
     const storage = getImageStorageService();
     const imageUrl = await resolveImageReference(storage, input.imageUrl);
-    const created = await toolsRepository.create({ ...input, imageUrl });
+    const coordinates = await addressService.geocode(input.pickupLocation);
+    const created = await toolsRepository.create({
+      ...input,
+      imageUrl,
+      pickupLat: coordinates?.latitude ?? null,
+      pickupLon: coordinates?.longitude ?? null
+    });
     return toToolResponse(created);
   },
 
@@ -123,9 +130,17 @@ export const toolsService = {
         ? await resolveImageReference(storage, input.data.imageUrl)
         : undefined;
 
+    const geo =
+      input.data.pickupLocation !== undefined
+        ? await addressService.geocode(input.data.pickupLocation)
+        : null;
+
     const updated = await toolsRepository.update(input.toolId, {
       ...input.data,
-      ...(imageUrl !== undefined ? { imageUrl } : {})
+      ...(imageUrl !== undefined ? { imageUrl } : {}),
+      ...(input.data.pickupLocation !== undefined
+        ? { pickupLat: geo?.latitude ?? null, pickupLon: geo?.longitude ?? null }
+        : {})
     });
     return toToolResponse(updated);
   },

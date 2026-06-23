@@ -64,6 +64,8 @@ model User {
   passwordHash  String
   name          String
   address       String
+  latitude      Float?
+  longitude     Float?
   role          Role           @default(USER)
   isSuspended   Boolean        @default(false)
   expoPushToken String?
@@ -90,6 +92,8 @@ model Tool {
   imageUrl    String?
   pickupLocation String?
   pickupLocationNote String?
+  pickupLat   Float?
+  pickupLon   Float?
   status      ToolStatus @default(AVAILABLE)
   createdAt   DateTime   @default(now())
   owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -102,6 +106,8 @@ model Workshop {
   name        String
   description String
   location    String
+  latitude    Float?
+  longitude   Float?
   maxCapacity Int
   equipment   String[]   @default([])
   imageUrls   String[]   @default([])
