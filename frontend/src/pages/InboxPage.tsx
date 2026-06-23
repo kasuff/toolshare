@@ -921,7 +921,7 @@ export function InboxPage({ currentUser, token }: Props) {
                 ) : (
                   <>
                 <MessengerRow
-                  variant={selectedBooking.requesterId === currentUser.id ? "incoming" : "outgoing"}
+                  variant={selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}
                   avatar={<UserAvatar name={selectedBooking.requesterName ?? currentUser.name} imageUrl={null} size="sm" />}
                 >
                   <RequestMessageCard
@@ -945,7 +945,7 @@ export function InboxPage({ currentUser, token }: Props) {
                   return (
                     <MessengerRow
                       key={proposal.id}
-                      variant={fromOtherUser ? "outgoing" : "incoming"}
+                      variant={fromOtherUser ? "incoming" : "outgoing"}
                       avatar={
                         <UserAvatar
                           name={fromOtherUser ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
@@ -975,7 +975,7 @@ export function InboxPage({ currentUser, token }: Props) {
                   return (
                     <MessengerRow
                       key={proposal.id}
-                      variant={fromOtherUser ? "outgoing" : "incoming"}
+                      variant={fromOtherUser ? "incoming" : "outgoing"}
                       avatar={
                         <UserAvatar
                           name={fromOtherUser ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
@@ -1001,7 +1001,7 @@ export function InboxPage({ currentUser, token }: Props) {
 
                 {selectedBooking.status !== "OFFEN" && (
                   <MessengerRow
-                    variant={selectedBooking.providerId === currentUser.id ? "incoming" : "outgoing"}
+                    variant={selectedBooking.providerId === currentUser.id ? "outgoing" : "incoming"}
                     avatar={<UserAvatar name={selectedBooking.providerName ?? currentUser.name} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
@@ -1069,7 +1069,7 @@ export function InboxPage({ currentUser, token }: Props) {
 
                 {counterFormBookingId === selectedBooking.id && selectedBooking.status === "OFFEN" && (
                   <MessengerRow
-                    variant="incoming"
+                    variant="outgoing"
                     avatar={<UserAvatar name={currentUser.name} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
