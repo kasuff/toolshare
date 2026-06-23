@@ -1,4 +1,4 @@
-import type { AuthPayload } from "./types";
+import type { AuthPayload, RefreshPayload } from "./types";
 import { request } from "./client";
 
 export const authApi = {
@@ -13,6 +13,13 @@ export const authApi = {
     return request<AuthPayload>("/auth/register", {
       method: "POST",
       body: JSON.stringify(input)
+    });
+  },
+
+  async refresh(refreshToken: string): Promise<RefreshPayload> {
+    return request<RefreshPayload>("/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken })
     });
   },
 
