@@ -31,15 +31,18 @@ services:
       REDIS_URL: redis://redis:6379
       CACHE_BACKEND: redis
       MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-r2}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # --skip-generate: Der Prisma-Client wird bereits im Image-Build erzeugt.
-    # Beim Start als non-root-User ("node") schlägt ein erneutes generate mit
-    # EACCES (unlink .prisma/client/default.js) fehl – daher hier überspringen.
-    command: sh -c "npx prisma db push --skip-generate && node dist/index.js"
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
     restart: unless-stopped
     # Speicher deckeln: ein einzelner Container darf die VM (3,8 GB, kein Swap)
     # nicht komplett auffressen und damit den ganzen Gast einfrieren.
