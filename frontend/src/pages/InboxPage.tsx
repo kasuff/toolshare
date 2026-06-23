@@ -999,10 +999,19 @@ export function InboxPage({ currentUser, token }: Props) {
                   );
                 })}
 
-                {selectedBooking.status !== "OFFEN" && (
+                {selectedBooking.status !== "OFFEN" && (() => {
+                  // "Anfrage angenommen" o. Ä. auf die Seite dessen legen, der den
+                  // Status ausgelöst hat (z. B. wer den Alternativvorschlag annahm).
+                  const statusActorId = getStatusActorId(selectedBooking);
+                  const statusByCurrentUser = statusActorId === currentUser.id;
+                  const statusActorName =
+                    statusActorId === selectedBooking.providerId
+                      ? (selectedBooking.providerName ?? currentUser.name)
+                      : (selectedBooking.requesterName ?? currentUser.name);
+                  return (
                   <MessengerRow
-                    variant={selectedBooking.providerId === currentUser.id ? "outgoing" : "incoming"}
-                    avatar={<UserAvatar name={selectedBooking.providerName ?? currentUser.name} imageUrl={null} size="sm" />}
+                    variant={statusByCurrentUser ? "outgoing" : "incoming"}
+                    avatar={<UserAvatar name={statusActorName} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
                       label={
@@ -1026,7 +1035,8 @@ export function InboxPage({ currentUser, token }: Props) {
                       secondValue={formatDateTime(selectedBooking.endIso)}
                     />
                   </MessengerRow>
-                )}
+                  );
+                })()}
 
                 {selectedBookingRating && selectedBookingRating.status === "SICHTBAR" && (
                   <MessengerRow
@@ -1377,6 +1387,21 @@ function UserAvatar({
       {letter}
     </span>
   );
+}
+
+function getStatusActorId(booking: BookingRow): string {
+  // Wer hat den aktuellen Status ausgelöst? Bei einem angenommenen
+  // Alternativvorschlag ist das der Annehmende (= nicht der Vorschlagende),
+  // sonst der Anbieter, der die ursprüngliche Anfrage entschieden hat.
+  const acceptedProposal =
+    booking.pickupProposals.find((p) => p.status === "ACCEPTED") ??
+    booking.timeslotProposals.find((p) => p.status === "ACCEPTED");
+  if (booking.status === "BESTAETIGT" && acceptedProposal) {
+    return acceptedProposal.proposedById === booking.requesterId
+      ? booking.providerId
+      : booking.requesterId;
+  }
+  return booking.providerId;
 }
 
 function MessengerRow({
