@@ -41,4 +41,7 @@ frontend/src/**/*.js
 
 # Prisma
 backend/prisma/*.db
-backend/prisma/migrations/**/migration_lock.toml
+# migration_lock.toml must be committed for `prisma migrate deploy`.
+
+# DB backups (contain production data — never commit)
+backup_*.sql
