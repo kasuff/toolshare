@@ -1,17 +1,9 @@
-import type {
-  Booking,
-  BookingSelectedTool,
-  BookingStatus,
-  PickupProposal,
-  PublicRating,
-  Rating,
-  TimeslotProposal,
-  Tool,
-  User,
-  Workshop,
-  WorkshopBookedRange,
-  WorkshopSlot
-} from "../../types/domain";
+import type { AdminMetricsResponse } from "../../contracts/response/users.schema";
+import type { AuthResponse, RefreshResponse } from "../../contracts/response/auth.schema";
+import type { RatingResponse } from "../../contracts/response/ratings.schema";
+import type { ModerationReportResponse } from "../../contracts/response/moderation.schema";
+import type { SystemSettingResponse } from "../../contracts/response/system-rules.schema";
+import type { AddressSuggestionResponse } from "../../contracts/response/address.schema";
 export type BackendRole = "USER" | "MODERATOR" | "MANAGER";
 export type BackendToolStatus = "AVAILABLE" | "REQUESTED" | "BORROWED";
 export type BackendBookingStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED";
@@ -24,57 +16,13 @@ export type BackendUser = {
   role: BackendRole;
   isSuspended: boolean;
 };
-export type BackendMetrics = {
-  users: number;
-  tools: number;
-  workshops: number;
-  openBookings: number;
-  openReports: number;
-  openSuspensionRequests: number;
-};
+// Single source of truth: Wire-Typen werden aus den Shared-Response-Contracts
+// (Zod) abgeleitet (ADR-013), statt sie hier dupliziert zu pflegen.
+export type BackendMetrics = AdminMetricsResponse;
 
-export type ModerationReport = {
-  id: string;
-  reporterId: string;
-  reporterName: string;
-  targetType: "TOOL" | "WORKSHOP" | "USER" | "RATING";
-  targetId: string;
-  targetLabel: string;
-  targetHref: string | null;
-  subjectUserId: string | null;
-  subjectUserName: string | null;
-  ratingPreview?: {
-    score: number;
-    comment: string | null;
-    fromUserName: string;
-    listingLabel: string | null;
-  } | null;
-  reason: string;
-  details?: string;
-  conversationContext?: string;
-  status: "OPEN" | "IN_REVIEW" | "RESOLVED" | "REJECTED";
-  decisionNote?: string | null;
-  decisionAt?: string | null;
-  moderatorId?: string | null;
-  moderatorName?: string | null;
-  createdAt: string;
-};
+export type ModerationReport = ModerationReportResponse;
 
-export type BackendRating = {
-  id: string;
-  bookingId: string;
-  fromUserId: string;
-  toUserId: string;
-  score: number;
-  comment?: string | null;
-  status?: "VISIBLE" | "HIDDEN";
-  createdAt: string;
-  fromUser?: { id: string; name: string } | null;
-  booking?: {
-    tool?: { id: string; name: string } | null;
-    timeslot?: { workshop?: { id: string; name: string } | null } | null;
-  } | null;
-};
+export type BackendRating = RatingResponse;
 
 export type SuspensionRequestItem = {
   id: string;
@@ -89,38 +37,13 @@ export type SuspensionRequestItem = {
   report?: { id: string; reason: string; targetType: string; targetId: string } | null;
 };
 
-export type SystemSetting = {
-  key: string;
-  label: string;
-  unit: string;
-  value: number;
-  min: number;
-  max: number;
-};
+export type SystemSetting = SystemSettingResponse;
 
-export type AddressSuggestion = {
-  label: string;
-  street: string;
-  houseNumber: string;
-  postalCode: string;
-  city: string;
-  country: string;
-};
+export type AddressSuggestion = AddressSuggestionResponse;
 
-export type AuthPayload = {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    address?: string;
-    role: BackendRole;
-    isSuspended?: boolean;
-  };
-  accessToken: string;
-  refreshToken: string;
-};
+export type AuthPayload = AuthResponse;
 
-export type RefreshPayload = Pick<AuthPayload, "accessToken" | "refreshToken">;
+export type RefreshPayload = RefreshResponse;
 
 export type BackendTool = {
   id: string;
