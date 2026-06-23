@@ -6,11 +6,11 @@ const STORAGE_VER = "v1";
 export const INBOX_READ_CHANGED_EVENT = "toolshare-inbox-read-update";
 
 export function inboxReadStorageKey(userId: string): string {
-  return `toolshare.inbox.readMsgs.${STORAGE_VER}:${userId}`;
+  return `toolshare.inbox.readMsgs.${STORAGE_VER}.${userId}`;
 }
 
 export function inboxReadSeedKey(userId: string): string {
-  return `toolshare.inbox.readSeed.${STORAGE_VER}:${userId}`;
+  return `toolshare.inbox.readSeed.${STORAGE_VER}.${userId}`;
 }
 
 export function requestMessageKey(bookingId: string): string {

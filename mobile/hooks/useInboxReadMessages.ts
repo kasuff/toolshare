@@ -8,13 +8,19 @@ import {
 } from '../utils/inboxMessageRead';
 import { notifyInboxBadgeRefresh } from '../utils/inboxBadgeEvents';
 
-export function useInboxReadMessages(bookings: Booking[]) {
+export function useInboxReadMessages(bookings: Booking[], isLoading: boolean = false) {
   const { currentUser } = useAuth();
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
 
   useEffect(() => {
     if (!currentUser?.id) {
       setReadIds(new Set());
+      setIsStorageLoaded(false);
+      return;
+    }
+
+    if (isLoading) {
       return;
     }
 
@@ -26,6 +32,7 @@ export function useInboxReadMessages(bookings: Booking[]) {
       const ids = seededIds ?? (await loadReadMessageIds(currentUser.id));
       if (!cancelled) {
         setReadIds(ids);
+        setIsStorageLoaded(true);
         if (seededIds) {
           notifyInboxBadgeRefresh();
         }
@@ -35,7 +42,7 @@ export function useInboxReadMessages(bookings: Booking[]) {
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.id, bookings]);
+  }, [currentUser?.id, bookings, isLoading]);
 
   const markThreadRead = useCallback(
     async (booking: Booking) => {
@@ -49,5 +56,5 @@ export function useInboxReadMessages(bookings: Booking[]) {
     [currentUser?.id]
   );
 
-  return { readIds, markThreadRead };
+  return { readIds, markThreadRead, isStorageLoaded };
 }

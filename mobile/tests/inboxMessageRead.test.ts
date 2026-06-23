@@ -71,12 +71,12 @@ beforeEach(() => {
 
 describe('storage key helpers', () => {
   it('namespaces read-message keys per user', () => {
-    expect(inboxReadStorageKey('user-1')).toBe('toolshare.inbox.readMsgs.v1:user-1');
-    expect(inboxReadStorageKey('a/b c')).toBe('toolshare.inbox.readMsgs.v1:a/b c');
+    expect(inboxReadStorageKey('user-1')).toBe('toolshare.inbox.readMsgs.v1.user-1');
+    expect(inboxReadStorageKey('a/b c')).toBe('toolshare.inbox.readMsgs.v1.a/b c');
   });
 
   it('builds distinct seed and message keys', () => {
-    expect(inboxReadSeedKey('u1')).toBe('toolshare.inbox.readSeed.v1:u1');
+    expect(inboxReadSeedKey('u1')).toBe('toolshare.inbox.readSeed.v1.u1');
     expect(requestMessageKey('b1')).toBe('req:b1');
     expect(proposalMessageKey('b1', 'p9')).toBe('prop:b1:p9');
   });

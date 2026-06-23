@@ -124,7 +124,7 @@ export default function InboxScreen() {
   const [pickupDraft, setPickupDraft] = useState<DraftToolRangeParts | null>(null);
   const [workshopDraft, setWorkshopDraft] = useState<DraftWorkshopRangeParts | null>(null);
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
-  const { readIds, markThreadRead } = useInboxReadMessages(bookings);
+  const { readIds, markThreadRead, isStorageLoaded } = useInboxReadMessages(bookings, isLoading);
   
   // Report states
   const [reportTargetUserId, setReportTargetUserId] = useState<string | null>(null);
@@ -396,7 +396,7 @@ export default function InboxScreen() {
     }
   };
 
-  if (isLoading) return <LoadingSpinner />;
+  if (isLoading || !isStorageLoaded) return <LoadingSpinner />;
 
   if (loadError) {
     return (
