@@ -192,15 +192,6 @@ export default function InboxScreen() {
   const [pickupDraft, setPickupDraft] = useState<DraftToolRangeParts | null>(null);
   const [workshopDraft, setWorkshopDraft] = useState<DraftWorkshopRangeParts | null>(null);
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
-  const allRatings = useMemo(() => [...ratingsGiven, ...ratingsReceived], [ratingsGiven, ratingsReceived]);
-  const { readIds, markThreadRead, isStorageLoaded } = useInboxReadMessages(bookings, allRatings, isLoading);
-  
-  // Report states
-  const [reportTargetUserId, setReportTargetUserId] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState('');
-  const [reportDetails, setReportDetails] = useState('');
-  const [isReporting, setIsReporting] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
 
   // Rating states
   const [ratingsGiven, setRatingsGiven] = useState<Rating[]>([]);
@@ -209,6 +200,16 @@ export default function InboxScreen() {
   const [ratingScore, setRatingScore] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+
+  // Report states
+  const [reportTargetUserId, setReportTargetUserId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
+  const allRatings = useMemo(() => [...ratingsGiven, ...ratingsReceived], [ratingsGiven, ratingsReceived]);
+  const { readIds, markThreadRead, isStorageLoaded } = useInboxReadMessages(bookings, allRatings, isLoading);
 
   const ratingsByBookingId = useMemo(() => {
     const map = new Map<string, Rating>();
