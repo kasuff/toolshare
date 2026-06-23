@@ -5,8 +5,9 @@ import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./utils/addr
 import { Layout } from "./components/Layout";
 import { GlobalProgressBar } from "./components/GlobalProgressBar";
 import { ToastViewport } from "./components/ui";
-import { useSession } from "./hooks/useSession";
 import { ToastProvider, useToast } from "./hooks/useToast";
+import { useAuthStore } from "./store/authStore";
+import { useInboxStore } from "./store/inboxStore";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ToolsPage } from "./pages/ToolsPage";
 import { ToolDetailPage } from "./pages/ToolDetailPage";
@@ -277,15 +278,21 @@ function AppWithProviders() {
   const { pushToast } = useToast();
   const {
     token,
-    users,
     currentUser,
     isLoading,
     error,
     login,
     register,
     logout,
-    updateProfile
-  } = useSession();
+    updateProfile,
+    initSession
+  } = useAuthStore();
+
+  const users = currentUser ? [currentUser] : [];
+
+  useEffect(() => {
+    void initSession();
+  }, [initSession]);
 
   useEffect(() => {
     const handleSessionExpired = () => {
@@ -299,6 +306,7 @@ function AppWithProviders() {
 
   const handleLogout = () => {
     logout();
+    useInboxStore.getState().clear();
   };
 
   return (
@@ -316,79 +324,79 @@ function AppWithProviders() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="tools" element={<ToolsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
-        <Route path="tools/:id" element={<ToolDetailPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
+        <Route path="tools" element={<ToolsPage />} />
+        <Route path="tools/:id" element={<ToolDetailPage />} />
         <Route
           path="tools/:id/edit"
           element={
-            <RequireAuth token={token}>
-              <EditToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            <RequireAuth>
+              <EditToolPage />
             </RequireAuth>
           }
         />
         <Route
           path="tools/new"
           element={
-            <RequireAuth token={token}>
-              <NewToolPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            <RequireAuth>
+              <NewToolPage />
             </RequireAuth>
           }
         />
-        <Route path="workshops" element={<WorkshopsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
-        <Route path="workshops/:id" element={<WorkshopsPage currentUser={currentUser ?? undefined} token={token ?? undefined} />} />
+        <Route path="workshops" element={<WorkshopsPage />} />
+        <Route path="workshops/:id" element={<WorkshopsPage />} />
         <Route
           path="workshops/new"
           element={
-            <RequireAuth token={token}>
-              <NewWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            <RequireAuth>
+              <NewWorkshopPage />
             </RequireAuth>
           }
         />
         <Route
           path="workshops/:id/edit"
           element={
-            <RequireAuth token={token}>
-              <EditWorkshopPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            <RequireAuth>
+              <EditWorkshopPage />
             </RequireAuth>
           }
         />
         <Route
           path="workshops/availability"
           element={
-            <RequireAuth token={token}>
-              <WorkshopAvailabilityPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            <RequireAuth>
+              <WorkshopAvailabilityPage />
             </RequireAuth>
           }
         />
         <Route
           path="offers"
           element={
-            <RequireAuth token={token}>
-              <MyOffersPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            <RequireAuth>
+              <MyOffersPage />
             </RequireAuth>
           }
         />
         <Route
           path="profile"
           element={
-            <RequireAuth token={token}>
-              <ProfileSettingsPage currentUser={currentUser ?? undefined} token={token ?? undefined} onSave={updateProfile} />
+            <RequireAuth>
+              <ProfileSettingsPage onSave={updateProfile} />
             </RequireAuth>
           }
         />
         <Route
           path="inbox"
           element={
-            <RequireAuth token={token}>
-              <InboxPage currentUser={currentUser ?? undefined} token={token ?? undefined} />
+            <RequireAuth>
+              <InboxPage />
             </RequireAuth>
           }
         />
         {(currentUser?.role === "MODERATOR" || currentUser?.role === "ADMIN") && (
-          <Route path="moderation" element={<ModerationPage token={token ?? undefined} />} />
+          <Route path="moderation" element={<ModerationPage />} />
         )}
         {currentUser?.role === "ADMIN" && (
-          <Route path="admin" element={<AdminPage currentUser={currentUser} token={token ?? undefined} />} />
+          <Route path="admin" element={<AdminPage />} />
         )}
         <Route
           path="auth"
@@ -408,7 +416,8 @@ function AppWithProviders() {
   );
 }
 
-function RequireAuth({ token, children }: { token: string | null; children: JSX.Element }) {
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const { token } = useAuthStore();
   const location = useLocation();
 
   if (!token) {

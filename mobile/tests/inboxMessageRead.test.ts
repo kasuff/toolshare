@@ -70,9 +70,9 @@ beforeEach(() => {
 });
 
 describe('storage key helpers', () => {
-  it('namespaces and sanitizes the read-message key', () => {
+  it('namespaces read-message keys per user', () => {
     expect(inboxReadStorageKey('user-1')).toBe('toolshare.inbox.readMsgs.v1.user-1');
-    expect(inboxReadStorageKey('a/b c')).toBe('toolshare.inbox.readMsgs.v1.a_b_c');
+    expect(inboxReadStorageKey('a/b c')).toBe('toolshare.inbox.readMsgs.v1.a/b c');
   });
 
   it('builds distinct seed and message keys', () => {

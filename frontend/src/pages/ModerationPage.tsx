@@ -1,13 +1,11 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 import { api, type ModerationReport } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
-
-type Props = {
-  token?: string;
-};
+import { usePageAuth } from "../hooks/usePageAuth";
 
 type DialogMode = "warn" | "suspend" | "delete" | "deleteRating" | null;
 
@@ -105,17 +103,15 @@ function ReportSummary({ report, showDecision }: { report: ModerationReport; sho
 function ReportActions({
   report,
   token,
-  onDone
 }: {
   report: ModerationReport;
   token: string;
-  onDone: () => Promise<void>;
 }) {
   const { pushToast } = useToast();
+  const queryClient = useQueryClient();
   const [decisionNote, setDecisionNote] = useState("");
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [actionReason, setActionReason] = useState("");
-  const [busy, setBusy] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const closeDialog = useCallback(() => setDialogMode(null), []);
@@ -124,27 +120,27 @@ function ReportActions({
   const subjectId = report.subjectUserId;
   const canActOnUser = Boolean(subjectId);
 
-  const runUpdate = async (payload: Parameters<typeof api.updateReportStatus>[1]) => {
-    setBusy(true);
-    try {
+  const { mutate: runUpdate, isPending: busy } = useMutation({
+    mutationFn: async (payload: Parameters<typeof api.updateReportStatus>[1]) => {
       await api.updateReportStatus(report.id, payload, token);
-      await onDone();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moderation", "reports"] });
       setDialogMode(null);
       setActionReason("");
       setDecisionNote("");
-    } catch (error) {
+    },
+    onError: (error) => {
       pushToast(error instanceof Error ? error.message : "Aktion fehlgeschlagen.", "error");
-    } finally {
-      setBusy(false);
     }
-  };
+  });
 
   const reject = () => {
     const note = decisionNote.trim();
     if (note.length < 3) {
       return;
     }
-    void runUpdate({ status: "REJECTED", decisionNote: note });
+    runUpdate({ status: "REJECTED", decisionNote: note });
   };
 
   const submitDialog = (event: FormEvent) => {
@@ -160,7 +156,7 @@ function ReportActions({
 
     const note = decisionNote.trim() || undefined;
     if (dialogMode === "warn") {
-      void runUpdate({
+      runUpdate({
         status: "RESOLVED",
         decisionNote: note,
         warnUserId: subjectId ?? undefined,
@@ -170,7 +166,7 @@ function ReportActions({
     }
 
     if (dialogMode === "suspend") {
-      void runUpdate({
+      runUpdate({
         status: "RESOLVED",
         decisionNote: note,
         requestSuspensionUserId: subjectId ?? undefined,
@@ -180,7 +176,7 @@ function ReportActions({
     }
 
     if (dialogMode === "delete") {
-      void runUpdate({
+      runUpdate({
         status: "RESOLVED",
         decisionNote: note,
         deleteTool: report.targetType === "TOOL",
@@ -191,7 +187,7 @@ function ReportActions({
     }
 
     if (dialogMode === "deleteRating") {
-      void runUpdate({
+      runUpdate({
         status: "RESOLVED",
         decisionNote: reason,
         deleteRating: true
@@ -354,32 +350,25 @@ function ReportActions({
   );
 }
 
-export function ModerationPage({ token }: Props) {
-  const { pushToast } = useToast();
-  const [reports, setReports] = useState<ModerationReport[]>([]);
-  const [closedReports, setClosedReports] = useState<ModerationReport[]>([]);
+export function ModerationPage({ token: propToken }: { token?: string | null } = {}) {
+  const { token } = usePageAuth(undefined, propToken);
   const [archiveLimit, setArchiveLimit] = useState<number | "all">(10);
 
-  const loadData = async () => {
-    if (!token) return;
-    try {
-      const [nextReports, nextClosedReports] = await Promise.all([
+  const { data, isLoading } = useQuery({
+    queryKey: ["moderation", "reports", token],
+    queryFn: async () => {
+      if (!token) throw new Error("No token");
+      const [open, closed] = await Promise.all([
         api.listReports(token),
         api.listClosedReports(token)
       ]);
-      setReports(nextReports);
-      setClosedReports(nextClosedReports);
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Moderationsdaten konnten nicht geladen werden.", "error");
-    }
-  };
+      return { open, closed };
+    },
+    enabled: !!token
+  });
 
-  useEffect(() => {
-    if (!token) return;
-    void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
+  const reports = data?.open ?? [];
+  const closedReports = data?.closed ?? [];
   const rejectedCount = closedReports.filter((r) => r.status === "REJECTED").length;
   const displayedReports = archiveLimit === "all" ? closedReports : closedReports.slice(0, archiveLimit);
 
@@ -406,14 +395,15 @@ export function ModerationPage({ token }: Props) {
       </p>
 
       <Surface title="Offene Meldungen" subtitle="Verwerfen = unbegründet. Ermahnen oder Sperrung = bestätigt mit Folge.">
-        {reports.length === 0 ? (
+        {isLoading && <p className="hint">Lade Meldungen...</p>}
+        {!isLoading && reports.length === 0 ? (
           <EmptyState title="Keine offenen Meldungen" text="Aktuell warten keine Meldungen auf Bearbeitung." />
         ) : (
           <ul className="moderation-report-list">
             {reports.map((report) => (
               <li key={report.id} className="inbox-item moderation-report">
                 <ReportSummary report={report} />
-                <ReportActions report={report} token={token} onDone={loadData} />
+                <ReportActions report={report} token={token} />
               </li>
             ))}
           </ul>

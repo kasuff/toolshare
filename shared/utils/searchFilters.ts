@@ -89,22 +89,22 @@ export function rangeOverlapsDay(startIso: string, endIso: string, day: Date) {
   return new Date(startIso) < dayEnd && new Date(endIso) > dayStart;
 }
 
-export function isDayUnavailable(day: Date, slots: any[], bookedRanges: any[]) {
+export function isDayUnavailable(day: Date, slots: any[] = [], bookedRanges: any[] = []) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
   if (day < todayStart) {
     return true;
   }
-  const blocked = slots.some((slot) => slot.blockedByOwner && rangeOverlapsDay(slot.startIso, slot.endIso, day));
-  const booked = bookedRanges.some((range) => rangeOverlapsDay(range.startIso, range.endIso, day));
+  const blocked = (slots || []).some((slot) => slot.blockedByOwner && rangeOverlapsDay(slot.startIso, slot.endIso, day));
+  const booked = (bookedRanges || []).some((range) => rangeOverlapsDay(range.startIso, range.endIso, day));
   return blocked || booked;
 }
 
 export function isDateRangeAvailable(
   startDate: string,
   endDate: string,
-  slots: any[],
-  bookedRanges: any[]
+  slots: any[] = [],
+  bookedRanges: any[] = []
 ) {
   if (!startDate || !endDate) return false;
   if (startDate > endDate) return false;

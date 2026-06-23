@@ -14,8 +14,11 @@ const mocks = vi.hoisted(() => ({
   txBookingFindFirst: vi.fn(),
   txWorkshopToolFindMany: vi.fn(),
   txBookingCreate: vi.fn(),
+  txBookingUpdate: vi.fn(),
+  txToolUpdate: vi.fn(),
   txBookingFindUnique: vi.fn(),
   txBookingSelectedToolCreateMany: vi.fn(),
+  txOutboxEventCreate: vi.fn(),
   prismaTransaction: vi.fn()
 }));
 
@@ -44,7 +47,8 @@ describe("bookingsRepository", () => {
     mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
       handler({
         tool: { findUnique: mocks.txToolFindUnique },
-        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate }
+        booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate },
+        outboxEvent: { create: mocks.txOutboxEventCreate }
       })
     );
   };
@@ -60,7 +64,8 @@ describe("bookingsRepository", () => {
           findUnique: mocks.txBookingFindUnique
         },
         workshopTool: { findMany: mocks.txWorkshopToolFindMany },
-        bookingSelectedTool: { createMany: mocks.txBookingSelectedToolCreateMany }
+        bookingSelectedTool: { createMany: mocks.txBookingSelectedToolCreateMany },
+        outboxEvent: { create: mocks.txOutboxEventCreate }
       })
     );
   };
@@ -125,7 +130,16 @@ describe("bookingsRepository", () => {
     mocks.txToolFindUnique.mockResolvedValueOnce({ id: "tool-1", ownerId: "owner-1" });
     mocks.txBookingFindFirst.mockResolvedValueOnce(null);
     mocks.txBookingCreate.mockResolvedValueOnce({ id: "booking-created" });
-    mocks.bookingUpdate.mockResolvedValueOnce({ id: "booking-created", status: "ACCEPTED" });
+    mocks.txOutboxEventCreate.mockResolvedValue({ id: "outbox-1" });
+
+    mocks.prismaTransaction.mockImplementationOnce(async (handler: any) =>
+      handler({
+        booking: { update: mocks.txBookingUpdate },
+        tool: { update: mocks.txToolUpdate },
+        outboxEvent: { create: mocks.txOutboxEventCreate }
+      })
+    );
+    mocks.txBookingUpdate.mockResolvedValueOnce({ id: "booking-created", status: "ACCEPTED" });
     mocks.toolUpdate.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" });
 
     const created = await bookingsRepository.createToolBookingTransaction({
@@ -148,7 +162,7 @@ describe("bookingsRepository", () => {
         status: "PENDING"
       }
     });
-    expect(mocks.bookingUpdate).toHaveBeenCalledWith({
+    expect(mocks.txBookingUpdate).toHaveBeenCalledWith({
       where: { id: "booking-created" },
       data: { status: "ACCEPTED" }
     });

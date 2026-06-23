@@ -254,7 +254,12 @@ describe("ToolDetailPage", () => {
         status: "VERFUEGBAR"
       }
     ]);
-    createToolOwnerBlock.mockResolvedValueOnce({ id: "block-1" });
+    let periods: any[] = [];
+    getToolBlockingPeriods.mockImplementation(() => Promise.resolve(periods));
+    createToolOwnerBlock.mockImplementation(async (req) => {
+      periods = [{ startIso: req.startIso, endIso: req.endIso }];
+      return { id: "block-1" };
+    });
     deleteTool.mockResolvedValueOnce(undefined);
     const owner = {
       id: "owner-1",
@@ -287,8 +292,10 @@ describe("ToolDetailPage", () => {
         "token-123"
       )
     );
-    const julyCalendar = screen.getByLabelText(/Verf.gbare Tage im Juli 2026/i);
-    expect(within(julyCalendar).getByRole("button", { name: "6" })).toBeDisabled();
+    await waitFor(() => {
+      const julyCalendar = screen.getByLabelText(/Verf.gbare Tage im Juli 2026/i);
+      expect(within(julyCalendar).getByRole("button", { name: "6" })).toBeDisabled();
+    });
     unmount();
 
     render(

@@ -1,6 +1,4 @@
 import { AppError } from "../../utils/app-error";
-import { notificationsRepository } from "../notifications/notifications.repository";
-import { pushService } from "../notifications/push.service";
 import { ratingsRepository } from "./ratings.repository";
 
 function getProviderUserId(booking: NonNullable<Awaited<ReturnType<typeof ratingsRepository.findBookingWithParticipants>>>) {
@@ -67,18 +65,15 @@ export const ratingsService = {
       throw new AppError("RATING_ALREADY_EXISTS", "Rating already exists for this booking", 409);
     }
 
-    const rating = await ratingsRepository.create({
+    const starsLabel = input.score === 1 ? "1 Stern" : `${input.score} Sterne`;
+    return ratingsRepository.createWithNotification({
       bookingId: input.bookingId,
       fromUserId: input.fromUserId,
       toUserId: providerUserId,
       score: input.score,
-      comment: input.comment?.trim() || undefined
+      comment: input.comment?.trim() || undefined,
+      starsLabel
     });
-
-    const starsLabel = input.score === 1 ? "1 Stern" : `${input.score} Sterne`;
-    await notificationsRepository.create(providerUserId, `Du hast eine neue Bewertung erhalten (${starsLabel}).`);
-    await pushService.sendPushNotification(providerUserId, "Neue Bewertung", `Du hast eine neue Bewertung erhalten (${starsLabel}).`);
-    return rating;
   },
 
   async hideFromModeration(ratingId: string, moderatorId: string, decisionNote?: string) {

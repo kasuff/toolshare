@@ -1,14 +1,16 @@
 import { z } from "zod";
-
-const roleSchema = z.enum(["USER", "MODERATOR", "MANAGER"]);
+import {
+  decideSuspensionRequestBodySchema,
+  listUsersQuerySchema,
+  updateMyProfileBodySchema,
+  updateUserRoleBodySchema,
+  updateUserSuspensionBodySchema
+} from "@toolshare/shared/contracts/request/users.schema";
 
 export const listUsersSchema = z.object({
   body: z.object({}),
   params: z.object({}),
-  query: z.object({
-    role: roleSchema.optional(),
-    search: z.string().min(1).optional()
-  })
+  query: listUsersQuerySchema
 });
 
 export const userIdParamSchema = z.object({
@@ -19,33 +21,14 @@ export const userIdParamSchema = z.object({
   query: z.object({})
 });
 
-const hasHouseNumber = (val: string) => {
-  const streetPart = val.split(",")[0]?.trim() ?? "";
-  const tokens = streetPart.split(/\s+/).filter(Boolean);
-  const lastToken = tokens.length > 1 ? tokens.pop() : "";
-  return Boolean(lastToken && /\d/.test(lastToken));
-};
-
 export const updateMyProfileSchema = z.object({
-  body: z
-    .object({
-      name: z.string().min(2).optional(),
-      address: z.string().min(5).refine(hasHouseNumber, {
-        message: "Die Adresse muss eine Hausnummer enthalten."
-      }).optional(),
-      expoPushToken: z.string().optional()
-    })
-    .refine((value) => value.name !== undefined || value.address !== undefined || value.expoPushToken !== undefined, {
-      message: "Mindestens ein Feld muss angegeben werden."
-    }),
+  body: updateMyProfileBodySchema,
   params: z.object({}),
   query: z.object({})
 });
 
 export const updateUserRoleSchema = z.object({
-  body: z.object({
-    role: roleSchema
-  }),
+  body: updateUserRoleBodySchema,
   params: z.object({
     id: z.string().uuid()
   }),
@@ -53,9 +36,7 @@ export const updateUserRoleSchema = z.object({
 });
 
 export const updateUserSuspensionSchema = z.object({
-  body: z.object({
-    isSuspended: z.boolean()
-  }),
+  body: updateUserSuspensionBodySchema,
   params: z.object({
     id: z.string().uuid()
   }),
@@ -63,10 +44,7 @@ export const updateUserSuspensionSchema = z.object({
 });
 
 export const decideSuspensionRequestSchema = z.object({
-  body: z.object({
-    approve: z.boolean(),
-    decisionNote: z.string().min(3).max(600).optional()
-  }),
+  body: decideSuspensionRequestBodySchema,
   params: z.object({
     requestId: z.string().uuid()
   }),

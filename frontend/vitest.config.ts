@@ -8,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const reactRoot = path.dirname(require.resolve('react/package.json'));
 const reactDomRoot = path.dirname(require.resolve('react-dom/package.json'));
+const zodRoot = path.dirname(require.resolve('zod/package.json'));
+const testingLibraryReactRoot = path.dirname(require.resolve('@testing-library/react/package.json'));
 
 export default defineConfig({
   plugins: [react()],
@@ -16,13 +18,15 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.{test,spec}.{ts,tsx}', 'src/tests/**/*.{test,spec}.{ts,tsx}'],
+    // axe checks run in the dedicated frontend:accessibility CI job (test:a11y).
+    exclude: ['tests/accessibility/a11y.test.tsx'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    pool: process.env.CI ? 'threads' : 'forks',
-    maxWorkers: process.env.CI ? 1 : undefined,
+    pool: "forks",
+    maxWorkers: 1,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'cobertura', 'lcov'],
+      reporter: ['text', 'json', 'cobertura', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'node_modules/',
@@ -38,6 +42,9 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
+      zod: zodRoot,
+      '@testing-library/react': path.resolve(__dirname, './tests/testing-library.tsx'),
+      '@testing-library/react-original': testingLibraryReactRoot,
       react: reactRoot,
       'react-dom': reactDomRoot,
       'react/jsx-runtime': path.join(reactRoot, 'jsx-runtime'),

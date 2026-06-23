@@ -2,44 +2,35 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Outlet } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
+import { useAuthStore } from "../src/store/authStore";
 
 const {
-  session,
-  login,
-  register,
-  logout,
-  updateProfile,
+  loginApi,
+  registerApi,
+  getCurrentUser,
   suggestAddresses,
   validateAddress
 } = vi.hoisted(() => ({
-  session: {
-    token: null as string | null,
-    users: [] as Array<{ id: string; name: string; role: string }>,
-    currentUser: null as null | { id: string; name: string; role: string },
-    isLoading: false,
-    error: null as string | null
-  },
-  login: vi.fn(),
-  register: vi.fn(),
-  logout: vi.fn(),
-  updateProfile: vi.fn(),
+  loginApi: vi.fn(),
+  registerApi: vi.fn(),
+  getCurrentUser: vi.fn(),
   suggestAddresses: vi.fn(),
   validateAddress: vi.fn()
 }));
 
-vi.mock("../src/hooks/useSession", () => ({
-  useSession: () => ({
-    token: session.token,
-    users: session.users,
-    currentUser: session.currentUser,
-    isLoading: session.isLoading,
-    error: session.error,
-    login,
-    register,
-    logout,
-    updateProfile
-  })
-}));
+function syncAuthStore(overrides: {
+  token?: string | null;
+  currentUser?: { id: string; name: string; role: string } | null;
+  isLoading?: boolean;
+  error?: string | null;
+} = {}) {
+  useAuthStore.setState({
+    token: overrides.token ?? null,
+    currentUser: overrides.currentUser ?? null,
+    isLoading: overrides.isLoading ?? false,
+    error: overrides.error ?? null
+  });
+}
 
 vi.mock("@toolshare/shared", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@toolshare/shared")>();
@@ -47,8 +38,11 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      login: loginApi,
+      register: registerApi,
+      getCurrentUser,
       suggestAddresses,
-    validateAddress
+      validateAddress
     }
   };
 });
@@ -73,17 +67,13 @@ vi.mock("../src/pages/MyOffersPage", () => ({ MyOffersPage: () => <div>My offers
 vi.mock("../src/pages/ProfileSettingsPage", () => ({ ProfileSettingsPage: () => <div>Profile mock</div> }));
 
 function resetSession() {
-  session.token = null;
-  session.users = [];
-  session.currentUser = null;
-  session.isLoading = false;
-  session.error = null;
-  login.mockReset();
-  register.mockReset();
-  logout.mockReset();
-  updateProfile.mockReset();
+  loginApi.mockReset();
+  registerApi.mockReset();
+  getCurrentUser.mockReset();
   suggestAddresses.mockReset();
   validateAddress.mockReset();
+  getCurrentUser.mockResolvedValue(null);
+  syncAuthStore();
 }
 
 describe("App", () => {
@@ -92,7 +82,8 @@ describe("App", () => {
   });
 
   it("shows the loading shell while the session is resolving", () => {
-    session.isLoading = true;
+    getCurrentUser.mockImplementation(() => new Promise(() => {}));
+    syncAuthStore({ token: "pending-token", isLoading: true });
 
     render(
       <MemoryRouter>
@@ -104,6 +95,9 @@ describe("App", () => {
   });
 
   it("logs in from the auth screen and submits the login payload", async () => {
+    loginApi.mockResolvedValue({ accessToken: "token-123" });
+    getCurrentUser.mockResolvedValue({ id: "u1", name: "Lea", email: "lea@example.com", role: "NUTZER", isSuspended: false });
+
     render(
       <MemoryRouter initialEntries={["/auth"]}>
         <App />
@@ -115,7 +109,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Einloggen" }));
 
     await waitFor(() => {
-      expect(login).toHaveBeenCalledWith("lea@example.com", "password123");
+      expect(loginApi).toHaveBeenCalledWith("lea@example.com", "password123");
     });
   });
 
@@ -172,12 +166,14 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Registrieren und starten" }));
 
     await waitFor(() => {
-      expect(register).not.toHaveBeenCalled();
+      expect(registerApi).not.toHaveBeenCalled();
       expect(validateAddress).not.toHaveBeenCalled();
     });
   });
 
   it("registers a user with validated address data", async () => {
+    registerApi.mockResolvedValue({ accessToken: "token-456" });
+    getCurrentUser.mockResolvedValue({ id: "u2", name: "Nina", email: "nina@example.com", role: "NUTZER", isSuspended: false });
     validateAddress.mockResolvedValueOnce({
       isValid: true,
       normalizedAddress: null,
@@ -200,7 +196,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(validateAddress).toHaveBeenCalledWith("Musterstraße 5, 80331 Muenchen, Deutschland");
-      expect(register).toHaveBeenCalledWith({
+      expect(registerApi).toHaveBeenCalledWith({
         email: "nina@example.com",
         password: "password123",
         name: "Nina",
@@ -220,7 +216,7 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Willkommen zurück" })).toBeInTheDocument();
   });
 
-  it("protects the offers overview and renders it for authenticated users", () => {
+  it("protects the offers overview and renders it for authenticated users", async () => {
     const { unmount } = render(
       <MemoryRouter initialEntries={["/offers"]}>
         <App />
@@ -230,9 +226,11 @@ describe("App", () => {
     expect(screen.getByText("Bitte melde dich an, um diese Funktion zu nutzen.")).toBeInTheDocument();
     unmount();
 
-    session.token = "token-123";
-    session.currentUser = { id: "u5", name: "Sabine", role: "NUTZER" };
-    session.users = [{ id: "u5", name: "Sabine", role: "NUTZER" }];
+    syncAuthStore({
+      token: "token-123",
+      currentUser: { id: "u5", name: "Sabine", role: "NUTZER" }
+    });
+    getCurrentUser.mockResolvedValue({ id: "u5", name: "Sabine", email: "s@example.com", role: "NUTZER", isSuspended: false });
 
     render(
       <MemoryRouter initialEntries={["/offers"]}>
@@ -240,13 +238,15 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("My offers mock")).toBeInTheDocument();
+    expect(await screen.findByText("My offers mock")).toBeInTheDocument();
   });
 
-  it("renders the dashboard when an authenticated user lands on the app", () => {
-    session.token = "token-123";
-    session.currentUser = { id: "u5", name: "Sabine", role: "ADMIN" };
-    session.users = [{ id: "u5", name: "Sabine", role: "ADMIN" }];
+  it("renders the dashboard when an authenticated user lands on the app", async () => {
+    syncAuthStore({
+      token: "token-123",
+      currentUser: { id: "u5", name: "Sabine", role: "ADMIN" }
+    });
+    getCurrentUser.mockResolvedValue({ id: "u5", name: "Sabine", email: "s@example.com", role: "ADMIN", isSuspended: false });
 
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -254,13 +254,15 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Dashboard mock")).toBeInTheDocument();
+    expect(await screen.findByText("Dashboard mock")).toBeInTheDocument();
   });
 
-  it("renders the admin route when the session user is an admin", () => {
-    session.token = "token-123";
-    session.currentUser = { id: "u5", name: "Sabine", role: "ADMIN" };
-    session.users = [{ id: "u5", name: "Sabine", role: "ADMIN" }];
+  it("renders the admin route when the session user is an admin", async () => {
+    syncAuthStore({
+      token: "token-123",
+      currentUser: { id: "u5", name: "Sabine", role: "ADMIN" }
+    });
+    getCurrentUser.mockResolvedValue({ id: "u5", name: "Sabine", email: "s@example.com", role: "ADMIN", isSuspended: false });
 
     render(
       <MemoryRouter initialEntries={["/admin"]}>
@@ -268,13 +270,15 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Admin mock")).toBeInTheDocument();
+    expect(await screen.findByText("Admin mock")).toBeInTheDocument();
   });
 
-  it("renders the moderation route when the session user is a moderator", () => {
-    session.token = "token-123";
-    session.currentUser = { id: "u4", name: "Tobias", role: "MODERATOR" };
-    session.users = [{ id: "u4", name: "Tobias", role: "MODERATOR" }];
+  it("renders the moderation route when the session user is a moderator", async () => {
+    syncAuthStore({
+      token: "token-123",
+      currentUser: { id: "u4", name: "Tobias", role: "MODERATOR" }
+    });
+    getCurrentUser.mockResolvedValue({ id: "u4", name: "Tobias", email: "t@example.com", role: "MODERATOR", isSuspended: false });
 
     render(
       <MemoryRouter initialEntries={["/moderation"]}>
@@ -282,6 +286,6 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Moderation mock")).toBeInTheDocument();
+    expect(await screen.findByText("Moderation mock")).toBeInTheDocument();
   });
 });

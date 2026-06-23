@@ -3,16 +3,19 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Layout } from "../../src/components/Layout";
 import type { User } from "@toolshare/shared";
+import { useAuthStore } from "../../src/store/authStore";
 import {
   INBOX_READ_CHANGED_EVENT,
+  inboxReadSeedKey,
   requestMessageKey,
   ratingMessageKey,
   saveReadMessageIds
 } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, getRatingsReceived, getNotifications } = vi.hoisted(() => ({
+const { getBookingsForUser, getRatingsReceived, getRatingsGiven, getNotifications } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   getRatingsReceived: vi.fn().mockResolvedValue([]),
+  getRatingsGiven: vi.fn().mockResolvedValue([]),
   getNotifications: vi.fn().mockResolvedValue([])
 }));
 
@@ -24,6 +27,7 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
       ...actual.api,
       getBookingsForUser,
     getRatingsReceived,
+    getRatingsGiven,
     getNotifications
     }
   };
@@ -39,6 +43,7 @@ describe("Layout", () => {
     vi.resetAllMocks();
     localStorage.clear();
     getRatingsReceived.mockResolvedValue([]);
+    getRatingsGiven.mockResolvedValue([]);
     getNotifications.mockResolvedValue([]);
   });
 
@@ -89,6 +94,8 @@ describe("Layout", () => {
   it("updates the bell unread count when an inbox thread is marked read", async () => {
     const onSwitchUser = vi.fn();
     const onLogout = vi.fn();
+    localStorage.setItem(inboxReadSeedKey(users[0].id), "1");
+    useAuthStore.setState({ currentUser: users[0], token: "tok-1" });
     const bookings = [
       {
         id: "b1",
@@ -150,6 +157,8 @@ describe("Layout", () => {
   });
 
   it("includes unread ratings in the bell count when booking messages are already read", async () => {
+    localStorage.setItem(inboxReadSeedKey(users[0].id), "1");
+    useAuthStore.setState({ currentUser: users[0], token: "tok-1" });
     const bookings = [
       {
         id: "b-rating",

@@ -126,6 +126,23 @@ const userFriendlyMessageByLegacyMessage: Record<string, string> = {
     "Bitte dokumentieren Sie die Entscheidung mit einer Begründung."
 };
 
+type ProblemBody = {
+  type: string;
+  title: string;
+  status: number;
+  detail: string;
+  code: string;
+  errors?: {
+    fieldErrors?: Record<string, string[] | undefined>;
+    formErrors?: string[];
+  };
+};
+
+const sendProblem = (res: Response, body: ProblemBody) => {
+  res.setHeader("Content-Type", "application/problem+json");
+  return res.status(body.status).json(body);
+};
+
 const getMessageForAppError = (error: AppError): string => {
   if (userFriendlyMessageByCode[error.code]) {
     return userFriendlyMessageByCode[error.code];
@@ -149,23 +166,25 @@ export const errorHandler = (
   _next: NextFunction
 ) => {
   if (error instanceof AppError) {
-    return res.status(error.status).json({
-      error: {
-        code: error.code,
-        message: getMessageForAppError(error),
-        status: error.status
-      }
+    const detail = getMessageForAppError(error);
+    return sendProblem(res, {
+      type: `urn:toolshare:problem:${error.code.toLowerCase()}`,
+      title: error.code.replaceAll("_", " "),
+      status: error.status,
+      detail,
+      code: error.code
     });
   }
 
   if (error instanceof ZodError) {
-    return res.status(400).json({
-      error: {
-        code: "VALIDATION_ERROR",
-        message: userFriendlyMessageByCode.VALIDATION_ERROR,
-        status: 400,
-        details: error.flatten()
-      }
+    const flattened = error.flatten();
+    return sendProblem(res, {
+      type: "urn:toolshare:problem:validation-error",
+      title: "VALIDATION ERROR",
+      status: 400,
+      detail: userFriendlyMessageByCode.VALIDATION_ERROR,
+      code: "VALIDATION_ERROR",
+      errors: flattened
     });
   }
 
@@ -182,11 +201,11 @@ export const errorHandler = (
       ? error.message
       : "Es ist ein unerwarteter Serverfehler aufgetreten.";
 
-  return res.status(500).json({
-    error: {
-      code: "INTERNAL_SERVER_ERROR",
-      message: internalMessage,
-      status: 500
-    }
+  return sendProblem(res, {
+    type: "urn:toolshare:problem:internal-server-error",
+    title: "INTERNAL SERVER ERROR",
+    status: 500,
+    detail: internalMessage,
+    code: "INTERNAL_SERVER_ERROR"
   });
 };

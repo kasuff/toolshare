@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { notificationOutboxService } from "../../infrastructure/outbox/notification-outbox.service";
 
 const ratingInclude = {
   fromUser: {
@@ -108,6 +109,36 @@ export const ratingsRepository = {
         comment: input.comment
       },
       include: ratingInclude
+    });
+  },
+
+  createWithNotification(input: {
+    bookingId: string;
+    fromUserId: string;
+    toUserId: string;
+    score: number;
+    comment?: string;
+    starsLabel: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const rating = await tx.rating.create({
+        data: {
+          bookingId: input.bookingId,
+          fromUserId: input.fromUserId,
+          toUserId: input.toUserId,
+          score: input.score,
+          comment: input.comment
+        },
+        include: ratingInclude
+      });
+
+      await notificationOutboxService.scheduleRatingNotification(tx, {
+        ratingId: rating.id,
+        providerId: input.toUserId,
+        starsLabel: input.starsLabel
+      });
+
+      return rating;
     });
   },
 

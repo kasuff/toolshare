@@ -3,13 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../App";
 import { ToastProvider } from "../../hooks/useToast";
-import {  api  } from "@toolshare/shared";
-
-const mockUseSession = vi.fn();
-
-vi.mock("../../hooks/useSession", () => ({
-  useSession: () => mockUseSession()
-}));
+import { api } from "@toolshare/shared";
 
 vi.mock("@toolshare/shared", async () => {
   const actual = await vi.importActual<typeof import("@toolshare/shared")>("@toolshare/shared");
@@ -40,17 +34,6 @@ describe("Authentication user journey", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseSession.mockReturnValue({
-      token: null,
-      users: [],
-      currentUser: null,
-      isLoading: false,
-      error: null,
-      login: vi.fn(),
-      register: vi.fn(),
-      logout: vi.fn(),
-      updateProfile: vi.fn()
-    });
     vi.mocked(api.suggestAddresses).mockResolvedValue([]);
     vi.mocked(api.validateAddress).mockResolvedValue({
       isValid: true,

@@ -84,7 +84,7 @@ describe("WorkshopsPage coverage", () => {
     renderWorkshopsPage();
 
     expect(await screen.findByText("Maker Space")).toBeInTheDocument();
-    getRatingsForWorkshop.mockResolvedValueOnce([
+    getRatingsForWorkshop.mockResolvedValue([
       {
         id: "rating-w1",
         score: 4,
@@ -95,7 +95,9 @@ describe("WorkshopsPage coverage", () => {
     ]);
     fireEvent.click(screen.getByRole("button", { name: "Maker Space: Details anzeigen" }));
     expect(await screen.findByRole("heading", { name: "Bewertungen" })).toBeInTheDocument();
-    expect(screen.getByText("Gute Ausstattung")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Gute Ausstattung")).toBeInTheDocument();
+    });
     expect(getRatingsForWorkshop).toHaveBeenCalledWith("w1");
     expect(await screen.findByRole("region", { name: "Maker Space" })).toBeInTheDocument();
     expect(screen.getByText("Eigene Werkstatt")).toBeInTheDocument();

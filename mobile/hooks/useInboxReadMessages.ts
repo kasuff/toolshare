@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Booking } from '@toolshare/shared';
+import type { Booking, Rating } from '@toolshare/shared';
 import { useAuth } from './useAuth';
 import {
   loadReadMessageIds,
@@ -8,13 +8,23 @@ import {
 } from '../utils/inboxMessageRead';
 import { notifyInboxBadgeRefresh } from '../utils/inboxBadgeEvents';
 
-export function useInboxReadMessages(bookings: Booking[]) {
+export function useInboxReadMessages(
+  bookings: Booking[],
+  ratings: Rating[],
+  isLoading: boolean = false
+) {
   const { currentUser } = useAuth();
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
 
   useEffect(() => {
     if (!currentUser?.id) {
       setReadIds(new Set());
+      setIsStorageLoaded(false);
+      return;
+    }
+
+    if (isLoading) {
       return;
     }
 
@@ -22,10 +32,11 @@ export function useInboxReadMessages(bookings: Booking[]) {
     const apiBookings = bookings.filter((booking) => booking.type !== 'SYSTEM_WARNING');
 
     void (async () => {
-      const seededIds = await seedReadMessagesIfNeeded(currentUser.id, apiBookings);
+      const seededIds = await seedReadMessagesIfNeeded(currentUser.id, apiBookings, ratings);
       const ids = seededIds ?? (await loadReadMessageIds(currentUser.id));
       if (!cancelled) {
         setReadIds(ids);
+        setIsStorageLoaded(true);
         if (seededIds) {
           notifyInboxBadgeRefresh();
         }
@@ -35,12 +46,12 @@ export function useInboxReadMessages(bookings: Booking[]) {
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.id, bookings]);
+  }, [currentUser?.id, bookings, ratings, isLoading]);
 
   const markThreadRead = useCallback(
-    async (booking: Booking) => {
+    async (booking: Booking, rating?: Rating | null) => {
       if (!currentUser?.id || booking.type === 'SYSTEM_WARNING') return;
-      const next = await markThreadReadForUser(currentUser.id, booking);
+      const next = await markThreadReadForUser(currentUser.id, booking, rating);
       if (next) {
         setReadIds(next);
         notifyInboxBadgeRefresh();
@@ -49,5 +60,6 @@ export function useInboxReadMessages(bookings: Booking[]) {
     [currentUser?.id]
   );
 
-  return { readIds, markThreadRead };
+  return { readIds, markThreadRead, isStorageLoaded };
 }
+

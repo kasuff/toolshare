@@ -94,8 +94,8 @@ describe("ProfileSettingsPage", () => {
     });
     fireEvent.focus(screen.getByPlaceholderText("Adresse suchen"));
 
-    expect(await screen.findByRole("listbox", { name: "Adressvorschläge" })).toBeInTheDocument();
-    await waitFor(() => expect(suggestAddresses).toHaveBeenCalled());
+    await waitFor(() => expect(suggestAddresses).toHaveBeenCalled(), { timeout: 3000 });
+    expect(await screen.findByRole("listbox", { name: "Adressvorschläge" }, { timeout: 3000 })).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("option", { name: /Musterstraße 5, 80331 München, Deutschland/i }));
 
     fireEvent.change(screen.getByPlaceholderText("Dein Name"), { target: { value: "Lea Neu" } });

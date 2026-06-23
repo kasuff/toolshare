@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const reactRoot = path.dirname(require.resolve("react/package.json"));
 const reactDomRoot = path.dirname(require.resolve("react-dom/package.json"));
+const zodRoot = path.dirname(require.resolve("zod/package.json"));
 
 export default defineConfig({
   plugins: [react()],
@@ -17,6 +18,7 @@ export default defineConfig({
       "react-dom": reactDomRoot,
       "react/jsx-runtime": path.join(reactRoot, "jsx-runtime"),
       "react/jsx-dev-runtime": path.join(reactRoot, "jsx-dev-runtime"),
+      zod: zodRoot,
     },
     dedupe: ["react", "react-dom"],
   },

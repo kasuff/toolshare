@@ -147,7 +147,7 @@ describe("US-13 Authentication acceptance criteria", () => {
     });
 
     expect(response.status).toBe(401);
-    expect(response.body.error?.code).toBe("INVALID_CREDENTIALS");
+    expect(response.body.code).toBe("INVALID_CREDENTIALS");
     expect(response.body.accessToken).toBeUndefined();
   });
 
@@ -155,7 +155,7 @@ describe("US-13 Authentication acceptance criteria", () => {
     const response = await request(app).get("/api/bookings/me");
 
     expect(response.status).toBe(401);
-    expect(response.body.error?.code).toBe("UNAUTHORIZED");
+    expect(response.body.code).toBe("UNAUTHORIZED");
   });
 
   it("rejects login for suspended accounts", async () => {
@@ -165,7 +165,7 @@ describe("US-13 Authentication acceptance criteria", () => {
     });
 
     expect(response.status).toBe(403);
-    expect(response.body.error?.code).toBe("ACCOUNT_SUSPENDED");
+    expect(response.body.code).toBe("ACCOUNT_SUSPENDED");
   });
 
   it("rejects protected requests for suspended accounts with a valid token", async () => {
@@ -188,7 +188,7 @@ describe("US-13 Authentication acceptance criteria", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(403);
-    expect(response.body.error?.code).toBe("ACCOUNT_SUSPENDED");
+    expect(response.body.code).toBe("ACCOUNT_SUSPENDED");
   });
 
   it("validates minimum password length on registration", async () => {
@@ -200,8 +200,8 @@ describe("US-13 Authentication acceptance criteria", () => {
     });
 
     expect(response.status).toBe(400);
-    expect(response.body.error?.code).toBe("VALIDATION_ERROR");
-    expect(response.body.error?.details?.fieldErrors?.body?.[0]).toContain("at least 8 character");
+    expect(response.body.code).toBe("VALIDATION_ERROR");
+    expect(response.body.errors?.fieldErrors?.body?.[0]).toContain("at least 8 character");
   });
 
   it("rejects registration when address misses a house number", async () => {
@@ -213,8 +213,8 @@ describe("US-13 Authentication acceptance criteria", () => {
     });
 
     expect(response.status).toBe(400);
-    expect(response.body.error?.code).toBe("VALIDATION_ERROR");
-    expect(response.body.error?.details?.fieldErrors?.body?.[0]).toContain("Hausnummer");
+    expect(response.body.code).toBe("VALIDATION_ERROR");
+    expect(response.body.errors?.fieldErrors?.body?.[0]).toContain("Hausnummer");
   });
 
   it("always creates newly registered users with USER role", async () => {

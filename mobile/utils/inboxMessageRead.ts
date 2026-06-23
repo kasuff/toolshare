@@ -1,43 +1,30 @@
-import type { Booking, PickupProposal, TimeslotProposal } from '@toolshare/shared';
-import { storage } from './appStorage';
+import type { Booking, Rating } from "@toolshare/shared";
+import {
+  collectAllMessageKeys,
+  collectIncomingMessageKeys,
+  inboxReadSeedKey,
+  inboxReadStorageKey,
+  requestMessageKey,
+  proposalMessageKey,
+  ratingMessageKey,
+  bookingHasUnreadForUser,
+  countUnreadInboxThreads,
+  type InboxRatingRef,
+} from "@toolshare/shared";
+import { storage } from "./appStorage";
 
-const STORAGE_VER = 'v1';
-
-function sanitizeStoragePart(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]/g, '_');
-}
-
-export function inboxReadStorageKey(userId: string): string {
-  return `toolshare.inbox.readMsgs.${STORAGE_VER}.${sanitizeStoragePart(userId)}`;
-}
-
-export function inboxReadSeedKey(userId: string): string {
-  return `toolshare.inbox.readSeed.${STORAGE_VER}.${sanitizeStoragePart(userId)}`;
-}
-
-export function requestMessageKey(bookingId: string): string {
-  return `req:${bookingId}`;
-}
-
-export function proposalMessageKey(bookingId: string, proposalId: string): string {
-  return `prop:${bookingId}:${proposalId}`;
-}
-
-export function collectAllMessageKeys(
-  bookings: Array<Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] }>
-): string[] {
-  const keys: string[] = [];
-  for (const booking of bookings) {
-    keys.push(requestMessageKey(booking.id));
-    for (const proposal of booking.pickupProposals ?? []) {
-      keys.push(proposalMessageKey(booking.id, proposal.id));
-    }
-    for (const proposal of booking.timeslotProposals ?? []) {
-      keys.push(proposalMessageKey(booking.id, proposal.id));
-    }
-  }
-  return keys;
-}
+export {
+  inboxReadStorageKey,
+  inboxReadSeedKey,
+  requestMessageKey,
+  proposalMessageKey,
+  ratingMessageKey,
+  collectAllMessageKeys,
+  collectIncomingMessageKeys,
+  bookingHasUnreadForUser,
+  countUnreadInboxThreads,
+  type InboxRatingRef,
+};
 
 export async function loadReadMessageIds(userId: string): Promise<Set<string>> {
   try {
@@ -45,7 +32,7 @@ export async function loadReadMessageIds(userId: string): Promise<Set<string>> {
     if (!raw) return new Set();
     const arr = JSON.parse(raw) as unknown;
     if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((x): x is string => typeof x === 'string'));
+    return new Set(arr.filter((x): x is string => typeof x === "string"));
   } catch {
     return new Set();
   }
@@ -59,88 +46,41 @@ export async function saveReadMessageIds(userId: string, ids: Set<string>): Prom
   }
 }
 
-export function countUnreadInboxThreads(
-  bookings: Booking[],
-  userId: string,
-  readIds: Set<string>
-): number {
-  let count = 0;
-  for (const booking of bookings) {
-    if (bookingHasUnreadForUser(booking, userId, readIds)) {
-      count += 1;
-    }
-  }
-  return count;
-}
-
-export function bookingHasUnreadForUser(
-  booking: Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] },
-  userId: string,
-  readIds: Set<string>
-): boolean {
-  if (booking.requesterId !== userId && !readIds.has(requestMessageKey(booking.id))) {
-    return true;
-  }
-  for (const proposal of booking.pickupProposals ?? []) {
-    if (proposal.status !== 'PENDING') continue;
-    if (proposal.proposedById !== userId && !readIds.has(proposalMessageKey(booking.id, proposal.id))) {
-      return true;
-    }
-  }
-  for (const proposal of booking.timeslotProposals ?? []) {
-    if (proposal.status !== 'PENDING') continue;
-    if (proposal.proposedById !== userId && !readIds.has(proposalMessageKey(booking.id, proposal.id))) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function collectIncomingMessageKeys(booking: Booking, currentUserId: string): string[] {
-  const keys: string[] = [];
-  if (booking.type === 'SYSTEM_WARNING') {
-    return keys;
-  }
-  if (booking.requesterId !== currentUserId) {
-    keys.push(requestMessageKey(booking.id));
-  }
-  for (const proposal of booking.pickupProposals ?? []) {
-    if (proposal.status === 'PENDING' && proposal.proposedById !== currentUserId) {
-      keys.push(proposalMessageKey(booking.id, proposal.id));
-    }
-  }
-  for (const proposal of booking.timeslotProposals ?? []) {
-    if (proposal.status === 'PENDING' && proposal.proposedById !== currentUserId) {
-      keys.push(proposalMessageKey(booking.id, proposal.id));
-    }
-  }
-  return keys;
-}
-
 export async function seedReadMessagesIfNeeded(
   userId: string,
-  bookings: Booking[]
+  bookings: Booking[],
+  ratings: Rating[] = []
 ): Promise<Set<string> | null> {
   try {
     const seeded = await storage.getItem(inboxReadSeedKey(userId));
     if (seeded) return null;
 
     const keys = collectAllMessageKeys(bookings);
+    for (const r of ratings) {
+      keys.push(ratingMessageKey(r.bookingId, r.id));
+    }
     const merged = new Set(await loadReadMessageIds(userId));
     for (const key of keys) {
       merged.add(key);
     }
     await saveReadMessageIds(userId, merged);
-    await storage.setItem(inboxReadSeedKey(userId), '1');
+    await storage.setItem(inboxReadSeedKey(userId), "1");
     return merged;
   } catch {
     return null;
   }
 }
 
-export async function markThreadReadForUser(userId: string, booking: Booking): Promise<Set<string> | null> {
+export async function markThreadReadForUser(
+  userId: string,
+  booking: Booking,
+  rating?: Rating | null
+): Promise<Set<string> | null> {
   const currentReadIds = await loadReadMessageIds(userId);
   const incomingKeys = collectIncomingMessageKeys(booking, userId);
+  if (rating && rating.toUserId === userId && rating.status === "SICHTBAR") {
+    incomingKeys.push(ratingMessageKey(booking.id, rating.id));
+  }
   if (incomingKeys.length === 0) {
     return null;
   }
