@@ -806,7 +806,7 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                       }
                     >
                       <RequestMessageCard
-                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
+                        label="Alternativvorschlag"
                         title={selectedBooking.toolName ?? "Werkzeug"}
                         icon="help"
                         firstLabel="Abholung"
@@ -835,7 +835,7 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                       }
                     >
                       <RequestMessageCard
-                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
+                        label="Alternativvorschlag"
                         title={selectedBooking.toolName ?? "Werkstatt"}
                         icon="help"
                         firstLabel="Von"

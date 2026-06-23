@@ -106,9 +106,10 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
     };
 
     void pollData();
+    // Kein WebSocket/SSE vorhanden – kurzes Intervall damit die Glocke sich spürbar aktualisiert.
     const intervalId = window.setInterval(() => {
       if (!cancelled) void pollData();
-    }, 60_000);
+    }, 20_000);
 
     const onVisibility = () => {
       if (document.visibilityState === "visible" && !cancelled) {
