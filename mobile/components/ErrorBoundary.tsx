@@ -1,6 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { View, Text, Button, StyleSheet } from "react-native";
-import { colors, spacing } from "../constants/theme";
+import { Colors, Spacing } from "../constants/theme";
 
 interface Props {
   children?: ReactNode;
@@ -52,31 +52,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: spacing.lg,
-    backgroundColor: colors.background,
+    padding: Spacing.lg,
+    backgroundColor: Colors.bg,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: colors.text,
-    marginBottom: spacing.sm,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
+    color: Colors.textMuted,
+    marginBottom: Spacing.lg,
     textAlign: "center",
   },
   errorBox: {
-    backgroundColor: colors.surfaceHover,
-    padding: spacing.md,
+    backgroundColor: Colors.surfaceSoft,
+    padding: Spacing.md,
     borderRadius: 8,
-    marginBottom: spacing.lg,
+    marginBottom: Spacing.lg,
     width: "100%",
   },
   errorText: {
-    color: colors.text,
+    color: Colors.text,
     fontFamily: "monospace",
   },
 });

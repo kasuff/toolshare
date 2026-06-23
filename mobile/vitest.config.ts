@@ -5,6 +5,9 @@ import path from 'path';
 // neither builds nor bundles it. These tests exercise the pure business logic
 // (date handling, inbox unread/read bookkeeping) in a plain Node environment;
 // anything that touches the React Native / Expo runtime is mocked per-test.
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
 export default defineConfig({
   test: {
     globals: true,
@@ -27,7 +30,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@toolshare/shared': path.resolve(__dirname, '../shared/index.ts'),
-      zod: path.resolve(__dirname, 'node_modules/zod'),
+      zod: path.dirname(require.resolve('zod')),
     },
   },
 });
