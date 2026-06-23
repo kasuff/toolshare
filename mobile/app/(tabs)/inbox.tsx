@@ -3,7 +3,8 @@ import { View, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicat
 import { useFocusEffect } from 'expo-router';
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
-import { api, Booking } from '@toolshare/shared';
+import { api, Booking, Rating } from '@toolshare/shared';
+import { RatingFormPanel } from '../../components/RatingFormPanel';
 import { useAuth } from '../../hooks/useAuth';
 import { EmptyState, LoadingSpinner } from '../../components/EmptyState';
 import { Ionicons } from '@expo/vector-icons';
@@ -100,6 +101,19 @@ function getLastActivityMs(booking: Booking): number {
   return latest;
 }
 
+function isBookingRateable(booking: Booking) {
+  if (booking.status === "ABGELEHNT" || booking.status === "OFFEN") {
+    return false;
+  }
+  if (booking.status === "ABGESCHLOSSEN") {
+    return true;
+  }
+  if (!booking.endIso) {
+    return false;
+  }
+  return new Date(booking.endIso) <= new Date();
+}
+
 function proposalStatusLabel(status: 'PENDING' | 'ACCEPTED' | 'DECLINED') {
   if (status === 'ACCEPTED') return 'Angenommen';
   if (status === 'DECLINED') return 'Abgelehnt';
@@ -133,12 +147,22 @@ export default function InboxScreen() {
   const [isReporting, setIsReporting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
+  // Rating states
+  const [ratingsGiven, setRatingsGiven] = useState<Rating[]>([]);
+  const [showRatingForm, setShowRatingForm] = useState(false);
+  const [ratingScore, setRatingScore] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+
   const loadBookings = useCallback(async () => {
     if (!token || !currentUser?.id) return;
     try {
       setLoadError(null);
-      const bookingsData = await api.getBookingsForUser(token);
-      const notificationsData = await api.getNotifications(token);
+      const [bookingsData, notificationsData, ratingsData] = await Promise.all([
+        api.getBookingsForUser(token),
+        api.getNotifications(token),
+        api.getRatingsGiven(token).catch(() => [])
+      ]);
       
       const systemNotifications = notificationsData
         .filter(n => isInboxSystemNotification(n.message))
@@ -172,6 +196,7 @@ export default function InboxScreen() {
       combined.sort((a, b) => getLastActivityMs(b) - getLastActivityMs(a));
       
       setBookings(combined);
+      setRatingsGiven(ratingsData);
       setSelectedBooking((prev) => (prev ? combined.find((b) => b.id === prev.id) ?? prev : null));
       const unreadCount = await countUnreadInboxItems(bookingsData, notificationsData, currentUser.id);
       notifyInboxBadgeRefresh(unreadCount);
@@ -360,6 +385,27 @@ export default function InboxScreen() {
     }
   };
 
+  const submitRating = async () => {
+    if (!selectedBooking || !token) return;
+    setIsSubmittingRating(true);
+    try {
+      await api.createRating({
+        bookingId: selectedBooking.id,
+        score: ratingScore,
+        comment: ratingComment || undefined
+      }, token);
+      Alert.alert('Erfolg', 'Bewertung wurde abgegeben.');
+      setShowRatingForm(false);
+      setRatingScore(0);
+      setRatingComment('');
+      await loadBookings();
+    } catch (e) {
+      Alert.alert('Fehler', e instanceof Error ? e.message : 'Bewertung konnte nicht gespeichert werden.');
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
   const handleDecide = async (bookingId: string, accept: boolean) => {
     if (!token) return;
     try {
@@ -441,6 +487,14 @@ export default function InboxScreen() {
       !showCounterForm &&
       (canRespondToPickupCounter || canRespondToTimeslotCounter) &&
       !isSystemWarning;
+    
+    const showRatingFooter = Boolean(
+      currentUser &&
+        selectedBooking &&
+        selectedBooking.requesterId === currentUser.id &&
+        isBookingRateable(selectedBooking) &&
+        !ratingsGiven.some(r => r.bookingId === selectedBooking.id)
+    );
 
     return (
       <View style={styles.container}>
@@ -935,6 +989,20 @@ export default function InboxScreen() {
           </View>
         )}
         
+        {showRatingFooter && (
+          <View style={styles.ratingFooter}>
+            <ThemedText type="muted" style={styles.ratingHint}>
+              Wie war deine Erfahrung? Du kannst jederzeit bewerten.
+            </ThemedText>
+            <TouchableOpacity
+              style={styles.ratingButton}
+              onPress={() => setShowRatingForm(true)}
+            >
+              <ThemedText style={styles.ratingButtonText}>Bewertung abgeben</ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <ReportForm
           visible={reportTargetUserId !== null}
           title="Nutzer melden"
@@ -945,6 +1013,20 @@ export default function InboxScreen() {
           onDetailsChange={setReportDetails}
           onSubmit={submitReport}
           onCancel={() => setReportTargetUserId(null)}
+        />
+
+        <RatingFormPanel
+          visible={showRatingForm}
+          title="Bewertung abgeben"
+          hint="Deine Bewertung hilft anderen Nutzern bei der Entscheidung."
+          targetLabel={selectedBooking ? (selectedBooking.toolName ?? (selectedBooking.type === 'WORKSHOP' ? 'Werkstatt' : 'Werkzeug')) : ''}
+          score={ratingScore}
+          comment={ratingComment}
+          isSubmitting={isSubmittingRating}
+          onScoreChange={setRatingScore}
+          onCommentChange={setRatingComment}
+          onSubmit={submitRating}
+          onCancel={() => { setShowRatingForm(false); setRatingScore(0); setRatingComment(''); }}
         />
       </View>
     );
@@ -1315,5 +1397,30 @@ const useStyles = createThemedStyleSheet((colors) => ({
   },
   systemMessageContainer: {
     paddingVertical: Spacing.xs,
+  },
+  ratingFooter: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    alignItems: 'center',
+  },
+  ratingHint: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  ratingButton: {
+    backgroundColor: colors.brand,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    width: '100%',
+    alignItems: 'center',
+  },
+  ratingButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 15,
   }
 }));
