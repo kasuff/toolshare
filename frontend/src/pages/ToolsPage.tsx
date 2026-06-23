@@ -6,7 +6,7 @@ import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../compo
 import { SearchRadiusMap } from "../components/SearchRadiusMap";
 import { useTools } from "../hooks/queries/tools.queries";
 import {  TOOL_CATEGORIES  } from "@toolshare/shared";
-import { distanceBetweenLocations, isWithinRadius } from "@toolshare/shared";
+import { distanceBetweenPoints, isPointWithinRadius, type GeoPoint } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
 import {  pluralize  } from "@toolshare/shared";
 import type {  User  } from "@toolshare/shared";
@@ -31,11 +31,16 @@ type Props = {
 export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {}) {
   const { currentUser, token } = usePageAuth(propUser, propToken);
   const defaultLocation = currentUser?.address ?? "München Zentrum";
+  const originPoint: GeoPoint = {
+    latitude: currentUser?.latitude,
+    longitude: currentUser?.longitude,
+    location: defaultLocation
+  };
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [borrowFrom, setBorrowFrom] = useState("");
   const [borrowUntil, setBorrowUntil] = useState("");
-  const [radiusKm, setRadiusKm] = useState(5);
+  const [radiusKm, setRadiusKm] = useState(15);
 
   const { data: tools = [], isLoading, isFetched } = useTools({ q }, token);
 
@@ -49,11 +54,29 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
   }, [borrowFrom, borrowUntil, category, tools]);
 
   const filteredTools = useMemo(() => {
-    return candidateTools.filter((tool) => isWithinRadius(defaultLocation, tool.pickupLocation, radiusKm));
-  }, [candidateTools, defaultLocation, radiusKm]);
+    return candidateTools
+      .map((tool) => ({
+        tool,
+        distance: distanceBetweenPoints(originPoint, {
+          latitude: tool.pickupLat,
+          longitude: tool.pickupLon,
+          location: tool.pickupLocation
+        })
+      }))
+      .filter(({ tool }) =>
+        isPointWithinRadius(
+          originPoint,
+          { latitude: tool.pickupLat, longitude: tool.pickupLon, location: tool.pickupLocation },
+          radiusKm
+        )
+      )
+      .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+      .map((entry) => entry.tool);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateTools, currentUser?.latitude, currentUser?.longitude, defaultLocation, radiusKm]);
 
   const hasActiveFilters = Boolean(
-    q || category || borrowFrom || borrowUntil || radiusKm !== 5
+    q || category || borrowFrom || borrowUntil || radiusKm !== 15
   );
 
   const resetFilters = () => {
@@ -61,7 +84,7 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
     setCategory("");
     setBorrowFrom("");
     setBorrowUntil("");
-    setRadiusKm(5);
+    setRadiusKm(15);
   };
 
   return (
@@ -125,7 +148,15 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
             </div>
             <SearchRadiusMap
               centerAddress={defaultLocation}
-              points={candidateTools.map((tool) => ({ id: tool.id, label: tool.name, location: tool.pickupLocation }))}
+              centerLatitude={currentUser?.latitude}
+              centerLongitude={currentUser?.longitude}
+              points={candidateTools.map((tool) => ({
+                id: tool.id,
+                label: tool.name,
+                location: tool.pickupLocation,
+                latitude: tool.pickupLat,
+                longitude: tool.pickupLon
+              }))}
               radiusKm={radiusKm}
               onRadiusChange={setRadiusKm}
               sliderId="tool-radius-slider"
@@ -139,7 +170,11 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
           <EmptyState title="Kein Werkzeug gefunden" text="Passe Suche oder Kategorie an, um passende Werkzeuge zu finden." />
         )}
         {filteredTools.map((tool) => {
-          const distance = distanceBetweenLocations(defaultLocation, tool.pickupLocation);
+          const distance = distanceBetweenPoints(originPoint, {
+            latitude: tool.pickupLat,
+            longitude: tool.pickupLon,
+            location: tool.pickupLocation
+          });
           const ownerName = tool.ownerName ?? "Unbekannt";
           return (
             <OfferCard

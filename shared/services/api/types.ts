@@ -12,6 +12,8 @@ export type BackendUser = {
   email: string;
   name: string;
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   avatarUrl?: string | null;
   role: BackendRole;
   isSuspended: boolean;
@@ -55,6 +57,8 @@ export type BackendTool = {
   imageUrl?: string | null;
   pickupLocation?: string | null;
   pickupLocationNote?: string | null;
+  pickupLat?: number | null;
+  pickupLon?: number | null;
   status: BackendToolStatus;
   bookings?: BackendWorkshopBookedRange[];
 };
@@ -66,6 +70,8 @@ export type BackendWorkshop = {
   name: string;
   description: string;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
   maxCapacity: number;
   equipment?: string[];
   extras?: string[];

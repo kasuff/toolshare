@@ -1,6 +1,7 @@
 import { AppError } from "../../utils/app-error";
 import { getImageStorageService } from "../../config/services";
 import { resolveImageUrls } from "../../ports/image-storage.service";
+import { addressService } from "../address/address.service";
 import { workshopsRepository } from "./workshops.repository";
 import {
   toWorkshopResponse,
@@ -43,8 +44,11 @@ export const workshopsService = {
   }) {
     const storage = getImageStorageService();
     const imageUrls = (await resolveImageUrls(storage, input.imageUrls)) ?? [];
+    const coordinates = await addressService.geocode(input.location);
     const created = await workshopsRepository.create({
       ...input,
+      latitude: coordinates?.latitude ?? null,
+      longitude: coordinates?.longitude ?? null,
       extras: input.extras ?? [],
       workshopTools: input.workshopTools ?? [],
       imageUrls
@@ -82,9 +86,15 @@ export const workshopsService = {
         ? (await resolveImageUrls(storage, input.data.imageUrls)) ?? []
         : undefined;
 
+    const geo =
+      input.data.location !== undefined ? await addressService.geocode(input.data.location) : null;
+
     const updated = await workshopsRepository.update(input.workshopId, {
       ...input.data,
-      ...(imageUrls !== undefined ? { imageUrls } : {})
+      ...(imageUrls !== undefined ? { imageUrls } : {}),
+      ...(input.data.location !== undefined
+        ? { latitude: geo?.latitude ?? null, longitude: geo?.longitude ?? null }
+        : {})
     });
     return toWorkshopResponse(updated);
   },

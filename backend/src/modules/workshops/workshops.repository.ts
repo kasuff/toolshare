@@ -88,6 +88,8 @@ export const workshopsRepository = {
     name: string;
     description: string;
     location: string;
+    latitude?: number | null;
+    longitude?: number | null;
     maxCapacity: number;
     extras: string[];
     workshopTools: Array<{ name: string; category: string }>;
@@ -99,6 +101,8 @@ export const workshopsRepository = {
         name: input.name,
         description: input.description,
         location: input.location,
+        latitude: input.latitude,
+        longitude: input.longitude,
         maxCapacity: input.maxCapacity,
         equipment: input.extras,
         imageUrls: input.imageUrls,
@@ -127,6 +131,8 @@ export const workshopsRepository = {
       name?: string;
       description?: string;
       location?: string;
+      latitude?: number | null;
+      longitude?: number | null;
       maxCapacity?: number;
       extras?: string[];
       workshopTools?: Array<{ name: string; category: string }>;

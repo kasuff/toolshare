@@ -36,6 +36,8 @@ function mapTool(tool: BackendTool): Tool {
     imageUrl: normalizePlaceholderImage(tool.imageUrl),
     pickupLocation: tool.pickupLocation ?? "",
     pickupLocationNote: tool.pickupLocationNote ?? undefined,
+    pickupLat: tool.pickupLat ?? undefined,
+    pickupLon: tool.pickupLon ?? undefined,
     bookedRanges: mapWorkshopBookedRanges(tool.bookings)
   };
 }
@@ -49,6 +51,8 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
     name: workshop.name,
     description: workshop.description,
     location: workshop.location,
+    latitude: workshop.latitude ?? undefined,
+    longitude: workshop.longitude ?? undefined,
     maxCapacity: workshop.maxCapacity,
     extras,
     equipmentItems: (workshop.workshopTools ?? []).map((tool) => ({
