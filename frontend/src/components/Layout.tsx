@@ -133,7 +133,9 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
     };
 
     void loadUnreadRequestsForBell();
-    const intervalId = window.setInterval(() => void loadUnreadRequestsForBell(), 60_000);
+    // Kein WebSocket/SSE vorhanden – neue eingehende Nachrichten werden nur per Polling
+    // erkannt. Kurzes Intervall, damit die Glocke sich spürbar "automatisch" aktualisiert.
+    const intervalId = window.setInterval(() => void loadUnreadRequestsForBell(), 20_000);
     const onVisibility = () => {
       if (document.visibilityState === "visible") void loadUnreadRequestsForBell();
     };

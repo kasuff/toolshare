@@ -954,7 +954,7 @@ export function InboxPage({ currentUser, token }: Props) {
                       }
                     >
                       <RequestMessageCard
-                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
+                        label="Alternativvorschlag"
                         title={selectedBooking.toolName ?? "Werkzeug"}
                         icon="help"
                         firstLabel="Abholung"
@@ -983,7 +983,7 @@ export function InboxPage({ currentUser, token }: Props) {
                       }
                     >
                       <RequestMessageCard
-                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
+                        label="Alternativvorschlag"
                         title={selectedBooking.toolName ?? "Werkstatt"}
                         icon="help"
                         firstLabel="Von"
@@ -1491,12 +1491,6 @@ function RequestMessageCard({
       {children}
     </article>
   );
-}
-
-function proposalStatusLabel(status: PickupProposal["status"] | TimeslotProposal["status"]): string {
-  if (status === "ACCEPTED") return "Angenommen";
-  if (status === "DECLINED") return "Abgelehnt";
-  return "Warte auf Antwort";
 }
 
 function threadHasUnread(
