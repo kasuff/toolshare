@@ -1,10 +1,12 @@
 import { AppError } from "../../utils/app-error";
 import { notificationsService } from "../notifications/notifications.service";
 import { usersRepository } from "./users.repository";
+import { toAdminMetricsResponse, toUserResponse, toUserResponseList } from "./users.presenter";
 
 export const usersService = {
-  listUsers(filters: { role?: "USER" | "MODERATOR" | "MANAGER"; search?: string }) {
-    return usersRepository.listPublic(filters);
+  async listUsers(filters: { role?: "USER" | "MODERATOR" | "MANAGER"; search?: string }) {
+    const users = await usersRepository.listPublic(filters);
+    return toUserResponseList(users);
   },
 
   async getMyProfile(userId: string) {
@@ -12,7 +14,7 @@ export const usersService = {
     if (!user) {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
-    return user;
+    return toUserResponse(user);
   },
 
   async getById(userId: string) {
@@ -20,7 +22,7 @@ export const usersService = {
     if (!user) {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
-    return user;
+    return toUserResponse(user);
   },
 
   async updateMyProfile(input: { userId: string; name?: string; address?: string; expoPushToken?: string }) {
@@ -29,11 +31,12 @@ export const usersService = {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
 
-    return usersRepository.updateProfile(input.userId, {
+    const updated = await usersRepository.updateProfile(input.userId, {
       name: input.name,
       address: input.address,
       expoPushToken: input.expoPushToken
     });
+    return toUserResponse(updated);
   },
 
   async updateRole(input: {
@@ -54,7 +57,8 @@ export const usersService = {
       );
     }
 
-    return usersRepository.updateRole(input.targetUserId, input.role);
+    const updated = await usersRepository.updateRole(input.targetUserId, input.role);
+    return toUserResponse(updated);
   },
 
   async updateSuspension(input: { targetUserId: string; isSuspended: boolean }) {
@@ -80,10 +84,11 @@ export const usersService = {
       );
     }
 
-    return updated;
+    return toUserResponse(updated);
   },
 
   async getAdminMetrics() {
-    return usersRepository.getSystemMetrics();
+    const metrics = await usersRepository.getSystemMetrics();
+    return toAdminMetricsResponse(metrics);
   }
 };

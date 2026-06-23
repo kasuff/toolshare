@@ -17,8 +17,8 @@ export const bookingsRepository = {
         ]
       },
       include: {
-        user: true,
-        tool: { include: { owner: true } },
+        user: { select: { id: true, name: true } },
+        tool: { include: { owner: { select: { id: true, name: true } } } },
         workshop: { include: { manager: { select: { id: true, name: true } } } },
         timeslot: { include: { workshop: { include: { manager: { select: { id: true, name: true } } } } } },
         selectedTools: { include: { workshopTool: true } },

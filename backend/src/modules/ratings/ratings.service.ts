@@ -1,5 +1,10 @@
 import { AppError } from "../../utils/app-error";
 import { ratingsRepository } from "./ratings.repository";
+import {
+  toPublicRatingResponseList,
+  toRatingResponse,
+  toRatingResponseList
+} from "./ratings.presenter";
 
 function getProviderUserId(booking: NonNullable<Awaited<ReturnType<typeof ratingsRepository.findBookingWithParticipants>>>) {
   if (booking.tool?.ownerId) {
@@ -16,20 +21,24 @@ function isBookingFinished(booking: { status: string; endDate: Date }) {
 }
 
 export const ratingsService = {
-  listReceived(userId: string) {
-    return ratingsRepository.listReceived(userId);
+  async listReceived(userId: string) {
+    const ratings = await ratingsRepository.listReceived(userId);
+    return toRatingResponseList(ratings);
   },
 
-  listGiven(userId: string) {
-    return ratingsRepository.listGiven(userId);
+  async listGiven(userId: string) {
+    const ratings = await ratingsRepository.listGiven(userId);
+    return toRatingResponseList(ratings);
   },
 
-  listForTool(toolId: string) {
-    return ratingsRepository.listForTool(toolId);
+  async listForTool(toolId: string) {
+    const ratings = await ratingsRepository.listForTool(toolId);
+    return toPublicRatingResponseList(ratings);
   },
 
-  listForWorkshop(workshopId: string) {
-    return ratingsRepository.listForWorkshop(workshopId);
+  async listForWorkshop(workshopId: string) {
+    const ratings = await ratingsRepository.listForWorkshop(workshopId);
+    return toPublicRatingResponseList(ratings);
   },
 
   async create(input: {
@@ -66,7 +75,7 @@ export const ratingsService = {
     }
 
     const starsLabel = input.score === 1 ? "1 Stern" : `${input.score} Sterne`;
-    return ratingsRepository.createWithNotification({
+    const rating = await ratingsRepository.createWithNotification({
       bookingId: input.bookingId,
       fromUserId: input.fromUserId,
       toUserId: providerUserId,
@@ -74,6 +83,7 @@ export const ratingsService = {
       comment: input.comment?.trim() || undefined,
       starsLabel
     });
+    return toRatingResponse(rating);
   },
 
   async hideFromModeration(ratingId: string, moderatorId: string, decisionNote?: string) {

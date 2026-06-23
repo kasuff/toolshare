@@ -2,7 +2,9 @@ openapi: 3.1.0
 info:
   version: 0.1.0
   title: ToolShare API
-  description: REST API contract for ToolShare (subset — auth, tools & bookings)
+  description: REST API contract for ToolShare (auth, tools, bookings, workshops,
+    users, ratings, moderation, notifications, system-rules & address). Response
+    payloads are derived from the shared Zod response contracts (ADR-013).
 servers:
   - url: http://localhost:4000/api
 components:
@@ -11,7 +13,1861 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-  schemas: {}
+  schemas:
+    ToolResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        imageUrl:
+          type:
+            - string
+            - "null"
+        pickupLocation:
+          type:
+            - string
+            - "null"
+        pickupLocationNote:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          enum: &a1
+            - AVAILABLE
+            - REQUESTED
+            - BORROWED
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        owner:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            role:
+              type: string
+              enum: &a2
+                - USER
+                - MODERATOR
+                - MANAGER
+            isSuspended:
+              type: boolean
+          required:
+            - id
+            - name
+            - role
+            - isSuspended
+        bookings:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              startDate:
+                type: string
+              endDate:
+                type: string
+              status:
+                type: string
+                enum: &a3
+                  - PENDING
+                  - ACCEPTED
+                  - REJECTED
+                  - RETURNED
+            required:
+              - id
+              - startDate
+              - endDate
+              - status
+      required:
+        - id
+        - ownerId
+        - name
+        - description
+        - category
+        - imageUrl
+        - pickupLocation
+        - pickupLocationNote
+        - status
+        - createdAt
+        - updatedAt
+        - owner
+    ToolListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          ownerId:
+            type: string
+            format: uuid
+          name:
+            type: string
+          description:
+            type: string
+          category:
+            type: string
+          imageUrl:
+            type:
+              - string
+              - "null"
+          pickupLocation:
+            type:
+              - string
+              - "null"
+          pickupLocationNote:
+            type:
+              - string
+              - "null"
+          status:
+            type: string
+            enum: *a1
+          createdAt:
+            type: string
+          updatedAt:
+            type: string
+          owner:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              role:
+                type: string
+                enum: *a2
+              isSuspended:
+                type: boolean
+            required:
+              - id
+              - name
+              - role
+              - isSuspended
+          bookings:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                startDate:
+                  type: string
+                endDate:
+                  type: string
+                status:
+                  type: string
+                  enum: *a3
+              required:
+                - id
+                - startDate
+                - endDate
+                - status
+        required:
+          - id
+          - ownerId
+          - name
+          - description
+          - category
+          - imageUrl
+          - pickupLocation
+          - pickupLocationNote
+          - status
+          - createdAt
+          - updatedAt
+          - owner
+    ToolBlockingPeriodListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          startDate:
+            type: string
+          endDate:
+            type: string
+        required:
+          - startDate
+          - endDate
+    ToolOwnerBlockListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          startDate:
+            type: string
+          endDate:
+            type: string
+        required:
+          - id
+          - startDate
+          - endDate
+    BookingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        toolId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        timeslotId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        workshopId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        startDate:
+          type: string
+        endDate:
+          type: string
+        pickupTime:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+        status:
+          type: string
+          enum: &a5
+            - PENDING
+            - ACCEPTED
+            - REJECTED
+            - RETURNED
+        user:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+          required:
+            - id
+            - name
+        tool:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            ownerId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            imageUrl:
+              type:
+                - string
+                - "null"
+            owner:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+              required:
+                - id
+                - name
+          required:
+            - id
+            - ownerId
+            - name
+        workshop:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            managerId:
+              type: string
+              format: uuid
+            manager:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+              required:
+                - id
+                - name
+          required:
+            - id
+            - name
+            - managerId
+        timeslot:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            workshopId:
+              type: string
+              format: uuid
+            startTime:
+              type: string
+            endTime:
+              type: string
+            workshop:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                managerId:
+                  type: string
+                  format: uuid
+                manager:
+                  type:
+                    - object
+                    - "null"
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                  required:
+                    - id
+                    - name
+              required:
+                - id
+                - name
+                - managerId
+          required:
+            - id
+            - workshopId
+            - startTime
+            - endTime
+        selectedTools:
+          type: array
+          items:
+            type: object
+            properties:
+              workshopToolId:
+                type: string
+                format: uuid
+              workshopTool:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  category:
+                    type: string
+                required:
+                  - id
+                  - name
+                  - category
+            required:
+              - workshopToolId
+              - workshopTool
+        pickupProposals:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              bookingId:
+                type: string
+                format: uuid
+              proposedByUserId:
+                type: string
+                format: uuid
+              proposedPickupTime:
+                type: string
+              proposedReturnTime:
+                type:
+                  - string
+                  - "null"
+              previousPickupTime:
+                type:
+                  - string
+                  - "null"
+              previousReturnTime:
+                type:
+                  - string
+                  - "null"
+              status:
+                type: string
+                enum: &a4
+                  - PENDING
+                  - ACCEPTED
+                  - DECLINED
+              createdAt:
+                type: string
+            required:
+              - id
+              - bookingId
+              - proposedByUserId
+              - proposedPickupTime
+              - proposedReturnTime
+              - previousPickupTime
+              - previousReturnTime
+              - status
+              - createdAt
+        timeslotProposals:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              bookingId:
+                type: string
+                format: uuid
+              proposedByUserId:
+                type: string
+                format: uuid
+              proposedStartDate:
+                type: string
+              proposedEndDate:
+                type: string
+              previousStartDate:
+                type:
+                  - string
+                  - "null"
+              previousEndDate:
+                type:
+                  - string
+                  - "null"
+              status:
+                type: string
+                enum: *a4
+              createdAt:
+                type: string
+            required:
+              - id
+              - bookingId
+              - proposedByUserId
+              - proposedStartDate
+              - proposedEndDate
+              - previousStartDate
+              - previousEndDate
+              - status
+              - createdAt
+      required:
+        - id
+        - userId
+        - startDate
+        - endDate
+        - status
+    BookingListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          userId:
+            type: string
+            format: uuid
+          toolId:
+            type:
+              - string
+              - "null"
+            format: uuid
+          timeslotId:
+            type:
+              - string
+              - "null"
+            format: uuid
+          workshopId:
+            type:
+              - string
+              - "null"
+            format: uuid
+          startDate:
+            type: string
+          endDate:
+            type: string
+          pickupTime:
+            type:
+              - string
+              - "null"
+          createdAt:
+            type: string
+          status:
+            type: string
+            enum: *a5
+          user:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+            required:
+              - id
+              - name
+          tool:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              ownerId:
+                type: string
+                format: uuid
+              name:
+                type: string
+              imageUrl:
+                type:
+                  - string
+                  - "null"
+              owner:
+                type:
+                  - object
+                  - "null"
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+            required:
+              - id
+              - ownerId
+              - name
+          workshop:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              managerId:
+                type: string
+                format: uuid
+              manager:
+                type:
+                  - object
+                  - "null"
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+            required:
+              - id
+              - name
+              - managerId
+          timeslot:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              workshopId:
+                type: string
+                format: uuid
+              startTime:
+                type: string
+              endTime:
+                type: string
+              workshop:
+                type:
+                  - object
+                  - "null"
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  managerId:
+                    type: string
+                    format: uuid
+                  manager:
+                    type:
+                      - object
+                      - "null"
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                    required:
+                      - id
+                      - name
+                required:
+                  - id
+                  - name
+                  - managerId
+            required:
+              - id
+              - workshopId
+              - startTime
+              - endTime
+          selectedTools:
+            type: array
+            items:
+              type: object
+              properties:
+                workshopToolId:
+                  type: string
+                  format: uuid
+                workshopTool:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                    category:
+                      type: string
+                  required:
+                    - id
+                    - name
+                    - category
+              required:
+                - workshopToolId
+                - workshopTool
+          pickupProposals:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                bookingId:
+                  type: string
+                  format: uuid
+                proposedByUserId:
+                  type: string
+                  format: uuid
+                proposedPickupTime:
+                  type: string
+                proposedReturnTime:
+                  type:
+                    - string
+                    - "null"
+                previousPickupTime:
+                  type:
+                    - string
+                    - "null"
+                previousReturnTime:
+                  type:
+                    - string
+                    - "null"
+                status:
+                  type: string
+                  enum: *a4
+                createdAt:
+                  type: string
+              required:
+                - id
+                - bookingId
+                - proposedByUserId
+                - proposedPickupTime
+                - proposedReturnTime
+                - previousPickupTime
+                - previousReturnTime
+                - status
+                - createdAt
+          timeslotProposals:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                bookingId:
+                  type: string
+                  format: uuid
+                proposedByUserId:
+                  type: string
+                  format: uuid
+                proposedStartDate:
+                  type: string
+                proposedEndDate:
+                  type: string
+                previousStartDate:
+                  type:
+                    - string
+                    - "null"
+                previousEndDate:
+                  type:
+                    - string
+                    - "null"
+                status:
+                  type: string
+                  enum: *a4
+                createdAt:
+                  type: string
+              required:
+                - id
+                - bookingId
+                - proposedByUserId
+                - proposedStartDate
+                - proposedEndDate
+                - previousStartDate
+                - previousEndDate
+                - status
+                - createdAt
+        required:
+          - id
+          - userId
+          - startDate
+          - endDate
+          - status
+    BookingPickupProposalResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        proposedByUserId:
+          type: string
+          format: uuid
+        proposedPickupTime:
+          type: string
+        proposedReturnTime:
+          type:
+            - string
+            - "null"
+        previousPickupTime:
+          type:
+            - string
+            - "null"
+        previousReturnTime:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          enum: *a4
+        createdAt:
+          type: string
+      required:
+        - id
+        - bookingId
+        - proposedByUserId
+        - proposedPickupTime
+        - proposedReturnTime
+        - previousPickupTime
+        - previousReturnTime
+        - status
+        - createdAt
+    BookingTimeslotProposalResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        proposedByUserId:
+          type: string
+          format: uuid
+        proposedStartDate:
+          type: string
+        proposedEndDate:
+          type: string
+        previousStartDate:
+          type:
+            - string
+            - "null"
+        previousEndDate:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          enum: *a4
+        createdAt:
+          type: string
+      required:
+        - id
+        - bookingId
+        - proposedByUserId
+        - proposedStartDate
+        - proposedEndDate
+        - previousStartDate
+        - previousEndDate
+        - status
+        - createdAt
+    WorkshopResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        managerId:
+          type: string
+          format: uuid
+        manager:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            isSuspended:
+              type: boolean
+          required:
+            - id
+            - name
+        name:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        maxCapacity:
+          type: number
+        extras:
+          type: array
+          items:
+            type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+        workshopTools:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              category:
+                type: string
+              status:
+                type: string
+                enum: *a1
+            required:
+              - id
+              - name
+              - category
+        timeslots:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              workshopId:
+                type: string
+                format: uuid
+              startTime:
+                type: string
+              endTime:
+                type: string
+              blockedByOwner:
+                type: boolean
+            required:
+              - id
+              - workshopId
+              - startTime
+              - endTime
+              - blockedByOwner
+        bookings:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              startDate:
+                type: string
+              endDate:
+                type: string
+              status:
+                type: string
+                enum: &a6
+                  - PENDING
+                  - ACCEPTED
+                  - REJECTED
+                  - RETURNED
+            required:
+              - id
+              - startDate
+              - endDate
+              - status
+      required:
+        - id
+        - managerId
+        - name
+        - description
+        - location
+        - maxCapacity
+        - extras
+        - imageUrls
+    WorkshopListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          managerId:
+            type: string
+            format: uuid
+          manager:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              isSuspended:
+                type: boolean
+            required:
+              - id
+              - name
+          name:
+            type: string
+          description:
+            type: string
+          location:
+            type: string
+          maxCapacity:
+            type: number
+          extras:
+            type: array
+            items:
+              type: string
+          imageUrls:
+            type: array
+            items:
+              type: string
+          workshopTools:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                category:
+                  type: string
+                status:
+                  type: string
+                  enum: *a1
+              required:
+                - id
+                - name
+                - category
+          timeslots:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                workshopId:
+                  type: string
+                  format: uuid
+                startTime:
+                  type: string
+                endTime:
+                  type: string
+                blockedByOwner:
+                  type: boolean
+              required:
+                - id
+                - workshopId
+                - startTime
+                - endTime
+                - blockedByOwner
+          bookings:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                startDate:
+                  type: string
+                endDate:
+                  type: string
+                status:
+                  type: string
+                  enum: *a6
+              required:
+                - id
+                - startDate
+                - endDate
+                - status
+        required:
+          - id
+          - managerId
+          - name
+          - description
+          - location
+          - maxCapacity
+          - extras
+          - imageUrls
+    WorkshopTimeslotResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workshopId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+        endTime:
+          type: string
+        blockedByOwner:
+          type: boolean
+      required:
+        - id
+        - workshopId
+        - startTime
+        - endTime
+        - blockedByOwner
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        address:
+          type: string
+        role:
+          type: string
+          enum: &a7
+            - USER
+            - MODERATOR
+            - MANAGER
+        isSuspended:
+          type: boolean
+        expoPushToken:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+      required:
+        - id
+        - email
+        - name
+        - address
+        - role
+        - isSuspended
+    UserListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          email:
+            type: string
+            format: email
+          name:
+            type: string
+          address:
+            type: string
+          role:
+            type: string
+            enum: *a7
+          isSuspended:
+            type: boolean
+          expoPushToken:
+            type:
+              - string
+              - "null"
+          createdAt:
+            type: string
+        required:
+          - id
+          - email
+          - name
+          - address
+          - role
+          - isSuspended
+    AdminMetricsResponse:
+      type: object
+      properties:
+        users:
+          type: number
+        tools:
+          type: number
+        workshops:
+          type: number
+        openBookings:
+          type: number
+        openReports:
+          type: number
+        openSuspensionRequests:
+          type: number
+      required:
+        - users
+        - tools
+        - workshops
+        - openBookings
+        - openReports
+        - openSuspensionRequests
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+            address:
+              type: string
+            role:
+              type: string
+              enum: *a7
+            isSuspended:
+              type: boolean
+          required:
+            - id
+            - email
+            - name
+            - role
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+      required:
+        - user
+        - accessToken
+        - refreshToken
+    RefreshResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+      required:
+        - accessToken
+        - refreshToken
+    RatingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        fromUserId:
+          type: string
+          format: uuid
+        toUserId:
+          type: string
+          format: uuid
+        score:
+          type: number
+        comment:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          enum: &a8
+            - VISIBLE
+            - HIDDEN
+        createdAt:
+          type: string
+        fromUser:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+          required:
+            - id
+            - name
+        toUser:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+          required:
+            - id
+            - name
+        booking:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+            startDate:
+              type: string
+            endDate:
+              type: string
+            toolId:
+              type:
+                - string
+                - "null"
+              format: uuid
+            tool:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+              required:
+                - id
+                - name
+            timeslot:
+              type:
+                - object
+                - "null"
+              properties:
+                workshopId:
+                  type: string
+                  format: uuid
+                workshop:
+                  type:
+                    - object
+                    - "null"
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name:
+                      type: string
+                  required:
+                    - id
+                    - name
+      required:
+        - id
+        - bookingId
+        - fromUserId
+        - toUserId
+        - score
+        - status
+        - createdAt
+    RatingListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          bookingId:
+            type: string
+            format: uuid
+          fromUserId:
+            type: string
+            format: uuid
+          toUserId:
+            type: string
+            format: uuid
+          score:
+            type: number
+          comment:
+            type:
+              - string
+              - "null"
+          status:
+            type: string
+            enum: *a8
+          createdAt:
+            type: string
+          fromUser:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+            required:
+              - id
+              - name
+          toUser:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+            required:
+              - id
+              - name
+          booking:
+            type:
+              - object
+              - "null"
+            properties:
+              id:
+                type: string
+                format: uuid
+              status:
+                type: string
+              startDate:
+                type: string
+              endDate:
+                type: string
+              toolId:
+                type:
+                  - string
+                  - "null"
+                format: uuid
+              tool:
+                type:
+                  - object
+                  - "null"
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+              timeslot:
+                type:
+                  - object
+                  - "null"
+                properties:
+                  workshopId:
+                    type: string
+                    format: uuid
+                  workshop:
+                    type:
+                      - object
+                      - "null"
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                    required:
+                      - id
+                      - name
+        required:
+          - id
+          - bookingId
+          - fromUserId
+          - toUserId
+          - score
+          - status
+          - createdAt
+    PublicRatingListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          score:
+            type: number
+          comment:
+            type:
+              - string
+              - "null"
+          createdAt:
+            type: string
+          fromUser:
+            type:
+              - object
+              - "null"
+            properties:
+              name:
+                type: string
+            required:
+              - name
+        required:
+          - id
+          - score
+          - createdAt
+    ModerationReportResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reporterId:
+          type: string
+          format: uuid
+        reporterName:
+          type: string
+        targetType:
+          type: string
+          enum: &a9
+            - TOOL
+            - WORKSHOP
+            - USER
+            - RATING
+        targetId:
+          type: string
+        targetLabel:
+          type: string
+        targetHref:
+          type:
+            - string
+            - "null"
+        subjectUserId:
+          type:
+            - string
+            - "null"
+        subjectUserName:
+          type:
+            - string
+            - "null"
+        ratingPreview:
+          type:
+            - object
+            - "null"
+          properties:
+            score:
+              type: number
+            comment:
+              type:
+                - string
+                - "null"
+            fromUserName:
+              type: string
+            listingLabel:
+              type:
+                - string
+                - "null"
+          required:
+            - score
+            - comment
+            - fromUserName
+            - listingLabel
+        bookingId:
+          type:
+            - string
+            - "null"
+        reason:
+          type: string
+        details:
+          type:
+            - string
+            - "null"
+        conversationContext:
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+          enum: &a10
+            - OPEN
+            - IN_REVIEW
+            - RESOLVED
+            - REJECTED
+        decisionNote:
+          type:
+            - string
+            - "null"
+        decisionAt:
+          type:
+            - string
+            - "null"
+        moderatorId:
+          type:
+            - string
+            - "null"
+        moderatorName:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+      required:
+        - id
+        - reporterId
+        - reporterName
+        - targetType
+        - targetId
+        - targetLabel
+        - targetHref
+        - subjectUserId
+        - subjectUserName
+        - ratingPreview
+        - reason
+        - status
+        - createdAt
+    ModerationReportListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          reporterId:
+            type: string
+            format: uuid
+          reporterName:
+            type: string
+          targetType:
+            type: string
+            enum: *a9
+          targetId:
+            type: string
+          targetLabel:
+            type: string
+          targetHref:
+            type:
+              - string
+              - "null"
+          subjectUserId:
+            type:
+              - string
+              - "null"
+          subjectUserName:
+            type:
+              - string
+              - "null"
+          ratingPreview:
+            type:
+              - object
+              - "null"
+            properties:
+              score:
+                type: number
+              comment:
+                type:
+                  - string
+                  - "null"
+              fromUserName:
+                type: string
+              listingLabel:
+                type:
+                  - string
+                  - "null"
+            required:
+              - score
+              - comment
+              - fromUserName
+              - listingLabel
+          bookingId:
+            type:
+              - string
+              - "null"
+          reason:
+            type: string
+          details:
+            type:
+              - string
+              - "null"
+          conversationContext:
+            type:
+              - string
+              - "null"
+          status:
+            type: string
+            enum: *a10
+          decisionNote:
+            type:
+              - string
+              - "null"
+          decisionAt:
+            type:
+              - string
+              - "null"
+          moderatorId:
+            type:
+              - string
+              - "null"
+          moderatorName:
+            type:
+              - string
+              - "null"
+          createdAt:
+            type: string
+        required:
+          - id
+          - reporterId
+          - reporterName
+          - targetType
+          - targetId
+          - targetLabel
+          - targetHref
+          - subjectUserId
+          - subjectUserName
+          - ratingPreview
+          - reason
+          - status
+          - createdAt
+    NotificationListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          userId:
+            type: string
+            format: uuid
+          message:
+            type: string
+          read:
+            type: boolean
+          createdAt:
+            type: string
+        required:
+          - id
+          - userId
+          - message
+          - read
+          - createdAt
+    SystemSettingListResponse:
+      type: array
+      items:
+        type: object
+        properties:
+          key:
+            type: string
+          label:
+            type: string
+          unit:
+            type: string
+          value:
+            type: number
+          min:
+            type: number
+          max:
+            type: number
+        required:
+          - key
+          - label
+          - unit
+          - value
+          - min
+          - max
+    AddressSuggestionsResponse:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              street:
+                type: string
+              houseNumber:
+                type: string
+              postalCode:
+                type: string
+              city:
+                type: string
+              country:
+                type: string
+            required:
+              - label
+              - street
+              - houseNumber
+              - postalCode
+              - city
+              - country
+      required:
+        - suggestions
+    AddressValidationResponse:
+      type: object
+      properties:
+        isValid:
+          type: boolean
+        normalizedAddress:
+          type:
+            - string
+            - "null"
+        normalizedParts:
+          type:
+            - object
+            - "null"
+          properties:
+            label:
+              type: string
+            street:
+              type: string
+            houseNumber:
+              type: string
+            postalCode:
+              type: string
+            city:
+              type: string
+            country:
+              type: string
+          required:
+            - label
+            - street
+            - houseNumber
+            - postalCode
+            - city
+            - country
+      required:
+        - isValid
+        - normalizedAddress
+        - normalizedParts
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+        errors:
+          type: object
+          properties:
+            fieldErrors:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+            formErrors:
+              type: array
+              items:
+                type: string
+      required:
+        - type
+        - title
+        - status
+        - detail
   parameters: {}
 paths:
   /auth/login:
@@ -35,6 +1891,32 @@ paths:
       responses:
         "200":
           description: JWT tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      responses:
+        "200":
+          description: Refreshed tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "401":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
   /tools:
     post:
       summary: Create tool
@@ -72,6 +1954,10 @@ paths:
       responses:
         "201":
           description: Created tool
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
     get:
       summary: List tools
       parameters:
@@ -83,10 +1969,7 @@ paths:
           in: query
         - schema:
             type: string
-            enum: &a1
-              - AVAILABLE
-              - REQUESTED
-              - BORROWED
+            enum: *a1
           required: false
           name: status
           in: query
@@ -105,6 +1988,10 @@ paths:
       responses:
         "200":
           description: Tool list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolListResponse"
   /tools/{id}:
     get:
       summary: Get tool by ID
@@ -118,8 +2005,16 @@ paths:
       responses:
         "200":
           description: Tool details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
     patch:
       summary: Update tool
       security:
@@ -161,6 +2056,10 @@ paths:
       responses:
         "200":
           description: Updated tool
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
     delete:
       summary: Delete tool
       security:
@@ -188,6 +2087,10 @@ paths:
       responses:
         "200":
           description: Blocking periods list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolBlockingPeriodListResponse"
   /tools/{id}/owner-blocks:
     get:
       summary: List owner blocks for tool
@@ -203,6 +2106,10 @@ paths:
       responses:
         "200":
           description: Owner blocks list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolOwnerBlockListResponse"
   /tools/{id}/owner-blocks/{bookingId}:
     delete:
       summary: Delete owner block for tool
@@ -232,6 +2139,10 @@ paths:
       responses:
         "200":
           description: My bookings list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingListResponse"
   /bookings/tool:
     post:
       summary: Create tool booking
@@ -263,8 +2174,16 @@ paths:
       responses:
         "201":
           description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
         "409":
           description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
   /bookings/tool-owner-block:
     post:
       summary: Create tool owner block
@@ -292,8 +2211,16 @@ paths:
       responses:
         "201":
           description: Owner block created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
         "409":
           description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
   /bookings/workshop:
     post:
       summary: Create workshop booking
@@ -327,8 +2254,16 @@ paths:
       responses:
         "201":
           description: Workshop booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
         "409":
           description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
   /bookings/{id}/pickup-proposals:
     post:
       summary: Create pickup proposal
@@ -359,6 +2294,10 @@ paths:
       responses:
         "201":
           description: Pickup proposal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingPickupProposalResponse"
   /bookings/{id}/pickup-proposals/{proposalId}:
     patch:
       summary: Respond to pickup proposal
@@ -393,6 +2332,10 @@ paths:
       responses:
         "200":
           description: Responded to pickup proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingPickupProposalResponse"
   /bookings/{id}/timeslot-proposals:
     post:
       summary: Create timeslot proposal
@@ -423,6 +2366,10 @@ paths:
       responses:
         "201":
           description: Timeslot proposal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingTimeslotProposalResponse"
   /bookings/{id}/timeslot-proposals/{proposalId}:
     patch:
       summary: Respond to timeslot proposal
@@ -457,6 +2404,10 @@ paths:
       responses:
         "200":
           description: Responded to timeslot proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingTimeslotProposalResponse"
   /bookings/{id}/status:
     patch:
       summary: Update booking status
@@ -486,4 +2437,282 @@ paths:
       responses:
         "200":
           description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+  /workshops:
+    get:
+      summary: List workshops
+      responses:
+        "200":
+          description: Workshop list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkshopListResponse"
+  /workshops/{id}:
+    get:
+      summary: Get workshop by ID
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Workshop details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkshopResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /workshops/{id}/timeslots:
+    post:
+      summary: Create workshop timeslot
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "201":
+          description: Timeslot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkshopTimeslotResponse"
+  /users:
+    get:
+      summary: List users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+  /users/me:
+    get:
+      summary: Get my profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: My profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /users/admin/metrics:
+    get:
+      summary: Get admin metrics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMetricsResponse"
+  /ratings/me/received:
+    get:
+      summary: List ratings received
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ratings received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingListResponse"
+  /ratings/me/given:
+    get:
+      summary: List ratings given
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ratings given
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingListResponse"
+  /ratings/tools/{toolId}:
+    get:
+      summary: List public ratings for a tool
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: toolId
+          in: path
+      responses:
+        "200":
+          description: Public tool ratings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicRatingListResponse"
+  /ratings/workshops/{workshopId}:
+    get:
+      summary: List public ratings for a workshop
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: workshopId
+          in: path
+      responses:
+        "200":
+          description: Public workshop ratings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicRatingListResponse"
+  /ratings:
+    post:
+      summary: Create rating
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Rating created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingResponse"
+  /moderation/reports:
+    get:
+      summary: List open moderation reports
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Open reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationReportListResponse"
+    post:
+      summary: Create moderation report
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Report created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationReportResponse"
+  /moderation/reports/closed:
+    get:
+      summary: List closed moderation reports
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Closed reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationReportListResponse"
+  /notifications/me:
+    get:
+      summary: List my notifications
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+  /system-rules:
+    get:
+      summary: List enforced system settings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: System settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemSettingListResponse"
+  /address/suggest:
+    get:
+      summary: Suggest addresses
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: q
+          in: query
+      responses:
+        "200":
+          description: Address suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressSuggestionsResponse"
+  /address/validate:
+    get:
+      summary: Validate an address
+      parameters:
+        - schema:
+            type: string
+          required: true
+          name: q
+          in: query
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressValidationResponse"
 webhooks: {}

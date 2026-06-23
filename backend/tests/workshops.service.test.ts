@@ -37,7 +37,8 @@ describe("workshopsService", () => {
       search: "holz",
       excludeSuspendedManagers: true
     });
-    expect(result).toEqual([{ id: "w1" }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("w1");
   });
 
   it("returns workshop by id with merged active booking ranges", async () => {

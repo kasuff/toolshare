@@ -315,7 +315,8 @@ describe("notificationsService", () => {
 
     const result = await notificationsService.listForUser("u1");
 
-    expect(result).toEqual([{ id: "n1" }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("n1");
   });
 
   it("marks notification as read and rejects unknown ids", async () => {

@@ -6,10 +6,12 @@ import {
 import { buildNotificationIdempotencyKey } from "../../domain/events/notification.events";
 import { suspensionRepository } from "../users/suspension.repository";
 import { notificationsRepository } from "./notifications.repository";
+import { toNotificationResponseList } from "./notifications.presenter";
 
 export const notificationsService = {
-  listForUser(userId: string) {
-    return notificationsRepository.listByUser(userId);
+  async listForUser(userId: string) {
+    const notifications = await notificationsRepository.listByUser(userId);
+    return toNotificationResponseList(notifications);
   },
 
   async createWarning(userId: string, reason: string, moderatorName = "Moderator") {
