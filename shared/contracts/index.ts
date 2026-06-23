@@ -11,3 +11,4 @@ export * from "./request/workshops.schema";
 export * from "./response/tools.schema";
 export * from "./response/bookings.schema";
 export * from "./errors/problem.schema";
+export * from "./request/notifications.schema";
