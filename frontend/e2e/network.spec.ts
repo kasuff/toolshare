@@ -34,9 +34,10 @@ test.describe("Network-Mocking – Fehlerbehandlung", () => {
 
     await page.goto(`/tools/${tool.id}`);
 
-    // Die Detailseite zeigt den Fehler als Toast und leitet zur Übersicht zurück.
+    // Die Detailseite fängt den Server-Fehler ab, zeigt einen generischen
+    // Fehler-Toast und leitet zur Übersicht zurück (statt hängen zu bleiben).
     await expect(
-      page.getByText("Backend nicht erreichbar (E2E-Mock).").first(),
+      page.getByText("Werkzeug konnte nicht geladen werden.").first(),
     ).toBeVisible();
     await expect(page).toHaveURL(/\/tools$/);
 
