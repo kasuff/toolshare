@@ -301,6 +301,7 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const pendingTimeslotProposal =
     selectedBooking?.type === "WORKSHOP" ? getPendingTimeslotProposal(selectedBooking) : null;
   const selectedBookingRating = selectedBooking ? ratingsByBookingId.get(selectedBooking.id) ?? null : null;
+  const originalRequestTimes = selectedBooking ? getOriginalRequestTimes(selectedBooking) : null;
   const showRatingFooter = Boolean(
     currentUser &&
       selectedBooking &&
@@ -781,11 +782,9 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                     title={selectedBooking.toolName ?? (selectedBooking.type === "WORKSHOP" ? "Werkstatt" : "Werkzeug")}
                     icon={selectedBooking.type === "WORKSHOP" ? "home_repair_service" : "construction"}
                     firstLabel={selectedBooking.type === "TOOL" ? "Abholung" : "Von"}
-                    firstValue={formatDateTime(
-                      selectedBooking.type === "TOOL" ? selectedBooking.pickupTimeIso : selectedBooking.startIso
-                    )}
+                    firstValue={formatDateTime(originalRequestTimes?.firstIso)}
                     secondLabel={selectedBooking.type === "TOOL" ? "Rückgabe" : "Bis"}
-                    secondValue={formatDateTime(selectedBooking.endIso)}
+                    secondValue={formatDateTime(originalRequestTimes?.secondIso)}
                     unread={selectedReqUnread}
                     onClick={selectedReqIncoming ? () => markIncomingRead(selectedReqKey) : undefined}
                   />
@@ -1177,6 +1176,24 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
 
 
 
+
+function getOriginalRequestTimes(booking: BookingRow): { firstIso?: string; secondIso?: string } {
+  // Die ursprünglich angefragten Zeiten. Beim Annehmen eines Alternativvorschlags
+  // überschreibt das Backend die Buchungszeiten – der früheste Vorschlag hält die
+  // Zeiten von davor (previous*) fest, also den Original-Anfragezeitraum.
+  if (booking.type === "TOOL") {
+    const earliest = [...booking.pickupProposals].sort((a, b) => a.createdIso.localeCompare(b.createdIso))[0];
+    return {
+      firstIso: earliest?.previousPickupIso ?? booking.pickupTimeIso,
+      secondIso: earliest?.previousReturnIso ?? booking.endIso,
+    };
+  }
+  const earliest = [...booking.timeslotProposals].sort((a, b) => a.createdIso.localeCompare(b.createdIso))[0];
+  return {
+    firstIso: earliest?.previousStartIso ?? booking.startIso,
+    secondIso: earliest?.previousEndIso ?? booking.endIso,
+  };
+}
 
 function getStatusActorId(booking: BookingRow): string {
   // Wer hat den aktuellen Status ausgelöst? Bei einem angenommenen
