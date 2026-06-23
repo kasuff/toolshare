@@ -36,7 +36,8 @@ function chooseZoom(center: Coordinates, radiusKm: number) {
   const desiredRadiusPx = 96;
   const radiusM = Math.max(1000, radiusKm * 1000);
   const rawZoom = Math.log2((Math.cos((center.lat * Math.PI) / 180) * EARTH_CIRCUMFERENCE_M * desiredRadiusPx) / (TILE_SIZE * radiusM));
-  return Math.min(15, Math.max(11, Math.round(rawZoom)));
+  // Untergrenze niedrig genug, damit auch große Radien (bis 30 km) in die Karte passen.
+  return Math.min(15, Math.max(8, Math.round(rawZoom)));
 }
 
 function pixelPosition(point: Coordinates, center: Coordinates, zoom: number) {
@@ -103,7 +104,9 @@ export function SearchRadiusMap({
     })
     .filter((point): point is NonNullable<typeof point> => Boolean(point));
   const metersPerPixel = (Math.cos((center.lat * Math.PI) / 180) * EARTH_CIRCUMFERENCE_M) / (TILE_SIZE * 2 ** zoom);
-  const radiusPx = Math.max(46, Math.min(150, (radiusKm * 1000) / metersPerPixel));
+  // Kreis exakt so groß wie der geografische Radius bei diesem Zoom – dann stimmt
+  // die optische Lage der Marker (gleicher Maßstab) mit "im Radius" überein.
+  const radiusPx = (radiusKm * 1000) / metersPerPixel;
 
   return (
     <div className="search-map" aria-label={`Karte um ${centerAddress}`}>
