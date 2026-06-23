@@ -17,6 +17,7 @@ RUN npx prisma generate
 
 COPY backend/tsconfig.json ./
 COPY backend/src ./src
+COPY backend/scripts ./scripts
 
 # prisma generate runs as root; dev runs as node (see below).
 RUN chown -R node:node /app /shared
