@@ -70,12 +70,6 @@ function getInitials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]?.toUpperCase()).join('');
 }
 
-function formatDateShort(iso: string) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth()+1).toString().padStart(2, '0')}.${d.getFullYear()}`;
-}
-
 function formatDateTime(iso: string) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -922,12 +916,9 @@ export default function InboxScreen() {
                         {fromOtherUser ? senderName : 'Du'} · {formatDateTime(selectedBookingRating.createdIso)}
                       </ThemedText>
                       <View style={[styles.messageBubble, fromOtherUser ? styles.incomingBubble : styles.outgoingBubble]}>
-                        <View style={styles.messageIconRow}>
-                          <Ionicons name="star" size={20} color={Colors.highlight || '#FFC107'} />
-                          <ThemedText type="defaultSemiBold" style={{marginLeft: Spacing.xs}}>
-                            Bewertung
-                          </ThemedText>
-                        </View>
+                        <ThemedText type="defaultSemiBold">
+                          Bewertung
+                        </ThemedText>
                         <View style={{ marginTop: Spacing.xs, marginBottom: Spacing.xs }}>
                           <StarRatingDisplay score={selectedBookingRating.score} size={18} />
                         </View>

@@ -23,6 +23,29 @@ export function FormErrorText({ error, style }: Props) {
   );
 }
 
+type SummaryProps = {
+  errors?: Record<string, string>;
+  error?: string | null;
+  style?: object;
+};
+
+export function FormErrorsSummary({ errors = {}, error, style }: SummaryProps) {
+  const messages = [
+    ...Object.values(errors).filter(Boolean),
+    ...(error ? [error] : []),
+  ];
+
+  if (messages.length === 0) return null;
+
+  return (
+    <View style={style}>
+      {messages.map((message, index) => (
+        <FormErrorText key={`${message}-${index}`} error={message} />
+      ))}
+    </View>
+  );
+}
+
 const useStyles = createThemedStyleSheet((colors) => ({
   container: {
     flexDirection: 'row',

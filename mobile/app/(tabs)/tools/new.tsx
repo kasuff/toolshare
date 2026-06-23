@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { View, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Pressable } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { api, TOOL_CATEGORIES, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
+import { api, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
@@ -11,7 +11,8 @@ import { ImageLightbox } from '../../../components/ImageLightbox';
 import * as ImagePicker from 'expo-image-picker';
 import { BackHandler } from 'react-native';
 import { useToast } from '../../../hooks/useToast';
-import { FormErrorText } from '../../../components/FormErrorText';
+import { FormErrorsSummary } from '../../../components/FormErrorText';
+import { CategoryDropdown } from '../../../components/CategoryDropdown';
 import { getErrorMessage } from '../../../utils/errors';
 
 const ADDRESS_VALIDATION_ERROR =
@@ -31,7 +32,6 @@ export default function NewToolScreen() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const { pushToast } = useToast();
@@ -244,7 +244,6 @@ export default function NewToolScreen() {
             placeholder="z.B. Akku-Bohrmaschine"
             placeholderTextColor={Colors.textMuted}
           />
-          <FormErrorText error={errors.name} />
         </View>
 
         <View style={styles.field}>
@@ -259,56 +258,15 @@ export default function NewToolScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
-          <FormErrorText error={errors.description} />
         </View>
 
-        <View style={[styles.field, isDropdownOpen && { zIndex: 10 }]}>
+        <View style={styles.field}>
           <ThemedText style={styles.label}>Kategorie *</ThemedText>
-          <TouchableOpacity 
-            style={styles.dropdownTrigger} 
-            onPress={() => setIsDropdownOpen(!isDropdownOpen)}
-          >
-            <ThemedText style={category ? styles.dropdownTriggerText : styles.dropdownPlaceholderText}>
-              {category ? TOOL_CATEGORIES.find(cat => cat.value === category)?.label : 'Kategorie wählen...'}
-            </ThemedText>
-            <Ionicons name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color={Colors.textMuted} />
-          </TouchableOpacity>
-
-          {isDropdownOpen && (
-            <View style={styles.dropdownList}>
-              <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
-                {TOOL_CATEGORIES.map(cat => (
-                  <TouchableOpacity
-                    key={cat.value}
-                    style={[
-                      styles.dropdownItem,
-                      category === cat.value && styles.dropdownItemActive
-                    ]}
-                    onPress={() => {
-                      setCategory(cat.value);
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    <ThemedText style={[
-                      styles.dropdownItemText,
-                      category === cat.value && styles.dropdownItemTextActive
-                    ]}>
-                      {cat.label}
-                    </ThemedText>
-                    {category === cat.value && (
-                      <Ionicons name="checkmark" size={20} color={Colors.brand} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-          <FormErrorText error={errors.category} />
+          <CategoryDropdown value={category} onChange={setCategory} />
         </View>
 
         <View style={styles.field}>
           <AddressInput value={address} onChange={setAddress} label="Abholort" required />
-          <FormErrorText error={errors.address} />
         </View>
 
         <View style={styles.field}>
@@ -325,7 +283,7 @@ export default function NewToolScreen() {
           />
         </View>
 
-        <FormErrorText error={apiError} style={{ marginBottom: Spacing.md }} />
+        <FormErrorsSummary errors={errors} error={apiError} style={{ marginBottom: Spacing.md }} />
 
         <TouchableOpacity 
           style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
@@ -439,59 +397,6 @@ const useStyles = createThemedStyleSheet((colors) => ({
     gap: Spacing.xs,
   },
   imageButtonText: {
-    color: colors.brand,
-    fontWeight: 'bold',
-  },
-  dropdownTrigger: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownTriggerText: {
-    fontSize: 16,
-    color: colors.text,
-  },
-  dropdownPlaceholderText: {
-    fontSize: 16,
-    color: colors.textMuted,
-  },
-  dropdownList: {
-    position: 'absolute',
-    top: 80,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    zIndex: 1000,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3.84,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderColor: colors.surfaceSoft,
-  },
-  dropdownItemActive: {
-    backgroundColor: colors.brandSoft,
-  },
-  dropdownItemText: {
-    fontSize: 16,
-    color: colors.text,
-  },
-  dropdownItemTextActive: {
     color: colors.brand,
     fontWeight: 'bold',
   },

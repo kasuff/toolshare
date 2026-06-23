@@ -10,7 +10,8 @@ import { AddressInput, AddressFormFields, EMPTY_ADDRESS, isAddressComplete, toAd
 import { ImageLightbox } from '../../../components/ImageLightbox';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '../../../hooks/useToast';
-import { FormErrorText } from '../../../components/FormErrorText';
+import { FormErrorsSummary } from '../../../components/FormErrorText';
+import { CategoryDropdown } from '../../../components/CategoryDropdown';
 import { getErrorMessage } from '../../../utils/errors';
 import type { ComponentProps } from 'react';
 
@@ -48,7 +49,6 @@ export default function NewWorkshopScreen() {
   const [equipmentItems, setEquipmentItems] = useState<Array<{ name: string; category: string }>>([]);
   const [newToolName, setNewToolName] = useState('');
   const [newToolCategory, setNewToolCategory] = useState(TOOL_CATEGORIES[0]?.value ?? 'sonstiges');
-  const [isToolCatDropdownOpen, setIsToolCatDropdownOpen] = useState(false);
   
 
 
@@ -321,7 +321,6 @@ export default function NewWorkshopScreen() {
             placeholder="z.B. Garagen-Werkstatt"
             placeholderTextColor={Colors.textMuted}
           />
-          <FormErrorText error={errors.name} />
         </View>
 
         <View style={styles.field}>
@@ -336,12 +335,10 @@ export default function NewWorkshopScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
-          <FormErrorText error={errors.description} />
         </View>
 
         <View style={styles.field}>
-          <AddressInput value={address} onChange={setAddress} label="Adresse" required initialMode="manual" />
-          <FormErrorText error={errors.address} />
+          <AddressInput value={address} onChange={setAddress} label="Adresse" required />
         </View>
 
         <View style={styles.field}>
@@ -357,7 +354,7 @@ export default function NewWorkshopScreen() {
         </View>
 
         {/* Ausstattung (Equipment builder) */}
-        <View style={[styles.field, isToolCatDropdownOpen && { zIndex: 10 }]}>
+        <View style={styles.field}>
           <ThemedText style={styles.label}>Ausstattung</ThemedText>
           <ThemedText type="muted" style={{ marginBottom: Spacing.sm }}>
             Füge die Werkzeuge hinzu, die in deiner Werkstatt vorhanden sind.
@@ -387,47 +384,8 @@ export default function NewWorkshopScreen() {
               placeholderTextColor={Colors.textMuted}
             />
             
-            {/* Category Dropdown inside equipment builder */}
-            <View style={{ marginTop: Spacing.sm, position: 'relative' }}>
-              <TouchableOpacity 
-                style={styles.dropdownTrigger} 
-                onPress={() => setIsToolCatDropdownOpen(!isToolCatDropdownOpen)}
-              >
-                <ThemedText style={styles.dropdownTriggerText}>
-                  {TOOL_CATEGORIES.find(cat => cat.value === newToolCategory)?.label || 'Kategorie wählen...'}
-                </ThemedText>
-                <Ionicons name={isToolCatDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color={Colors.textMuted} />
-              </TouchableOpacity>
-
-              {isToolCatDropdownOpen && (
-                <View style={styles.dropdownList}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                    {TOOL_CATEGORIES.map(cat => (
-                      <TouchableOpacity
-                        key={cat.value}
-                        style={[
-                          styles.dropdownItem,
-                          newToolCategory === cat.value && styles.dropdownItemActive
-                        ]}
-                        onPress={() => {
-                          setNewToolCategory(cat.value);
-                          setIsToolCatDropdownOpen(false);
-                        }}
-                      >
-                        <ThemedText style={[
-                          styles.dropdownItemText,
-                          newToolCategory === cat.value && styles.dropdownItemTextActive
-                        ]}>
-                          {cat.label}
-                        </ThemedText>
-                        {newToolCategory === cat.value && (
-                          <Ionicons name="checkmark" size={18} color={Colors.brand} />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+            <View style={{ marginTop: Spacing.sm }}>
+              <CategoryDropdown value={newToolCategory} onChange={setNewToolCategory} />
             </View>
 
             <TouchableOpacity style={styles.addEquipmentBtn} onPress={addEquipmentItem}>
@@ -467,7 +425,7 @@ export default function NewWorkshopScreen() {
           </View>
         </View>
 
-        <FormErrorText error={apiError} style={{ marginBottom: Spacing.md }} />
+        <FormErrorsSummary errors={errors} error={apiError} style={{ marginBottom: Spacing.md }} />
 
         <TouchableOpacity 
           style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
@@ -657,55 +615,6 @@ const useStyles = createThemedStyleSheet((colors) => ({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: Spacing.xs,
-  },
-  dropdownTrigger: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownTriggerText: {
-    fontSize: 16,
-    color: colors.text,
-  },
-  dropdownList: {
-    position: 'absolute',
-    top: 55,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: Radius.md,
-    zIndex: 1000,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3.84,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderColor: colors.surfaceSoft,
-  },
-  dropdownItemActive: {
-    backgroundColor: colors.brandSoft,
-  },
-  dropdownItemText: {
-    fontSize: 16,
-    color: colors.text,
-  },
-  dropdownItemTextActive: {
-    color: colors.brand,
-    fontWeight: 'bold',
   },
   equipmentInputBox: {
     backgroundColor: colors.surfaceSoft,
