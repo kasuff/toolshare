@@ -11,6 +11,8 @@ services:
       - "3000:80"
     depends_on:
       - backend
+    # Wie backend/db: nach Reboot oder Crash automatisch wieder starten.
+    restart: unless-stopped
     networks:
       - toolshare-network
 
@@ -29,8 +31,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npx prisma db push && node dist/index.js"
+    # --skip-generate: Der Prisma-Client wird bereits im Image-Build erzeugt.
+    # Beim Start als non-root-User ("node") schlägt ein erneutes generate mit
+    # EACCES (unlink .prisma/client/default.js) fehl – daher hier überspringen.
+    command: sh -c "npx prisma db push --skip-generate && node dist/index.js"
     restart: unless-stopped
+    # Speicher deckeln: ein einzelner Container darf die VM (3,8 GB, kein Swap)
+    # nicht komplett auffressen und damit den ganzen Gast einfrieren.
+    mem_limit: 640m
+    mem_reservation: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:4000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - toolshare-network
 
@@ -59,6 +74,10 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    # Postgres-Speicher deckeln (mit Reserve, damit die DB nicht selbst
+    # OOM-gekillt wird). Zusammen mit dem Swap fängt das Spitzen ab.
+    mem_limit: 1g
+    mem_reservation: 512m
     networks:
       - toolshare-network
 

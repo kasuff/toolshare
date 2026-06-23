@@ -33,6 +33,11 @@ export type GeoCoordinates = {
 };
 
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
+// Harte Obergrenze für den externen Geocoding-Aufruf. Ohne Timeout kann ein
+// hängender Nominatim-Request den Handler minutenlang blockieren (real gesehen:
+// 458 s) – das staut Requests, treibt den Speicher hoch und hat (ohne Swap)
+// die ganze VM eingefroren. Lieber schnell abbrechen und sauber scheitern.
+const NOMINATIM_TIMEOUT_MS = 5000;
 const REQUEST_HEADERS = {
   "User-Agent": "toolshare-address-validation/1.0 (se2-project)",
   Accept: "application/json",
@@ -50,7 +55,8 @@ async function searchAddress(query: string, limit: number): Promise<NominatimSea
 
   const response = await fetch(`${NOMINATIM_BASE_URL}?${params.toString()}`, {
     method: "GET",
-    headers: REQUEST_HEADERS
+    headers: REQUEST_HEADERS,
+    signal: AbortSignal.timeout(NOMINATIM_TIMEOUT_MS)
   });
 
   if (!response.ok) {
