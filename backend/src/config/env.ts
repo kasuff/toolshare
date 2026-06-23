@@ -43,7 +43,7 @@ export const env = {
   port: Number(process.env.PORT ?? 4000),
   databaseUrl: process.env.DATABASE_URL as string,
   jwtSecret: process.env.JWT_SECRET as string,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "1h",
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "6h",
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "7d",
   managerEmailAllowlist: parseEmailAllowlist(process.env.MANAGER_EMAIL_ALLOWLIST),
   corsOrigin: parseCorsOrigins(process.env.CORS_ORIGIN),

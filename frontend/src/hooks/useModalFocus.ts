@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -9,34 +9,48 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])"
 ].join(",");
 
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true"
+  );
+}
+
 export function useModalFocus(
   containerRef: RefObject<HTMLElement>,
   onClose: () => void,
   initialFocusRef?: RefObject<HTMLElement>,
   enabled = true
 ) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!enabled) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const focusTarget =
+      initialFocusRef?.current ?? getFocusableElements(container)[0] ?? container;
+    focusTarget.focus();
+  }, [containerRef, enabled, initialFocusRef]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const container = containerRef.current;
     if (!container) return;
 
-    const getFocusableElements = () =>
-      Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-        (element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true"
-      );
-
-    (initialFocusRef?.current ?? getFocusableElements()[0] ?? container).focus();
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
 
-      const elements = getFocusableElements();
+      const elements = getFocusableElements(container);
       if (elements.length === 0) {
         event.preventDefault();
         container.focus();
@@ -63,5 +77,5 @@ export function useModalFocus(
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
     };
-  }, [containerRef, enabled, initialFocusRef, onClose]);
+  }, [containerRef, enabled]);
 }

@@ -1,5 +1,5 @@
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
@@ -32,7 +32,6 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
   const [borrowUntil, setBorrowUntil] = useState("");
   const [maxCapacityFilter, setMaxCapacityFilter] = useState(10);
   const [radiusKm, setRadiusKm] = useState(5);
-  const [selectedWorkshopId, setSelectedWorkshopId] = useState<string | null>(null);
 
   const defaultLocation = currentUser?.address ?? "München Zentrum";
   const { data: rawItems = [], isLoading, isFetched } = useWorkshops({ q }, token);
@@ -85,18 +84,9 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
   }, [candidateItems, defaultLocation, radiusKm]);
 
   const selectedWorkshop = useMemo(() => {
-    const workshopId = selectedWorkshopId ?? openWorkshopId;
-    if (!workshopId) return null;
-    return items.find((item) => item.workshop.id === workshopId) ?? null;
-  }, [items, openWorkshopId, selectedWorkshopId]);
-
-  useEffect(() => {
-    if (!openWorkshopId || selectedWorkshopId === openWorkshopId || items.length === 0) return;
-    const match = items.find((item) => item.workshop.id === openWorkshopId);
-    if (match) {
-      setSelectedWorkshopId(openWorkshopId);
-    }
-  }, [items, openWorkshopId, selectedWorkshopId]);
+    if (!openWorkshopId) return null;
+    return items.find((item) => item.workshop.id === openWorkshopId) ?? null;
+  }, [items, openWorkshopId]);
 
   const hasActiveFilters = Boolean(q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== 10 || radiusKm !== 5);
 

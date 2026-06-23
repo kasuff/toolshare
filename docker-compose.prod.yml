@@ -24,17 +24,24 @@ services:
     environment:
       DATABASE_URL: postgresql://toolshare:${POSTGRES_PASSWORD}@db:5432/toolshare
       JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-6h}
       PORT: 4000
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       REDIS_URL: redis://redis:6379
       CACHE_BACKEND: redis
       MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-r2}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: sh -c "npx prisma db push && node dist/index.js"
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
     restart: unless-stopped
     networks:
       - toolshare-network
