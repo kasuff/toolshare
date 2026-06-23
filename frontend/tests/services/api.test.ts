@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { api } from "@toolshare/shared";
-import { onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
+import { configureAuthSession, onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
 
 const fetchMock = vi.fn();
@@ -16,6 +16,12 @@ function responseJson(body: unknown, init?: ResponseInit) {
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  configureAuthSession({
+    getAccessToken: () => null,
+    getRefreshToken: () => null,
+    setTokens: vi.fn(),
+    clearTokens: vi.fn()
+  });
 });
 
 describe("api service", () => {
@@ -28,6 +34,38 @@ describe("api service", () => {
 
     expect(handleSessionExpired).toHaveBeenCalledTimes(1);
     unsubscribe();
+  });
+
+  it("silently refreshes expired access tokens and retries the original request", async () => {
+    const setTokens = vi.fn();
+    configureAuthSession({
+      getAccessToken: () => "expired-token",
+      getRefreshToken: () => "valid-refresh",
+      setTokens,
+      clearTokens: vi.fn()
+    });
+
+    fetchMock
+      .mockResolvedValueOnce(responseJson({ error: { message: "Invalid or expired token" } }, { status: 401 }))
+      .mockResolvedValueOnce(
+        responseJson({ accessToken: "new-access-token", refreshToken: "new-refresh-token" })
+      )
+      .mockResolvedValueOnce(
+        responseJson({ id: "u1", email: "lea@toolshare.local", name: "Lea", role: "USER", isSuspended: false })
+      );
+
+    const user = await api.getCurrentUser("expired-token");
+
+    expect(user.name).toBe("Lea");
+    expect(setTokens).toHaveBeenCalledWith({
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token"
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2][0]).toBe("http://localhost:4000/api/users/me");
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({
+      headers: expect.objectContaining({ Authorization: "Bearer new-access-token" })
+    });
   });
 
   it("maps backend users and sends authorization headers", async () => {

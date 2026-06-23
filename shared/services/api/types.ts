@@ -120,6 +120,8 @@ export type AuthPayload = {
   refreshToken: string;
 };
 
+export type RefreshPayload = Pick<AuthPayload, "accessToken" | "refreshToken">;
+
 export type BackendTool = {
   id: string;
   ownerId: string;

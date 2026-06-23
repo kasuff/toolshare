@@ -68,6 +68,7 @@ describe("authStore", () => {
     });
 
     expect(localStorage.getItem("toolshare_access_token")).toBeNull();
+    expect(localStorage.getItem("toolshare_refresh_token")).toBeNull();
     expect(useAuthStore.getState().currentUser).toBeNull();
   });
 
@@ -93,14 +94,15 @@ describe("authStore", () => {
     });
 
     expect(localStorage.getItem("toolshare_access_token")).toBeNull();
+    expect(localStorage.getItem("toolshare_refresh_token")).toBeNull();
     expect(useAuthStore.getState().token).toBeNull();
     expect(useAuthStore.getState().currentUser).toBeNull();
     expect(useAuthStore.getState().error).toBe(SESSION_EXPIRED_MESSAGE);
   });
 
   it("persists tokens on login and register", async () => {
-    login.mockResolvedValueOnce({ accessToken: "login-token" });
-    register.mockResolvedValueOnce({ accessToken: "register-token" });
+    login.mockResolvedValueOnce({ accessToken: "login-token", refreshToken: "login-refresh" });
+    register.mockResolvedValueOnce({ accessToken: "register-token", refreshToken: "register-refresh" });
     getCurrentUser
       .mockResolvedValueOnce({
         id: "u1",
@@ -123,6 +125,7 @@ describe("authStore", () => {
 
     expect(login).toHaveBeenCalledWith("lea@toolshare.local", "password123");
     expect(localStorage.getItem("toolshare_access_token")).toBe("login-token");
+    expect(localStorage.getItem("toolshare_refresh_token")).toBe("login-refresh");
 
     await act(async () => {
       await useAuthStore.getState().register({
@@ -140,6 +143,7 @@ describe("authStore", () => {
       address: "Musterstraße 1"
     });
     expect(localStorage.getItem("toolshare_access_token")).toBe("register-token");
+    expect(localStorage.getItem("toolshare_refresh_token")).toBe("register-refresh");
   });
 
   it("updates profile for logged-in users and rejects guest updates", async () => {
@@ -147,7 +151,7 @@ describe("authStore", () => {
       "Du musst eingeloggt sein."
     );
 
-    login.mockResolvedValueOnce({ accessToken: "profile-token" });
+    login.mockResolvedValueOnce({ accessToken: "profile-token", refreshToken: "profile-refresh" });
     getCurrentUser.mockResolvedValueOnce({
       id: "u1",
       name: "Lea",
