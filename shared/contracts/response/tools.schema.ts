@@ -33,4 +33,22 @@ export const toolResponseSchema = z.object({
 
 export const toolListResponseSchema = z.array(toolResponseSchema);
 
+export const toolBlockingPeriodResponseSchema = z.object({
+  startDate: z.string(),
+  endDate: z.string()
+});
+
+export const toolBlockingPeriodListResponseSchema = z.array(toolBlockingPeriodResponseSchema);
+
+export const toolOwnerBlockResponseSchema = z.object({
+  id: z.string().uuid(),
+  startDate: z.string(),
+  endDate: z.string()
+});
+
+export const toolOwnerBlockListResponseSchema = z.array(toolOwnerBlockResponseSchema);
+
 export type ToolResponse = z.infer<typeof toolResponseSchema>;
+export type ToolOwnerResponse = z.infer<typeof toolOwnerResponseSchema>;
+export type ToolBlockingPeriodResponse = z.infer<typeof toolBlockingPeriodResponseSchema>;
+export type ToolOwnerBlockResponse = z.infer<typeof toolOwnerBlockResponseSchema>;
