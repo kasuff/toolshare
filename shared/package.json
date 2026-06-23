@@ -2,17 +2,43 @@
   "name": "@toolshare/shared",
   "version": "1.0.0",
   "private": true,
-  "main": "index.ts",
+  "main": "dist/index.js",
   "types": "index.ts",
   "exports": {
-    ".": "./index.ts",
-    "./contracts": "./contracts/index.ts",
-    "./contracts/request/*": "./contracts/request/*.ts",
-    "./contracts/response/*": "./contracts/response/*.ts",
-    "./contracts/errors/*": "./contracts/errors/*.ts"
+    ".": {
+      "types": "./index.ts",
+      "import": "./index.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./contracts/index.ts",
+      "import": "./contracts/index.ts",
+      "require": "./dist/contracts/index.js",
+      "default": "./dist/contracts/index.js"
+    },
+    "./contracts/request/*": {
+      "types": "./contracts/request/*.ts",
+      "import": "./contracts/request/*.ts",
+      "require": "./dist/contracts/request/*.js",
+      "default": "./dist/contracts/request/*.js"
+    },
+    "./contracts/response/*": {
+      "types": "./contracts/response/*.ts",
+      "import": "./contracts/response/*.ts",
+      "require": "./dist/contracts/response/*.js",
+      "default": "./dist/contracts/response/*.js"
+    },
+    "./contracts/errors/*": {
+      "types": "./contracts/errors/*.ts",
+      "import": "./contracts/errors/*.ts",
+      "require": "./dist/contracts/errors/*.js",
+      "default": "./dist/contracts/errors/*.js"
+    }
   },
   "scripts": {
-    "check": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",

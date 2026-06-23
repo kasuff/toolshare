@@ -387,6 +387,7 @@ backend:build:
       [ "$ok" -eq 1 ]
     # Install dependencies for shared package so ts-node can resolve zod during generate-openapi
     - npm install --prefix ../shared --prefer-offline --no-audit --no-fund --cache .npm
+    - npm run build --prefix ../shared
     # tsc occasionally crashes internally on shared runners (V8 JIT); retry before failing.
     - |
       ok=0

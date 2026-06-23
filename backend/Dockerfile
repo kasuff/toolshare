@@ -11,7 +11,8 @@ RUN npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtim
 
 COPY shared /shared
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --prefix /shared --omit=dev --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+    npm install --prefix /shared --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 \
+    && npm run build --prefix /shared
 COPY backend/prisma ./prisma
 RUN npx prisma generate
 
@@ -40,9 +41,7 @@ COPY backend/package*.json ./
 COPY shared/package*.json /shared/
 RUN npm ci --omit=dev --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
 
-COPY shared /shared
-RUN --mount=type=cache,target=/root/.npm \
-    npm install --prefix /shared --omit=dev --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+COPY --from=build /shared /shared
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 RUN npx prisma generate && chown -R node:node /app /shared
