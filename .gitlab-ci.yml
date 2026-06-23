@@ -132,7 +132,7 @@ workflow:
 
 frontend:lint:
   stage: lint
-  image: node:20.19-alpine   # pinned: node:20 drifted to v20.20.2 whose x64 V8 JIT crashes
+  image: node:20.19-slim
   extends: .frontend_cache
   cache:
     policy: pull-push   # lint runs first -> it seeds the shared npm cache
@@ -153,9 +153,10 @@ frontend:test:
   # core-dumps workers ("Illegal instruction" in Runtime_CompileOptimized).
   image: node:20.19-slim
   extends: .frontend_cache
-  timeout: 15m
+  # V8 coverage on shared runners can stall for several minutes under load; 15m was too tight.
+  timeout: 30m
   variables:
-    NODE_OPTIONS: "--max-old-space-size=2048"   # headroom so the test fork is not OOM-killed
+    NODE_OPTIONS: "--max-old-space-size=4096"   # headroom so the test fork is not OOM-killed
   script:
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
@@ -229,6 +230,33 @@ backend:lint:
     when: always
     paths:
       - backend-lint-report.html
+
+backend:architecture:
+  stage: test
+  image: node:20.19
+  extends: .backend_cache
+  script:
+    - cd backend
+    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - npx vitest run tests/architecture.test.ts
+
+backend:contracts:
+  stage: test
+  image: node:20.19
+  extends: .backend_cache
+  script:
+    - cd backend
+    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - npm run test:contracts
+
+frontend:architecture:
+  stage: test
+  image: node:20.19-slim
+  extends: .frontend_cache
+  script:
+    - cd frontend
+    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - npx vitest run tests/architecture.test.ts
 
 backend:test:
   stage: test
@@ -317,18 +345,29 @@ frontend:build:
   # linux-x64 V8 build intermittently corrupts tsc and crashes it deep in
   # its internals ("Cannot read properties of undefined (reading 'flags')").
   # 20.19 is the last minor before that regression.
-  image: node:20.19-alpine
+  image: node:20.19-slim
   extends: .frontend_cache
   script:
     - cd frontend
     - npm ci --workspaces=false --prefer-offline --cache .npm
-    - npm run build
+    # tsc occasionally crashes internally on shared runners (V8 JIT); retry before failing.
+    - |
+      ok=0
+      for attempt in 1 2 3; do
+        if npm run build; then
+          ok=1
+          break
+        fi
+        echo "npm run build failed (attempt $attempt) -- retrying in 3s"
+        sleep 3
+      done
+      [ "$ok" -eq 1 ]
 
 backend:build:
   stage: build
   # See frontend:build: pinned off floating node:20 (v20.20.2) whose x64 V8
   # build crashes tsc during emit ("Cannot read properties of undefined").
-  image: node:20.19
+  image: node:20.19-slim
   extends: .backend_cache
   needs:
     - backend:test
@@ -346,7 +385,20 @@ backend:build:
         sleep 3
       done
       [ "$ok" -eq 1 ]
-    - npm run build
+    # Install dependencies for shared package so ts-node can resolve zod during generate-openapi
+    - npm install --prefix ../shared --prefer-offline --no-audit --no-fund --cache .npm
+    # tsc occasionally crashes internally on shared runners (V8 JIT); retry before failing.
+    - |
+      ok=0
+      for attempt in 1 2 3; do
+        if npm run build; then
+          ok=1
+          break
+        fi
+        echo "npm run build failed (attempt $attempt) -- retrying in 3s"
+        sleep 3
+      done
+      [ "$ok" -eq 1 ]
 
 # === DEPLOY JOB ===
 

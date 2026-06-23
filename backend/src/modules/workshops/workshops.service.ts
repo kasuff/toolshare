@@ -1,4 +1,6 @@
 import { AppError } from "../../utils/app-error";
+import { getImageStorageService } from "../../config/services";
+import { resolveImageUrls } from "../../ports/image-storage.service";
 import { workshopsRepository } from "./workshops.repository";
 
 export const workshopsService = {
@@ -23,7 +25,7 @@ export const workshopsService = {
     return { ...workshop, bookings };
   },
 
-  create(input: {
+  async create(input: {
     managerId: string;
     name: string;
     description: string;
@@ -33,11 +35,13 @@ export const workshopsService = {
     workshopTools?: Array<{ name: string; category: string }>;
     imageUrls?: string[];
   }) {
+    const storage = getImageStorageService();
+    const imageUrls = (await resolveImageUrls(storage, input.imageUrls)) ?? [];
     return workshopsRepository.create({
       ...input,
       extras: input.extras ?? [],
       workshopTools: input.workshopTools ?? [],
-      imageUrls: input.imageUrls ?? []
+      imageUrls
     });
   },
 
@@ -65,7 +69,16 @@ export const workshopsService = {
       throw new AppError("FORBIDDEN", "Only the workshop manager can update this workshop", 403);
     }
 
-    return workshopsRepository.update(input.workshopId, input.data);
+    const storage = getImageStorageService();
+    const imageUrls =
+      input.data.imageUrls !== undefined
+        ? (await resolveImageUrls(storage, input.data.imageUrls)) ?? []
+        : undefined;
+
+    return workshopsRepository.update(input.workshopId, {
+      ...input.data,
+      ...(imageUrls !== undefined ? { imageUrls } : {})
+    });
   },
 
   async remove(input: {

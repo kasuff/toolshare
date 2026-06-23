@@ -1,28 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
-import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
+import { enqueueProposalNotification } from "../src/infrastructure/outbox/enqueue-user-notification";
 import { toolsService } from "../src/modules/tools/tools.service";
 import { workshopsService } from "../src/modules/workshops/workshops.service";
 import { bookingsService } from "../src/modules/bookings/bookings.service";
 import { systemRulesService } from "../src/modules/system-rules/system-rules.service";
-
-const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: {
-    timeSlot: { findFirst: vi.fn() },
-    booking: { findFirst: vi.fn(), update: vi.fn() },
-    bookingPickupProposal: {
-      findFirst: vi.fn(),
-      updateMany: vi.fn(),
-      update: vi.fn(),
-      findUnique: vi.fn()
-    },
-    $transaction: vi.fn()
-  }
-}));
-
-vi.mock("../src/config/prisma", () => ({
-  prisma: prismaMock
-}));
 
 vi.mock("../src/modules/bookings/bookings.repository", () => ({
   bookingsRepository: {
@@ -38,14 +20,25 @@ vi.mock("../src/modules/bookings/bookings.repository", () => ({
     declinePendingTimeslotProposals: vi.fn(),
     createTimeslotProposal: vi.fn(),
     updateStatus: vi.fn(),
-    markToolAvailable: vi.fn()
+    markToolAvailable: vi.fn(),
+    findToolBookingOverlap: vi.fn(),
+    runPickupProposalCreation: vi.fn(),
+    findPickupProposalWithBooking: vi.fn(),
+    declinePickupProposal: vi.fn(),
+    findPickupProposalById: vi.fn(),
+    acceptPickupProposalTransaction: vi.fn(),
+    runTimeslotProposalCreation: vi.fn(),
+    findOverlappingBlockedWorkshopSlot: vi.fn(),
+    findWorkshopBookingOverlap: vi.fn(),
+    findTimeslotProposalWithBooking: vi.fn(),
+    declineTimeslotProposal: vi.fn(),
+    findTimeslotProposalById: vi.fn(),
+    acceptTimeslotProposalTransaction: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/notifications/notifications.repository", () => ({
-  notificationsRepository: {
-    create: vi.fn()
-  }
+vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
+  enqueueProposalNotification: vi.fn()
 }));
 
 vi.mock("../src/modules/system-rules/system-rules.service", () => ({
@@ -67,7 +60,7 @@ vi.mock("../src/modules/workshops/workshops.service", () => ({
 }));
 
 const mockedBookingsRepository = vi.mocked(bookingsRepository);
-const mockedNotificationsRepository = vi.mocked(notificationsRepository);
+const mockedEnqueueProposalNotification = vi.mocked(enqueueProposalNotification);
 const mockedSystemRulesService = vi.mocked(systemRulesService);
 const mockedToolsService = vi.mocked(toolsService);
 const mockedWorkshopsService = vi.mocked(workshopsService);
@@ -110,10 +103,8 @@ describe("bookingsService", () => {
       pickupProposals: [],
       tool: { ownerId: "provider-1" }
     } as any);
-    prismaMock.booking.findFirst.mockResolvedValueOnce(null);
-    prismaMock.$transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback({}));
-    mockedBookingsRepository.declinePendingPickupProposals.mockResolvedValueOnce({ count: 0 } as any);
-    mockedBookingsRepository.createPickupProposal.mockResolvedValueOnce({ id: "pickup-proposal-1" } as any);
+    mockedBookingsRepository.findToolBookingOverlap.mockResolvedValueOnce(null);
+    mockedBookingsRepository.runPickupProposalCreation.mockResolvedValueOnce({ id: "pickup-proposal-1" } as any);
 
     await expect(
       bookingsService.createPickupProposal({
@@ -124,9 +115,9 @@ describe("bookingsService", () => {
       })
     ).resolves.toMatchObject({ id: "pickup-proposal-1" });
 
-    expect(mockedBookingsRepository.createPickupProposal).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(mockedBookingsRepository.runPickupProposalCreation).toHaveBeenCalledWith(
       expect.objectContaining({
+        bookingId: "booking-tool-1",
         proposedPickupTime: new Date("2026-06-02T09:00:00.000Z"),
         proposedReturnTime: new Date("2026-06-02T15:00:00.000Z"),
         previousReturnTime: new Date("2026-06-01T14:00:00.000Z")
@@ -135,7 +126,7 @@ describe("bookingsService", () => {
   });
 
   it("applies pickup and return times when a tool counter proposal is accepted", async () => {
-    prismaMock.bookingPickupProposal.findFirst.mockResolvedValueOnce({
+    mockedBookingsRepository.findPickupProposalWithBooking.mockResolvedValueOnce({
       id: "pickup-proposal-1",
       bookingId: "booking-tool-1",
       proposedByUserId: "provider-1",
@@ -149,16 +140,13 @@ describe("bookingsService", () => {
         tool: { id: "tool-1", ownerId: "provider-1" },
         timeslot: null
       }
-    });
-    prismaMock.booking.findFirst.mockResolvedValueOnce(null);
-    prismaMock.bookingPickupProposal.updateMany.mockResolvedValueOnce({ count: 0 });
-    prismaMock.bookingPickupProposal.update.mockResolvedValueOnce({ id: "pickup-proposal-1" });
-    prismaMock.booking.update.mockResolvedValueOnce({ id: "booking-tool-1" });
-    prismaMock.$transaction.mockResolvedValueOnce([]);
-    prismaMock.bookingPickupProposal.findUnique.mockResolvedValueOnce({
+    } as any);
+    mockedBookingsRepository.findToolBookingOverlap.mockResolvedValueOnce(null);
+    mockedBookingsRepository.acceptPickupProposalTransaction.mockResolvedValueOnce([] as any);
+    mockedBookingsRepository.findPickupProposalById.mockResolvedValueOnce({
       id: "pickup-proposal-1",
       status: "ACCEPTED"
-    });
+    } as any);
 
     await bookingsService.respondPickupProposal({
       actorId: "requester-1",
@@ -167,14 +155,12 @@ describe("bookingsService", () => {
       decision: "ACCEPT"
     });
 
-    expect(prismaMock.booking.update).toHaveBeenCalledWith({
-      where: { id: "booking-tool-1" },
-      data: {
-        status: "ACCEPTED",
-        pickupTime: new Date("2026-06-02T09:00:00.000Z"),
-        startDate: new Date("2026-06-02T09:00:00.000Z"),
-        endDate: new Date("2026-06-02T15:00:00.000Z")
-      }
+    expect(mockedBookingsRepository.acceptPickupProposalTransaction).toHaveBeenCalledWith({
+      bookingId: "booking-tool-1",
+      proposalId: "pickup-proposal-1",
+      pickupTime: new Date("2026-06-02T09:00:00.000Z"),
+      startDate: new Date("2026-06-02T09:00:00.000Z"),
+      endDate: new Date("2026-06-02T15:00:00.000Z")
     });
   });
 
@@ -192,13 +178,9 @@ describe("bookingsService", () => {
         workshop: { managerId: "provider-1" }
       }
     } as any);
-    prismaMock.timeSlot.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: "availability-1" });
-    prismaMock.booking.findFirst.mockResolvedValueOnce(null);
-    prismaMock.$transaction.mockImplementationOnce(async (callback: (tx: unknown) => unknown) => callback({}));
-    mockedBookingsRepository.declinePendingTimeslotProposals.mockResolvedValueOnce({ count: 0 } as any);
-    mockedBookingsRepository.createTimeslotProposal.mockResolvedValueOnce({ id: "proposal-1" } as any);
+    mockedBookingsRepository.findOverlappingBlockedWorkshopSlot.mockResolvedValueOnce(null);
+    mockedBookingsRepository.findWorkshopBookingOverlap.mockResolvedValueOnce(null);
+    mockedBookingsRepository.runTimeslotProposalCreation.mockResolvedValueOnce({ id: "proposal-1" } as any);
 
     await expect(
       bookingsService.createTimeslotProposal({
@@ -209,8 +191,7 @@ describe("bookingsService", () => {
       })
     ).resolves.toMatchObject({ id: "proposal-1" });
 
-    expect(mockedBookingsRepository.createTimeslotProposal).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(mockedBookingsRepository.runTimeslotProposalCreation).toHaveBeenCalledWith(
       expect.objectContaining({
         bookingId: "booking-1",
         proposedByUserId: "provider-1"
@@ -323,7 +304,6 @@ describe("bookingsService", () => {
 
     expect(mockedToolsService.getById).toHaveBeenCalledWith("t1");
     expect(mockedBookingsRepository.createToolBookingTransaction).toHaveBeenCalled();
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner-1", expect.stringContaining("Ausleihanfrage"));
     expect(result).toMatchObject({ id: "b1" });
   });
 
@@ -351,7 +331,6 @@ describe("bookingsService", () => {
       endDate: new Date(endDate),
       workshopToolIds: ["wt-1"]
     });
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("manager-1", expect.stringContaining("Werkstatt"));
     expect(result).toMatchObject({ id: "b2" });
   });
 
@@ -409,8 +388,10 @@ describe("bookingsService", () => {
       status: "ACCEPTED"
     });
 
-    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "ACCEPTED");
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("requester-1", expect.stringContaining("ACCEPTED"));
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "ACCEPTED", {
+      notifyUserId: "requester-1",
+      markToolAvailableId: undefined
+    });
     expect(result).toMatchObject({ id: "b1", status: "ACCEPTED" });
   });
 
@@ -423,7 +404,6 @@ describe("bookingsService", () => {
       tool: { id: "tool-1", ownerId: "owner-1" }
     } as any);
     mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
-    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
 
     const result = await bookingsService.updateBookingStatus({
       actorId: "owner-1",
@@ -432,9 +412,10 @@ describe("bookingsService", () => {
       status: "RETURNED"
     });
 
-    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "RETURNED");
-    expect(mockedBookingsRepository.markToolAvailable).toHaveBeenCalledWith("tool-1");
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("requester-1", expect.stringContaining("RETURNED"));
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b1", "RETURNED", {
+      notifyUserId: "requester-1",
+      markToolAvailableId: "tool-1"
+    });
     expect(result).toMatchObject({ id: "b1", status: "RETURNED" });
   });
 
@@ -455,8 +436,10 @@ describe("bookingsService", () => {
       status: "RETURNED"
     });
 
-    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b2", "RETURNED");
-    expect(mockedBookingsRepository.markToolAvailable).not.toHaveBeenCalled();
+    expect(mockedBookingsRepository.updateStatus).toHaveBeenCalledWith("b2", "RETURNED", {
+      notifyUserId: "requester-1",
+      markToolAvailableId: undefined
+    });
     expect(result).toMatchObject({ id: "b2", status: "RETURNED" });
   });
 
@@ -495,8 +478,6 @@ describe("bookingsService", () => {
         endDate: "2026-07-01T12:00:00.000Z"
       })
     ).resolves.toMatchObject({ status: "ACCEPTED" });
-
-    expect(mockedNotificationsRepository.create).not.toHaveBeenCalled();
   });
 
   it("returns a booking conflict when an owner block overlaps a booking", async () => {
@@ -535,7 +516,6 @@ describe("bookingsService", () => {
       tool: { id: "tool-1", ownerId: "owner-1" }
     } as any);
     mockedBookingsRepository.updateStatus.mockResolvedValueOnce({ id: "b1", status: "RETURNED" } as any);
-    mockedBookingsRepository.markToolAvailable.mockResolvedValueOnce({ id: "tool-1", status: "AVAILABLE" } as any);
 
     await expect(
       bookingsService.updateBookingStatus({

@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { enqueueModerationNotification } from "../src/infrastructure/outbox/enqueue-user-notification";
 import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
 import { suspensionRepository } from "../src/modules/users/suspension.repository";
 import { notificationsService } from "../src/modules/notifications/notifications.service";
+
+vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
+  enqueueModerationNotification: vi.fn(),
+  newModerationNotificationKey: vi.fn(() => "moderation:key")
+}));
 
 vi.mock("../src/modules/notifications/notifications.repository", () => ({
   notificationsRepository: {
@@ -17,6 +23,7 @@ vi.mock("../src/modules/users/suspension.repository", () => ({
   }
 }));
 
+const mockedEnqueueModerationNotification = vi.mocked(enqueueModerationNotification);
 const mockedNotificationsRepository = vi.mocked(notificationsRepository);
 const mockedSuspensionRepository = vi.mocked(suspensionRepository);
 
@@ -26,17 +33,19 @@ describe("notificationsService", () => {
   });
 
   it("creates warning messages with moderator name", async () => {
-    mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n1" } as any);
-
     await notificationsService.createWarning("user-1", "Unangemessene Sprache", "Lea");
 
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
-      "user-1",
-      expect.stringContaining("ERMAHNUNG: Unangemessene Sprache")
+    expect(mockedEnqueueModerationNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        inAppMessage: expect.stringContaining("ERMAHNUNG: Unangemessene Sprache"),
+        pushTitle: "System-Ermahnung"
+      })
     );
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
-      "user-1",
-      expect.stringContaining("Moderator: Lea")
+    expect(mockedEnqueueModerationNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inAppMessage: expect.stringContaining("Moderator: Lea")
+      })
     );
   });
 
@@ -45,23 +54,25 @@ describe("notificationsService", () => {
       { id: "m1" },
       { id: "m2" }
     ] as any);
-    mockedNotificationsRepository.create.mockResolvedValue({ id: "n1" } as any);
 
     await notificationsService.notifyManagersSuspensionRequest("req-1", "Max", "Spam");
 
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledTimes(2);
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
-      "m1",
-      expect.stringContaining("SPERRUNG_ANFRAGE")
+    expect(mockedEnqueueModerationNotification).toHaveBeenCalledTimes(2);
+    expect(mockedEnqueueModerationNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "m1",
+        inAppMessage: expect.stringContaining("SPERRUNG_ANFRAGE")
+      })
     );
   });
 
   it("creates suspension notice and rejects unknown markAsRead", async () => {
-    mockedNotificationsRepository.create.mockResolvedValueOnce({ id: "n2" } as any);
     await notificationsService.createSuspensionNotice("user-2", "Verstoß gegen Regeln");
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith(
-      "user-2",
-      expect.stringContaining("SPERRUNG:")
+    expect(mockedEnqueueModerationNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-2",
+        inAppMessage: expect.stringContaining("SPERRUNG:")
+      })
     );
 
     mockedNotificationsRepository.markAsRead.mockResolvedValueOnce({ count: 0 } as any);

@@ -63,13 +63,17 @@ function AppLayout() {
   );
 }
 
+import { ErrorBoundary } from '../components/ErrorBoundary';
+
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppLayout />
-      </ToastProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <AppLayout />
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

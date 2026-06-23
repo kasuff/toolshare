@@ -277,3 +277,25 @@ model SystemSetting {
   value     Int
   updatedAt DateTime @updatedAt
 }
+
+/// Transactional Outbox — Domain Events werden atomar mit Business-Daten geschrieben.
+model OutboxEvent {
+  id             String    @id @default(uuid())
+  eventType      String
+  payload        Json
+  idempotencyKey String    @unique
+  aggregateType  String?
+  aggregateId    String?
+  createdAt      DateTime  @default(now())
+  processedAt    DateTime?
+  retryCount     Int       @default(0)
+  lastError      String?
+
+  @@index([processedAt, createdAt])
+}
+
+/// Idempotenz-Nachweis für at-least-once Zustellung (Push/In-App).
+model NotificationDelivery {
+  idempotencyKey String   @id
+  processedAt    DateTime @default(now())
+}

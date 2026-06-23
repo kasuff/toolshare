@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { usePageAuth } from "../hooks/usePageAuth";
 import { OfferCard } from "../components/OfferCard";
 import { EmptyState, GuestBanner, SkeletonCards } from "../components/ui";
-import { useToast } from "../hooks/useToast";
-import {  api  } from "@toolshare/shared";
-import type {  Tool, User, Workshop, WorkshopSlot, Booking  } from "@toolshare/shared";
+import { useMyOffers } from "../hooks/queries/workshops.queries";
+import type { User } from "@toolshare/shared";
 import { distanceBetweenLocations } from "@toolshare/shared";
 import { formatOfferDistance } from "../utils/offerFormatting";
 import {
@@ -14,62 +13,17 @@ import {
 } from "../utils/offerStatus";
 
 type Props = {
-  token?: string;
   currentUser?: User;
+  token?: string | null;
 };
 
-type WorkshopOffer = {
-  workshop: Workshop;
-  slots: WorkshopSlot[];
-};
+export function MyOffersPage({ currentUser: propUser, token: propToken }: Props = {}) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
+  const { data, isLoading, isError } = useMyOffers(currentUser?.id, token);
 
-export function MyOffersPage({ token, currentUser }: Props) {
-  const { pushToast } = useToast();
-  const [tools, setTools] = useState<Tool[]>([]);
-  const [workshops, setWorkshops] = useState<WorkshopOffer[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    if (!token || !currentUser) {
-      setIsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadOffers = async () => {
-      setIsLoading(true);
-      setHasError(false);
-      try {
-        const [ownedTools, ownedWorkshops, userBookings] = await Promise.all([
-          api.getTools({ ownerId: currentUser.id }, token),
-          api.getWorkshops({ managerId: currentUser.id }, token),
-          api.getBookingsForUser(token)
-        ]);
-        if (cancelled) return;
-        setTools(ownedTools.filter((tool) => tool.ownerId === currentUser.id));
-        setWorkshops(
-          ownedWorkshops
-            .filter((entry) => entry.workshop.ownerId === currentUser.id)
-            .map(({ workshop, slots }) => ({ workshop, slots }))
-        );
-        setBookings(userBookings);
-      } catch (error) {
-        if (cancelled) return;
-        setHasError(true);
-        pushToast(error instanceof Error ? error.message : "Deine Angebote konnten nicht geladen werden.", "error");
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void loadOffers();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUser, pushToast, token]);
+  const tools = data?.tools ?? [];
+  const workshops = data?.workshops ?? [];
+  const bookings = data?.bookings ?? [];
 
   if (!token || !currentUser) {
     return (
@@ -102,14 +56,14 @@ export function MyOffersPage({ token, currentUser }: Props) {
 
       {isLoading && <SkeletonCards count={4} />}
 
-      {!isLoading && hasError && (
+      {!isLoading && isError && (
         <EmptyState
           title="Angebote konnten nicht geladen werden"
           text="Bitte versuche es später erneut."
         />
       )}
 
-      {!isLoading && !hasError && !hasOffers && (
+      {!isLoading && !isError && !hasOffers && (
         <div className="my-offers-empty">
           <EmptyState
             title="Keine Angebote vorhanden"
@@ -126,7 +80,7 @@ export function MyOffersPage({ token, currentUser }: Props) {
         </div>
       )}
 
-      {!isLoading && !hasError && hasOffers && (
+      {!isLoading && !isError && hasOffers && (
         <>
           <section className="my-offers-section" aria-labelledby="my-workshops-heading">
             <h2 id="my-workshops-heading">Werkstätten</h2>

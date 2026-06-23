@@ -1,12 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import type {  User  } from "@toolshare/shared";
-import {  api  } from "@toolshare/shared";
-import {
-  countUnreadInboxThreads,
-  INBOX_READ_CHANGED_EVENT,
-  loadReadMessageIds,
-} from "../utils/inboxMessageRead";
+import type { User } from "@toolshare/shared";
+import { useInboxStore } from "../store/inboxStore";
 import { RoleSwitcher } from "./RoleSwitcher";
 
 type Props = {
@@ -89,66 +84,46 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isMobileNavOpen]);
 
-  const [unreadRequestBellCount, setUnreadRequestBellCount] = useState(0);
+  const unreadRequestBellCount = useInboxStore((state) => state.unreadCount);
+  const fetchData = useInboxStore((state) => state.fetchData);
+  const clearInbox = useInboxStore((state) => state.clear);
 
   useEffect(() => {
     if (!token || !currentUser?.id) {
-      setUnreadRequestBellCount(0);
+      clearInbox();
       return;
     }
 
     let cancelled = false;
     const userId = currentUser.id;
 
-    const loadUnreadRequestsForBell = async () => {
+    const pollData = async () => {
       try {
-        const [bookings, ratingsReceived, notifications] = await Promise.all([
-          api.getBookingsForUser(token),
-          api.getRatingsReceived(token),
-          api.getNotifications(token)
-        ]);
-        if (cancelled) return;
-        const ratingsByBookingId = new Map(
-          ratingsReceived.map((rating) => [
-            rating.bookingId,
-            { id: rating.id, bookingId: rating.bookingId, toUserId: rating.toUserId, status: rating.status }
-          ])
-        );
-        const readIds = loadReadMessageIds(userId);
-        let count = countUnreadInboxThreads(bookings, userId, readIds, ratingsByBookingId);
-
-        const unreadNotifications = notifications.filter(
-          (n) =>
-            !n.read &&
-            (n.message.startsWith("ERMAHNUNG:") ||
-              n.message.startsWith("SPERRUNG:") ||
-              n.message.includes("wurde storniert") ||
-              n.message.includes("wurde gelöscht"))
-        );
-        count += unreadNotifications.length;
-        setUnreadRequestBellCount(count);
-      } catch {
-        if (!cancelled) setUnreadRequestBellCount(0);
+        await fetchData(token, userId);
+      } catch (err) {
+        console.error("Fehler beim Laden der Benachrichtigungen/Inbox im Polling:", err);
       }
     };
 
-    void loadUnreadRequestsForBell();
-    const intervalId = window.setInterval(() => void loadUnreadRequestsForBell(), 60_000);
+    void pollData();
+    const intervalId = window.setInterval(() => {
+      if (!cancelled) void pollData();
+    }, 60_000);
+
     const onVisibility = () => {
-      if (document.visibilityState === "visible") void loadUnreadRequestsForBell();
+      if (document.visibilityState === "visible" && !cancelled) {
+        void pollData();
+      }
     };
-    const onInboxReadChanged = () => void loadUnreadRequestsForBell();
 
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener(INBOX_READ_CHANGED_EVENT, onInboxReadChanged);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener(INBOX_READ_CHANGED_EVENT, onInboxReadChanged);
     };
-  }, [token, currentUser?.id, location.pathname]);
+  }, [token, currentUser?.id, fetchData, clearInbox, location.pathname]);
 
   const inboxAriaLabel =
     unreadRequestBellCount > 0

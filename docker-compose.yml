@@ -19,12 +19,15 @@ services:
 #          path: ./frontend/package.json
 #        - action: rebuild
 #          path: ./frontend/package-lock.json
+    volumes:
+      - ./frontend/src:/app/frontend/src
     networks:
       - toolshare-network
 
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       target: dev
     ports:
       - "4000:4000"
@@ -33,14 +36,20 @@ services:
       JWT_SECRET: dev-secret-change-in-production
       PORT: 4000
       CORS_ORIGIN: http://localhost:3000
+      REDIS_URL: redis://redis:6379
+      CACHE_BACKEND: redis
       MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npx prisma db push --accept-data-loss && npm run dev"
+      redis:
+        condition: service_healthy
+    command: sh -c "npx prisma db push --accept-data-loss --skip-generate && npm run dev"
     volumes:
       - ./backend/src:/app/src
       - ./backend/prisma:/app/prisma
+      - ./shared:/shared
+      - shared_node_modules:/shared/node_modules
     networks:
       - toolshare-network
 
@@ -61,8 +70,19 @@ services:
     networks:
       - toolshare-network
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - toolshare-network
+
 volumes:
   pgdata:
+  shared_node_modules:
 
 networks:
   toolshare-network:

@@ -1,5 +1,8 @@
 import { AppError } from "../../utils/app-error";
+import { getImageStorageService } from "../../config/services";
+import { resolveImageReference } from "../../ports/image-storage.service";
 import { toolsRepository } from "./tools.repository";
+import { toToolResponse, toToolResponseList } from "./tools.presenter";
 
 const canModerate = (role: "USER" | "MODERATOR" | "MANAGER") => {
   return role === "MODERATOR" || role === "MANAGER";
@@ -12,10 +15,12 @@ export const toolsService = {
     ownerId?: string;
     search?: string;
   }) {
-    return toolsRepository.list({
-      ...filters,
-      excludeSuspendedOwners: !filters.ownerId
-    });
+    return toolsRepository
+      .list({
+        ...filters,
+        excludeSuspendedOwners: !filters.ownerId
+      })
+      .then(toToolResponseList);
   },
 
   async getById(id: string) {
@@ -26,9 +31,8 @@ export const toolsService = {
     if (tool.owner.isSuspended) {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
-    // Belegte Zeiträume mitliefern, damit der Kalender gebuchte Tage durchstreichen kann.
     const bookings = await toolsRepository.findActiveBookingRanges(id);
-    return { ...tool, bookings };
+    return toToolResponse({ ...tool, bookings });
   },
 
   async listBlockingPeriods(id: string) {
@@ -67,7 +71,7 @@ export const toolsService = {
     }
   },
 
-  create(input: {
+  async create(input: {
     ownerId: string;
     name: string;
     description: string;
@@ -76,7 +80,10 @@ export const toolsService = {
     pickupLocation: string;
     pickupLocationNote?: string;
   }) {
-    return toolsRepository.create(input);
+    const storage = getImageStorageService();
+    const imageUrl = await resolveImageReference(storage, input.imageUrl);
+    const created = await toolsRepository.create({ ...input, imageUrl });
+    return toToolResponse(created);
   },
 
   async update(input: {
@@ -103,7 +110,17 @@ export const toolsService = {
       throw new AppError("FORBIDDEN", "Only owner or moderation roles can update this tool", 403);
     }
 
-    return toolsRepository.update(input.toolId, input.data);
+    const storage = getImageStorageService();
+    const imageUrl =
+      input.data.imageUrl !== undefined
+        ? await resolveImageReference(storage, input.data.imageUrl)
+        : undefined;
+
+    const updated = await toolsRepository.update(input.toolId, {
+      ...input.data,
+      ...(imageUrl !== undefined ? { imageUrl } : {})
+    });
+    return toToolResponse(updated);
   },
 
   async remove(input: {

@@ -34,12 +34,17 @@ export function usePushNotifications(token: string | null, userId?: string) {
   const notificationListener = useRef<Notifications.Subscription>(null);
   const responseListener = useRef<Notifications.Subscription>(null);
   const lastSyncedTokenRef = useRef<string | null>(null);
+  const lastFetchedExpoTokenRef = useRef<string | null>(null);
+  const lastDevicePushTokenRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
+  const refreshInFlightRef = useRef(false);
   const listenerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!token || !userId) {
       lastSyncedTokenRef.current = null;
+      lastFetchedExpoTokenRef.current = null;
+      lastDevicePushTokenRef.current = null;
       return;
     }
 
@@ -77,22 +82,40 @@ export function usePushNotifications(token: string | null, userId?: string) {
       }
     };
 
-    const refreshExpoPushToken = () => {
-      registerForPushNotificationsAsync().then((pushToken) => {
+    const refreshExpoPushToken = async (force = false) => {
+      if (refreshInFlightRef.current) return;
+
+      if (!force && lastFetchedExpoTokenRef.current) {
+        void syncPushToken(lastFetchedExpoTokenRef.current);
+        return;
+      }
+
+      refreshInFlightRef.current = true;
+      try {
+        const pushToken = await registerForPushNotificationsAsync();
         if (pushToken) {
+          lastFetchedExpoTokenRef.current = pushToken;
           void syncPushToken(pushToken);
         }
-      });
+      } finally {
+        refreshInFlightRef.current = false;
+      }
     };
 
-    refreshExpoPushToken();
+    void refreshExpoPushToken();
 
-    const pushTokenListener = Notifications.addPushTokenListener(() => {
+    const pushTokenListener = Notifications.addPushTokenListener((deviceToken) => {
+      const tokenData =
+        typeof deviceToken.data === "string" ? deviceToken.data : JSON.stringify(deviceToken.data);
+      if (tokenData === lastDevicePushTokenRef.current) return;
+      lastDevicePushTokenRef.current = tokenData;
+      lastFetchedExpoTokenRef.current = null;
+
       if (listenerDebounceRef.current) {
         clearTimeout(listenerDebounceRef.current);
       }
       listenerDebounceRef.current = setTimeout(() => {
-        refreshExpoPushToken();
+        void refreshExpoPushToken(true);
       }, PUSH_LISTENER_DEBOUNCE_MS);
     });
 
@@ -165,7 +188,6 @@ async function registerForPushNotificationsAsync() {
           projectId,
         })
       ).data;
-      console.log("Expo Push Token:", token);
     } catch (e) {
       console.warn("Could not get Expo Push Token", e);
     }

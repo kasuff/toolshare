@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { DateInput } from "../components/DateInput";
 import { KebabMenu } from "../components/KebabMenu";
@@ -6,6 +6,18 @@ import { RatingFormPanel } from "../components/RatingFormPanel";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { StarRatingDisplay } from "../components/StarRatingInput";
 import { EmptyState, StatusPill, Surface } from "../components/ui";
+import { InboxThreadList } from "../components/InboxThreadList";
+import { UserAvatar } from "../components/UserAvatar";
+import {
+  MessengerRow,
+  RequestMessageCard,
+  bookingStatusLabel,
+  getChatHeaderSubtitle,
+  getChatHeaderTitle,
+  getSystemWarningLabel,
+  proposalStatusLabel,
+  threadHasUnread,
+} from "../components/inbox/inboxChatHelpers";
 import { useToast } from "../hooks/useToast";
 import { api } from "@toolshare/shared";
 
@@ -13,53 +25,43 @@ import type {
   Booking,
   BookingStatus,
   BookingType,
-  Notification,
   PickupProposal,
   Rating,
   TimeslotProposal,
   User
 } from "@toolshare/shared";
+import { useInboxStore } from "../store/inboxStore";
+import { usePageAuth } from "../hooks/usePageAuth";
 import {
-  bookingHasUnreadForUser,
-  collectAllMessageKeys,
-  inboxReadSeedKey,
-  INBOX_READ_CHANGED_EVENT,
-  loadReadMessageIds,
   proposalMessageKey,
   ratingMessageKey,
   requestMessageKey,
-  saveReadMessageIds,
 } from "../utils/inboxMessageRead";
 import { canProviderCompleteBooking } from "../utils/bookingCompletion";
+import {
+  BookingRow,
+  parseSuspensionMessage,
+  parseWarningMessage,
+  getLastActivityMs,
+  counterparty,
+  bookingTypeLabel,
+  formatDateTime,
+  getPendingPickupProposal,
+  getPendingTimeslotProposal,
+  toToolRangeDraft,
+  combineLocalDateTimeToIso,
+  toWorkshopDraft,
+  isBookingRateable,
+  buildConversationContext,
+  DraftToolRangeParts,
+  DraftWorkshopRangeParts
+} from "../utils/inboxHelpers";
+
 
 type Props = {
   currentUser?: User;
   token?: string;
 };
-
-const bookingTypeLabel: Record<BookingType, string> = {
-  TOOL: "Werkzeug",
-  WORKSHOP: "Werkstatt",
-  SYSTEM_WARNING: "System-Meldung"
-};
-
-interface ParsedWarning {
-  reason: string;
-  moderator: string;
-  hint: string;
-}
-
-function parseSuspensionMessage(message: string): { reason: string } {
-  if (!message.startsWith("SPERRUNG:")) {
-    return { reason: message };
-  }
-
-  const content = message.replace("SPERRUNG:", "").trim();
-  const reasonLine = content.split("\n").find((line) => line.trim().startsWith("Grund:"));
-  return {
-    reason: reasonLine ? reasonLine.replace("Grund:", "").trim() : content
-  };
-}
 
 function isInboxSystemNotification(message: string): boolean {
   return (
@@ -70,57 +72,7 @@ function isInboxSystemNotification(message: string): boolean {
   );
 }
 
-function parseWarningMessage(message: string): ParsedWarning {
-  if (!message.startsWith("ERMAHNUNG:")) {
-    return { reason: message, moderator: "Moderator", hint: "" };
-  }
-  
-  const content = message.replace("ERMAHNUNG:", "").trim();
-  const lines = content.split("\n");
-  
-  let reason = "";
-  let moderator = "Moderator";
-  let hint = "";
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("Moderator:")) {
-      moderator = trimmed.replace("Moderator:", "").trim();
-    } else if (trimmed.startsWith("Hinweis:")) {
-      hint = trimmed;
-    } else if (trimmed) {
-      if (reason) reason += "\n" + trimmed;
-      else reason = trimmed;
-    }
-  }
-  
-  return { reason, moderator, hint };
-}
 
-const bookingStatusLabel: Record<BookingStatus, string> = {
-  OFFEN: "Offen",
-  BESTAETIGT: "Bestätigt",
-  ABGELEHNT: "Abgelehnt",
-  ABGESCHLOSSEN: "Abgeschlossen",
-};
-
-type DraftToolRangeParts = {
-  pickupDate: string;
-  pickupTime: string;
-  returnDate: string;
-  returnTime: string;
-};
-type DraftWorkshopRangeParts = {
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-};
-
-type BookingRow = Booking & {
-  pickupProposals: PickupProposal[];
-  timeslotProposals: TimeslotProposal[];
-};
 
 const MOBILE_INBOX_MEDIA_QUERY = "(max-width: 900px)";
 
@@ -139,25 +91,32 @@ function useMobileInboxLayout() {
   return isMobile;
 }
 
-export function InboxPage({ currentUser, token }: Props) {
+export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
+  const { currentUser, token } = usePageAuth(propUser, propToken);
   const location = useLocation();
   const isMobileInbox = useMobileInboxLayout();
   const { pushToast } = useToast();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const bookings = useInboxStore((state) => state.bookings);
+  const notifications = useInboxStore((state) => state.notifications);
+  const ratingsGiven = useInboxStore((state) => state.ratingsGiven);
+  const ratingsReceived = useInboxStore((state) => state.ratingsReceived);
+  const readMessageIds = useInboxStore((state) => state.readMessageIds);
+  const isLoading = useInboxStore((state) => state.isLoading);
+  const fetchData = useInboxStore((state) => state.fetchData);
+  const markMessageRead = useInboxStore((state) => state.markMessageRead);
+  const markThreadReadStore = useInboxStore((state) => state.markThreadRead);
+  const markNotificationReadStore = useInboxStore((state) => state.markNotificationRead);
+
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftToolRangeParts>>({});
   const [draftWorkshopRangeByBooking, setDraftWorkshopRangeByBooking] = useState<
     Record<string, DraftWorkshopRangeParts>
   >({});
-  const [isLoading, setIsLoading] = useState(false);
   const [showUserReportForm, setShowUserReportForm] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetails, setReportDetails] = useState("");
   const [isReportingUser, setIsReportingUser] = useState(false);
   const [counterFormBookingId, setCounterFormBookingId] = useState<string | null>(null);
-  const [ratingsGiven, setRatingsGiven] = useState<Rating[]>([]);
-  const [ratingsReceived, setRatingsReceived] = useState<Rating[]>([]);
   const [showRatingForm, setShowRatingForm] = useState(false);
   const [ratingScore, setRatingScore] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
@@ -168,26 +127,13 @@ export function InboxPage({ currentUser, token }: Props) {
   const mobileBackButtonRef = useRef<HTMLButtonElement>(null);
   const mobileThreadToRestoreRef = useRef<string | null>(null);
   const shouldFocusMobileChatRef = useRef(false);
-  const [readMessageIds, setReadMessageIds] = useState<Set<string>>(new Set());
 
   const loadData = async () => {
-    if (!token) return;
-    setIsLoading(true);
+    if (!token || !currentUser?.id) return;
     try {
-      const [nextBookings, nextGivenRatings, nextReceivedRatings, fetchedNotifications] = await Promise.all([
-        api.getBookingsForUser(token),
-        api.getRatingsGiven(token),
-        api.getRatingsReceived(token),
-        api.getNotifications(token)
-      ]);
-      setBookings(nextBookings);
-      setRatingsGiven(nextGivenRatings);
-      setRatingsReceived(nextReceivedRatings);
-      setNotifications(fetchedNotifications);
+      await fetchData(token, currentUser.id);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -200,29 +146,6 @@ export function InboxPage({ currentUser, token }: Props) {
   useEffect(() => {
     draftSeededForThreadRef.current.clear();
   }, [token]);
-
-  useEffect(() => {
-    if (!currentUser?.id) {
-      setReadMessageIds(new Set());
-      return;
-    }
-    setReadMessageIds(loadReadMessageIds(currentUser.id));
-  }, [currentUser?.id]);
-
-  useLayoutEffect(() => {
-    if (!currentUser?.id || bookings.length === 0) return;
-    if (localStorage.getItem(inboxReadSeedKey(currentUser.id))) return;
-    const keys = collectAllMessageKeys(bookings);
-    for (const rating of [...ratingsGiven, ...ratingsReceived]) {
-      keys.push(ratingMessageKey(rating.bookingId, rating.id));
-    }
-    const merged = new Set(loadReadMessageIds(currentUser.id));
-    for (const k of keys) merged.add(k);
-    saveReadMessageIds(currentUser.id, merged);
-    localStorage.setItem(inboxReadSeedKey(currentUser.id), "1");
-    setReadMessageIds(merged);
-    window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
-  }, [currentUser?.id, bookings, ratingsGiven, ratingsReceived]);
 
   const bookingRows: BookingRow[] = useMemo(
     () => [
@@ -416,49 +339,19 @@ export function InboxPage({ currentUser, token }: Props) {
 
   const markIncomingRead = (messageKey: string) => {
     if (!currentUser?.id) return;
-    setReadMessageIds((prev) => {
-      if (prev.has(messageKey)) return prev;
-      const next = new Set(prev);
-      next.add(messageKey);
-      saveReadMessageIds(currentUser.id, next);
-      window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
-      return next;
-    });
+    markMessageRead(messageKey, currentUser.id);
   };
 
   const markThreadRead = (booking: BookingRow) => {
     if (!currentUser?.id) return;
-    const incomingKeys = collectIncomingMessageKeys(
-      booking,
-      currentUser.id,
-      ratingsByBookingId.get(booking.id)
-    );
-    if (incomingKeys.length === 0) return;
-
-    setReadMessageIds((prev) => {
-      let changed = false;
-      const next = new Set(prev);
-      for (const key of incomingKeys) {
-        if (!next.has(key)) {
-          next.add(key);
-          changed = true;
-        }
-      }
-      if (!changed) return prev;
-      saveReadMessageIds(currentUser.id, next);
-      window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
-      return next;
-    });
+    if (booking.type === "SYSTEM_WARNING") return;
+    markThreadReadStore(booking, currentUser.id);
   };
 
   const markNotificationRead = async (notificationId: string) => {
     if (!token) return;
     try {
-      await api.markNotificationAsRead(notificationId, token);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-      );
-      window.dispatchEvent(new Event(INBOX_READ_CHANGED_EVENT));
+      await markNotificationReadStore(notificationId, token);
     } catch (error) {
       console.error("Fehler beim Markieren der Benachrichtigung als gelesen:", error);
     }
@@ -700,66 +593,25 @@ export function InboxPage({ currentUser, token }: Props) {
         <div
           className={`messenger-shell${isMobileInbox && selectedBooking ? " messenger-shell--chat-open" : ""}`}
         >
-          <aside className="messenger-thread-list" aria-label="Konversationen">
-            {sortedRows.map((booking) => {
-              const active = selectedBooking?.id === booking.id;
-              const cp = counterparty(booking, currentUser.id);
-              const preview = getThreadPreview(booking, currentUser.id, ratingsByBookingId.get(booking.id));
-              const lastAt = getLastActivityMs(booking, ratingsByBookingId.get(booking.id));
-              const threadUnread = threadHasUnread(
-                booking,
-                currentUser.id,
-                readMessageIds,
-                ratingsByBookingId.get(booking.id)
-              );
-              return (
-                <button
-                  ref={(element) => {
-                    if (element) {
-                      threadButtonRefs.current.set(booking.id, element);
-                    } else {
-                      threadButtonRefs.current.delete(booking.id);
-                    }
-                  }}
-                  key={booking.id}
-                  type="button"
-                  className={`messenger-thread-item ${active ? "active" : ""}${threadUnread ? " messenger-thread-item--unread" : ""}`}
-                  aria-current={active ? "true" : undefined}
-                  onClick={() => {
-                    if (isMobileInbox) {
-                      mobileThreadToRestoreRef.current = booking.id;
-                      shouldFocusMobileChatRef.current = true;
-                    }
-                    setSelectedBookingId(booking.id);
-                    if (booking.type !== "SYSTEM_WARNING") {
-                      markThreadRead(booking);
-                    }
-                  }}
-                >
-                  <span className="messenger-thread-avatar-wrap">
-                    <UserAvatar name={cp.name} imageUrl={null} size="md" />
-                    {threadUnread && (
-                      <span className="messenger-thread-unread-badge" aria-label="1 neue Nachricht">
-                        1
-                      </span>
-                    )}
-                  </span>
-                  <span className="messenger-thread-body">
-                    <span className="messenger-thread-top">
-                      <span className="messenger-thread-sub">{cp.name}</span>
-                      <time className="messenger-thread-time" dateTime={new Date(lastAt).toISOString()}>
-                        {formatShortClockOrDate(lastAt)}
-                      </time>
-                    </span>
-                    <strong className="messenger-thread-name">
-                      {booking.toolName ?? bookingTypeLabel[booking.type]}
-                    </strong>
-                    <span className="messenger-thread-preview">{preview}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </aside>
+          <InboxThreadList
+            sortedRows={sortedRows}
+            selectedBookingId={selectedBooking?.id ?? null}
+            currentUser={currentUser}
+            ratingsByBookingId={ratingsByBookingId}
+            readMessageIds={readMessageIds}
+            threadHasUnread={threadHasUnread}
+            threadButtonRefs={threadButtonRefs}
+            onSelectThread={(booking) => {
+              if (isMobileInbox) {
+                mobileThreadToRestoreRef.current = booking.id;
+                shouldFocusMobileChatRef.current = true;
+              }
+              setSelectedBookingId(booking.id);
+              if (booking.type !== "SYSTEM_WARNING") {
+                markThreadRead(booking);
+              }
+            }}
+          />
 
           {selectedBooking && (
             <div className="messenger-chat">
@@ -921,7 +773,7 @@ export function InboxPage({ currentUser, token }: Props) {
                 ) : (
                   <>
                 <MessengerRow
-                  variant={selectedBooking.requesterId === currentUser.id ? "incoming" : "outgoing"}
+                  variant={selectedBooking.requesterId === currentUser.id ? "outgoing" : "incoming"}
                   avatar={<UserAvatar name={selectedBooking.requesterName ?? currentUser.name} imageUrl={null} size="sm" />}
                 >
                   <RequestMessageCard
@@ -945,7 +797,7 @@ export function InboxPage({ currentUser, token }: Props) {
                   return (
                     <MessengerRow
                       key={proposal.id}
-                      variant={fromOtherUser ? "outgoing" : "incoming"}
+                      variant={fromOtherUser ? "incoming" : "outgoing"}
                       avatar={
                         <UserAvatar
                           name={fromOtherUser ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
@@ -975,7 +827,7 @@ export function InboxPage({ currentUser, token }: Props) {
                   return (
                     <MessengerRow
                       key={proposal.id}
-                      variant={fromOtherUser ? "outgoing" : "incoming"}
+                      variant={fromOtherUser ? "incoming" : "outgoing"}
                       avatar={
                         <UserAvatar
                           name={fromOtherUser ? counterparty(selectedBooking, currentUser.id).name : currentUser.name}
@@ -1001,7 +853,7 @@ export function InboxPage({ currentUser, token }: Props) {
 
                 {selectedBooking.status !== "OFFEN" && (
                   <MessengerRow
-                    variant={selectedBooking.providerId === currentUser.id ? "incoming" : "outgoing"}
+                    variant={selectedBooking.providerId === currentUser.id ? "outgoing" : "incoming"}
                     avatar={<UserAvatar name={selectedBooking.providerName ?? currentUser.name} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
@@ -1069,7 +921,7 @@ export function InboxPage({ currentUser, token }: Props) {
 
                 {counterFormBookingId === selectedBooking.id && selectedBooking.status === "OFFEN" && (
                   <MessengerRow
-                    variant="incoming"
+                    variant="outgoing"
                     avatar={<UserAvatar name={currentUser.name} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
@@ -1310,403 +1162,10 @@ export function InboxPage({ currentUser, token }: Props) {
   );
 }
 
-function isBookingRateable(booking: Booking) {
-  if (booking.status === "ABGELEHNT" || booking.status === "OFFEN") {
-    return false;
-  }
-  if (booking.status === "ABGESCHLOSSEN") {
-    return true;
-  }
-  if (!booking.endIso) {
-    return false;
-  }
-  return new Date(booking.endIso) <= new Date();
-}
 
-function buildConversationContext(booking: Booking, currentUserId: string, rating?: Rating | null): string {
-  const lines: string[] = [];
-  lines.push(`Booking ${booking.id} (${booking.type})`);
-  lines.push(`Anfrage von ${booking.requesterName ?? booking.requesterId} an ${booking.providerName ?? booking.providerId}`);
-  lines.push(`Status: ${booking.status}`);
-  lines.push(`Zeitraum: ${formatDateTime(booking.startIso)} - ${formatDateTime(booking.endIso)}`);
-  lines.push(`Abholung: ${formatDateTime(booking.pickupTimeIso)}`);
-  lines.push(
-    booking.requesterId === currentUserId
-      ? "Nachricht 1 (Du): Ausleihanfrage erstellt"
-      : `Nachricht 1 (${booking.requesterName ?? booking.requesterId}): Ausleihanfrage erstellt`
-  );
 
-  for (const proposal of booking.pickupProposals ?? []) {
-    const sender = proposal.proposedById === currentUserId ? "Du" : proposal.proposedById;
-    lines.push(
-      `Alternativvorschlag (${sender}) ${formatDateTime(proposal.createdIso)}: ${formatDateTime(proposal.proposedPickupIso)} [${proposal.status}]`
-    );
-  }
-  if (rating && rating.status === "SICHTBAR") {
-    const sender = rating.fromUserId === currentUserId ? "Du" : (rating.fromUserName ?? rating.fromUserId);
-    lines.push(
-      `Bewertung (${sender}) ${formatDateTime(rating.createdIso)}: ${rating.score} von 5 Sternen${rating.comment ? ` – ${rating.comment}` : ""}`
-    );
-  }
-  return lines.join("\n");
-}
 
-function UserAvatar({
-  name,
-  imageUrl,
-  size,
-}: {
-  name: string;
-  imageUrl?: string | null;
-  size: "sm" | "md" | "lg";
-}) {
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() ?? "")
-    .join("");
-  const letter = initials || "?";
 
-  if (imageUrl) {
-    return <img src={imageUrl} alt="" className={`msg-avatar msg-avatar-${size}`} />;
-  }
 
-  return (
-    <span className={`msg-avatar msg-avatar-${size} msg-avatar-fallback`} aria-hidden="true">
-      {letter}
-    </span>
-  );
-}
 
-function MessengerRow({
-  variant,
-  avatar,
-  children,
-}: {
-  variant: "incoming" | "outgoing";
-  avatar?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className={`messenger-msg-row ${variant}`}>
-      {variant === "incoming" && avatar && <div className="messenger-msg-avatar-col">{avatar}</div>}
-      <div className="messenger-msg-bubble-col">{children}</div>
-      {variant === "outgoing" && avatar && <div className="messenger-msg-avatar-col">{avatar}</div>}
-    </div>
-  );
-}
 
-function RequestMessageCard({
-  label,
-  title,
-  icon,
-  firstLabel,
-  firstValue,
-  secondLabel,
-  secondValue,
-  unread = false,
-  onClick,
-  children
-}: {
-  label: string;
-  title: string;
-  icon: string;
-  firstLabel?: string;
-  firstValue?: string;
-  secondLabel?: string;
-  secondValue?: string;
-  unread?: boolean;
-  onClick?: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <article className={`request-message-card${unread ? " request-message-card--unread" : ""}`}>
-      <div className="request-message-card-head">
-        <span className="request-message-card-icon" aria-hidden="true">
-          <span className="material-symbols-outlined">{icon}</span>
-        </span>
-        <div className="request-message-card-heading">
-          <span>{label}</span>
-          <h3>{title}</h3>
-        </div>
-        {onClick && (
-          <button type="button" className="icon-button request-message-read-button" onClick={onClick} aria-label="Nachricht als gelesen markieren">
-            <span className="material-symbols-outlined" aria-hidden="true">done</span>
-          </button>
-        )}
-      </div>
-      {firstLabel && firstValue && secondLabel && secondValue && (
-        <div className="request-message-card-metadata">
-          <div>
-            <span>{firstLabel}</span>
-            <strong>{firstValue}</strong>
-          </div>
-          <div>
-            <span>{secondLabel}</span>
-            <strong>{secondValue}</strong>
-          </div>
-        </div>
-      )}
-      {children}
-    </article>
-  );
-}
-
-function proposalStatusLabel(status: PickupProposal["status"] | TimeslotProposal["status"]): string {
-  if (status === "ACCEPTED") return "Angenommen";
-  if (status === "DECLINED") return "Abgelehnt";
-  return "Warte auf Antwort";
-}
-
-function threadHasUnread(
-  booking: BookingRow,
-  currentUserId: string,
-  readIds: Set<string>,
-  rating?: Rating | null
-): boolean {
-  if (booking.type === "SYSTEM_WARNING") {
-    return !booking.isNotificationRead;
-  }
-  return bookingHasUnreadForUser(booking, currentUserId, readIds, rating);
-}
-
-function collectIncomingMessageKeys(booking: BookingRow, currentUserId: string, rating?: Rating | null): string[] {
-  const keys: string[] = [];
-  if (booking.type === "SYSTEM_WARNING") {
-    return keys;
-  }
-  if (booking.requesterId !== currentUserId) {
-    keys.push(requestMessageKey(booking.id));
-  }
-  for (const proposal of booking.pickupProposals) {
-    if (proposal.status === "PENDING" && proposal.proposedById !== currentUserId) {
-      keys.push(proposalMessageKey(booking.id, proposal.id));
-    }
-  }
-  for (const proposal of booking.timeslotProposals) {
-    if (proposal.status === "PENDING" && proposal.proposedById !== currentUserId) {
-      keys.push(proposalMessageKey(booking.id, proposal.id));
-    }
-  }
-  if (rating && rating.toUserId === currentUserId && rating.status === "SICHTBAR") {
-    keys.push(ratingMessageKey(booking.id, rating.id));
-  }
-  return keys;
-}
-
-function counterparty(booking: Booking, currentUserId: string): { name: string } {
-  if (booking.type === "SYSTEM_WARNING") {
-    return { name: booking.providerName ?? "System" };
-  }
-  if (booking.providerId === currentUserId) {
-    return { name: booking.requesterName ?? "Anfragender" };
-  }
-  return { name: booking.providerName ?? "Anbieter" };
-}
-
-function getBookingContextLabel(type: BookingType): string {
-  if (type === "WORKSHOP") return "Werkstatt";
-  if (type === "TOOL") return "Ausleihe";
-  return bookingTypeLabel[type];
-}
-
-function getSystemWarningLabel(text?: string): string {
-  if (text?.startsWith("ERMAHNUNG:")) return "Verwarnung";
-  if (text?.startsWith("SPERRUNG:")) return "Gesperrt";
-  return "Info";
-}
-
-function getChatHeaderTitle(booking: Booking, currentUserId: string, compact: boolean): string {
-  if (compact) {
-    if (booking.type === "SYSTEM_WARNING") return "Moderation";
-    return counterparty(booking, currentUserId).name;
-  }
-  if (booking.type === "SYSTEM_WARNING") {
-    return booking.toolName ?? "System-Meldung";
-  }
-  return booking.toolName ?? `${bookingTypeLabel[booking.type]}-Anfrage`;
-}
-
-function getChatHeaderSubtitle(booking: Booking, currentUserId: string, compact: boolean): string {
-  if (compact) {
-    if (booking.type === "SYSTEM_WARNING") {
-      return getSystemWarningLabel(booking.systemWarningText);
-    }
-    return `${getBookingContextLabel(booking.type)} · ${bookingStatusLabel[booking.status]}`;
-  }
-  return counterparty(booking, currentUserId).name;
-}
-
-function getThreadPreview(row: BookingRow, currentUserId: string, rating?: Rating | null): string {
-  if (row.type === "SYSTEM_WARNING") {
-    if (row.systemWarningText?.startsWith("SPERRUNG:")) {
-      return parseSuspensionMessage(row.systemWarningText).reason;
-    }
-    const parsed = parseWarningMessage(row.systemWarningText ?? "");
-    return parsed.reason;
-  }
-  const latestPickup =
-    row.pickupProposals.length > 0 ? row.pickupProposals[row.pickupProposals.length - 1] : null;
-  const latestTimeslot =
-    row.timeslotProposals.length > 0 ? row.timeslotProposals[row.timeslotProposals.length - 1] : null;
-
-  const latestPickupMs = latestPickup ? new Date(latestPickup.createdIso).getTime() : 0;
-  const latestTimeslotMs = latestTimeslot ? new Date(latestTimeslot.createdIso).getTime() : 0;
-  const ratingMs =
-    rating && rating.status === "SICHTBAR" && rating.createdIso ? new Date(rating.createdIso).getTime() : 0;
-  const latestActivityMs = Math.max(latestPickupMs, latestTimeslotMs, ratingMs);
-
-  if (rating && rating.status === "SICHTBAR" && ratingMs >= latestActivityMs) {
-    if (rating.fromUserId === currentUserId) {
-      return `Du: ${rating.score} von 5 Sternen`;
-    }
-    return `Bewertung · ${rating.score} von 5 Sternen`;
-  }
-
-  if (latestPickup && latestPickupMs >= latestTimeslotMs) {
-    const short = formatShortDateTime(latestPickup.proposedPickupIso);
-    if (latestPickup.proposedById === currentUserId) {
-      return `Du: Alternativ ${short}`;
-    }
-    return `Alternativvorschlag · ${short}`;
-  }
-
-  if (latestTimeslot) {
-    const short = formatShortDateTime(latestTimeslot.proposedStartIso);
-    if (latestTimeslot.proposedById === currentUserId) {
-      return `Du: Alternativzeit ${short}`;
-    }
-    return `Alternativzeit · ${short}`;
-  }
-
-  if (row.requesterId === currentUserId) {
-    return row.type === "WORKSHOP" ? "Du hast eine Werkstatt angefragt" : "Du hast eine Ausleihe angefragt";
-  }
-  return row.type === "WORKSHOP"
-    ? `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "deine Werkstatt"}“ buchen`
-    : `${row.requesterName ?? "Jemand"} möchte „${row.toolName ?? "dein Angebot"}“ ausleihen`;
-}
-
-function getLastActivityMs(booking: BookingRow, rating?: Rating | null): number {
-  const createdMs = booking.createdIso ? new Date(booking.createdIso).getTime() : 0;
-  let t = Number.isNaN(createdMs) ? 0 : createdMs;
-  for (const p of booking.pickupProposals) {
-    const ms = new Date(p.createdIso).getTime();
-    if (!Number.isNaN(ms)) t = Math.max(t, ms);
-  }
-  for (const p of booking.timeslotProposals) {
-    const ms = new Date(p.createdIso).getTime();
-    if (!Number.isNaN(ms)) t = Math.max(t, ms);
-  }
-  if (rating?.createdIso && rating.status === "SICHTBAR") {
-    const ms = new Date(rating.createdIso).getTime();
-    if (!Number.isNaN(ms)) t = Math.max(t, ms);
-  }
-  return t;
-}
-
-function formatShortClockOrDate(ms: number) {
-  const d = new Date(ms);
-  const now = new Date();
-  const sameDay =
-    d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  if (sameDay) {
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
-}
-
-function formatShortDateTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-function getPendingPickupProposal(booking: Booking): PickupProposal | null {
-  const pending = (booking.pickupProposals ?? []).filter((p: PickupProposal) => p.status === "PENDING");
-  return pending.length > 0 ? pending[pending.length - 1] : null;
-}
-
-function getPendingTimeslotProposal(booking: Booking): TimeslotProposal | null {
-  const pending = (booking.timeslotProposals ?? []).filter((p: TimeslotProposal) => p.status === "PENDING");
-  return pending.length > 0 ? pending[pending.length - 1] : null;
-}
-
-function splitIsoToLocalParts(iso: string): { date: string; time: string } {
-  if (!iso.trim()) return { date: "", time: "" };
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { date: "", time: "" };
-  const pad = (value: number) => `${value}`.padStart(2, "0");
-  return {
-    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
-  };
-}
-
-function toToolRangeDraft(booking: Booking): DraftToolRangeParts {
-  const latest = booking.pickupProposals?.length
-    ? booking.pickupProposals[booking.pickupProposals.length - 1]
-    : null;
-  const pickup = splitIsoToLocalParts(latest?.proposedPickupIso ?? booking.pickupTimeIso ?? booking.startIso ?? "");
-  const returnTime = splitIsoToLocalParts(latest?.proposedReturnIso ?? booking.endIso ?? "");
-  return {
-    pickupDate: pickup.date,
-    pickupTime: pickup.time,
-    returnDate: returnTime.date,
-    returnTime: returnTime.time
-  };
-}
-
-function combineLocalDateTimeToIso(date: string, time: string): string | null {
-  const dStr = date.trim();
-  const tStr = time.trim();
-  if (!dStr || !tStr) return null;
-  const [y, m, day] = dStr.split("-").map(Number);
-  const timeParts = tStr.split(":");
-  const hh = Number(timeParts[0]);
-  const mm = Number(timeParts[1] ?? 0);
-  if (!y || !m || !day || Number.isNaN(hh) || Number.isNaN(mm)) return null;
-  const dt = new Date(y, m - 1, day, hh, mm, 0, 0);
-  if (Number.isNaN(dt.getTime())) return null;
-  return dt.toISOString();
-}
-
-function toWorkshopDraft(booking: Booking): DraftWorkshopRangeParts {
-  const latest = booking.timeslotProposals?.length
-    ? booking.timeslotProposals[booking.timeslotProposals.length - 1]
-    : null;
-  const startIso = latest?.proposedStartIso ?? booking.startIso ?? "";
-  const endIso = latest?.proposedEndIso ?? booking.endIso ?? "";
-  const startParts = splitIsoToLocalParts(startIso);
-  const endParts = splitIsoToLocalParts(endIso);
-  if (!startParts.date) {
-    const now = new Date();
-    now.setDate(now.getDate() + 1);
-    const end = new Date(now);
-    end.setHours(end.getHours() + 2);
-    const pad = (value: number) => `${value}`.padStart(2, "0");
-    return {
-      startDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-      startTime: "10:00",
-      endDate: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
-      endTime: "12:00"
-    };
-  }
-  return {
-    startDate: startParts.date,
-    startTime: startParts.time || "10:00",
-    endDate: endParts.date || startParts.date,
-    endTime: endParts.time || "12:00"
-  };
-}

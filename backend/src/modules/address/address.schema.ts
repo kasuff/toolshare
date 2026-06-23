@@ -1,17 +1,17 @@
 import { z } from "zod";
+import {
+  suggestAddressQuerySchema,
+  validateAddressQuerySchema
+} from "@toolshare/shared/contracts/request/address.schema";
 
 export const suggestAddressSchema = z.object({
   body: z.object({}),
   params: z.object({}),
-  query: z.object({
-    q: z.string().trim().min(3).max(200)
-  })
+  query: suggestAddressQuerySchema
 });
 
 export const validateAddressSchema = z.object({
   body: z.object({}),
   params: z.object({}),
-  query: z.object({
-    q: z.string().trim().min(5).max(200)
-  })
+  query: validateAddressQuerySchema
 });

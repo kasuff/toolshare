@@ -126,7 +126,7 @@ describe("System settings acceptance tests", () => {
         .set("Authorization", `Bearer ${makeToken(USER_ID, "USER")}`);
 
       expect(response.status).toBe(403);
-      expect(response.body).toMatchObject({ error: { code: "FORBIDDEN" } });
+      expect(response.body).toMatchObject({ code: "FORBIDDEN", status: 403 });
     });
 
     it("When: ich eine Einstellung ändern möchte, Then: wird der Zugriff verweigert (403)", async () => {

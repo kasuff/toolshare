@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ratingsRepository } from "../src/modules/ratings/ratings.repository";
-import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
 import { ratingsService } from "../src/modules/ratings/ratings.service";
 
 vi.mock("../src/modules/ratings/ratings.repository", () => ({
@@ -10,6 +9,7 @@ vi.mock("../src/modules/ratings/ratings.repository", () => ({
     findBookingWithParticipants: vi.fn(),
     findByBookingAndRequester: vi.fn(),
     create: vi.fn(),
+    createWithNotification: vi.fn(),
     listForTool: vi.fn(),
     listForWorkshop: vi.fn(),
     hide: vi.fn(),
@@ -18,14 +18,12 @@ vi.mock("../src/modules/ratings/ratings.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/notifications/notifications.repository", () => ({
-  notificationsRepository: {
-    create: vi.fn()
-  }
+vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
+  enqueueModerationNotification: vi.fn(),
+  newModerationNotificationKey: vi.fn(() => "moderation:key")
 }));
 
 const mockedRatingsRepository = vi.mocked(ratingsRepository);
-const mockedNotificationsRepository = vi.mocked(notificationsRepository);
 
 describe("ratingsService", () => {
   beforeEach(() => {
@@ -128,7 +126,7 @@ describe("ratingsService", () => {
       endDate: new Date("2026-01-01T00:00:00.000Z")
     } as any);
     mockedRatingsRepository.findByBookingAndRequester.mockResolvedValueOnce(null);
-    mockedRatingsRepository.create.mockResolvedValueOnce({ id: "rating-1", score: 5 } as any);
+    mockedRatingsRepository.createWithNotification.mockResolvedValueOnce({ id: "rating-1", score: 5 } as any);
 
     const result = await ratingsService.create({
       bookingId: "b1",
@@ -137,14 +135,14 @@ describe("ratingsService", () => {
       comment: "Top"
     });
 
-    expect(mockedRatingsRepository.create).toHaveBeenCalledWith({
+    expect(mockedRatingsRepository.createWithNotification).toHaveBeenCalledWith({
       bookingId: "b1",
       fromUserId: "requester",
       toUserId: "owner",
       score: 5,
-      comment: "Top"
+      comment: "Top",
+      starsLabel: "5 Sterne"
     });
-    expect(mockedNotificationsRepository.create).toHaveBeenCalledWith("owner", expect.stringContaining("Bewertung"));
     expect(result).toMatchObject({ id: "rating-1", score: 5 });
   });
 
@@ -158,7 +156,7 @@ describe("ratingsService", () => {
       endDate: new Date("2020-01-01T00:00:00.000Z")
     } as any);
     mockedRatingsRepository.findByBookingAndRequester.mockResolvedValueOnce(null);
-    mockedRatingsRepository.create.mockResolvedValueOnce({ id: "rating-2", score: 4 } as any);
+    mockedRatingsRepository.createWithNotification.mockResolvedValueOnce({ id: "rating-2", score: 4 } as any);
 
     await ratingsService.create({
       bookingId: "b1",
@@ -166,7 +164,7 @@ describe("ratingsService", () => {
       score: 4
     });
 
-    expect(mockedRatingsRepository.create).toHaveBeenCalled();
+    expect(mockedRatingsRepository.createWithNotification).toHaveBeenCalled();
   });
 
   it("hides a rating from moderation", async () => {
@@ -234,7 +232,7 @@ describe("ratingsService", () => {
       endDate: new Date("2026-01-01T00:00:00.000Z")
     } as any);
     mockedRatingsRepository.findByBookingAndRequester.mockResolvedValueOnce(null);
-    mockedRatingsRepository.create.mockResolvedValueOnce({ id: "rating-3", score: 5 } as any);
+    mockedRatingsRepository.createWithNotification.mockResolvedValueOnce({ id: "rating-3", score: 5 } as any);
 
     await ratingsService.create({
       bookingId: "b1",
@@ -242,7 +240,7 @@ describe("ratingsService", () => {
       score: 5
     });
 
-    expect(mockedRatingsRepository.create).toHaveBeenCalledWith(
+    expect(mockedRatingsRepository.createWithNotification).toHaveBeenCalledWith(
       expect.objectContaining({ toUserId: "manager-1" })
     );
   });

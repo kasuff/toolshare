@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
-import { api, type AddressSuggestion } from "@toolshare/shared";
+import type { AddressSuggestion } from "@toolshare/shared";
 import { isAddressComplete, type AddressFormFields } from "../utils/address";
+import { useAddressSuggestions } from "../hooks/queries/address.queries";
 
 type Props = {
   value: AddressFormFields;
@@ -27,9 +28,12 @@ export function AddressInput({
 }: Props) {
   const [mode, setMode] = useState<"automatic" | "manual">("automatic");
   const [searchValue, setSearchValue] = useState(initialSearchValue);
-  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const { data: suggestions = [] } = useAddressSuggestions(
+    searchValue,
+    mode === "automatic" && isFocused
+  );
   const inputId = useId();
   const listboxId = `${inputId}-suggestions`;
   const descriptionIds = [describedBy, hasError ? errorMessageId : null].filter(Boolean).join(" ") || undefined;
@@ -45,20 +49,13 @@ export function AddressInput({
   }, [value.city, value.houseNumber, value.postalCode, value.street]);
 
   useEffect(() => {
+    setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
+  }, [suggestions]);
+
+  useEffect(() => {
     if (mode !== "automatic" || !isFocused || searchValue.trim().length < 3) {
-      setSuggestions([]);
       setActiveSuggestionIndex(-1);
-      return;
     }
-
-    const timer = window.setTimeout(() => {
-      void api.suggestAddresses(searchValue).then((nextSuggestions) => {
-        setSuggestions(nextSuggestions);
-        setActiveSuggestionIndex(nextSuggestions.length > 0 ? 0 : -1);
-      });
-    }, 250);
-
-    return () => window.clearTimeout(timer);
   }, [isFocused, mode, searchValue]);
 
   const selectSuggestion = (suggestion: AddressSuggestion) => {
@@ -70,13 +67,12 @@ export function AddressInput({
       country: suggestion.country || "Deutschland"
     });
     setSearchValue(suggestion.label);
-    setSuggestions([]);
     setActiveSuggestionIndex(-1);
+    setIsFocused(false);
   };
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
-      setSuggestions([]);
       setActiveSuggestionIndex(-1);
       return;
     }

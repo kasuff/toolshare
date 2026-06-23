@@ -1,7 +1,7 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useSession } from "../../src/hooks/useSession";
-import { notifySessionExpired, onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
+import { useAuthStore } from "../../src/store/authStore";
+import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
 
 const { login, register, getCurrentUser, updateMyProfile } = vi.hoisted(() => ({
   login: vi.fn(),
@@ -17,14 +17,23 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
     api: {
       ...actual.api,
       login,
-    register,
-    getCurrentUser,
-    updateMyProfile
+      register,
+      getCurrentUser,
+      updateMyProfile
     }
   };
 });
 
-describe("useSession", () => {
+function resetAuthStore() {
+  useAuthStore.setState({
+    token: null,
+    currentUser: null,
+    isLoading: false,
+    error: null
+  });
+}
+
+describe("authStore", () => {
   beforeEach(() => {
     if (typeof localStorage?.clear === "function") {
       localStorage.clear();
@@ -33,6 +42,7 @@ describe("useSession", () => {
     register.mockReset();
     getCurrentUser.mockReset();
     updateMyProfile.mockReset();
+    resetAuthStore();
   });
 
   it("loads the current user from a stored token and handles logout", async () => {
@@ -44,18 +54,21 @@ describe("useSession", () => {
       role: "NUTZER",
       isSuspended: false
     });
+    useAuthStore.setState({ token: "stored-token", isLoading: true });
 
-    const { result } = renderHook(() => useSession());
+    await act(async () => {
+      await useAuthStore.getState().initSession();
+    });
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.currentUser?.name).toBe("Lea");
+    await waitFor(() => expect(useAuthStore.getState().isLoading).toBe(false));
+    expect(useAuthStore.getState().currentUser?.name).toBe("Lea");
 
     act(() => {
-      result.current.logout();
+      useAuthStore.getState().logout();
     });
 
     expect(localStorage.getItem("toolshare_access_token")).toBeNull();
-    expect(result.current.currentUser).toBeNull();
+    expect(useAuthStore.getState().currentUser).toBeNull();
   });
 
   it("clears an expired session immediately", async () => {
@@ -67,36 +80,52 @@ describe("useSession", () => {
       role: "NUTZER",
       isSuspended: false
     });
+    useAuthStore.setState({ token: "expired-token", isLoading: true });
 
-    const { result } = renderHook(() => useSession());
-    await waitFor(() => expect(result.current.currentUser?.name).toBe("Lea"));
+    await act(async () => {
+      await useAuthStore.getState().initSession();
+    });
+
+    await waitFor(() => expect(useAuthStore.getState().currentUser?.name).toBe("Lea"));
 
     act(() => {
       notifySessionExpired();
     });
 
     expect(localStorage.getItem("toolshare_access_token")).toBeNull();
-    expect(result.current.token).toBeNull();
-    expect(result.current.currentUser).toBeNull();
-    expect(result.current.error).toBe(SESSION_EXPIRED_MESSAGE);
+    expect(useAuthStore.getState().token).toBeNull();
+    expect(useAuthStore.getState().currentUser).toBeNull();
+    expect(useAuthStore.getState().error).toBe(SESSION_EXPIRED_MESSAGE);
   });
 
   it("persists tokens on login and register", async () => {
     login.mockResolvedValueOnce({ accessToken: "login-token" });
     register.mockResolvedValueOnce({ accessToken: "register-token" });
-
-    const { result } = renderHook(() => useSession());
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    getCurrentUser
+      .mockResolvedValueOnce({
+        id: "u1",
+        name: "Lea",
+        email: "lea@toolshare.local",
+        role: "NUTZER",
+        isSuspended: false
+      })
+      .mockResolvedValueOnce({
+        id: "u2",
+        name: "Nina",
+        email: "nina@toolshare.local",
+        role: "NUTZER",
+        isSuspended: false
+      });
 
     await act(async () => {
-      await result.current.login("lea@toolshare.local", "password123");
+      await useAuthStore.getState().login("lea@toolshare.local", "password123");
     });
 
     expect(login).toHaveBeenCalledWith("lea@toolshare.local", "password123");
     expect(localStorage.getItem("toolshare_access_token")).toBe("login-token");
 
     await act(async () => {
-      await result.current.register({
+      await useAuthStore.getState().register({
         email: "nina@toolshare.local",
         password: "password123",
         name: "Nina",
@@ -114,10 +143,9 @@ describe("useSession", () => {
   });
 
   it("updates profile for logged-in users and rejects guest updates", async () => {
-    const { result } = renderHook(() => useSession());
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    await expect(result.current.updateProfile({ name: "Guest" })).rejects.toThrow("Du musst eingeloggt sein.");
+    await expect(useAuthStore.getState().updateProfile({ name: "Guest" })).rejects.toThrow(
+      "Du musst eingeloggt sein."
+    );
 
     login.mockResolvedValueOnce({ accessToken: "profile-token" });
     getCurrentUser.mockResolvedValueOnce({
@@ -136,15 +164,16 @@ describe("useSession", () => {
     });
 
     await act(async () => {
-      await result.current.login("lea@toolshare.local", "password123");
+      await useAuthStore.getState().login("lea@toolshare.local", "password123");
     });
-    await waitFor(() => expect(result.current.currentUser?.name).toBe("Lea"));
+
+    await waitFor(() => expect(useAuthStore.getState().currentUser?.name).toBe("Lea"));
 
     await act(async () => {
-      await result.current.updateProfile({ name: "Lea Neu" });
+      await useAuthStore.getState().updateProfile({ name: "Lea Neu" });
     });
 
     expect(updateMyProfile).toHaveBeenCalledWith({ name: "Lea Neu" }, "profile-token");
-    expect(result.current.currentUser?.name).toBe("Lea Neu");
+    expect(useAuthStore.getState().currentUser?.name).toBe("Lea Neu");
   });
 });

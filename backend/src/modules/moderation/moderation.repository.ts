@@ -109,5 +109,32 @@ export const moderationRepository = {
         decisionAt: status === "RESOLVED" || status === "REJECTED" ? new Date() : null
       }
     });
+  },
+
+  findActiveToolBookings(toolId: string) {
+    return prisma.booking.findMany({
+      where: {
+        toolId,
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: { id: true, userId: true }
+    });
+  },
+
+  findActiveWorkshopBookings(workshopId: string) {
+    return prisma.booking.findMany({
+      where: {
+        timeslot: { workshopId },
+        status: { in: ["PENDING", "ACCEPTED"] }
+      },
+      select: { id: true, userId: true }
+    });
+  },
+
+  rejectBooking(bookingId: string) {
+    return prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: "REJECTED" }
+    });
   }
 };

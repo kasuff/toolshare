@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -160,7 +160,9 @@ describe("Guest protected actions", () => {
     renderWithRoutes(<WorkshopsPage />, "/workshops");
 
     const toolFilter = await screen.findByRole("combobox", { name: /Werkzeugfilter/i });
-    expect(toolFilter).toHaveTextContent("Bandsäge");
+    await waitFor(() => {
+      expect(toolFilter).toHaveTextContent("Bandsäge");
+    });
     expect(toolFilter).not.toHaveTextContent("Schleifer");
 
     fireEvent.click(await screen.findByRole("button", { name: "Holzwerkstatt: Details anzeigen" }));

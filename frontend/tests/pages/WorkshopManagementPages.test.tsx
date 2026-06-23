@@ -275,7 +275,7 @@ describe("Workshop management pages", () => {
   });
 
   it("manages slots and shows validation errors while editing", async () => {
-    getWorkshopById.mockResolvedValueOnce({
+    getWorkshopById.mockResolvedValue({
       workshop: {
         id: "workshop-1",
         ownerId: "owner-1",
