@@ -19,6 +19,8 @@ services:
 #          path: ./frontend/package.json
 #        - action: rebuild
 #          path: ./frontend/package-lock.json
+    volumes:
+      - ./frontend/src:/app/frontend/src
     networks:
       - toolshare-network
 
