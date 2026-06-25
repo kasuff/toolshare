@@ -1,17 +1,23 @@
 import type { BackendMetrics, SystemSetting } from "./types";
-import { request } from "./client";
+import { requestParsed } from "./client";
+import { adminMetricsResponseSchema } from "../../contracts/response/users.schema";
+import {
+  systemSettingResponseSchema,
+  systemSettingListResponseSchema
+} from "../../contracts/response/system-rules.schema";
 
 export const adminApi = {
   async getMetrics(token: string): Promise<BackendMetrics> {
-    return request<BackendMetrics>("/users/admin/metrics", undefined, token);
+    return requestParsed(adminMetricsResponseSchema, "/users/admin/metrics", undefined, token);
   },
 
   async getSystemSettings(token: string): Promise<SystemSetting[]> {
-    return request<SystemSetting[]>("/system-rules", undefined, token);
+    return requestParsed(systemSettingListResponseSchema, "/system-rules", undefined, token);
   },
 
   async updateSystemSetting(key: string, value: number, token: string): Promise<SystemSetting> {
-    return request<SystemSetting>(
+    return requestParsed(
+      systemSettingResponseSchema,
       `/system-rules/${key}`,
       { method: "PUT", body: JSON.stringify({ value }) },
       token

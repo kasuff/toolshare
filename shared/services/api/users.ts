@@ -1,11 +1,12 @@
 import type { User } from "../../types/domain";
-import type { BackendRole, BackendUser } from "./types";
-import { request } from "./client";
+import type { BackendRole } from "./types";
+import { request, requestParsed } from "./client";
 import { roleMap } from "./mappers/roles";
+import { userResponseSchema, userListResponseSchema } from "../../contracts/response/users.schema";
 
 export const usersApi = {
   async getCurrentUser(token: string): Promise<User> {
-    const user = await request<BackendUser>("/users/me", undefined, token);
+    const user = await requestParsed(userResponseSchema, "/users/me", undefined, token);
     return {
       id: user.id,
       name: user.name,
@@ -27,9 +28,8 @@ export const usersApi = {
     if (filters.role) {
       params.set("role", filters.role === "ADMIN" ? "MANAGER" : filters.role === "MODERATOR" ? "MODERATOR" : "USER");
     }
-
     const query = params.toString();
-    const users = await request<BackendUser[]>(query ? `/users?${query}` : "/users", undefined, token);
+    const users = await requestParsed(userListResponseSchema, query ? `/users?${query}` : "/users", undefined, token);
     return users.map((user) => ({
       id: user.id,
       name: user.name,
@@ -43,10 +43,7 @@ export const usersApi = {
     const backendRole: BackendRole = role === "ADMIN" ? "MANAGER" : role === "MODERATOR" ? "MODERATOR" : "USER";
     await request(
       `/users/${userId}/role`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ role: backendRole })
-      },
+      { method: "PATCH", body: JSON.stringify({ role: backendRole }) },
       token
     );
   },
@@ -54,10 +51,7 @@ export const usersApi = {
   async updateUserSuspension(userId: string, isSuspended: boolean, token: string) {
     await request(
       `/users/${userId}/suspension`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ isSuspended })
-      },
+      { method: "PATCH", body: JSON.stringify({ isSuspended }) },
       token
     );
   },
@@ -66,15 +60,12 @@ export const usersApi = {
     input: { name?: string; address?: string; expoPushToken?: string },
     token: string
   ): Promise<User> {
-    const user = await request<BackendUser>(
+    const user = await requestParsed(
+      userResponseSchema,
       "/users/me",
-      {
-        method: "PATCH",
-        body: JSON.stringify(input)
-      },
+      { method: "PATCH", body: JSON.stringify(input) },
       token
     );
-
     return {
       id: user.id,
       name: user.name,
@@ -86,5 +77,4 @@ export const usersApi = {
       isSuspended: user.isSuspended
     };
   }
-
 };
