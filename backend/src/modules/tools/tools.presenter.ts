@@ -17,6 +17,8 @@ export function toToolResponse(tool: ToolEntity): ToolResponse {
     imageUrl: tool.imageUrl,
     pickupLocation: tool.pickupLocation,
     pickupLocationNote: tool.pickupLocationNote,
+    pickupLat: tool.pickupLat ?? null,
+    pickupLon: tool.pickupLon ?? null,
     status: tool.status,
     createdAt: tool.createdAt.toISOString(),
     updatedAt: (tool.updatedAt ?? tool.createdAt).toISOString(),

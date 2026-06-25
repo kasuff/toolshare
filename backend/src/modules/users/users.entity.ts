@@ -5,6 +5,8 @@ export type UserEntity = {
   email: string;
   name: string;
   address: string;
+  latitude?: number | null;
+  longitude?: number | null;
   role: RoleValue;
   isSuspended: boolean;
   expoPushToken?: string | null;

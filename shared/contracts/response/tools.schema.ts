@@ -24,6 +24,8 @@ export const toolResponseSchema = z.object({
   imageUrl: z.string().nullable(),
   pickupLocation: z.string().nullable(),
   pickupLocationNote: z.string().nullable(),
+  pickupLat: z.number().nullable().optional(),
+  pickupLon: z.number().nullable().optional(),
   status: toolStatusSchema,
   createdAt: z.string(),
   updatedAt: z.string(),

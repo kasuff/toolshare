@@ -36,6 +36,8 @@ export const workshopResponseSchema = z.object({
   name: z.string(),
   description: z.string(),
   location: z.string(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
   maxCapacity: z.number(),
   extras: z.array(z.string()),
   imageUrls: z.array(z.string()),
