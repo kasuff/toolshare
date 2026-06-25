@@ -38,7 +38,7 @@ services:
       CORS_ORIGIN: http://localhost:3000
       REDIS_URL: redis://redis:6379
       CACHE_BACKEND: redis
-      MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
+      MANAGER_EMAIL_ALLOWLIST: ${MANAGER_EMAIL_ALLOWLIST}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-dataurl}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
