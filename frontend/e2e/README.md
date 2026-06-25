@@ -58,10 +58,14 @@ e2e/
 ├── requests.spec.ts     Phase 2: Ausleihanfrage + Inbox-Entscheidung (Akzeptieren/Ablehnen)
 ├── counter-proposal.spec.ts  Phase 2: Alternativvorschlag senden und annehmen (2 Kontexte)
 ├── completion.spec.ts   Phase 2: Bestätigte Buchung als abgeschlossen markieren
+├── ratings.spec.ts      Phase 2: Bewertung nach Buchungsabschluss
+├── notifications.spec.ts  Phase 2: Glocke zeigt ungelesene Konversationen
+├── booking-conflict.spec.ts  Phase 2: Überlappende Doppelbuchung (409)
 ├── workshops.spec.ts    Phase 2: Werkstattbuchung + Konflikt (blockierter Zeitraum)
 ├── admin.spec.ts        Admin: Nutzerverwaltung (Rolle/Sperre) + Zugriffsschutz
+├── system-rules.spec.ts Admin: Systemregeln bearbeiten
 ├── moderation.spec.ts   Moderation: Bereich sichtbar + Zugriffsschutz
-├── moderation-workflow.spec.ts  Moderation: Meldung aus Inbox anlegen und verwerfen
+├── moderation-workflow.spec.ts  Moderation: Meldung anlegen, verwerfen oder ermahnen
 ├── clock.spec.ts        Phase 3: Clock-Mocking (deterministische Default-Daten)
 ├── network.spec.ts      Phase 3: Network-Mocking (erzwungener Backend-Fehler)
 └── a11y.spec.ts         Phase 3: Accessibility-Scan ganzer Seiten (axe)

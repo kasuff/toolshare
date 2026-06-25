@@ -1,7 +1,7 @@
-import { request as apiRequest, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, request as apiRequest, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import { createTool, type CreatedTool } from "./api";
 import { futureDate, uniqueSuffix } from "./data";
-import { readUsers } from "./roles";
+import { readUsers, storageFileFor } from "./roles";
 
 /** Legt ein eindeutiges Werkzeug für den geteilten Anbieter an. */
 export async function seedTool(namePrefix: string): Promise<CreatedTool> {
@@ -37,4 +37,24 @@ export async function submitToolRequest(
 export async function openInboxThread(page: Page, toolName: string): Promise<void> {
   await page.goto("/inbox");
   await page.locator(".messenger-thread-item", { hasText: toolName }).first().click();
+}
+
+/** Anbieter akzeptiert eine offene Ausleihanfrage in der Inbox. */
+export async function acceptBookingAsProvider(browser: Browser, toolName: string): Promise<void> {
+  const ctx = await browser.newContext({ storageState: storageFileFor("anbieter") });
+  const page = await ctx.newPage();
+  await openInboxThread(page, toolName);
+  await page.getByRole("button", { name: "Akzeptieren" }).click();
+  await expect(page.getByText("Anfrage angenommen")).toBeVisible();
+  await ctx.close();
+}
+
+/** Anbieter markiert eine bestätigte Buchung als abgeschlossen. */
+export async function completeBookingAsProvider(browser: Browser, toolName: string): Promise<void> {
+  const ctx = await browser.newContext({ storageState: storageFileFor("anbieter") });
+  const page = await ctx.newPage();
+  await openInboxThread(page, toolName);
+  await page.getByRole("button", { name: "Als abgeschlossen markieren" }).click();
+  await expect(page.locator(".toast-popup")).toContainText("Buchung als abgeschlossen markiert.");
+  await ctx.close();
 }

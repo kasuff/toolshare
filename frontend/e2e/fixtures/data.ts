@@ -44,6 +44,15 @@ export function futureDate(daysAhead: number): { iso: string; display: string } 
   return { iso: `${year}-${month}-${day}`, display: `${day}.${month}.${year}` };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** ISO-Zeitstempel für API-Buchungen (N Kalendertage ab jetzt, feste UTC-Stunde). */
+export function isoDaysFromNow(days: number, hourUtc = 10): string {
+  const date = new Date(Date.now() + days * DAY_MS);
+  date.setUTCHours(hourUtc, 0, 0, 0);
+  return date.toISOString();
+}
+
 export function makeUser(label: string): NewUser {
   const suffix = uniqueSuffix();
   return {

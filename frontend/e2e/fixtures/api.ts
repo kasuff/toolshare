@@ -136,6 +136,36 @@ export async function createWorkshop(
 }
 
 /** Blockiert einen Zeitraum als Eigentümer (macht ihn für Buchungen unverfügbar). */
+export type ToolBookingPayload = {
+  toolId: string;
+  startDate: string;
+  endDate: string;
+  pickupTime: string;
+};
+
+export async function createToolBooking(
+  request: APIRequestContext,
+  token: string,
+  payload: ToolBookingPayload,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await request.post(`${API_URL}/bookings/tool`, {
+    headers: authHeaders(token),
+    data: payload,
+  });
+  return { status: res.status(), body: (await res.json()) as Record<string, unknown> };
+}
+
+export async function listNotifications(
+  request: APIRequestContext,
+  token: string,
+): Promise<Array<{ id: string; message: string; read: boolean }>> {
+  const res = await request.get(`${API_URL}/notifications/me`, {
+    headers: authHeaders(token),
+  });
+  expect(res.ok(), `listNotifications fehlgeschlagen: ${res.status()} ${await res.text()}`).toBeTruthy();
+  return res.json();
+}
+
 export async function blockWorkshopSlot(
   request: APIRequestContext,
   token: string,
