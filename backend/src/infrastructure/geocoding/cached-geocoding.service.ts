@@ -1,7 +1,7 @@
 import type { CacheStore } from "../../ports/cache.store";
 import type { GeocodingService } from "../../ports/geocoding.service";
 
-function cacheKey(prefix: "suggest" | "validate", query: string): string {
+function cacheKey(prefix: "suggest" | "validate" | "geocode", query: string): string {
   return `geocoding:${prefix}:${query.toLowerCase().trim()}`;
 }
 
@@ -31,6 +31,19 @@ export class CachedGeocodingService implements GeocodingService {
     }
     const result = await this.inner.validate(query);
     await this.cache.set(key, result, this.ttlSeconds);
+    return result;
+  }
+
+  async geocode(query: string) {
+    const key = cacheKey("geocode", query);
+    const cached = await this.cache.get<NonNullable<Awaited<ReturnType<GeocodingService["geocode"]>>>>(key);
+    if (cached !== null) {
+      return cached;
+    }
+    const result = await this.inner.geocode(query);
+    if (result !== null) {
+      await this.cache.set(key, result, this.ttlSeconds);
+    }
     return result;
   }
 }
