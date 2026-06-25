@@ -103,7 +103,7 @@ describe("InboxPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Nachrichten" })).toBeInTheDocument();
     expect(screen.queryByText(/Benachrichtigungen/)).not.toBeInTheDocument();
-    const threadList = screen.getByLabelText("Konversationen");
+    const threadList = await screen.findByLabelText("Konversationen");
     expect(within(threadList).getByText("Max Mustermann")).toBeInTheDocument();
     expect(within(threadList).getByText("Test-Bohrer")).toBeInTheDocument();
     expect(within(threadList).getByText(/möchte „Test-Bohrer“ ausleihen/)).toBeInTheDocument();
@@ -344,7 +344,7 @@ describe("InboxPage", () => {
     );
 
     await screen.findByRole("heading", { name: "Nachrichten" });
-    const card = screen.getByText("Ausleihanfrage").closest(".request-message-card");
+    const card = (await screen.findByText("Ausleihanfrage")).closest(".request-message-card");
     expect(card).toBeTruthy();
     expect(card).toHaveClass("request-message-card--unread");
 
@@ -364,6 +364,7 @@ describe("InboxPage", () => {
     );
 
     await screen.findByRole("heading", { name: "Nachrichten" });
+    await screen.findByText("Ausleihanfrage");
     const chat = document.querySelector(".messenger-chat-scroll") as HTMLDivElement;
     Object.defineProperty(chat, "scrollHeight", { configurable: true, value: 900 });
 
@@ -851,7 +852,7 @@ describe("InboxPage", () => {
     );
 
     await screen.findByRole("heading", { name: "Nachrichten" });
-    const threadList = screen.getByLabelText("Konversationen");
+    const threadList = await screen.findByLabelText("Konversationen");
     fireEvent.click(within(threadList).getByRole("button", { name: /Test-Bohrer/i }));
     fireEvent.click(await screen.findByRole("button", { name: "Konversationsaktionen" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Nutzer melden" }));
