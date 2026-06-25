@@ -10,7 +10,11 @@ vi.mock("../src/modules/auth/auth.repository", () => ({
   authRepository: {
     findByEmail: vi.fn(),
     findById: vi.fn(),
-    createUser: vi.fn()
+    createUser: vi.fn(),
+    createRefreshToken: vi.fn(),
+    findRefreshToken: vi.fn(),
+    revokeRefreshToken: vi.fn(),
+    revokeAllRefreshTokensForUser: vi.fn()
   }
 }));
 

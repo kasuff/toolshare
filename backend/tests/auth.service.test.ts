@@ -10,7 +10,11 @@ vi.mock("../src/modules/auth/auth.repository", () => ({
     findById: vi.fn(),
     createUser: vi.fn(),
     findCredentialsById: vi.fn(),
-    updatePassword: vi.fn()
+    updatePassword: vi.fn(),
+    createRefreshToken: vi.fn(),
+    findRefreshToken: vi.fn(),
+    revokeRefreshToken: vi.fn(),
+    revokeAllRefreshTokensForUser: vi.fn()
   }
 }));
 
@@ -129,10 +133,18 @@ describe("authService.login", () => {
 });
 
 describe("authService.refresh", () => {
-  beforeEach(() => vi.clearAllMocks());
+  // resetAllMocks (statt clearAllMocks) leert auch die mockResolvedValueOnce-Queues,
+  // sonst lecken nicht konsumierte Once-Werte zwischen den Tests.
+  beforeEach(() => vi.resetAllMocks());
 
   const signRefreshToken = (payload: { userId: string; role: "USER" | "MODERATOR" | "MANAGER" }) =>
     jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: "7d" });
+
+  const storedToken = () => ({
+    userId: USER_ID,
+    revokedAt: null,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  });
 
   it("throws UNAUTHORIZED for an invalid refresh token", async () => {
     await expect(authService.refresh("not-a-valid-token")).rejects.toMatchObject({
@@ -143,7 +155,8 @@ describe("authService.refresh", () => {
 
   it("throws UNAUTHORIZED when the user no longer exists", async () => {
     const refreshToken = signRefreshToken({ userId: USER_ID, role: "USER" });
-    mockedRepo.findById.mockResolvedValueOnce(null);
+    mockedRepo.findRefreshToken.mockResolvedValue(storedToken() as never);
+    mockedRepo.findById.mockResolvedValue(null);
 
     await expect(authService.refresh(refreshToken)).rejects.toMatchObject({
       code: "UNAUTHORIZED",
@@ -151,8 +164,30 @@ describe("authService.refresh", () => {
     });
   });
 
+  it("throws UNAUTHORIZED when the refresh token is unknown or already revoked", async () => {
+    const refreshToken = signRefreshToken({ userId: USER_ID, role: "USER" });
+    mockedRepo.findRefreshToken.mockResolvedValue(null);
+
+    await expect(authService.refresh(refreshToken)).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+      status: 401
+    });
+  });
+
+  it("revokes all sessions when a revoked token is reused", async () => {
+    const refreshToken = signRefreshToken({ userId: USER_ID, role: "USER" });
+    mockedRepo.findRefreshToken.mockResolvedValue({
+      ...storedToken(),
+      revokedAt: new Date()
+    } as never);
+
+    await expect(authService.refresh(refreshToken)).rejects.toMatchObject({ status: 401 });
+    expect(mockedRepo.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(USER_ID);
+  });
+
   it("throws ACCOUNT_SUSPENDED when the user is suspended", async () => {
     const refreshToken = signRefreshToken({ userId: USER_ID, role: "USER" });
+    mockedRepo.findRefreshToken.mockResolvedValue(storedToken() as never);
     mockedRepo.findById.mockResolvedValueOnce({
       id: USER_ID,
       role: "USER",
@@ -165,8 +200,9 @@ describe("authService.refresh", () => {
     });
   });
 
-  it("issues new access and refresh tokens for a valid refresh token", async () => {
+  it("rotates tokens for a valid refresh token (revokes old, issues new)", async () => {
     const refreshToken = signRefreshToken({ userId: USER_ID, role: "USER" });
+    mockedRepo.findRefreshToken.mockResolvedValue(storedToken() as never);
     mockedRepo.findById.mockResolvedValueOnce({
       id: USER_ID,
       role: "USER",
@@ -177,10 +213,30 @@ describe("authService.refresh", () => {
 
     expect(result.accessToken).toBeTypeOf("string");
     expect(result.refreshToken).toBeTypeOf("string");
+    expect(mockedRepo.revokeRefreshToken).toHaveBeenCalledTimes(1);
+    expect(mockedRepo.createRefreshToken).toHaveBeenCalledTimes(1);
     const accessPayload = jwt.verify(result.accessToken, process.env.JWT_SECRET as string) as {
       userId: string;
       role: string;
     };
     expect(accessPayload).toMatchObject({ userId: USER_ID, role: "USER" });
+  });
+});
+
+describe("authService.logout", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const signRefreshToken = (payload: { userId: string; role: "USER" | "MODERATOR" | "MANAGER" }) =>
+    jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: "7d" });
+
+  it("revokes the presented refresh token", async () => {
+    const refreshToken = signRefreshToken({ userId: USER_ID, role: "USER" });
+    await authService.logout(refreshToken);
+    expect(mockedRepo.revokeRefreshToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("is a no-op for an empty token", async () => {
+    await authService.logout("");
+    expect(mockedRepo.revokeRefreshToken).not.toHaveBeenCalled();
   });
 });
