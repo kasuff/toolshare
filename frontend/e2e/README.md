@@ -80,6 +80,62 @@ Einblende-Animationen.
 
 `.auth/` (Sessions) und `playwright-report/`, `test-results/` sind gitignored.
 
+## Fixtures (Helfer)
+
+Die Spec-Dateien sollen den **Nutzerflow** lesbar halten; wiederkehrendes Setup steckt in
+`fixtures/`. Grob zwei Schichten:
+
+| Schicht | Dateien | Zweck |
+|---------|---------|--------|
+| **Daten & Sessions** | `data.ts`, `roles.ts` | Eindeutige E-Mails/Suffixe, Datumsformate, Pfade zu `.auth/*.json` |
+| **Setup ohne Browser** | `api.ts` | Backend direkt ansprechen (schnell, kein CORS) – Nutzer, Tools, Buchungen, Notifications |
+| **UI-Flows** | `booking.ts`, `forms.ts` | Wiederkehrende Klickpfade im Browser (Anfrage stellen, Inbox öffnen, Formulare) |
+
+**Warum getrennt?** API-Helfer legen Testdaten zuverlässig an und sparen UI-Schritte beim
+Arrange-Teil. UI-Helfer kapseln nur dort, wo der Flow selbst getestet werden soll (z. B.
+„Anfrage senden“). Multi-Rollen-Szenarien nutzen weiterhin **eigene Browser-Contexts** pro
+Rolle (`storageFileFor`) – die Fixtures ersetzen das nicht.
+
+### `data.ts`
+
+- `uniqueSuffix()`, `makeUser()` – kollisionsfreie Testdaten pro Lauf
+- `futureDate()` – Anzeigeformat `TT.MM.JJJJ` für `DateInput`
+- `isoDaysFromNow()` – ISO-Zeitstempel für API-Buchungen
+- `MANAGER_EMAIL` / `MANAGER_PASSWORD` – provisionierter Manager
+
+### `api.ts`
+
+Dünne Wrapper um `APIRequestContext` (Playwright `request`):
+
+| Funktion | Verwendung |
+|----------|------------|
+| `registerUser`, `loginUser` | Nutzer anlegen / einloggen |
+| `createTool`, `createWorkshop` | Angebote für Tests seeden |
+| `createToolBooking` | Buchungs-Konflikte per API (ohne UI) |
+| `listNotifications` | Outbox-/Benachrichtigungs-Polling (z. B. Ermahnung) |
+| `setUserRole` | Moderator befördern (Setup) |
+| `storageStateForToken` | `localStorage`-Session für sofort eingeloggte Tests |
+
+### `booking.ts`
+
+Wiederkehrende **Ausleihe-/Inbox-Flows** für Specs mit zwei Rollen:
+
+| Funktion | Verwendung |
+|----------|------------|
+| `seedTool` | Eindeutiges Werkzeug für den Standard-Anbieter anlegen |
+| `submitToolRequest` | Ausleihanfrage über die Werkzeug-Detailseite (UI) |
+| `openInboxThread` | Konversation in der Inbox öffnen |
+| `acceptBookingAsProvider` | Anbieter-Kontext: Anfrage akzeptieren |
+| `completeBookingAsProvider` | Anbieter-Kontext: Buchung abschließen |
+
+Genutzt u. a. in `requests.spec.ts`, `counter-proposal.spec.ts`, `completion.spec.ts`,
+`ratings.spec.ts`, `notifications.spec.ts`, `moderation-workflow.spec.ts`.
+
+### `forms.ts` & `roles.ts`
+
+- `forms.ts` – Adress-Autocomplete mocken, Datei-Uploads, wiederkehrende Formularschritte
+- `roles.ts` – `readUsers()` (Tokens/IDs aus Setup), `storageFileFor("anfrager" | …)`
+
 ## Rollen & Sessions
 
 Das Setup (`global.setup.ts`) bereitet vier Rollen-Sessions vor:
