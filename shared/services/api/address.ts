@@ -1,11 +1,15 @@
-import type { AddressSuggestion } from "./types";
-import { request } from "./client";
+import { requestParsed } from "./client";
+import {
+  addressSuggestionsResponseSchema,
+  addressValidationResponseSchema
+} from "../../contracts/response/address.schema";
 
 export const addressApi = {
-  async suggestAddresses(query: string): Promise<AddressSuggestion[]> {
+  async suggestAddresses(query: string) {
     if (query.trim().length < 3) return [];
     try {
-      const response = await request<{ suggestions: AddressSuggestion[] }>(
+      const response = await requestParsed(
+        addressSuggestionsResponseSchema,
         `/address/suggest?q=${encodeURIComponent(query.trim())}`
       );
       return response.suggestions;
@@ -14,22 +18,17 @@ export const addressApi = {
     }
   },
 
-  async validateAddress(query: string): Promise<{
-    isValid: boolean;
-    normalizedAddress: string | null;
-    normalizedParts: AddressSuggestion | null;
-  }> {
+  async validateAddress(query: string) {
     if (query.trim().length < 5) {
       return { isValid: false, normalizedAddress: null, normalizedParts: null };
     }
     try {
-      return await request<{ isValid: boolean; normalizedAddress: string | null; normalizedParts: AddressSuggestion | null }>(
+      return await requestParsed(
+        addressValidationResponseSchema,
         `/address/validate?q=${encodeURIComponent(query.trim())}`
       );
     } catch {
-      // Do not hard-block registration/profile save if provider is unavailable.
       return { isValid: true, normalizedAddress: null, normalizedParts: null };
     }
-  },
-
+  }
 };

@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import { getAuthSessionAdapter } from "../../auth/session";
 import { beginRequestActivity } from "../requestActivity";
 import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "../sessionEvents";
@@ -195,4 +196,14 @@ async function request<T>(
   }
 }
 
-export { request, translateValidationMessage, toLocalDateTimeInputValue };
+async function requestParsed<S extends z.ZodTypeAny>(
+  schema: S,
+  path: string,
+  init?: RequestInit,
+  token?: string
+): Promise<z.infer<S>> {
+  const data = await request<unknown>(path, init, token);
+  return schema.parse(data);
+}
+
+export { request, requestParsed, translateValidationMessage, toLocalDateTimeInputValue };
