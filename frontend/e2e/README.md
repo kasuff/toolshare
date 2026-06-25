@@ -44,6 +44,7 @@ e2e/
 ├── fixtures/
 │   ├── data.ts      eindeutige Testdaten (Nutzer, Adressen, Datumshelfer, Manager-Creds)
 │   ├── api.ts       API-Helfer (Register/Login/Tools/Workshops/Rolle) + storageState
+│   ├── booking.ts   Buchungs-Flow-Helfer (Werkzeug anlegen, Anfrage, Inbox-Thread)
 │   ├── forms.ts     UI-Form-Helfer (Adress-Mock, manuelle Adresse, Foto-Upload)
 │   └── roles.ts     Pfade & Zugriff auf vorbereitete Rollen-Sessions
 ├── setup/
@@ -55,9 +56,12 @@ e2e/
 ├── manage.spec.ts       Werkzeug/Werkstatt bearbeiten + löschen (Anbieter)
 ├── offers.spec.ts       Meine Angebote + Profil (Name speichern, Passwort ändern)
 ├── requests.spec.ts     Phase 2: Ausleihanfrage + Inbox-Entscheidung (Akzeptieren/Ablehnen)
+├── counter-proposal.spec.ts  Phase 2: Alternativvorschlag senden und annehmen (2 Kontexte)
+├── completion.spec.ts   Phase 2: Bestätigte Buchung als abgeschlossen markieren
 ├── workshops.spec.ts    Phase 2: Werkstattbuchung + Konflikt (blockierter Zeitraum)
 ├── admin.spec.ts        Admin: Nutzerverwaltung (Rolle/Sperre) + Zugriffsschutz
 ├── moderation.spec.ts   Moderation: Bereich sichtbar + Zugriffsschutz
+├── moderation-workflow.spec.ts  Moderation: Meldung aus Inbox anlegen und verwerfen
 ├── clock.spec.ts        Phase 3: Clock-Mocking (deterministische Default-Daten)
 ├── network.spec.ts      Phase 3: Network-Mocking (erzwungener Backend-Fehler)
 └── a11y.spec.ts         Phase 3: Accessibility-Scan ganzer Seiten (axe)
