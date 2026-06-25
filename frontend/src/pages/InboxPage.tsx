@@ -18,8 +18,10 @@ import {
   proposalStatusLabel,
   threadHasUnread,
 } from "../components/inbox/inboxChatHelpers";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../hooks/useToast";
 import { api } from "@toolshare/shared";
+import { inboxKeys, useInboxData, type InboxData } from "../hooks/queries/inbox.queries";
 
 import type {
   Booking,
@@ -76,6 +78,10 @@ function isInboxSystemNotification(message: string): boolean {
 
 const MOBILE_INBOX_MEDIA_QUERY = "(max-width: 900px)";
 
+// Geteilte, unveränderliche Leerliste als stabiler Fallback für noch nicht
+// geladene Inbox-Daten (vermeidet neue Array-Referenzen pro Render).
+const EMPTY_LIST: never[] = [];
+
 function useMobileInboxLayout() {
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia(MOBILE_INBOX_MEDIA_QUERY).matches
@@ -96,16 +102,18 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const location = useLocation();
   const isMobileInbox = useMobileInboxLayout();
   const { pushToast } = useToast();
-  const bookings = useInboxStore((state) => state.bookings);
-  const notifications = useInboxStore((state) => state.notifications);
-  const ratingsGiven = useInboxStore((state) => state.ratingsGiven);
-  const ratingsReceived = useInboxStore((state) => state.ratingsReceived);
+  const queryClient = useQueryClient();
+  const inboxQuery = useInboxData(token, currentUser?.id);
+  // Stabile Leer-Referenz, damit die abgeleiteten useMemo-Hooks nicht bei jedem
+  // Render neu rechnen, solange noch keine Daten geladen sind.
+  const bookings = inboxQuery.data?.bookings ?? EMPTY_LIST;
+  const notifications = inboxQuery.data?.notifications ?? EMPTY_LIST;
+  const ratingsGiven = inboxQuery.data?.ratingsGiven ?? EMPTY_LIST;
+  const ratingsReceived = inboxQuery.data?.ratingsReceived ?? EMPTY_LIST;
+  const isLoading = inboxQuery.isLoading;
   const readMessageIds = useInboxStore((state) => state.readMessageIds);
-  const isLoading = useInboxStore((state) => state.isLoading);
-  const fetchData = useInboxStore((state) => state.fetchData);
   const markMessageRead = useInboxStore((state) => state.markMessageRead);
   const markThreadReadStore = useInboxStore((state) => state.markThreadRead);
-  const markNotificationReadStore = useInboxStore((state) => state.markNotificationRead);
 
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftToolRangeParts>>({});
@@ -128,20 +136,12 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const mobileThreadToRestoreRef = useRef<string | null>(null);
   const shouldFocusMobileChatRef = useRef(false);
 
+  // Nach Mutationen neu laden = den Inbox-Query invalidieren (TanStack refetcht).
+  // Das initiale Laden übernimmt der Query selbst (enabled, sobald Token+User da).
   const loadData = async () => {
-    if (!token || !currentUser?.id) return;
-    try {
-      await fetchData(token, currentUser.id);
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
-    }
+    if (!currentUser?.id) return;
+    await queryClient.invalidateQueries({ queryKey: inboxKeys.data(currentUser.id) });
   };
-
-  useEffect(() => {
-    if (!token) return;
-    void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   useEffect(() => {
     draftSeededForThreadRef.current.clear();
@@ -346,13 +346,24 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const markThreadRead = (booking: BookingRow) => {
     if (!currentUser?.id) return;
     if (booking.type === "SYSTEM_WARNING") return;
-    markThreadReadStore(booking, currentUser.id);
+    markThreadReadStore(booking, currentUser.id, ratingsByBookingId.get(booking.id) ?? null);
   };
 
   const markNotificationRead = async (notificationId: string) => {
-    if (!token) return;
+    if (!token || !currentUser?.id) return;
     try {
-      await markNotificationReadStore(notificationId, token);
+      await api.markNotificationAsRead(notificationId, token);
+      // Benachrichtigung im Query-Cache als gelesen markieren (kein Refetch nötig).
+      queryClient.setQueryData<InboxData>(inboxKeys.data(currentUser.id), (old) =>
+        old
+          ? {
+              ...old,
+              notifications: old.notifications.map((n) =>
+                n.id === notificationId ? { ...n, read: true } : n
+              )
+            }
+          : old
+      );
     } catch (error) {
       console.error("Fehler beim Markieren der Benachrichtigung als gelesen:", error);
     }
@@ -806,7 +817,7 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                       }
                     >
                       <RequestMessageCard
-                        label="Alternativvorschlag"
+                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
                         title={selectedBooking.toolName ?? "Werkzeug"}
                         icon="help"
                         firstLabel="Abholung"
@@ -835,7 +846,7 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                       }
                     >
                       <RequestMessageCard
-                        label="Alternativvorschlag"
+                        label={`Alternativvorschlag · ${proposalStatusLabel(proposal.status)}`}
                         title={selectedBooking.toolName ?? "Werkstatt"}
                         icon="help"
                         firstLabel="Von"

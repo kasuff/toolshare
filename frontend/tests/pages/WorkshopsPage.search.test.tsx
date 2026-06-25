@@ -147,7 +147,7 @@ describe("WorkshopsPage search filters", () => {
     await waitFor(() => expect(getWorkshops).toHaveBeenCalled());
   });
 
-  it("filters approved workshops by radius and keeps the map slider capped at 5 km", async () => {
+  it("filters approved workshops by the search radius (15 km default, 30 km max)", async () => {
     getWorkshops.mockResolvedValueOnce([
       {
         workshop: workshop({ id: "near", name: "Schwabing-Werkstatt", location: "Leopoldstraße 120, München" }),
@@ -163,12 +163,19 @@ describe("WorkshopsPage search filters", () => {
 
     renderPage();
 
+    // Default-Umkreis 15 km zeigt beide Münchner Werkstätten (~3,4 km bzw. ~7,7 km).
     expect(await screen.findByText("Schwabing-Werkstatt")).toBeInTheDocument();
-    expect(screen.queryByText("Neufreimann-Werkstatt")).not.toBeInTheDocument();
+    expect(screen.getByText("Neufreimann-Werkstatt")).toBeInTheDocument();
 
     const radiusSlider = screen.getByLabelText(/Umkreis/i);
-    expect(radiusSlider).toHaveAttribute("max", "5");
+    expect(radiusSlider).toHaveAttribute("max", "30");
 
+    // 5 km: nur die nahe Werkstatt bleibt, die ferne (~7,7 km) fällt raus.
+    fireEvent.change(radiusSlider, { target: { value: "5" } });
+    await waitFor(() => expect(screen.queryByText("Neufreimann-Werkstatt")).not.toBeInTheDocument());
+    expect(screen.getByText("Schwabing-Werkstatt")).toBeInTheDocument();
+
+    // 1 km: auch die nahe Werkstatt (~3,4 km) fällt raus.
     fireEvent.change(radiusSlider, { target: { value: "1" } });
     await waitFor(() => expect(screen.queryByText("Schwabing-Werkstatt")).not.toBeInTheDocument());
     expect(screen.getByText("Keine Werkstatt gefunden")).toBeInTheDocument();

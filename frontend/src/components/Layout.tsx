@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@toolshare/shared";
-import { useInboxStore } from "../store/inboxStore";
+import { useInboxBackground } from "../hooks/useInbox";
 import { RoleSwitcher } from "./RoleSwitcher";
 
 type Props = {
@@ -84,47 +84,9 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isMobileNavOpen]);
 
-  const unreadRequestBellCount = useInboxStore((state) => state.unreadCount);
-  const fetchData = useInboxStore((state) => state.fetchData);
-  const clearInbox = useInboxStore((state) => state.clear);
-
-  useEffect(() => {
-    if (!token || !currentUser?.id) {
-      clearInbox();
-      return;
-    }
-
-    let cancelled = false;
-    const userId = currentUser.id;
-
-    const pollData = async () => {
-      try {
-        await fetchData(token, userId);
-      } catch (err) {
-        console.error("Fehler beim Laden der Benachrichtigungen/Inbox im Polling:", err);
-      }
-    };
-
-    void pollData();
-    // Kein WebSocket/SSE vorhanden – kurzes Intervall damit die Glocke sich spürbar aktualisiert.
-    const intervalId = window.setInterval(() => {
-      if (!cancelled) void pollData();
-    }, 20_000);
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible" && !cancelled) {
-        void pollData();
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [token, currentUser?.id, fetchData, clearInbox, location.pathname]);
+  // Inbox-Hintergrundlogik (Polling + Focus-Refetch via TanStack Query, Seeding,
+  // ungelesen-Zähler) zentral hier, da das Layout app-weit gemountet ist.
+  const { unreadCount: unreadRequestBellCount } = useInboxBackground(token, currentUser?.id);
 
   const inboxAriaLabel =
     unreadRequestBellCount > 0
