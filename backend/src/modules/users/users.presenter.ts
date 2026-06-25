@@ -10,6 +10,8 @@ export function toUserResponse(user: UserEntity): UserResponse {
     email: user.email,
     name: user.name,
     address: user.address,
+    latitude: user.latitude ?? null,
+    longitude: user.longitude ?? null,
     role: user.role,
     isSuspended: user.isSuspended,
     expoPushToken: user.expoPushToken ?? null,

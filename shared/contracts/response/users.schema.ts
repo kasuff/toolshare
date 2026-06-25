@@ -7,6 +7,8 @@ export const userResponseSchema = z.object({
   email: z.string().email(),
   name: z.string(),
   address: z.string(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
   role: roleResponseSchema,
   isSuspended: z.boolean(),
   expoPushToken: z.string().nullable().optional(),

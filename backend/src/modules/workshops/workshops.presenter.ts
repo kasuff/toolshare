@@ -33,6 +33,8 @@ export function toWorkshopResponse(workshop: WorkshopEntity): WorkshopResponse {
     name: workshop.name,
     description: workshop.description,
     location: workshop.location,
+    latitude: workshop.latitude ?? null,
+    longitude: workshop.longitude ?? null,
     maxCapacity: workshop.maxCapacity,
     extras: workshop.extras ?? workshop.equipment ?? [],
     imageUrls: workshop.imageUrls ?? [],

@@ -23,6 +23,8 @@ export type ToolEntity = {
   imageUrl: string | null;
   pickupLocation: string | null;
   pickupLocationNote: string | null;
+  pickupLat?: number | null;
+  pickupLon?: number | null;
   status: ToolStatus;
   createdAt: Date;
   updatedAt?: Date;

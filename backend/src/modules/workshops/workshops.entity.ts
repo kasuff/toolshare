@@ -32,6 +32,8 @@ export type WorkshopEntity = {
   name: string;
   description: string;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
   maxCapacity: number;
   // Prisma-Spalte heisst `equipment`; der Wire-Vertrag nutzt `extras`.
   equipment?: string[];
