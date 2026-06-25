@@ -22,18 +22,25 @@ export const bookingsRepository = {
         workshop: { include: { manager: { select: { id: true, name: true } } } },
         timeslot: { include: { workshop: { include: { manager: { select: { id: true, name: true } } } } } },
         selectedTools: { include: { workshopTool: true } },
+        // Sicherheits-Cap gegen pathologisch lange Verhandlungen (real nur wenige
+        // Proposals). Echtes Lazy-Laden der Nachrichten je geöffnetem Chat ist als
+        // Folgeschritt vorgesehen (siehe docs/performance-pagination.md).
         pickupProposals: {
           orderBy: { createdAt: "asc" },
+          take: 100,
           include: { proposedBy: { select: { id: true, name: true } } }
         },
         timeslotProposals: {
           orderBy: { createdAt: "asc" },
+          take: 100,
           include: {
             proposedBy: { select: { id: true, name: true } }
           }
         }
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      // Neueste 100 Konversationen. Thread-Listen-Pagination ist Folgeschritt.
+      take: 100
     });
   },
 

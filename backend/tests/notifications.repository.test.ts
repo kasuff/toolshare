@@ -25,11 +25,13 @@ describe("notificationsRepository", () => {
   it("lists notifications by user ordered by newest first", async () => {
     mocks.notificationFindMany.mockResolvedValueOnce([{ id: "n1" }]);
 
-    const result = await notificationsRepository.listByUser("user-1");
+    const result = await notificationsRepository.listByUser("user-1", { limit: 100, offset: 0 });
 
     expect(mocks.notificationFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      skip: 0
     });
     expect(result).toEqual([{ id: "n1" }]);
   });

@@ -92,14 +92,17 @@ describe("bookingsRepository", () => {
         selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
           orderBy: { createdAt: "asc" },
+          take: 100,
           include: { proposedBy: { select: { id: true, name: true } } }
         },
         timeslotProposals: {
           orderBy: { createdAt: "asc" },
+          take: 100,
           include: { proposedBy: { select: { id: true, name: true } } }
         }
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 100
     });
     expect(result).toEqual([{ id: "b1" }]);
   });
