@@ -24,6 +24,15 @@ export const authApi = {
     });
   },
 
+  // Entwertet den Refresh-Token serverseitig, sodass er nach dem Logout nicht
+  // mehr eingelöst werden kann. Idempotent (auch bei ungültigem/fehlendem Token).
+  async logout(refreshToken: string): Promise<void> {
+    return request<void>("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken })
+    });
+  },
+
   async changePassword(currentPassword: string, newPassword: string, token: string): Promise<void> {
     return request<void>(
       "/auth/change-password",

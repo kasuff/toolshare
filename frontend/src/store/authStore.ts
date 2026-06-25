@@ -66,6 +66,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    // Refresh-Token serverseitig entwerten (best effort – lokales Logout darf nie
+    // an einem fehlgeschlagenen Netzwerkaufruf hängen).
+    const refreshToken = localStorage.getItem(REFRESH_KEY);
+    if (refreshToken) {
+      void api.logout(refreshToken).catch(() => undefined);
+    }
     clearPersistedTokens();
     set({ token: null, currentUser: null, error: null });
   },

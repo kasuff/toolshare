@@ -131,6 +131,8 @@ Die vollständige Projektdokumentation (Architektur, ADRs, Scrum, etc.) befindet
 
 Architektur liegt im Doku-Repo; im Code gelten lesbarer Code und sinnvolle Kommentare ([ADR-007](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/adr/007-repo-struktur.md)).
 
+Code-nahe Doku in diesem Repo: [Authentifizierung & Token-Sicherheit](docs/auth-token-security.md).
+
 ---
 
 ## Architekturrichtlinien

@@ -26,6 +26,11 @@ export const authController = {
     res.status(200).json(result);
   }),
 
+  logout: asyncHandler(async (req: Request, res: Response) => {
+    await authService.logout(req.body.refreshToken as string);
+    res.status(204).send();
+  }),
+
   changePassword: asyncHandler(async (req: Request, res: Response) => {
     await authService.changePassword({
       userId: req.authUser!.userId,

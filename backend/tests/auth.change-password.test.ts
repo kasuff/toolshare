@@ -6,7 +6,8 @@ import { authRepository } from "../src/modules/auth/auth.repository";
 vi.mock("../src/modules/auth/auth.repository", () => ({
   authRepository: {
     findCredentialsById: vi.fn(),
-    updatePassword: vi.fn()
+    updatePassword: vi.fn(),
+    revokeAllRefreshTokensForUser: vi.fn()
   }
 }));
 
