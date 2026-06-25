@@ -107,16 +107,20 @@ describe("workshopsService", () => {
       maxCapacity: 4
     });
 
-    expect(mockedWorkshopsRepository.create).toHaveBeenCalledWith({
-      managerId: "u1",
-      name: "Werkstatt",
-      description: "desc",
-      location: "Muenchen",
-      maxCapacity: 4,
-      extras: [],
-      workshopTools: [],
-      imageUrls: []
-    });
+    // objectContaining: die geocodeten latitude/longitude werden zusätzlich
+    // durchgereicht; geprüft wird hier das Auffüllen der optionalen Defaults.
+    expect(mockedWorkshopsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        managerId: "u1",
+        name: "Werkstatt",
+        description: "desc",
+        location: "Muenchen",
+        maxCapacity: 4,
+        extras: [],
+        workshopTools: [],
+        imageUrls: []
+      })
+    );
   });
 
   it("updates workshop for owner", async () => {

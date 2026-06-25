@@ -71,10 +71,15 @@ describe("usersService profile endpoints", () => {
       address: "Neue Straße 1"
     });
 
-    expect(mockedUsersRepository.updateProfile).toHaveBeenCalledWith("user-1", {
-      name: "Lea Neu",
-      address: "Neue Straße 1"
-    });
+    // Beim Adresswechsel geocodet der Service und reicht zusätzlich
+    // latitude/longitude (und expoPushToken) an das Repository durch.
+    expect(mockedUsersRepository.updateProfile).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        name: "Lea Neu",
+        address: "Neue Straße 1"
+      })
+    );
     expect(result.name).toBe("Lea Neu");
   });
 });
