@@ -1,30 +1,44 @@
+import type { z } from "zod";
+import { userResponseSchema } from "../../contracts/response/users.schema";
 import type { AdminMetricsResponse } from "../../contracts/response/users.schema";
+import { toolResponseSchema } from "../../contracts/response/tools.schema";
+import {
+  workshopResponseSchema,
+  workshopToolResponseSchema,
+  workshopTimeslotResponseSchema
+} from "../../contracts/response/workshops.schema";
 import type { AuthResponse, RefreshResponse } from "../../contracts/response/auth.schema";
 import type { RatingResponse } from "../../contracts/response/ratings.schema";
 import type { ModerationReportResponse } from "../../contracts/response/moderation.schema";
 import type { SystemSettingResponse } from "../../contracts/response/system-rules.schema";
 import type { AddressSuggestionResponse } from "../../contracts/response/address.schema";
+
 export type BackendRole = "USER" | "MODERATOR" | "MANAGER";
 export type BackendToolStatus = "AVAILABLE" | "REQUESTED" | "BORROWED";
 export type BackendBookingStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED";
-export type BackendUser = {
-  id: string;
-  email: string;
-  name: string;
-  address?: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  avatarUrl?: string | null;
-  role: BackendRole;
-  isSuspended: boolean;
-};
-// Single source of truth: Wire-Typen werden aus den Shared-Response-Contracts
-// (Zod) abgeleitet (ADR-013), statt sie hier dupliziert zu pflegen.
+
+// Single source of truth (ADR-013): Diese Typen werden direkt aus den Zod-Response-Schemas
+// abgeleitet. Nie manuell synchronisieren — Schema ändern, Typ folgt automatisch.
+export type BackendUser = z.infer<typeof userResponseSchema>;
+export type BackendTool = z.infer<typeof toolResponseSchema>;
+export type BackendWorkshop = z.infer<typeof workshopResponseSchema>;
+export type BackendWorkshopTool = z.infer<typeof workshopToolResponseSchema>;
+export type BackendWorkshopTimeslot = z.infer<typeof workshopTimeslotResponseSchema>;
+
 export type BackendMetrics = AdminMetricsResponse;
-
 export type ModerationReport = ModerationReportResponse;
-
 export type BackendRating = RatingResponse;
+export type SystemSetting = SystemSettingResponse;
+export type AddressSuggestion = AddressSuggestionResponse;
+export type AuthPayload = AuthResponse;
+export type RefreshPayload = RefreshResponse;
+
+export type BackendWorkshopBookedRange = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  status: BackendBookingStatus;
+};
 
 export type SuspensionRequestItem = {
   id: string;
@@ -37,71 +51,6 @@ export type SuspensionRequestItem = {
   user: { id: string; name: string; email: string; isSuspended: boolean };
   requestedBy: { id: string; name: string };
   report?: { id: string; reason: string; targetType: string; targetId: string } | null;
-};
-
-export type SystemSetting = SystemSettingResponse;
-
-export type AddressSuggestion = AddressSuggestionResponse;
-
-export type AuthPayload = AuthResponse;
-
-export type RefreshPayload = RefreshResponse;
-
-export type BackendTool = {
-  id: string;
-  ownerId: string;
-  owner?: Pick<BackendUser, "id" | "name"> | null;
-  name: string;
-  description: string;
-  category: string;
-  imageUrl?: string | null;
-  pickupLocation?: string | null;
-  pickupLocationNote?: string | null;
-  pickupLat?: number | null;
-  pickupLon?: number | null;
-  status: BackendToolStatus;
-  bookings?: BackendWorkshopBookedRange[];
-};
-
-export type BackendWorkshop = {
-  id: string;
-  managerId: string;
-  manager?: Pick<BackendUser, "id" | "name"> | null;
-  name: string;
-  description: string;
-  location: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  maxCapacity: number;
-  equipment?: string[];
-  extras?: string[];
-  imageUrls?: string[];
-  workshopTools?: BackendWorkshopTool[];
-  timeslots?: BackendWorkshopTimeslot[];
-  bookings?: BackendWorkshopBookedRange[];
-};
-
-export type BackendWorkshopBookedRange = {
-  id: string;
-  startDate: string;
-  endDate: string;
-  status: BackendBookingStatus;
-};
-
-export type BackendWorkshopTool = {
-  id: string;
-  workshopId?: string;
-  name: string;
-  category: string;
-  status?: BackendToolStatus;
-};
-
-export type BackendWorkshopTimeslot = {
-  id: string;
-  workshopId: string;
-  startTime: string;
-  endTime: string;
-  blockedByOwner?: boolean;
 };
 
 export type BackendPickupProposalStatus = "PENDING" | "ACCEPTED" | "DECLINED";
