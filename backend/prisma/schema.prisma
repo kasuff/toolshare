@@ -97,6 +97,8 @@ model RefreshToken {
   revokedAt DateTime?
 
   @@index([userId])
+  // Unterstützt das künftige Aufräumen abgelaufener Tokens.
+  @@index([expiresAt])
 }
 
 model Tool {
@@ -114,6 +116,11 @@ model Tool {
   createdAt   DateTime   @default(now())
   owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   bookings    Booking[]
+
+  // ownerId = "Meine Werkzeuge"/Besitzabfragen; status/category = Filter in der Suche.
+  @@index([ownerId])
+  @@index([status])
+  @@index([category])
 }
 
 model Workshop {
@@ -251,6 +258,9 @@ model Notification {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Deckt listByUser ab: Filter userId + Sortierung createdAt desc.
+  @@index([userId, createdAt])
 }
 
 model Report {

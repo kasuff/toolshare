@@ -480,7 +480,10 @@ describe("Controller route integration coverage", () => {
 
       expect(listResponse.status).toBe(200);
       expect(markReadResponse.status).toBe(204);
-      expect(mockedNotificationsService.listForUser).toHaveBeenCalledWith(MANAGER_ID);
+      expect(mockedNotificationsService.listForUser).toHaveBeenCalledWith(
+        MANAGER_ID,
+        { limit: 100, offset: 0 }
+      );
       expect(mockedNotificationsService.markAsRead).toHaveBeenCalledWith(MANAGER_ID, NOTIFICATION_ID);
     });
   });

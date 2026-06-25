@@ -7,10 +7,11 @@ import { buildNotificationIdempotencyKey } from "../../domain/events/notificatio
 import { suspensionRepository } from "../users/suspension.repository";
 import { notificationsRepository } from "./notifications.repository";
 import { toNotificationResponseList } from "./notifications.presenter";
+import type { PageParams } from "../../utils/pagination";
 
 export const notificationsService = {
-  async listForUser(userId: string) {
-    const notifications = await notificationsRepository.listByUser(userId);
+  async listForUser(userId: string, page: PageParams) {
+    const notifications = await notificationsRepository.listByUser(userId, page);
     return toNotificationResponseList(notifications);
   },
 
