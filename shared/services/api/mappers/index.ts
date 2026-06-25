@@ -43,7 +43,7 @@ function mapTool(tool: BackendTool): Tool {
 }
 
 function mapWorkshop(workshop: BackendWorkshop): Workshop {
-  const extras = workshop.extras ?? workshop.equipment ?? [];
+  const extras = workshop.extras;
   return {
     id: workshop.id,
     ownerId: workshop.managerId,
