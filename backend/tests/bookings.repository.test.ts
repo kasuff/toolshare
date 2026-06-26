@@ -48,7 +48,8 @@ describe("bookingsRepository", () => {
       handler({
         tool: { findUnique: mocks.txToolFindUnique },
         booking: { findFirst: mocks.txBookingFindFirst, create: mocks.txBookingCreate },
-        outboxEvent: { create: mocks.txOutboxEventCreate }
+        outboxEvent: { create: mocks.txOutboxEventCreate },
+        $executeRaw: vi.fn().mockResolvedValue(0)
       })
     );
   };
@@ -65,7 +66,8 @@ describe("bookingsRepository", () => {
         },
         workshopTool: { findMany: mocks.txWorkshopToolFindMany },
         bookingSelectedTool: { createMany: mocks.txBookingSelectedToolCreateMany },
-        outboxEvent: { create: mocks.txOutboxEventCreate }
+        outboxEvent: { create: mocks.txOutboxEventCreate },
+        $executeRaw: vi.fn().mockResolvedValue(0)
       })
     );
   };
