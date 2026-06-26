@@ -335,6 +335,18 @@ describe("bookingsService", () => {
   });
 
   it("maps workshop booking repository errors to app errors", async () => {
+    mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("CONFLICT" as any);
+
+    await expect(
+      bookingsService.createWorkshopBooking({
+        requesterId: "user-1",
+        workshopId: "workshop-1",
+        startDate: validStart(),
+        endDate: validEnd(),
+        workshopToolIds: []
+      })
+    ).rejects.toMatchObject({ code: "BOOKING_CONFLICT", status: 409 });
+
     mockedBookingsRepository.createWorkshopBookingTransaction.mockResolvedValueOnce("BLOCKED" as any);
 
     await expect(

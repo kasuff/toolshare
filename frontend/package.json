@@ -16,6 +16,12 @@
     "test:a11y": "vitest run tests/accessibility --maxWorkers=1",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:mobile": "playwright test --project=mobile-chrome",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:codegen": "playwright codegen http://localhost:3000",
     "lighthouse": "lhci autorun"
   },
   "dependencies": {
@@ -33,7 +39,9 @@
     "uuid": "^11.1.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.61.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",

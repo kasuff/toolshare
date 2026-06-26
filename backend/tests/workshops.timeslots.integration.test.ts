@@ -3,6 +3,7 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 import type { Express } from "express";
 import type { PrismaClient, Role } from "@prisma/client";
+import { isoDaysFromNow } from "./helpers/booking-dates";
 
 type TestUser = {
   id: string;
@@ -23,7 +24,7 @@ type WorkshopDetail = {
 
 const TEST_EMAIL_PREFIX = `workshop-timeslot-int-${Date.now()}`;
 
-describe.skip("Workshop timeslot integration", () => {
+describe("Workshop timeslot integration", () => {
   let app: Express;
   let prisma: PrismaClient;
   let userCounter = 0;
@@ -144,16 +145,21 @@ describe.skip("Workshop timeslot integration", () => {
     const owner = await createUser("USER");
     const workshop = await createWorkshop(owner);
 
+    const availabilityStart = isoDaysFromNow(30, 0);
+    const availabilityEnd = isoDaysFromNow(210, 0);
+    const blockedStart = isoDaysFromNow(60, 0);
+    const blockedEnd = isoDaysFromNow(90, 0);
+
     const availability = await createTimeslot(owner, workshop.id, {
-      startTime: "2027-01-01T00:00:00.000Z",
-      endTime: "2027-07-01T00:00:00.000Z"
+      startTime: availabilityStart,
+      endTime: availabilityEnd
     });
     expect(availability.status).toBe(201);
     expect(availability.body.blockedByOwner).toBe(false);
 
     const blocked = await createTimeslot(owner, workshop.id, {
-      startTime: "2027-02-01T00:00:00.000Z",
-      endTime: "2027-03-01T00:00:00.000Z",
+      startTime: blockedStart,
+      endTime: blockedEnd,
       blockedByOwner: true
     });
     expect(blocked.status).toBe(201);
@@ -170,18 +176,18 @@ describe.skip("Workshop timeslot integration", () => {
 
     expect(normalized).toEqual([
       {
-        startTime: "2027-01-01T00:00:00.000Z",
-        endTime: "2027-02-01T00:00:00.000Z",
+        startTime: availabilityStart,
+        endTime: blockedStart,
         blockedByOwner: false
       },
       {
-        startTime: "2027-02-01T00:00:00.000Z",
-        endTime: "2027-03-01T00:00:00.000Z",
+        startTime: blockedStart,
+        endTime: blockedEnd,
         blockedByOwner: true
       },
       {
-        startTime: "2027-03-01T00:00:00.000Z",
-        endTime: "2027-07-01T00:00:00.000Z",
+        startTime: blockedEnd,
+        endTime: availabilityEnd,
         blockedByOwner: false
       }
     ]);
@@ -192,23 +198,21 @@ describe.skip("Workshop timeslot integration", () => {
     const workshop = await createWorkshop(owner);
 
     const firstBlocked = await createTimeslot(owner, workshop.id, {
-      startTime: "2027-04-01T00:00:00.000Z",
-      endTime: "2027-04-15T00:00:00.000Z",
+      startTime: isoDaysFromNow(40, 0),
+      endTime: isoDaysFromNow(54, 0),
       blockedByOwner: true
     });
     expect(firstBlocked.status).toBe(201);
 
     const overlappingBlocked = await createTimeslot(owner, workshop.id, {
-      startTime: "2027-04-10T00:00:00.000Z",
-      endTime: "2027-04-20T00:00:00.000Z",
+      startTime: isoDaysFromNow(49, 0),
+      endTime: isoDaysFromNow(59, 0),
       blockedByOwner: true
     });
     expect(overlappingBlocked.status).toBe(409);
     expect(overlappingBlocked.body).toMatchObject({
-      error: {
-        code: "TIMESLOT_CONFLICT",
-        status: 409
-      }
+      code: "TIMESLOT_CONFLICT",
+      status: 409
     });
   });
 
@@ -217,42 +221,47 @@ describe.skip("Workshop timeslot integration", () => {
     const requester = await createUser("USER");
     const workshop = await createWorkshop(owner);
 
+    const availabilityStart = isoDaysFromNow(10, 0);
+    const availabilityEnd = isoDaysFromNow(40, 0);
+    const bookingStart = isoDaysFromNow(15, 10);
+    const bookingEnd = isoDaysFromNow(25, 10);
+    const blockedStart = isoDaysFromNow(18, 10);
+    const blockedEnd = isoDaysFromNow(28, 10);
+
     const availability = await createTimeslot(owner, workshop.id, {
-      startTime: "2027-05-01T00:00:00.000Z",
-      endTime: "2027-06-01T00:00:00.000Z"
+      startTime: availabilityStart,
+      endTime: availabilityEnd
     });
     expect(availability.status).toBe(201);
     expect(availability.body.id).toBeTypeOf("string");
 
-    const booking = await request(app)
-      .post("/api/bookings/workshop")
-      .set("Authorization", `Bearer ${requester.token}`)
-      .send({
+    await prisma.booking.create({
+      data: {
+        userId: requester.id,
         workshopId: workshop.id,
-        startDate: "2027-05-05T00:00:00.000Z",
-        endDate: "2027-05-15T00:00:00.000Z",
-        workshopToolIds: [workshop.workshopToolId]
-      });
-    expect(booking.status).toBe(201);
+        timeslotId: availability.body.id as string,
+        status: "ACCEPTED",
+        startDate: new Date(bookingStart),
+        endDate: new Date(bookingEnd)
+      }
+    });
 
     const blockedInsert = await createTimeslot(owner, workshop.id, {
-      startTime: "2027-05-10T00:00:00.000Z",
-      endTime: "2027-05-20T00:00:00.000Z",
+      startTime: blockedStart,
+      endTime: blockedEnd,
       blockedByOwner: true
     });
     expect(blockedInsert.status).toBe(409);
     expect(blockedInsert.body).toMatchObject({
-      error: {
-        code: "ACTIVE_BOOKING_EXISTS",
-        status: 409
-      }
+      code: "ACTIVE_BOOKING_EXISTS",
+      status: 409
     });
 
     const detail = await getWorkshopDetail(workshop.id);
     expect(detail.timeslots).toHaveLength(1);
     expect(detail.timeslots[0]?.blockedByOwner).toBe(false);
-    expect(new Date(detail.timeslots[0]!.startTime).toISOString()).toBe("2027-05-01T00:00:00.000Z");
-    expect(new Date(detail.timeslots[0]!.endTime).toISOString()).toBe("2027-06-01T00:00:00.000Z");
+    expect(new Date(detail.timeslots[0]!.startTime).toISOString()).toBe(availabilityStart);
+    expect(new Date(detail.timeslots[0]!.endTime).toISOString()).toBe(availabilityEnd);
   });
 
   it("rejects workshop bookings for owner-blocked timeslots", async () => {
@@ -260,9 +269,12 @@ describe.skip("Workshop timeslot integration", () => {
     const requester = await createUser("USER");
     const workshop = await createWorkshop(owner);
 
+    const blockedStart = isoDaysFromNow(20, 9);
+    const blockedEnd = isoDaysFromNow(20, 17);
+
     const blocked = await createTimeslot(owner, workshop.id, {
-      startTime: "2027-08-01T09:00:00.000Z",
-      endTime: "2027-08-01T17:00:00.000Z",
+      startTime: blockedStart,
+      endTime: blockedEnd,
       blockedByOwner: true
     });
     expect(blocked.status).toBe(201);
@@ -272,17 +284,15 @@ describe.skip("Workshop timeslot integration", () => {
       .set("Authorization", `Bearer ${requester.token}`)
       .send({
         workshopId: workshop.id,
-        startDate: "2027-08-01T09:00:00.000Z",
-        endDate: "2027-08-01T17:00:00.000Z",
+        startDate: blockedStart,
+        endDate: blockedEnd,
         workshopToolIds: [workshop.workshopToolId]
       });
 
     expect(bookingAttempt.status).toBe(409);
     expect(bookingAttempt.body).toMatchObject({
-      error: {
-        code: "TIMESLOT_BLOCKED",
-        status: 409
-      }
+      code: "TIMESLOT_BLOCKED",
+      status: 409
     });
 
     const blockedBookingCount = await prisma.booking.count({

@@ -38,7 +38,7 @@ services:
       CORS_ORIGIN: http://localhost:3000
       REDIS_URL: redis://redis:6379
       CACHE_BACKEND: redis
-      MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu"
+      MANAGER_EMAIL_ALLOWLIST: "mittermeier.lukas@web.de,unglertmaik@gmail.com,sauerwei@hm.edu,katalin.szentmiklosy@hm.edu,e2e-manager@toolshare.test"
     depends_on:
       db:
         condition: service_healthy
