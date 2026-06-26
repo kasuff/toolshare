@@ -1058,22 +1058,41 @@ semgrep-sast:
 
 security:container:trivy:
   stage: test
+  # docker-cli + DinD: wir bauen unten die TATSÄCHLICH ausgelieferten Images und
+  # scannen diese, statt nur die rohen Upstream-Bases. So greifen unsere
+  # `apt-get upgrade`/`apk upgrade`-Layer und ein bereits in Debian/Alpine
+  # gefixtes OS-Paket blockiert die Pipeline nicht mehr, nur weil der floatende
+  # Upstream-Tag (z. B. postgres:16-bookworm) noch nicht neu gebaut wurde.
   image:
-    name: aquasec/trivy:latest
+    name: docker:27.3.1-cli
     entrypoint: [""]
+  services:
+    - docker:27.3.1-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    # Das docker-cli-Image (Alpine) bringt nur den Client mit → Trivy nachziehen.
+    - apk add --no-cache curl
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
   script:
-    # Full scan incl. monitoring/ (the dora-exporter is our own image/code).
-    # First command writes the HIGH+CRITICAL report and never fails the job;
-    # the second gates the pipeline on CRITICAL findings only.
+    # 1) Quellbaum: Lockfiles, Secrets, Fehlkonfiguration. Erst der nie
+    #    blockierende HIGH+CRITICAL-Report, dann das CRITICAL-Gate.
     - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table -o trivy-report.txt . || true
     - trivy fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 1 .
-    # Zusätzlich die tatsächlichen Runtime-Base-Images auf CVEs scannen (der
-    # fs-Scan oben deckt nur Quellbaum/Lockfiles ab, nicht die OS-Layer der
-    # Container). Report wird angehängt; --ignore-unfixed gated nur auf CRITICAL-
-    # Lücken, für die es bereits einen Fix gibt → kein Blockieren durch
-    # Upstream-CVEs ohne Patch.
+    # 2) Unsere ausgelieferten Images bauen (Build-Kontext exkl. node_modules via
+    #    .dockerignore). backend/frontend nutzen Kontext '.', backup/alertmanager
+    #    ihr Unterverzeichnis — exakt wie docker-compose.prod.yml.
+    - docker build --target prod -f backend/Dockerfile  -t toolshare-backend:scan  .
+    - docker build --target prod -f frontend/Dockerfile -t toolshare-frontend:scan .
+    - docker build -f backup/Dockerfile -t toolshare-pg-walg:scan backup
+    - docker build -f monitoring/alertmanager/Dockerfile -t toolshare-alertmanager:scan monitoring/alertmanager
+    # 3) Gescannt werden die eben gebauten Images plus die Drittanbieter-Images,
+    #    die wir 1:1 deployen (redis, node-exporter). Report wird angehängt;
+    #    --ignore-unfixed gated nur auf CRITICAL-Lücken mit verfügbarem Fix.
     - |
-      IMAGES="postgres:16-bookworm node:20.19-bookworm-slim redis:7-alpine nginx:1.27-alpine prom/alertmanager:v0.27.0 prom/node-exporter:v1.8.1"
+      IMAGES="toolshare-backend:scan toolshare-frontend:scan toolshare-pg-walg:scan toolshare-alertmanager:scan redis:7-alpine prom/node-exporter:v1.8.1"
       echo "" >> trivy-report.txt
       echo "=== Image-Scans (HIGH,CRITICAL) ===" >> trivy-report.txt
       for img in $IMAGES; do
@@ -1081,7 +1100,7 @@ security:container:trivy:
         trivy image --scanners vuln --severity HIGH,CRITICAL --format table "$img" >> trivy-report.txt 2>&1 || true
       done
     - |
-      IMAGES="postgres:16-bookworm node:20.19-bookworm-slim redis:7-alpine nginx:1.27-alpine prom/alertmanager:v0.27.0 prom/node-exporter:v1.8.1"
+      IMAGES="toolshare-backend:scan toolshare-frontend:scan toolshare-pg-walg:scan toolshare-alertmanager:scan redis:7-alpine prom/node-exporter:v1.8.1"
       for img in $IMAGES; do
         trivy image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 "$img"
       done

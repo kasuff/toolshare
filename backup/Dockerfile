@@ -20,6 +20,9 @@ ARG TARGETARCH=amd64
 
 RUN set -eux; \
     apt-get update; \
+    # Sicherheits-Updates der Base-Layer einziehen (z. B. libgnutls30), damit das
+    # ausgelieferte Image nicht auf den Rebuild des Upstream-Tags warten muss.
+    apt-get upgrade -y; \
     # awscli: nur zum Messen der Bucket-Belegung (Size-Budget in backup.sh).
     apt-get install -y --no-install-recommends ca-certificates curl awscli; \
     # Asset-Namen je Architektur auflösen: WAL-G nutzt "aarch64", supercronic "arm64".

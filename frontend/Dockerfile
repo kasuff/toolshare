@@ -41,6 +41,9 @@ ENV VITE_GRAFANA_URL=$VITE_GRAFANA_URL
 RUN npm run build --workspace=frontend
 
 FROM nginx:1.27-alpine AS prod
+# Sicherheits-Updates der Alpine-Base einziehen, damit das ausgelieferte Image
+# nicht auf den Rebuild des Upstream-Tags warten muss.
+RUN apk -U upgrade --no-cache
 COPY ./frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 EXPOSE 80
