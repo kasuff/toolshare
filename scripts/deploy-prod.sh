@@ -172,6 +172,8 @@ if [ -n "${CI:-}" ]; then
 	# Alertmanager → GitLab (HTTP-Alert-Integration): Webhook-URL + Auth-Key.
 	set_env GITLAB_ALERT_WEBHOOK_URL "${GITLAB_ALERT_WEBHOOK_URL:-}"
 	set_env GITLAB_ALERT_AUTH_KEY "${GITLAB_ALERT_AUTH_KEY:-}"
+	# Dead-Man's-Switch: externe Heartbeat-Ping-URL für den Watchdog-Alert.
+	set_env WATCHDOG_HEARTBEAT_URL "${WATCHDOG_HEARTBEAT_URL:-}"
 fi
 
 # 3) Ensure the monitoring stack is up. It runs as an independent compose

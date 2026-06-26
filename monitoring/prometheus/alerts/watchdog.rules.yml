@@ -1,0 +1,25 @@
+groups:
+  - name: watchdog.alerts
+    rules:
+
+      # ── Dead-Man's-Switch ──────────────────────────────────────────────────
+      # Dieser Alert feuert IMMER (vector(1) ist konstant 1). Er meldet nichts an
+      # GitLab, sondern wird vom Alertmanager an einen EXTERNEN Heartbeat-Dienst
+      # (z. B. healthchecks.io / Dead Man's Snitch) geroutet, der genau dann
+      # alarmiert, wenn der Ping AUSBLEIBT.
+      #
+      # Sinn: Prometheus, Alertmanager und die App laufen auf derselben VM. Stirbt
+      # die Box — oder nur Prometheus/Alertmanager — können InstanceDown/BackendDown
+      # gar nicht mehr feuern (die Alarm-Pipeline ist mit-tot). Der Watchdog dreht
+      # die Logik um: solange die Pipeline lebt, kommt im Minutentakt ein Ping beim
+      # externen Dienst an; bleibt er aus, schlägt der externe Dienst Alarm.
+      #
+      # severity: none → wird vom DORA-Exporter (OUTAGE_ALERTNAMES) nicht als
+      # Ausfall gezählt und landet nicht im normalen GitLab-Incident-Pfad.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Watchdog: Monitoring-Pipeline lebt"
+          description: "Immer feuernder Heartbeat-Alert. Verschwindet er beim externen Heartbeat-Dienst, sind Prometheus und/oder Alertmanager (und damit die gesamte Alarmierung) tot — extern nachsehen."

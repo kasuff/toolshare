@@ -41,3 +41,33 @@ groups:
         annotations:
           summary: "Letztes FULL-Backup ist zu alt"
           description: "Das jüngste FULL-Backup ist {{ $value | humanizeDuration }} alt (Schwelle 8 Tage). Wöchentliches FULL (So 02:00) prüfen — Delta-Kette baut sonst auf einer alten Basis auf."
+
+      # ── Restore-Verifikation läuft gar nicht ───────────────────────────────
+      # "Ein Backup ist erst ein Backup, wenn der Restore getestet wurde." Diese
+      # Metrik schreibt scripts/verify-restore.sh nach einem nachweislich
+      # erfolgreichen Restore in einen Wegwerf-Postgres. Fehlt sie komplett, ist
+      # der wöchentliche CI-Schedule (backup:verify-restore) vermutlich nie
+      # eingerichtet worden — Backups werden gepusht, aber NIE auf
+      # Wiederherstellbarkeit geprüft. for: 8d überbrückt das Fenster bis zum
+      # ersten Lauf nach Aktivierung des Features.
+      - alert: RestoreVerifyMissing
+        expr: absent(toolshare_restore_verify_last_success_timestamp_seconds)
+        for: 8d
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restore-Verifikation hat noch nie erfolgreich gelaufen"
+          description: "Keine toolshare_restore_verify_last_success_timestamp_seconds-Metrik vorhanden. Wöchentlichen Pipeline-Schedule für backup:verify-restore einrichten (oder Job einmal manuell auf main starten), sonst werden Backups nie auf Wiederherstellbarkeit geprüft."
+
+      # ── Letzte Restore-Verifikation zu alt ─────────────────────────────────
+      # verify-restore läuft wöchentlich per Schedule. 9 Tage = 1 Woche + 2 Tage
+      # Puffer für verschobene Läufe. Schlägt der Restore-Test fehl, veraltet die
+      # Metrik → Alarm, bevor man im Ernstfall ein unbrauchbares Backup entdeckt.
+      - alert: RestoreVerifyTooOld
+        expr: time() - toolshare_restore_verify_last_success_timestamp_seconds > 9 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Letzte Restore-Verifikation ist zu alt"
+          description: "Die jüngste erfolgreiche Restore-Verifikation ist {{ $value | humanizeDuration }} alt (Schwelle 9 Tage). Der wöchentliche backup:verify-restore-Job schlägt vermutlich fehl — CI-Logs prüfen; das Backup ist evtl. nicht wiederherstellbar."

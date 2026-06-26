@@ -20,8 +20,38 @@ set -eu
 IMAGE="${RESTORE_IMAGE:-toolshare-pg-walg:local}"
 CONTAINER="toolshare-restore-test-$$"
 VOLUME="toolshare-restore-test-$$"
+# Geteiltes Heartbeat-Volume (von deploy-prod.sh angelegt). node-exporter liest
+# es read-only und Prometheus alarmiert auf veraltete Restore-Tests.
+METRICS_VOLUME="${RESTORE_METRICS_VOLUME:-toolshare-backup-metrics}"
 
 log() { echo "[verify-restore $(date -u +%FT%TZ)] $*"; }
+
+# Schreibt nach einem erfolgreichen Restore-Test eine node-exporter-Textfile-
+# Metrik ins geteilte Volume — dieselbe Konvention wie backup.sh. So unterscheidet
+# das Monitoring "Backup gepusht" (toolshare_backup_*) von "Restore nachweislich
+# wiederherstellbar" (toolshare_restore_verify_*). No-op, wenn das Volume fehlt
+# (z. B. lokaler Lauf ohne Monitoring-Stack) — die Verifikation selbst hängt nie
+# an der Metrik.
+write_restore_metric() {
+	if ! docker volume inspect "$METRICS_VOLUME" >/dev/null 2>&1; then
+		log "Hinweis: Volume $METRICS_VOLUME fehlt — Restore-Heartbeat-Metrik übersprungen."
+		return 0
+	fi
+	now="$(date +%s)"
+	# Atomar in einem Wegwerf-Container schreiben (erst .tmp, dann mv).
+	if docker run --rm -v "${METRICS_VOLUME}:/m" alpine:3 sh -c '
+		now="$1"; f=/m/toolshare_restore_verify.prom; t="/m/.toolshare_restore_verify.$$"
+		{
+			printf "%s\n" "# HELP toolshare_restore_verify_last_success_timestamp_seconds Unix-Zeit der letzten erfolgreichen WAL-G-Restore-Verifikation."
+			printf "%s\n" "# TYPE toolshare_restore_verify_last_success_timestamp_seconds gauge"
+			printf "%s\n" "toolshare_restore_verify_last_success_timestamp_seconds ${now}"
+		} >"$t" && mv -f "$t" "$f"
+	' _ "$now" >/dev/null 2>&1; then
+		log "Restore-Heartbeat-Metrik aktualisiert ($now)."
+	else
+		log "WARN: Restore-Heartbeat-Metrik konnte nicht geschrieben werden."
+	fi
+}
 
 # Pflicht-Variablen prüfen, bevor irgendetwas gestartet wird.
 : "${R2_BACKUP_BUCKET:?R2_BACKUP_BUCKET muss gesetzt sein}"
@@ -90,3 +120,7 @@ docker run --rm \
 	"$IMAGE" -c "$INNER"
 
 log "Restore-Verifikation erfolgreich abgeschlossen."
+
+# Erst NACH erfolgreichem Restore den Heartbeat erneuern (set -e hätte oben sonst
+# schon abgebrochen) → die Metrik beweist einen echten, geprüften Restore.
+write_restore_metric

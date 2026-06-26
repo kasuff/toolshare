@@ -14,6 +14,17 @@ route:
   group_interval: 5m
   # Nicht öfter als alle 4h an einen weiterhin offenen Alert erinnern.
   repeat_interval: 4h
+  routes:
+    # Dead-Man's-Switch: der immer feuernde Watchdog-Alert darf NICHT zu GitLab
+    # (sonst Dauer-Incident). Er geht an den externen Heartbeat-Dienst und wird
+    # solange die Pipeline lebt im Minutentakt erneuert. group_wait: 0s → der
+    # erste Ping kommt sofort; repeat_interval: 1m → regelmäßiger Heartbeat.
+    - receiver: deadmansswitch
+      matchers:
+        - alertname = "Watchdog"
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
 
 receivers:
   - name: gitlab
@@ -25,3 +36,10 @@ receivers:
           authorization:
             type: Bearer
             credentials: "__GITLAB_ALERT_AUTH_KEY__"
+
+  # Externer Heartbeat-Empfänger für den Watchdog. entrypoint.sh füllt die
+  # webhook_configs aus WATCHDOG_HEARTBEAT_URL. Ist die URL nicht gesetzt, bleibt
+  # hier nur der Name stehen → ein gültiger No-op-Receiver (der Watchdog wird
+  # verworfen, der Deploy läuft trotzdem). Diese Zeile wird ersetzt/entfernt:
+  - name: deadmansswitch
+__WATCHDOG_WEBHOOK_CONFIGS__

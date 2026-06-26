@@ -290,6 +290,11 @@ services:
       # einen Alertmanager ohne funktionierendes Ziel hochzufahren.
       GITLAB_ALERT_WEBHOOK_URL: ${GITLAB_ALERT_WEBHOOK_URL:?GITLAB_ALERT_WEBHOOK_URL muss gesetzt sein}
       GITLAB_ALERT_AUTH_KEY: ${GITLAB_ALERT_AUTH_KEY:?GITLAB_ALERT_AUTH_KEY muss gesetzt sein}
+      # Dead-Man's-Switch (optional): Ping-URL eines externen Heartbeat-Dienstes
+      # (z. B. healthchecks.io / Dead Man's Snitch). Der immer feuernde
+      # Watchdog-Alert wird hierhin geroutet; bleibt der Ping aus, ist die
+      # gesamte Alarm-Pipeline tot. Leer = Dead-Man's-Switch inaktiv.
+      WATCHDOG_HEARTBEAT_URL: ${WATCHDOG_HEARTBEAT_URL:-}
     ports:
       # Nur an localhost (Debug/SSH-Tunnel); Prometheus erreicht AM übers Docker-Netz.
       - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
