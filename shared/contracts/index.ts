@@ -20,3 +20,5 @@ export * from "./response/system-rules.schema";
 export * from "./response/address.schema";
 export * from "./errors/problem.schema";
 export * from "./request/notifications.schema";
+export * from "./request/inbox.schema";
+export * from "./response/inbox.schema";

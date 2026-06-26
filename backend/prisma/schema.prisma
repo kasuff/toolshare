@@ -82,6 +82,7 @@ model User {
   suspensionRequestsMade     SuspensionRequest[] @relation("SuspensionRequester")
   timeslotProposalsAuthored BookingTimeslotProposal[] @relation("TimeslotProposalAuthor")
   refreshTokens RefreshToken[]
+  inboxReadReceipts InboxReadReceipt[]
 }
 
 // Serverseitig nachgehaltene Refresh-Tokens. Es wird nur der SHA-256-Hash des
@@ -261,6 +262,22 @@ model Notification {
 
   // Deckt listByUser ab: Filter userId + Sortierung createdAt desc.
   @@index([userId, createdAt])
+}
+
+// Server-seitiger Read-Status der Inbox. Anders als Notification haben Buchungen,
+// Proposals und Ratings keine eigenen Message-Zeilen; der „gelesen"-Status ist eine
+// Menge synthetischer Keys (req:<id>, prop:<id>:<pid>, rating:<id>:<rid>). Früher nur
+// lokal (localStorage/SecureStore) → nicht geräteübergreifend. Der reservierte Key
+// __seeded__ markiert, dass die Erst-Historie des Nutzers einmalig geseedet wurde.
+model InboxReadReceipt {
+  id         String   @id @default(uuid())
+  userId     String
+  messageKey String
+  readAt     DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageKey])
+  @@index([userId])
 }
 
 model Report {

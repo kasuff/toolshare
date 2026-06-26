@@ -41,6 +41,14 @@ components:
           type:
             - string
             - "null"
+        pickupLat:
+          type:
+            - number
+            - "null"
+        pickupLon:
+          type:
+            - number
+            - "null"
         status:
           type: string
           enum: &a1
@@ -137,6 +145,14 @@ components:
           pickupLocationNote:
             type:
               - string
+              - "null"
+          pickupLat:
+            type:
+              - number
+              - "null"
+          pickupLon:
+            type:
+              - number
               - "null"
           status:
             type: string
@@ -901,6 +917,14 @@ components:
           type: string
         location:
           type: string
+        latitude:
+          type:
+            - number
+            - "null"
+        longitude:
+          type:
+            - number
+            - "null"
         maxCapacity:
           type: number
         extras:
@@ -1018,6 +1042,14 @@ components:
             type: string
           location:
             type: string
+          latitude:
+            type:
+              - number
+              - "null"
+          longitude:
+            type:
+              - number
+              - "null"
           maxCapacity:
             type: number
           extras:
@@ -1133,6 +1165,14 @@ components:
           type: string
         address:
           type: string
+        latitude:
+          type:
+            - number
+            - "null"
+        longitude:
+          type:
+            - number
+            - "null"
         role:
           type: string
           enum: &a7
@@ -1169,6 +1209,14 @@ components:
             type: string
           address:
             type: string
+          latitude:
+            type:
+              - number
+              - "null"
+          longitude:
+            type:
+              - number
+              - "null"
           role:
             type: string
             enum: *a7
