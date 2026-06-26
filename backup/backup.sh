@@ -8,7 +8,7 @@
 #   backup.sh full    → vollständiges Basis-Backup  (wöchentlich, So)
 #   backup.sh delta   → Differenz seit letztem Full (täglich, Mo–Sa)
 #
-# Konfigurierbar über Environment (.env.backup):
+# Konfigurierbar über Environment (in compose gesetzt, siehe walg-backup-Service):
 #   RETAIN_FULL       Anzahl der FULL-Ketten, die behalten werden (Default 4)
 #   MAX_BACKUP_BYTES  Maximale Gesamtbelegung im Bucket in Bytes.
 #                     Default 1_800_000_000 (~1,8 GB) → Headroom unter 2 GB für
