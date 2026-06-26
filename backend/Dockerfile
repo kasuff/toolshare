@@ -53,6 +53,7 @@ RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 \
 COPY --from=build --chown=node:node /shared /shared
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/prisma ./prisma
+COPY --from=build --chown=node:node /app/scripts ./scripts
 RUN npx prisma generate
 
 EXPOSE 4000

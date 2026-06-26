@@ -43,7 +43,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && node dist/index.js"
+    command: sh -c "sh scripts/migrate-deploy.sh && node dist/index.js"
     restart: unless-stopped
     # Speicher deckeln: ein einzelner Container darf die VM (3,8 GB, kein Swap)
     # nicht komplett auffressen und damit den ganzen Gast einfrieren.
