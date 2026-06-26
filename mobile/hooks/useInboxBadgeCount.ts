@@ -1,77 +1,39 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState } from 'react-native';
-import { api } from '@toolshare/shared';
+import { useEffect, useMemo } from 'react';
+import type { Rating } from '@toolshare/shared';
 import { useAuth } from './useAuth';
-import { countUnreadInboxItems } from '../utils/inboxUnread';
-import { subscribeInboxBadgeRefresh } from '../utils/inboxBadgeEvents';
+import { useInboxData } from './queries/inbox.queries';
+import { useInboxReadStore } from '../store/inboxReadStore';
+import { isInboxSystemNotification } from '../utils/inboxUnread';
+import { countUnreadInboxThreads } from '../utils/inboxMessageRead';
 
-const POLL_INTERVAL_MS = 30_000;
-const MIN_FETCH_INTERVAL_MS = 3_000;
-
+// Tab-Badge mit der Anzahl ungelesener Inbox-Items. Früher ein eigenes
+// setInterval-/AppState-Polling – jetzt rein abgeleitet aus dem gemeinsamen
+// useInboxData-Query (Polling + Focus-Refetch) und den gelesen-IDs im
+// inboxReadStore. Pendant zu useInboxBackground in der Webapp.
 export function useInboxBadgeCount(): number {
   const { token, currentUser } = useAuth();
-  const [count, setCount] = useState(0);
-  const lastFetchAtRef = useRef(0);
-  const inFlightRef = useRef(false);
+  const { data } = useInboxData(token, currentUser?.id);
+  const readMessageIds = useInboxReadStore((s) => s.readMessageIds);
+  const loadForUser = useInboxReadStore((s) => s.loadForUser);
 
-  const fetchFromApi = useCallback(async (force = false) => {
-    if (!token || !currentUser?.id || inFlightRef.current) {
-      return;
-    }
-
-    const now = Date.now();
-    if (!force && now - lastFetchAtRef.current < MIN_FETCH_INTERVAL_MS) {
-      return;
-    }
-
-    inFlightRef.current = true;
-    lastFetchAtRef.current = now;
-
-    try {
-      const [bookings, notifications] = await Promise.all([
-        api.getBookingsForUser(token),
-        api.getNotifications(token),
-      ]);
-      setCount(await countUnreadInboxItems(bookings, notifications, currentUser.id));
-    } catch {
-      // Keep the previous badge count when a background refresh fails.
-    } finally {
-      inFlightRef.current = false;
-    }
-  }, [token, currentUser?.id]);
-
-  const refresh = useCallback(
-    (knownCount?: number) => {
-      if (!token || !currentUser?.id) {
-        setCount(0);
-        return;
-      }
-
-      if (knownCount !== undefined) {
-        setCount(knownCount);
-        return;
-      }
-
-      void fetchFromApi(true);
-    },
-    [token, currentUser?.id, fetchFromApi]
-  );
-
+  // Sobald die Serverdaten vorliegen, gelesen-IDs (einmalig) seeden/laden.
   useEffect(() => {
-    void fetchFromApi(true);
+    if (data && currentUser?.id) {
+      void loadForUser(currentUser.id, data.bookings, data.ratingsReceived);
+    }
+  }, [data, currentUser?.id, loadForUser]);
 
-    const intervalId = setInterval(() => void fetchFromApi(), POLL_INTERVAL_MS);
-    const appStateSubscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void fetchFromApi(true);
-    });
-    const unsubscribe = subscribeInboxBadgeRefresh((knownCount) => refresh(knownCount));
-
-    return () => {
-      clearInterval(intervalId);
-      appStateSubscription.remove();
-      unsubscribe();
-    };
-  }, [fetchFromApi, refresh]);
-
-  return count;
+  return useMemo(() => {
+    if (!data || !currentUser?.id) return 0;
+    const ratingsByBookingId = new Map<string, Rating>(
+      data.ratingsReceived.map((rating) => [rating.bookingId, rating])
+    );
+    let count = countUnreadInboxThreads(data.bookings, currentUser.id, readMessageIds, ratingsByBookingId);
+    for (const notification of data.notifications) {
+      if (!notification.read && isInboxSystemNotification(notification.message)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [data, currentUser?.id, readMessageIds]);
 }

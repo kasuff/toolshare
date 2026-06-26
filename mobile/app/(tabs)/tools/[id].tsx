@@ -1,9 +1,12 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { View, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Pressable } from 'react-native';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { Tool, api, getPlaceholderImageForCategory, TOOL_CATEGORIES } from '@toolshare/shared';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { api, getPlaceholderImageForCategory, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { useToolDetail, useToolBlockingPeriods, useToolRatings, toolKeys } from '../../../hooks/queries/tools.queries';
+import { inboxKeys } from '../../../hooks/queries/inbox.queries';
 import { LoadingSpinner } from '../../../components/EmptyState';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
@@ -91,13 +94,18 @@ export default function ToolDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { token, currentUser } = useAuth();
-  
+  const queryClient = useQueryClient();
+
   const defaults = useMemo(getDefaultDateRange, []);
 
-  const [tool, setTool] = useState<Tool | null>(null);
-  const [blockingPeriods, setBlockingPeriods] = useState<BlockingPeriod[]>([]);
-  const [ratings, setRatings] = useState<PublicRating[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const toolQuery = useToolDetail(id ?? '', token);
+  const blockingQuery = useToolBlockingPeriods(id ?? '');
+  const ratingsQuery = useToolRatings(id ?? '');
+  const tool = toolQuery.data ?? null;
+  const blockingPeriods = useMemo<BlockingPeriod[]>(() => blockingQuery.data ?? [], [blockingQuery.data]);
+  const ratings: PublicRating[] = ratingsQuery.data ?? [];
+  const isLoading = toolQuery.isLoading;
+
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [startTime, setStartTime] = useState("10:00");
   const [endDate, setEndDate] = useState(defaults.endDate);
@@ -114,32 +122,6 @@ export default function ToolDetailScreen() {
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [isReporting, setIsReporting] = useState(false);
-
-  const loadData = useCallback(async () => {
-    if (!token || !id) return;
-    try {
-      setError('');
-      const [toolData, periodsData, toolRatings] = await Promise.all([
-        api.getToolById(id, token),
-        api.getToolBlockingPeriods(id),
-        api.getRatingsForTool(id).catch(() => [])
-      ]);
-      setTool(toolData);
-      setBlockingPeriods(periodsData);
-      setRatings(toolRatings);
-    } catch (e) {
-      console.error(e);
-      setError(getErrorMessage(e, 'Fehler beim Laden der Werkzeugdaten'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id, token]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [loadData])
-  );
 
   const isAvailable = tool?.status === 'VERFUEGBAR';
   const isOwnTool = Boolean(tool && currentUser?.id === tool.ownerId);
@@ -203,8 +185,7 @@ export default function ToolDetailScreen() {
       if (type === 'BLOCK') {
         await api.createToolOwnerBlock({ toolId: tool!.id, startIso, endIso }, token!);
         setSuccess('Werkzeug wurde erfolgreich blockiert.');
-        const updatedPeriods = await api.getToolBlockingPeriods(tool!.id);
-        setBlockingPeriods(updatedPeriods);
+        void queryClient.invalidateQueries({ queryKey: toolKeys.blocking(tool!.id) });
       } else {
         await api.createToolRequest({
           toolId: tool!.id,
@@ -213,6 +194,8 @@ export default function ToolDetailScreen() {
           pickupTimeIso: startIso
         }, token!);
         setSuccess('Buchungsanfrage erfolgreich gesendet!');
+        void queryClient.invalidateQueries({ queryKey: toolKeys.detail(tool!.id) });
+        void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
         setTimeout(() => {
           router.replace('/inbox');
         }, 1500);

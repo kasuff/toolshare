@@ -1,5 +1,5 @@
 import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Modal, Animated } from 'react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
@@ -8,51 +8,28 @@ import { EmptyState } from '../../components/EmptyState';
 import { ToolCard } from '../../components/ToolCard';
 import { WorkshopCard } from '../../components/WorkshopCard';
 import { useAuth } from '../../hooks/useAuth';
-import { api, Tool, Workshop } from '@toolshare/shared';
+import { useMyOffers } from '../../hooks/queries/offers.queries';
 import { getErrorMessage } from '../../utils/errors';
 
 export default function OffersScreen() {
   const { currentUser, token } = useAuth();
-  const [tools, setTools] = useState<Tool[]>([]);
-  const [workshops, setWorkshops] = useState<Workshop[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownAnimation = useRef(new Animated.Value(0)).current;
   const colors = useThemeColors();
   const styles = useStyles();
 
-  const loadOffers = useCallback(async () => {
-    if (!currentUser || !token) {
-      setLoading(false);
-      return;
-    }
-    try {
-      setError(null);
-      const [ownedTools, ownedWorkshops] = await Promise.all([
-        api.getTools({ ownerId: currentUser.id }, token),
-        api.getWorkshops({ managerId: currentUser.id }, token)
-      ]);
-      setTools(ownedTools.filter(t => t.ownerId === currentUser.id));
-      setWorkshops(ownedWorkshops.filter(w => w.workshop.ownerId === currentUser.id).map(w => w.workshop));
-    } catch (e) {
-      console.error('Failed to load offers:', e);
-      setError(getErrorMessage(e, 'Angebote konnten nicht geladen werden.'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [currentUser, token]);
-
-  useEffect(() => {
-    loadOffers();
-  }, [loadOffers]);
+  const { data, isLoading, isRefetching, isError, error: queryError, refetch } = useMyOffers(
+    currentUser?.id,
+    token
+  );
+  const tools = data?.tools ?? [];
+  const workshops = data?.workshops ?? [];
+  const loading = isLoading && Boolean(currentUser && token);
+  const error = isError ? getErrorMessage(queryError, 'Angebote konnten nicht geladen werden.') : null;
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadOffers();
-  }, [loadOffers]);
+    void refetch();
+  }, [refetch]);
 
   const openDropdown = useCallback(() => {
     setIsDropdownOpen(true);
@@ -99,7 +76,7 @@ export default function OffersScreen() {
     <ScrollView 
       style={styles.container} 
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
     >
       <View style={styles.header}>
         <View style={styles.headerTextContainer}>

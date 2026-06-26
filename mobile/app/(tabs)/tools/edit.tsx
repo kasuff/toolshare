@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react';
 import { View, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Pressable, Alert } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { toolKeys } from '../../../hooks/queries/tools.queries';
+import { offerKeys } from '../../../hooks/queries/offers.queries';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +25,7 @@ export default function EditToolScreen() {
   const Colors = useThemeColors();
   const styles = useStyles();
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -185,6 +189,8 @@ export default function EditToolScreen() {
         imageUrl: selectedImage || DEFAULT_PLACEHOLDER_IMAGE,
       }, token!);
 
+      void queryClient.invalidateQueries({ queryKey: toolKeys.all });
+      void queryClient.invalidateQueries({ queryKey: offerKeys.all });
       router.back();
     } catch (err) {
       setApiError(getErrorMessage(err, 'Werkzeug konnte nicht angelegt werden.'));
@@ -206,6 +212,8 @@ export default function EditToolScreen() {
             setIsSubmitting(true);
             try {
               await api.deleteTool(id!, token!);
+              void queryClient.invalidateQueries({ queryKey: toolKeys.all });
+              void queryClient.invalidateQueries({ queryKey: offerKeys.all });
               router.back();
             } catch (err) {
               setApiError(getErrorMessage(err, 'Werkzeug konnte nicht gelöscht werden.'));

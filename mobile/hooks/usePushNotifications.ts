@@ -3,8 +3,10 @@ import { Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@toolshare/shared";
 import { storage } from "../utils/appStorage";
+import { inboxKeys } from "./queries/inbox.queries";
 
 const PUSH_LISTENER_DEBOUNCE_MS = 1_000;
 
@@ -27,6 +29,7 @@ try {
 }
 
 export function usePushNotifications(token: string | null, userId?: string) {
+  const queryClient = useQueryClient();
   const [expoPushToken, setExpoPushToken] = useState("");
   const [notification, setNotification] = useState<Notifications.Notification | undefined>(
     undefined
@@ -122,6 +125,10 @@ export function usePushNotifications(token: string | null, userId?: string) {
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (nextNotification) => {
         setNotification(nextNotification);
+        // Push im Vordergrund → Inbox-Daten + Badge sofort aktualisieren, statt erst
+        // beim nächsten Poll. Im Hintergrund zeigt Expo die Notification ohnehin an;
+        // beim Öffnen der App sorgt der Focus-Refetch für Aktualität.
+        void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
       }
     );
 
@@ -144,7 +151,7 @@ export function usePushNotifications(token: string | null, userId?: string) {
         responseListener.current.remove();
       }
     };
-  }, [token, userId]);
+  }, [token, userId, queryClient]);
 
   return {
     expoPushToken,
