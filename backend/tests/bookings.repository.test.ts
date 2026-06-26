@@ -231,7 +231,8 @@ describe("bookingsRepository", () => {
     expect(mocks.txBookingFindFirst).toHaveBeenCalledWith({
       where: {
         toolId: "tool-1",
-        status: { in: ["PENDING", "ACCEPTED"] },
+        // Anfrage-Modell: nur bestätigte Buchungen reservieren -> nur ACCEPTED.
+        status: "ACCEPTED",
         startDate: { lt: endDate },
         endDate: { gt: startDate }
       }

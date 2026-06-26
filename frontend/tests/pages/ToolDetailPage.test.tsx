@@ -368,7 +368,7 @@ describe("ToolDetailPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Zeitraum.*blockieren/i }));
 
     expect(createToolOwnerBlock).not.toHaveBeenCalled();
-    expect(await screen.findByText(/bereits eine angenommene oder offene Buchung/i)).toBeInTheDocument();
+    expect(await screen.findByText(/bereits eine bestätigte Buchung/i)).toBeInTheDocument();
   });
   it("submits a report for another provider's tool", async () => {
     getTools.mockResolvedValueOnce([

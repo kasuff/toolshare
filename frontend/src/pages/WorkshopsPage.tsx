@@ -13,6 +13,7 @@ import { pluralize } from "@toolshare/shared";
 import type { User } from "@toolshare/shared";
 import { usePageAuth } from "../hooks/usePageAuth";
 import { WorkshopDetailView, type WorkshopListItem } from "../components/WorkshopDetailView";
+import { DEFAULT_MAX_CAPACITY, DEFAULT_RADIUS_KM, useFilterStore } from "../store/filterStore";
 
 type Props = {
   currentUser?: User;
@@ -26,12 +27,18 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
   const { id: openWorkshopId } = useParams();
   const [searchParams] = useSearchParams();
 
-  const [q, setQ] = useState("");
-  const [toolFilter, setToolFilter] = useState("");
-  const [borrowFrom, setBorrowFrom] = useState("");
-  const [borrowUntil, setBorrowUntil] = useState("");
-  const [maxCapacityFilter, setMaxCapacityFilter] = useState(10);
-  const [radiusKm, setRadiusKm] = useState(15);
+  const { q, toolFilter, borrowFrom, borrowUntil, maxCapacityFilter, radiusKm, advancedOpen } =
+    useFilterStore((state) => state.workshopFilters);
+  const setWorkshopFilter = useFilterStore((state) => state.setWorkshopFilter);
+  const resetWorkshopFilters = useFilterStore((state) => state.resetWorkshopFilters);
+
+  const setQ = (value: string) => setWorkshopFilter("q", value);
+  const setToolFilter = (value: string) => setWorkshopFilter("toolFilter", value);
+  const setBorrowFrom = (value: string) => setWorkshopFilter("borrowFrom", value);
+  const setBorrowUntil = (value: string) => setWorkshopFilter("borrowUntil", value);
+  const setMaxCapacityFilter = (value: number) => setWorkshopFilter("maxCapacityFilter", value);
+  const setRadiusKm = (value: number) => setWorkshopFilter("radiusKm", value);
+
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string | null>(null);
 
   const defaultLocation = currentUser?.address ?? "München Zentrum";
@@ -125,16 +132,9 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
     }
   }, [items, openWorkshopId, selectedWorkshopId]);
 
-  const hasActiveFilters = Boolean(q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== 10 || radiusKm !== 15);
+  const hasActiveFilters = Boolean(q || toolFilter || borrowFrom || borrowUntil || maxCapacityFilter !== DEFAULT_MAX_CAPACITY || radiusKm !== DEFAULT_RADIUS_KM);
 
-  const resetFilters = () => {
-    setQ("");
-    setToolFilter("");
-    setBorrowFrom("");
-    setBorrowUntil("");
-    setMaxCapacityFilter(10);
-    setRadiusKm(15);
-  };
+  const resetFilters = resetWorkshopFilters;
 
   const openWorkshop = (workshop: WorkshopListItem) => {
     navigate(`/workshops/${workshop.workshop.id}`);
@@ -191,7 +191,11 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
                 </select>
               </Field>
             </div>
-            <details className="advanced-filter-panel">
+            <details
+              className="advanced-filter-panel"
+              open={advancedOpen}
+              onToggle={(e) => setWorkshopFilter("advancedOpen", e.currentTarget.open)}
+            >
               <summary>Erweiterte Filter anzeigen</summary>
               <div className="advanced-filter-grid">
                 <div className="advanced-filter-fields">

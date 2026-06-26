@@ -236,6 +236,22 @@ export const bookingsService = {
       throw new AppError("FORBIDDEN", "Only provider or moderation roles can update booking", 403);
     }
 
+    // Anfrage-Modell (Werkzeuge): Offene Anfragen reservieren den Zeitraum nicht,
+    // mehrere dürfen sich überlappen. Spätestens beim BESTÄTIGEN muss daher
+    // sichergestellt sein, dass keine andere bereits bestätigte Buchung den
+    // Zeitraum belegt -- sonst entstünde eine Doppelbuchung.
+    if (input.status === "ACCEPTED" && booking.toolId) {
+      const conflict = await bookingsRepository.findToolBookingOverlap(
+        booking.id,
+        booking.toolId,
+        booking.startDate,
+        booking.endDate
+      );
+      if (conflict) {
+        throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
+      }
+    }
+
     const notifyUserId =
       booking.userId !== input.actorId ? booking.userId : undefined;
 

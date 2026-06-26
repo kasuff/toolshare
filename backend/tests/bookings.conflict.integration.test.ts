@@ -137,7 +137,8 @@ describe("Booking conflict handling (tool + workshop)", () => {
     await prisma.$disconnect();
   });
 
-  it("creates a tool booking and rejects an overlapping second request with 409", async () => {
+  it("allows overlapping pending tool requests but blocks a second confirmation (Anfrage-Modell)", async () => {
+    // Erste Anfrage.
     const first = await request(app)
       .post("/api/bookings/tool")
       .set("Authorization", `Bearer ${requesterToken}`)
@@ -149,8 +150,11 @@ describe("Booking conflict handling (tool + workshop)", () => {
       });
 
     expect(first.status).toBe(201);
+    const firstBookingId = first.body.id as string;
 
-    const conflict = await request(app)
+    // Zweite, ÜBERLAPPENDE Anfrage eines anderen Nutzers: offene Anfragen
+    // reservieren den Zeitraum nicht -> jetzt ebenfalls erlaubt (201).
+    const secondPending = await request(app)
       .post("/api/bookings/tool")
       .set("Authorization", `Bearer ${secondRequesterToken}`)
       .send({
@@ -160,13 +164,46 @@ describe("Booking conflict handling (tool + workshop)", () => {
         pickupTime: isoDaysFromNow(5, 14)
       });
 
-    expect(conflict.status).toBe(409);
-    expect(conflict.body).toMatchObject({
+    expect(secondPending.status).toBe(201);
+    const secondBookingId = secondPending.body.id as string;
+
+    // Eigentümer bestätigt die erste Anfrage -> Zeitraum ist jetzt belegt.
+    const acceptFirst = await request(app)
+      .patch(`/api/bookings/${firstBookingId}/status`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ status: "ACCEPTED" });
+
+    expect(acceptFirst.status).toBe(200);
+
+    // Die überlappende zweite Anfrage lässt sich nun NICHT mehr bestätigen
+    // (Doppelbuchung wird beim Annehmen verhindert).
+    const acceptSecond = await request(app)
+      .patch(`/api/bookings/${secondBookingId}/status`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ status: "ACCEPTED" });
+
+    expect(acceptSecond.status).toBe(409);
+    expect(acceptSecond.body).toMatchObject({
       code: "BOOKING_CONFLICT",
       status: 409,
       detail: "Im gewählten Zeitraum ist bereits eine Buchung vorhanden."
     });
 
+    // Eine neue überlappende Anfrage kollidiert jetzt schon beim Anlegen mit der
+    // bereits bestätigten Buchung.
+    const overlapAfterAccept = await request(app)
+      .post("/api/bookings/tool")
+      .set("Authorization", `Bearer ${secondRequesterToken}`)
+      .send({
+        toolId,
+        startDate: isoDaysFromNow(6),
+        endDate: isoDaysFromNow(8, 18),
+        pickupTime: isoDaysFromNow(6, 14)
+      });
+
+    expect(overlapAfterAccept.status).toBe(409);
+
+    // Nicht überlappender Zeitraum bleibt buchbar.
     const nonOverlap = await request(app)
       .post("/api/bookings/tool")
       .set("Authorization", `Bearer ${secondRequesterToken}`)

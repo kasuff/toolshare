@@ -4,24 +4,29 @@ WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-# @toolshare/shared is file:../shared — lives at /shared next to /app.
-COPY backend/package*.json ./
-COPY shared/package*.json /shared/
-RUN npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+# Alle Installs laufen als unprivilegierter `node`-User, damit node_modules
+# von Anfang an node gehoert. Das erspart am Ende ein `chown -R node:node`
+# ueber node_modules -- auf overlayfs erzwingt jeder chown ein copy-up des
+# gesamten Baums (>60s und doppelt so grosses Image).
+RUN mkdir -p /shared && chown node:node /app /shared
+USER node
 
-COPY shared /shared
-RUN --mount=type=cache,target=/root/.npm \
+# @toolshare/shared is file:../shared — lives at /shared next to /app.
+COPY --chown=node:node backend/package*.json ./
+COPY --chown=node:node shared/package*.json /shared/
+RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 \
+    npm ci --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+
+COPY --chown=node:node shared /shared
+RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 \
     npm install --prefix /shared --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 \
     && npm run build --prefix /shared
-COPY backend/prisma ./prisma
+COPY --chown=node:node backend/prisma ./prisma
 RUN npx prisma generate
 
-COPY backend/tsconfig.json ./
-COPY backend/src ./src
-COPY backend/scripts ./scripts
-
-# prisma generate runs as root; dev runs as node (see below).
-RUN chown -R node:node /app /shared
+COPY --chown=node:node backend/tsconfig.json ./
+COPY --chown=node:node backend/src ./src
+COPY --chown=node:node backend/scripts ./scripts
 
 FROM base AS dev
 ENV NODE_ENV=development
@@ -37,14 +42,18 @@ WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-COPY backend/package*.json ./
-COPY shared/package*.json /shared/
-RUN npm ci --omit=dev --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+RUN mkdir -p /shared && chown node:node /app /shared
+USER node
 
-COPY --from=build /shared /shared
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/prisma ./prisma
-RUN npx prisma generate && chown -R node:node /app /shared
+COPY --chown=node:node backend/package*.json ./
+COPY --chown=node:node shared/package*.json /shared/
+RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 \
+    npm ci --omit=dev --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000
+
+COPY --from=build --chown=node:node /shared /shared
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/prisma ./prisma
+RUN npx prisma generate
 
 EXPOSE 4000
 USER node

@@ -2,7 +2,11 @@ import { BookingStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { notificationOutboxService } from "../../infrastructure/outbox/notification-outbox.service";
 
-/** Buchungen in diesen Statusen blockieren Werkzeug-Zeiträume bzw. Werkstatt-Slots. */
+/**
+ * Buchungen in diesen Statusen blockieren Werkstatt-Slots (Reservierungsmodell:
+ * schon die offene Anfrage hält den Slot). Werkzeuge nutzen bewusst NUR ACCEPTED
+ * (Anfrage-Modell, siehe createToolBookingTransaction / findToolBookingOverlap).
+ */
 const BLOCKING_BOOKING_STATUSES: BookingStatus[] = ["PENDING", "ACCEPTED"];
 
 export const bookingsRepository = {
@@ -172,10 +176,14 @@ export const bookingsRepository = {
         return null;
       }
 
+      // Anfrage-Modell: nur BESTÄTIGTE (ACCEPTED) Buchungen reservieren einen
+      // Zeitraum. Offene Anfragen (PENDING) blockieren nicht -- mehrere Nutzer
+      // dürfen denselben Zeitraum anfragen, der Eigentümer bestätigt eine. Die
+      // Doppelbuchung wird beim Bestätigen verhindert (updateBookingStatus).
       const overlap = await tx.booking.findFirst({
         where: {
           toolId: input.toolId,
-          status: { in: BLOCKING_BOOKING_STATUSES },
+          status: "ACCEPTED",
           startDate: { lt: input.endDate },
           endDate: { gt: input.startDate }
         }
@@ -216,10 +224,14 @@ export const bookingsRepository = {
       if (!tool) return "TOOL_NOT_FOUND" as const;
       if (tool.ownerId !== input.ownerId) return "FORBIDDEN" as const;
 
+      // Anfrage-Modell: nur BESTÄTIGTE (ACCEPTED) Buchungen reservieren einen
+      // Zeitraum. Offene Anfragen (PENDING) blockieren nicht -- mehrere Nutzer
+      // dürfen denselben Zeitraum anfragen, der Eigentümer bestätigt eine. Die
+      // Doppelbuchung wird beim Bestätigen verhindert (updateBookingStatus).
       const overlap = await tx.booking.findFirst({
         where: {
           toolId: input.toolId,
-          status: { in: BLOCKING_BOOKING_STATUSES },
+          status: "ACCEPTED",
           startDate: { lt: input.endDate },
           endDate: { gt: input.startDate }
         }
@@ -370,12 +382,14 @@ export const bookingsRepository = {
     });
   },
 
+  // Anfrage-Modell: nur bestätigte Buchungen reservieren einen Zeitraum, daher
+  // zählt hier ausschließlich ACCEPTED (offene Anfragen kollidieren nicht).
   findToolBookingOverlap(excludeBookingId: string, toolId: string, start: Date, end: Date) {
     return prisma.booking.findFirst({
       where: {
         id: { not: excludeBookingId },
         toolId,
-        status: { in: BLOCKING_BOOKING_STATUSES },
+        status: "ACCEPTED",
         startDate: { lt: end },
         endDate: { gt: start }
       }

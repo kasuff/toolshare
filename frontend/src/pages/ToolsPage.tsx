@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DateInput } from "../components/DateInput";
 import { OfferCard } from "../components/OfferCard";
 import { EmptyState, Field, GuestBanner, SkeletonCards, Surface } from "../components/ui";
@@ -11,6 +11,7 @@ import { formatOfferDistance } from "../utils/offerFormatting";
 import {  pluralize  } from "@toolshare/shared";
 import type {  User  } from "@toolshare/shared";
 import { usePageAuth } from "../hooks/usePageAuth";
+import { DEFAULT_RADIUS_KM, useFilterStore } from "../store/filterStore";
 
 function categoryMatches(toolCategory: string, selectedCategory: string) {
   if (!selectedCategory) return true;
@@ -36,11 +37,17 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
     longitude: currentUser?.longitude,
     location: defaultLocation
   };
-  const [q, setQ] = useState("");
-  const [category, setCategory] = useState("");
-  const [borrowFrom, setBorrowFrom] = useState("");
-  const [borrowUntil, setBorrowUntil] = useState("");
-  const [radiusKm, setRadiusKm] = useState(15);
+  const { q, category, borrowFrom, borrowUntil, radiusKm, advancedOpen } = useFilterStore(
+    (state) => state.toolFilters
+  );
+  const setToolFilter = useFilterStore((state) => state.setToolFilter);
+  const resetToolFilters = useFilterStore((state) => state.resetToolFilters);
+
+  const setQ = (value: string) => setToolFilter("q", value);
+  const setCategory = (value: string) => setToolFilter("category", value);
+  const setBorrowFrom = (value: string) => setToolFilter("borrowFrom", value);
+  const setBorrowUntil = (value: string) => setToolFilter("borrowUntil", value);
+  const setRadiusKm = (value: number) => setToolFilter("radiusKm", value);
 
   const { data: tools = [], isLoading, isFetched } = useTools({ q }, token);
 
@@ -76,16 +83,10 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
   }, [candidateTools, currentUser?.latitude, currentUser?.longitude, defaultLocation, radiusKm]);
 
   const hasActiveFilters = Boolean(
-    q || category || borrowFrom || borrowUntil || radiusKm !== 15
+    q || category || borrowFrom || borrowUntil || radiusKm !== DEFAULT_RADIUS_KM
   );
 
-  const resetFilters = () => {
-    setQ("");
-    setCategory("");
-    setBorrowFrom("");
-    setBorrowUntil("");
-    setRadiusKm(15);
-  };
+  const resetFilters = resetToolFilters;
 
   return (
     <section className="stack search-page">
@@ -133,7 +134,11 @@ export function ToolsPage({ currentUser: propUser, token: propToken }: Props = {
             </select>
           </Field>
         </div>
-        <details className="advanced-filter-panel">
+        <details
+          className="advanced-filter-panel"
+          open={advancedOpen}
+          onToggle={(e) => setToolFilter("advancedOpen", e.currentTarget.open)}
+        >
           <summary>Erweiterte Filter anzeigen</summary>
           <div className="advanced-filter-grid">
             <div className="advanced-filter-fields">

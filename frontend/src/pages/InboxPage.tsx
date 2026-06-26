@@ -201,34 +201,48 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
     });
   }, [bookingRows, ratingsByBookingId]);
 
+  // Booking-ID, zu der nach dem Absenden einer Anfrage gesprungen werden soll
+  // (von ToolDetailPage/WorkshopDetailView via navigate-State übergeben).
+  const requestedBookingId =
+    typeof (location.state as { bookingId?: unknown } | null)?.bookingId === "string"
+      ? (location.state as { bookingId: string }).bookingId
+      : null;
+  // Den angefragten Thread nur EINMAL automatisch anspringen – sonst würde z. B.
+  // der "Zurück"-Button auf Mobil sofort wieder in den Thread zurückspringen.
+  const handledRequestedBookingRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (sortedRows.length === 0) {
       setSelectedBookingId(null);
       return;
     }
-    if (!selectedBookingId || !sortedRows.some((booking) => booking.id === selectedBookingId)) {
-      const requestedBookingId =
-        typeof (location.state as { bookingId?: unknown } | null)?.bookingId === "string"
-          ? (location.state as { bookingId: string }).bookingId
-          : null;
-      const requestedBooking = requestedBookingId
-        ? sortedRows.find((booking) => booking.id === requestedBookingId)
-        : null;
-      if (requestedBooking) {
-        if (isMobileInbox) {
-          mobileThreadToRestoreRef.current = requestedBooking.id;
-          shouldFocusMobileChatRef.current = true;
-        }
-        setSelectedBookingId(requestedBooking.id);
-        return;
-      }
-      if (isMobileInbox) {
-        setSelectedBookingId(null);
-        return;
-      }
-      setSelectedBookingId(sortedRows[0].id);
+    // Bestehende, noch gültige Auswahl (z. B. nach Klick) nicht überschreiben.
+    if (selectedBookingId && sortedRows.some((booking) => booking.id === selectedBookingId)) {
+      return;
     }
-  }, [isMobileInbox, location.state, sortedRows, selectedBookingId]);
+    // Frisch abgeschickte Anfrage: gezielt deren Thread anspringen. Taucht er in
+    // den (evtl. noch veralteten) Cache-Daten noch nicht auf, WARTEN wir auf den
+    // Refetch, statt auf einen alten Thread zurückzufallen – sonst bliebe man
+    // nach dem Nachladen auf dem alten Thread hängen.
+    if (requestedBookingId && handledRequestedBookingRef.current !== requestedBookingId) {
+      const requestedBooking = sortedRows.find((booking) => booking.id === requestedBookingId);
+      if (!requestedBooking) {
+        return;
+      }
+      handledRequestedBookingRef.current = requestedBookingId;
+      if (isMobileInbox) {
+        mobileThreadToRestoreRef.current = requestedBooking.id;
+        shouldFocusMobileChatRef.current = true;
+      }
+      setSelectedBookingId(requestedBooking.id);
+      return;
+    }
+    if (isMobileInbox) {
+      setSelectedBookingId(null);
+      return;
+    }
+    setSelectedBookingId(sortedRows[0].id);
+  }, [isMobileInbox, requestedBookingId, sortedRows, selectedBookingId]);
 
   const prevSelectedBookingIdRef = useRef<string | null>(null);
   useEffect(() => {

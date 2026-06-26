@@ -7,6 +7,7 @@ import { DetailTopBar } from "../components/DetailTopBar";
 import { RatingsSection } from "../components/RatingsSection";
 import { ReportFormPanel } from "../components/ReportFormPanel";
 import { api } from "@toolshare/shared";
+import { inboxKeys } from "../hooks/queries/inbox.queries";
 import { useToast } from "../hooks/useToast";
 import { DEFAULT_PLACEHOLDER_IMAGE, getPlaceholderImageForCategory, TOOL_CATEGORIES } from "@toolshare/shared";
 import { useModalFocus } from "../hooks/useModalFocus";
@@ -246,6 +247,9 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
     },
     onSuccess: (createdBooking) => {
       pushToast("Ausleihanfrage erstellt.", "success");
+      // Inbox invalidieren, damit der neue Thread beim Wechsel sofort (ohne
+      // Reload) in Liste und Chat erscheint und nicht erst beim nächsten Poll.
+      void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
       navigate("/inbox", { state: { bookingId: createdBooking.id } });
     },
     onError: (error) => {
@@ -293,7 +297,7 @@ export function ToolDetailPage({ currentUser: propUser, token: propToken }: Prop
       return;
     }
     if (periodsOverlap(startIso, endIso, blockingPeriods)) {
-      pushToast("Im gewählten Zeitraum ist bereits eine angenommene oder offene Buchung vorhanden.", "error");
+      pushToast("Im gewählten Zeitraum ist bereits eine bestätigte Buchung vorhanden.", "error");
       return;
     }
     blockToolMut({ startIso, endIso });
