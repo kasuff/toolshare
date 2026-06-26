@@ -22,6 +22,12 @@ export const outboxRepository = {
     });
   },
 
+  // FOR UPDATE SKIP LOCKED: gesperrte (von einem anderen Worker bereits geclaimte)
+  // Zeilen werden übersprungen statt blockiert. Dadurch ist der Worker
+  // multi-instanz-sicher — mehrere Backend-Replicas können den Outbox-Worker
+  // gleichzeitig laufen lassen und teilen sich die Events disjunkt auf, ohne
+  // Doppelverarbeitung. Zusammen mit der Idempotenz (idempotencyKey +
+  // NotificationDelivery) Voraussetzung für horizontale Skalierung (siehe ADR-016).
   async claimPending(limit: number) {
     return prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<

@@ -24,6 +24,13 @@ export const refreshSchema = z.object({
   query: z.object({})
 });
 
+// Logout entwertet denselben Refresh-Token wie /refresh – gleiche Body-Form.
+export const logoutSchema = z.object({
+  body: refreshBodySchema,
+  params: z.object({}),
+  query: z.object({})
+});
+
 export const changePasswordSchema = z.object({
   body: changePasswordBodySchema,
   params: z.object({}),

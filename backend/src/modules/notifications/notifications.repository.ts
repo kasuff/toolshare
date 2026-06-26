@@ -1,10 +1,13 @@
 import { prisma } from "../../config/prisma";
+import type { PageParams } from "../../utils/pagination";
 
 export const notificationsRepository = {
-  listByUser(userId: string) {
+  listByUser(userId: string, page: PageParams) {
     return prisma.notification.findMany({
       where: { userId },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: page.limit,
+      skip: page.offset
     });
   },
 

@@ -1,9 +1,21 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { api } from "@toolshare/shared";
-import { onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
+import { configureAuthSession, onSessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
 import { DEFAULT_PLACEHOLDER_IMAGE } from "@toolshare/shared";
 
 const fetchMock = vi.fn();
+
+// Gültige UUIDs für schema-konforme Backend-Payloads (die Response-Contracts
+// erzwingen z.string().uuid() auf allen IDs).
+const ID = {
+  u1: "11111111-1111-1111-1111-111111111111",
+  u2: "22222222-2222-2222-2222-222222222222",
+  u3: "33333333-3333-3333-3333-333333333333",
+  t1: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  w1: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  s1: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  b1: "dddddddd-dddd-dddd-dddd-dddddddddddd"
+} as const;
 
 function responseJson(body: unknown, init?: ResponseInit) {
   return {
@@ -16,6 +28,12 @@ function responseJson(body: unknown, init?: ResponseInit) {
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  configureAuthSession({
+    getAccessToken: () => null,
+    getRefreshToken: () => null,
+    setTokens: vi.fn(),
+    clearTokens: vi.fn()
+  });
 });
 
 describe("api service", () => {
@@ -30,19 +48,51 @@ describe("api service", () => {
     unsubscribe();
   });
 
+  it("silently refreshes expired access tokens and retries the original request", async () => {
+    const setTokens = vi.fn();
+    configureAuthSession({
+      getAccessToken: () => "expired-token",
+      getRefreshToken: () => "valid-refresh",
+      setTokens,
+      clearTokens: vi.fn()
+    });
+
+    fetchMock
+      .mockResolvedValueOnce(responseJson({ error: { message: "Invalid or expired token" } }, { status: 401 }))
+      .mockResolvedValueOnce(
+        responseJson({ accessToken: "new-access-token", refreshToken: "new-refresh-token" })
+      )
+      .mockResolvedValueOnce(
+        responseJson({ id: ID.u1, email: "lea@toolshare.local", name: "Lea", address: "Musterstraße 1, 80331 München", role: "USER", isSuspended: false })
+      );
+
+    const user = await api.getCurrentUser("expired-token");
+
+    expect(user.name).toBe("Lea");
+    expect(setTokens).toHaveBeenCalledWith({
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token"
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2][0]).toBe("http://localhost:4000/api/users/me");
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({
+      headers: expect.objectContaining({ Authorization: "Bearer new-access-token" })
+    });
+  });
+
   it("maps backend users and sends authorization headers", async () => {
     fetchMock.mockResolvedValueOnce(
-      responseJson({ id: "u1", email: "lea@toolshare.local", name: "Lea", role: "MANAGER", isSuspended: false })
+      responseJson({ id: ID.u1, email: "lea@toolshare.local", name: "Lea", address: "Musterstraße 1, 80331 München", role: "MANAGER", isSuspended: false })
     );
 
     const user = await api.getCurrentUser("token-123");
 
     expect(user).toEqual({
-      id: "u1",
+      id: ID.u1,
       email: "lea@toolshare.local",
       name: "Lea",
       role: "ADMIN",
-      address: undefined,
+      address: "Musterstraße 1, 80331 München",
       isSuspended: false
     });
     expect(fetchMock).toHaveBeenCalledWith(
@@ -60,13 +110,18 @@ describe("api service", () => {
       if (url.includes("/tools")) {
         return responseJson([
           {
-            id: "t1",
-            ownerId: "u3",
+            id: ID.t1,
+            ownerId: ID.u3,
             name: "Akkuschrauber",
             description: "Mit Bits",
             category: "Elektro",
             imageUrl: null,
-            status: "AVAILABLE"
+            pickupLocation: "München",
+            pickupLocationNote: null,
+            status: "AVAILABLE",
+            createdAt: "2026-05-01T10:00:00.000Z",
+            updatedAt: "2026-05-01T10:00:00.000Z",
+            owner: { id: ID.u3, name: "Owner", role: "USER", isSuspended: false }
           }
         ]);
       }
@@ -74,27 +129,33 @@ describe("api service", () => {
       if (url.includes("/workshops?") || url.endsWith("/workshops")) {
         return responseJson([
           {
-            id: "w1",
-            managerId: "u2",
+            id: ID.w1,
+            managerId: ID.u2,
             name: "Werkstatt",
             description: "Gemeinschaftsraum",
             location: "München",
             maxCapacity: 4,
-            timeslots: []
+            extras: [],
+            imageUrls: [],
+            timeslots: [
+              { id: ID.s1, workshopId: ID.w1, startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z", blockedByOwner: false }
+            ]
           }
         ]);
       }
 
-      if (url.endsWith("/workshops/w1")) {
+      if (url.endsWith(`/workshops/${ID.w1}`)) {
         return responseJson({
-          id: "w1",
-          managerId: "u2",
+          id: ID.w1,
+          managerId: ID.u2,
           name: "Werkstatt",
           description: "Gemeinschaftsraum",
           location: "München",
           maxCapacity: 4,
+          extras: [],
+          imageUrls: [],
           timeslots: [
-            { id: "s1", workshopId: "w1", startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z" }
+            { id: ID.s1, workshopId: ID.w1, startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z", blockedByOwner: false }
           ]
         });
       }
@@ -102,14 +163,14 @@ describe("api service", () => {
       if (url.endsWith("/bookings/me")) {
         return responseJson([
           {
-            id: "b1",
-            userId: "u1",
-            toolId: "t1",
+            id: ID.b1,
+            userId: ID.u1,
+            toolId: ID.t1,
             startDate: "2026-05-06T10:00:00.000Z",
             endDate: "2026-05-07T10:00:00.000Z",
             pickupTime: null,
             status: "PENDING",
-            tool: { ownerId: "u3" }
+            tool: { id: ID.t1, ownerId: ID.u3, name: "Akkuschrauber" }
           }
         ]);
       }
@@ -124,14 +185,15 @@ describe("api service", () => {
           tools: 3,
           workshops: 1,
           openBookings: 4,
-          openReports: 1
+          openReports: 1,
+          openSuspensionRequests: 0
         });
       }
 
       if (url.endsWith("/users")) {
         return responseJson([
-          { id: "u1", email: "a@example.com", name: "A", role: "USER" },
-          { id: "u2", email: "b@example.com", name: "B", role: "MODERATOR" }
+          { id: ID.u1, email: "a@example.com", name: "A", address: "München", role: "USER", isSuspended: false },
+          { id: ID.u2, email: "b@example.com", name: "B", address: "München", role: "MODERATOR", isSuspended: false }
         ]);
       }
 
@@ -154,26 +216,26 @@ describe("api service", () => {
     const metrics = await api.getMetrics("token-123");
 
     expect(tools[0]).toMatchObject({
-      id: "t1",
-      ownerId: "u3",
+      id: ID.t1,
+      ownerId: ID.u3,
       status: "VERFUEGBAR",
       imageUrl: DEFAULT_PLACEHOLDER_IMAGE
     });
     expect(workshops[0].workshop).toMatchObject({
-      id: "w1",
-      ownerId: "u2",
+      id: ID.w1,
+      ownerId: ID.u2,
       imageUrls: [DEFAULT_PLACEHOLDER_IMAGE]
     });
     expect(workshops[0].slots[0]).toMatchObject({
-      id: "s1",
-      workshopId: "w1",
+      id: ID.s1,
+      workshopId: ID.w1,
       blockedByOwner: false
     });
     expect(bookings[0]).toMatchObject({
-      id: "b1",
+      id: ID.b1,
       type: "TOOL",
-      requesterId: "u1",
-      providerId: "u3",
+      requesterId: ID.u1,
+      providerId: ID.u3,
       status: "OFFEN"
     });
     expect(metrics).toMatchObject({
@@ -187,14 +249,14 @@ describe("api service", () => {
 
   it("creates tool requests and forwards the ISO payloads", async () => {
     fetchMock.mockResolvedValueOnce(responseJson({
-      id: "b1",
-      userId: "u1",
-      toolId: "t1",
+      id: ID.b1,
+      userId: ID.u1,
+      toolId: ID.t1,
       startDate: "2026-05-06T10:00:00.000Z",
       endDate: "2026-05-07T10:00:00.000Z",
       pickupTime: "2026-05-06T09:00:00.000Z",
       status: "PENDING",
-      tool: { ownerId: "u3" }
+      tool: { id: ID.t1, ownerId: ID.u3, name: "Akkuschrauber" }
     }));
 
     const booking = await api.createToolRequest(
@@ -224,9 +286,9 @@ describe("api service", () => {
       }
     );
     expect(booking).toMatchObject({
-      id: "b1",
+      id: ID.b1,
       type: "TOOL",
-      providerId: "u3"
+      providerId: ID.u3
     });
   });
 

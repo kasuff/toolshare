@@ -78,10 +78,14 @@ export const toolsRepository = {
   },
 
   listBlockingPeriods(toolId: string) {
+    // Anfrage-Modell: Nur BESTÄTIGTE (ACCEPTED) Buchungen belegen den
+    // Verfügbarkeitskalender. Eine offene Anfrage (PENDING) reserviert den
+    // Zeitraum nicht und streicht ihn deshalb auch nicht durch -- konsistent zur
+    // Konfliktprüfung beim Anlegen und Bestätigen (nur ACCEPTED blockt).
     return prisma.booking.findMany({
       where: {
         toolId,
-        status: { in: ["PENDING", "ACCEPTED"] }
+        status: "ACCEPTED"
       },
       select: {
         startDate: true,
@@ -134,6 +138,8 @@ export const toolsRepository = {
     imageUrl?: string;
     pickupLocation: string;
     pickupLocationNote?: string;
+    pickupLat?: number | null;
+    pickupLon?: number | null;
   }) {
     return prisma.tool.create({
       data: {
@@ -144,6 +150,8 @@ export const toolsRepository = {
         imageUrl: input.imageUrl,
         pickupLocation: input.pickupLocation,
         pickupLocationNote: input.pickupLocationNote,
+        pickupLat: input.pickupLat,
+        pickupLon: input.pickupLon,
         status: "AVAILABLE"
       },
       include: {
@@ -168,6 +176,8 @@ export const toolsRepository = {
       imageUrl?: string;
       pickupLocation?: string;
       pickupLocationNote?: string;
+      pickupLat?: number | null;
+      pickupLon?: number | null;
       status?: "AVAILABLE" | "REQUESTED" | "BORROWED";
     }
   ) {

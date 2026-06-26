@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@toolshare/shared";
+import { inboxKeys } from "./inbox.queries";
 
 export const workshopKeys = {
   all: ["workshops"] as const,
@@ -52,6 +53,7 @@ export function useWorkshopRatings(workshopId: string) {
 }
 
 export function useCreateWorkshopBooking(token: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { workshopId: string; startIso: string; endIso: string; workshopToolIds?: string[] }) =>
       api.createWorkshopBooking(
@@ -62,7 +64,13 @@ export function useCreateWorkshopBooking(token: string) {
           workshopToolIds: input.workshopToolIds ?? []
         },
         token
-      )
+      ),
+    onSuccess: (_data, variables) => {
+      // Buchung belegt einen Zeitraum: Detail (Verfügbarkeit) und die Inbox des
+      // Buchenden müssen frisch nachgeladen werden.
+      void queryClient.invalidateQueries({ queryKey: workshopKeys.detail(variables.workshopId) });
+      void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
+    }
   });
 }
 
@@ -93,7 +101,12 @@ export function useCreateWorkshopTimeslot(token: string) {
 }
 
 export function useDeleteWorkshop(token: string) {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (workshopId: string) => api.deleteWorkshop(workshopId, token)
+    mutationFn: (workshopId: string) => api.deleteWorkshop(workshopId, token),
+    onSuccess: () => {
+      // Gelöschte Werkstatt aus Listen und "Meine Angebote" entfernen.
+      void queryClient.invalidateQueries({ queryKey: workshopKeys.all });
+    }
   });
 }

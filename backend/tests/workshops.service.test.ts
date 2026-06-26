@@ -37,7 +37,8 @@ describe("workshopsService", () => {
       search: "holz",
       excludeSuspendedManagers: true
     });
-    expect(result).toEqual([{ id: "w1" }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("w1");
   });
 
   it("returns workshop by id with merged active booking ranges", async () => {
@@ -106,16 +107,20 @@ describe("workshopsService", () => {
       maxCapacity: 4
     });
 
-    expect(mockedWorkshopsRepository.create).toHaveBeenCalledWith({
-      managerId: "u1",
-      name: "Werkstatt",
-      description: "desc",
-      location: "Muenchen",
-      maxCapacity: 4,
-      extras: [],
-      workshopTools: [],
-      imageUrls: []
-    });
+    // objectContaining: die geocodeten latitude/longitude werden zusätzlich
+    // durchgereicht; geprüft wird hier das Auffüllen der optionalen Defaults.
+    expect(mockedWorkshopsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        managerId: "u1",
+        name: "Werkstatt",
+        description: "desc",
+        location: "Muenchen",
+        maxCapacity: 4,
+        extras: [],
+        workshopTools: [],
+        imageUrls: []
+      })
+    );
   });
 
   it("updates workshop for owner", async () => {

@@ -134,7 +134,7 @@ describe("toolsRepository", () => {
     expect(result).toEqual([{ id: "b1" }]);
   });
 
-  it("lists pending and accepted blocking periods", async () => {
+  it("lists only accepted bookings as blocking periods (pending requests do not block)", async () => {
     mocks.bookingFindMany.mockResolvedValueOnce([
       {
         startDate: new Date("2026-07-06T09:00:00.000Z"),
@@ -147,7 +147,7 @@ describe("toolsRepository", () => {
     expect(mocks.bookingFindMany).toHaveBeenCalledWith({
       where: {
         toolId: "t1",
-        status: { in: ["PENDING", "ACCEPTED"] }
+        status: "ACCEPTED"
       },
       select: {
         startDate: true,

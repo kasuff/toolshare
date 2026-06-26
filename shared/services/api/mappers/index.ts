@@ -21,6 +21,7 @@ import type {
   BackendWorkshopBookedRange,
   BackendWorkshopTimeslot
 } from "../types";
+import type { PublicRatingResponse } from "../../../contracts/response/ratings.schema";
 import { bookingStatusMap, toolStatusMap } from "./roles";
 import { toLocalDateTimeInputValue } from "../client";
 
@@ -36,12 +37,14 @@ function mapTool(tool: BackendTool): Tool {
     imageUrl: normalizePlaceholderImage(tool.imageUrl),
     pickupLocation: tool.pickupLocation ?? "",
     pickupLocationNote: tool.pickupLocationNote ?? undefined,
+    pickupLat: tool.pickupLat ?? undefined,
+    pickupLon: tool.pickupLon ?? undefined,
     bookedRanges: mapWorkshopBookedRanges(tool.bookings)
   };
 }
 
 function mapWorkshop(workshop: BackendWorkshop): Workshop {
-  const extras = workshop.extras ?? workshop.equipment ?? [];
+  const extras = workshop.extras;
   return {
     id: workshop.id,
     ownerId: workshop.managerId,
@@ -49,6 +52,8 @@ function mapWorkshop(workshop: BackendWorkshop): Workshop {
     name: workshop.name,
     description: workshop.description,
     location: workshop.location,
+    latitude: workshop.latitude ?? undefined,
+    longitude: workshop.longitude ?? undefined,
     maxCapacity: workshop.maxCapacity,
     extras,
     equipmentItems: (workshop.workshopTools ?? []).map((tool) => ({
@@ -107,7 +112,7 @@ function mapTimeslotProposal(p: BackendTimeslotProposal): TimeslotProposal {
   };
 }
 
-function mapPublicRating(rating: BackendRating): PublicRating {
+function mapPublicRating(rating: PublicRatingResponse): PublicRating {
   return {
     id: rating.id,
     score: rating.score,

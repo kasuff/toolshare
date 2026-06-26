@@ -1,8 +1,14 @@
 import { AppError } from "../../utils/app-error";
 import { getImageStorageService } from "../../config/services";
 import { resolveImageReference } from "../../ports/image-storage.service";
+import { addressService } from "../address/address.service";
 import { toolsRepository } from "./tools.repository";
-import { toToolResponse, toToolResponseList } from "./tools.presenter";
+import {
+  toToolBlockingPeriodResponseList,
+  toToolOwnerBlockResponseList,
+  toToolResponse,
+  toToolResponseList
+} from "./tools.presenter";
 
 const canModerate = (role: "USER" | "MODERATOR" | "MANAGER") => {
   return role === "MODERATOR" || role === "MANAGER";
@@ -40,7 +46,8 @@ export const toolsService = {
     if (!tool) {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
-    return toolsRepository.listBlockingPeriods(id);
+    const periods = await toolsRepository.listBlockingPeriods(id);
+    return toToolBlockingPeriodResponseList(periods);
   },
 
   async listOwnerBlocks(id: string, requesterId: string) {
@@ -51,7 +58,8 @@ export const toolsService = {
     if (tool.ownerId !== requesterId) {
       throw new AppError("FORBIDDEN", "Only the tool owner can view its blocks", 403);
     }
-    return toolsRepository.listOwnerBlocks(id, requesterId);
+    const blocks = await toolsRepository.listOwnerBlocks(id, requesterId);
+    return toToolOwnerBlockResponseList(blocks);
   },
 
   async deleteOwnerBlock(input: { toolId: string; bookingId: string; actorId: string }) {
@@ -82,7 +90,13 @@ export const toolsService = {
   }) {
     const storage = getImageStorageService();
     const imageUrl = await resolveImageReference(storage, input.imageUrl);
-    const created = await toolsRepository.create({ ...input, imageUrl });
+    const coordinates = await addressService.geocode(input.pickupLocation);
+    const created = await toolsRepository.create({
+      ...input,
+      imageUrl,
+      pickupLat: coordinates?.latitude ?? null,
+      pickupLon: coordinates?.longitude ?? null
+    });
     return toToolResponse(created);
   },
 
@@ -116,9 +130,17 @@ export const toolsService = {
         ? await resolveImageReference(storage, input.data.imageUrl)
         : undefined;
 
+    const geo =
+      input.data.pickupLocation !== undefined
+        ? await addressService.geocode(input.data.pickupLocation)
+        : null;
+
     const updated = await toolsRepository.update(input.toolId, {
       ...input.data,
-      ...(imageUrl !== undefined ? { imageUrl } : {})
+      ...(imageUrl !== undefined ? { imageUrl } : {}),
+      ...(input.data.pickupLocation !== undefined
+        ? { pickupLat: geo?.latitude ?? null, pickupLon: geo?.longitude ?? null }
+        : {})
     });
     return toToolResponse(updated);
   },

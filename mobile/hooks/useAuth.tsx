@@ -1,11 +1,20 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { User, api, onSessionExpired, ACCESS_TOKEN_STORAGE_KEY } from '@toolshare/shared';
+import {
+  User,
+  api,
+  onSessionExpired,
+  ACCESS_TOKEN_STORAGE_KEY,
+  REFRESH_TOKEN_STORAGE_KEY,
+  configureAuthSession,
+  type AuthTokens,
+} from '@toolshare/shared';
 import { useRouter, useSegments } from 'expo-router';
 import { Platform } from 'react-native';
 import { getErrorMessage } from '../utils/errors';
 
-const TOKEN_KEY = ACCESS_TOKEN_STORAGE_KEY;
+const ACCESS_KEY = ACCESS_TOKEN_STORAGE_KEY;
+const REFRESH_KEY = REFRESH_TOKEN_STORAGE_KEY;
 
 // Web fallback for SecureStore since browsers do not have keychains
 const storage = {
@@ -31,11 +40,21 @@ const storage = {
   }
 };
 
+async function persistTokens({ accessToken, refreshToken }: AuthTokens) {
+  await storage.setItem(ACCESS_KEY, accessToken);
+  await storage.setItem(REFRESH_KEY, refreshToken);
+}
+
+async function clearPersistedTokens() {
+  await storage.deleteItem(ACCESS_KEY);
+  await storage.deleteItem(REFRESH_KEY);
+}
+
 type AuthContextType = {
   currentUser?: User;
   token: string | null;
   isLoaded: boolean;
-  login: (newToken: string) => Promise<void>;
+  login: (tokens: AuthTokens) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (input: { name?: string; address?: string }) => Promise<User | undefined>;
 };
@@ -50,16 +69,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
 
   const logout = useCallback(async () => {
-    await storage.deleteItem(TOKEN_KEY);
+    await clearPersistedTokens();
     setToken(null);
     setCurrentUser(undefined);
     router.replace('/login');
   }, [router]);
 
   useEffect(() => {
+    configureAuthSession({
+      getAccessToken: () => storage.getItem(ACCESS_KEY),
+      getRefreshToken: () => storage.getItem(REFRESH_KEY),
+      setTokens: async (tokens) => {
+        await persistTokens(tokens);
+        setToken(tokens.accessToken);
+      },
+      clearTokens: () => clearPersistedTokens(),
+    });
+  }, []);
+
+  useEffect(() => {
     async function loadSession() {
       try {
-        const storedToken = await storage.getItem(TOKEN_KEY);
+        const storedToken = await storage.getItem(ACCESS_KEY);
         if (storedToken) {
           const user = await api.getCurrentUser(storedToken);
           setToken(storedToken);
@@ -70,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (getErrorMessage(e, '').includes('Netzwerkfehler')) {
           // Keep token for network errors, just set loaded
         } else {
-          await storage.deleteItem(TOKEN_KEY);
+          await clearPersistedTokens();
           setToken(null);
           setCurrentUser(undefined);
         }
@@ -98,10 +129,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [token, isLoaded, segments, router]);
 
-  const login = async (newToken: string) => {
-    await storage.setItem(TOKEN_KEY, newToken);
-    setToken(newToken);
-    const user = await api.getCurrentUser(newToken);
+  const login = async (tokens: AuthTokens) => {
+    await persistTokens(tokens);
+    setToken(tokens.accessToken);
+    const user = await api.getCurrentUser(tokens.accessToken);
     setCurrentUser(user);
   };
 

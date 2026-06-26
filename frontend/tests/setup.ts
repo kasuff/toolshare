@@ -6,6 +6,10 @@ import { beforeEach } from "vitest";
 beforeEach(async () => {
   const { useAuthStore } = await import("../src/store/authStore");
   const { useInboxStore } = await import("../src/store/inboxStore");
+  const { useFilterStore } = await import("../src/store/filterStore");
+
+  useFilterStore.getState().resetToolFilters();
+  useFilterStore.getState().resetWorkshopFilters();
 
   useAuthStore.setState({
     token: null,

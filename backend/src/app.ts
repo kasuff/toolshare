@@ -22,6 +22,11 @@ import { metricsRegistry } from "./utils/metrics";
 export const createApp = () => {
   const app = express();
 
+  // Hinter dem Frontend-/Reverse-Proxy (nginx) erreicht das Backend Requests
+  // mit X-Forwarded-For-Header. Ohne diese Einstellung kann express-rate-limit
+  // die echte Client-IP nicht ermitteln und wirft eine ValidationError.
+  app.set("trust proxy", 1);
+
   app.use(helmet());
   app.use(
     cors({

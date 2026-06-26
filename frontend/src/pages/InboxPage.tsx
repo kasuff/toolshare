@@ -18,8 +18,10 @@ import {
   proposalStatusLabel,
   threadHasUnread,
 } from "../components/inbox/inboxChatHelpers";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../hooks/useToast";
 import { api } from "@toolshare/shared";
+import { inboxKeys, useInboxData, type InboxData } from "../hooks/queries/inbox.queries";
 
 import type {
   Booking,
@@ -76,6 +78,10 @@ function isInboxSystemNotification(message: string): boolean {
 
 const MOBILE_INBOX_MEDIA_QUERY = "(max-width: 900px)";
 
+// Geteilte, unveränderliche Leerliste als stabiler Fallback für noch nicht
+// geladene Inbox-Daten (vermeidet neue Array-Referenzen pro Render).
+const EMPTY_LIST: never[] = [];
+
 function useMobileInboxLayout() {
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia(MOBILE_INBOX_MEDIA_QUERY).matches
@@ -96,16 +102,18 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const location = useLocation();
   const isMobileInbox = useMobileInboxLayout();
   const { pushToast } = useToast();
-  const bookings = useInboxStore((state) => state.bookings);
-  const notifications = useInboxStore((state) => state.notifications);
-  const ratingsGiven = useInboxStore((state) => state.ratingsGiven);
-  const ratingsReceived = useInboxStore((state) => state.ratingsReceived);
+  const queryClient = useQueryClient();
+  const inboxQuery = useInboxData(token, currentUser?.id);
+  // Stabile Leer-Referenz, damit die abgeleiteten useMemo-Hooks nicht bei jedem
+  // Render neu rechnen, solange noch keine Daten geladen sind.
+  const bookings = inboxQuery.data?.bookings ?? EMPTY_LIST;
+  const notifications = inboxQuery.data?.notifications ?? EMPTY_LIST;
+  const ratingsGiven = inboxQuery.data?.ratingsGiven ?? EMPTY_LIST;
+  const ratingsReceived = inboxQuery.data?.ratingsReceived ?? EMPTY_LIST;
+  const isLoading = inboxQuery.isLoading;
   const readMessageIds = useInboxStore((state) => state.readMessageIds);
-  const isLoading = useInboxStore((state) => state.isLoading);
-  const fetchData = useInboxStore((state) => state.fetchData);
   const markMessageRead = useInboxStore((state) => state.markMessageRead);
   const markThreadReadStore = useInboxStore((state) => state.markThreadRead);
-  const markNotificationReadStore = useInboxStore((state) => state.markNotificationRead);
 
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [draftPickupByBooking, setDraftPickupByBooking] = useState<Record<string, DraftToolRangeParts>>({});
@@ -128,20 +136,12 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const mobileThreadToRestoreRef = useRef<string | null>(null);
   const shouldFocusMobileChatRef = useRef(false);
 
+  // Nach Mutationen neu laden = den Inbox-Query invalidieren (TanStack refetcht).
+  // Das initiale Laden übernimmt der Query selbst (enabled, sobald Token+User da).
   const loadData = async () => {
-    if (!token || !currentUser?.id) return;
-    try {
-      await fetchData(token, currentUser.id);
-    } catch (error) {
-      pushToast(error instanceof Error ? error.message : "Inbox konnte nicht geladen werden.", "error");
-    }
+    if (!currentUser?.id) return;
+    await queryClient.invalidateQueries({ queryKey: inboxKeys.data(currentUser.id) });
   };
-
-  useEffect(() => {
-    if (!token) return;
-    void loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   useEffect(() => {
     draftSeededForThreadRef.current.clear();
@@ -201,34 +201,48 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
     });
   }, [bookingRows, ratingsByBookingId]);
 
+  // Booking-ID, zu der nach dem Absenden einer Anfrage gesprungen werden soll
+  // (von ToolDetailPage/WorkshopDetailView via navigate-State übergeben).
+  const requestedBookingId =
+    typeof (location.state as { bookingId?: unknown } | null)?.bookingId === "string"
+      ? (location.state as { bookingId: string }).bookingId
+      : null;
+  // Den angefragten Thread nur EINMAL automatisch anspringen – sonst würde z. B.
+  // der "Zurück"-Button auf Mobil sofort wieder in den Thread zurückspringen.
+  const handledRequestedBookingRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (sortedRows.length === 0) {
       setSelectedBookingId(null);
       return;
     }
-    if (!selectedBookingId || !sortedRows.some((booking) => booking.id === selectedBookingId)) {
-      const requestedBookingId =
-        typeof (location.state as { bookingId?: unknown } | null)?.bookingId === "string"
-          ? (location.state as { bookingId: string }).bookingId
-          : null;
-      const requestedBooking = requestedBookingId
-        ? sortedRows.find((booking) => booking.id === requestedBookingId)
-        : null;
-      if (requestedBooking) {
-        if (isMobileInbox) {
-          mobileThreadToRestoreRef.current = requestedBooking.id;
-          shouldFocusMobileChatRef.current = true;
-        }
-        setSelectedBookingId(requestedBooking.id);
-        return;
-      }
-      if (isMobileInbox) {
-        setSelectedBookingId(null);
-        return;
-      }
-      setSelectedBookingId(sortedRows[0].id);
+    // Bestehende, noch gültige Auswahl (z. B. nach Klick) nicht überschreiben.
+    if (selectedBookingId && sortedRows.some((booking) => booking.id === selectedBookingId)) {
+      return;
     }
-  }, [isMobileInbox, location.state, sortedRows, selectedBookingId]);
+    // Frisch abgeschickte Anfrage: gezielt deren Thread anspringen. Taucht er in
+    // den (evtl. noch veralteten) Cache-Daten noch nicht auf, WARTEN wir auf den
+    // Refetch, statt auf einen alten Thread zurückzufallen – sonst bliebe man
+    // nach dem Nachladen auf dem alten Thread hängen.
+    if (requestedBookingId && handledRequestedBookingRef.current !== requestedBookingId) {
+      const requestedBooking = sortedRows.find((booking) => booking.id === requestedBookingId);
+      if (!requestedBooking) {
+        return;
+      }
+      handledRequestedBookingRef.current = requestedBookingId;
+      if (isMobileInbox) {
+        mobileThreadToRestoreRef.current = requestedBooking.id;
+        shouldFocusMobileChatRef.current = true;
+      }
+      setSelectedBookingId(requestedBooking.id);
+      return;
+    }
+    if (isMobileInbox) {
+      setSelectedBookingId(null);
+      return;
+    }
+    setSelectedBookingId(sortedRows[0].id);
+  }, [isMobileInbox, requestedBookingId, sortedRows, selectedBookingId]);
 
   const prevSelectedBookingIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -301,6 +315,7 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const pendingTimeslotProposal =
     selectedBooking?.type === "WORKSHOP" ? getPendingTimeslotProposal(selectedBooking) : null;
   const selectedBookingRating = selectedBooking ? ratingsByBookingId.get(selectedBooking.id) ?? null : null;
+  const originalRequestTimes = selectedBooking ? getOriginalRequestTimes(selectedBooking) : null;
   const showRatingFooter = Boolean(
     currentUser &&
       selectedBooking &&
@@ -345,13 +360,24 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
   const markThreadRead = (booking: BookingRow) => {
     if (!currentUser?.id) return;
     if (booking.type === "SYSTEM_WARNING") return;
-    markThreadReadStore(booking, currentUser.id);
+    markThreadReadStore(booking, currentUser.id, ratingsByBookingId.get(booking.id) ?? null);
   };
 
   const markNotificationRead = async (notificationId: string) => {
-    if (!token) return;
+    if (!token || !currentUser?.id) return;
     try {
-      await markNotificationReadStore(notificationId, token);
+      await api.markNotificationAsRead(notificationId, token);
+      // Benachrichtigung im Query-Cache als gelesen markieren (kein Refetch nötig).
+      queryClient.setQueryData<InboxData>(inboxKeys.data(currentUser.id), (old) =>
+        old
+          ? {
+              ...old,
+              notifications: old.notifications.map((n) =>
+                n.id === notificationId ? { ...n, read: true } : n
+              )
+            }
+          : old
+      );
     } catch (error) {
       console.error("Fehler beim Markieren der Benachrichtigung als gelesen:", error);
     }
@@ -781,11 +807,9 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                     title={selectedBooking.toolName ?? (selectedBooking.type === "WORKSHOP" ? "Werkstatt" : "Werkzeug")}
                     icon={selectedBooking.type === "WORKSHOP" ? "home_repair_service" : "construction"}
                     firstLabel={selectedBooking.type === "TOOL" ? "Abholung" : "Von"}
-                    firstValue={formatDateTime(
-                      selectedBooking.type === "TOOL" ? selectedBooking.pickupTimeIso : selectedBooking.startIso
-                    )}
+                    firstValue={formatDateTime(originalRequestTimes?.firstIso)}
                     secondLabel={selectedBooking.type === "TOOL" ? "Rückgabe" : "Bis"}
-                    secondValue={formatDateTime(selectedBooking.endIso)}
+                    secondValue={formatDateTime(originalRequestTimes?.secondIso)}
                     unread={selectedReqUnread}
                     onClick={selectedReqIncoming ? () => markIncomingRead(selectedReqKey) : undefined}
                   />
@@ -815,7 +839,6 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                         secondLabel="Rückgabe"
                         secondValue={formatDateTime(proposal.proposedReturnIso ?? selectedBooking.endIso)}
                         unread={fromOtherUser && proposal.status === "PENDING" && !readMessageIds.has(key)}
-                        onClick={fromOtherUser ? () => markIncomingRead(key) : undefined}
                       />
                     </MessengerRow>
                   );
@@ -845,16 +868,24 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                         secondLabel="Bis"
                         secondValue={formatDateTime(proposal.proposedEndIso)}
                         unread={fromOtherUser && proposal.status === "PENDING" && !readMessageIds.has(key)}
-                        onClick={fromOtherUser ? () => markIncomingRead(key) : undefined}
                       />
                     </MessengerRow>
                   );
                 })}
 
-                {selectedBooking.status !== "OFFEN" && (
+                {selectedBooking.status !== "OFFEN" && (() => {
+                  // "Anfrage angenommen" o. Ä. auf die Seite dessen legen, der den
+                  // Status ausgelöst hat (z. B. wer den Alternativvorschlag annahm).
+                  const statusActorId = getStatusActorId(selectedBooking);
+                  const statusByCurrentUser = statusActorId === currentUser.id;
+                  const statusActorName =
+                    statusActorId === selectedBooking.providerId
+                      ? (selectedBooking.providerName ?? currentUser.name)
+                      : (selectedBooking.requesterName ?? currentUser.name);
+                  return (
                   <MessengerRow
-                    variant={selectedBooking.providerId === currentUser.id ? "outgoing" : "incoming"}
-                    avatar={<UserAvatar name={selectedBooking.providerName ?? currentUser.name} imageUrl={null} size="sm" />}
+                    variant={statusByCurrentUser ? "outgoing" : "incoming"}
+                    avatar={<UserAvatar name={statusActorName} imageUrl={null} size="sm" />}
                   >
                     <RequestMessageCard
                       label={
@@ -878,7 +909,8 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
                       secondValue={formatDateTime(selectedBooking.endIso)}
                     />
                   </MessengerRow>
-                )}
+                  );
+                })()}
 
                 {selectedBookingRating && selectedBookingRating.status === "SICHTBAR" && (
                   <MessengerRow
@@ -1168,4 +1200,36 @@ export function InboxPage({ currentUser: propUser, token: propToken }: Props) {
 
 
 
+function getOriginalRequestTimes(booking: BookingRow): { firstIso?: string; secondIso?: string } {
+  // Die ursprünglich angefragten Zeiten. Beim Annehmen eines Alternativvorschlags
+  // überschreibt das Backend die Buchungszeiten – der früheste Vorschlag hält die
+  // Zeiten von davor (previous*) fest, also den Original-Anfragezeitraum.
+  if (booking.type === "TOOL") {
+    const earliest = [...booking.pickupProposals].sort((a, b) => a.createdIso.localeCompare(b.createdIso))[0];
+    return {
+      firstIso: earliest?.previousPickupIso ?? booking.pickupTimeIso,
+      secondIso: earliest?.previousReturnIso ?? booking.endIso,
+    };
+  }
+  const earliest = [...booking.timeslotProposals].sort((a, b) => a.createdIso.localeCompare(b.createdIso))[0];
+  return {
+    firstIso: earliest?.previousStartIso ?? booking.startIso,
+    secondIso: earliest?.previousEndIso ?? booking.endIso,
+  };
+}
+
+function getStatusActorId(booking: BookingRow): string {
+  // Wer hat den aktuellen Status ausgelöst? Bei einem angenommenen
+  // Alternativvorschlag ist das der Annehmende (= nicht der Vorschlagende),
+  // sonst der Anbieter, der die ursprüngliche Anfrage entschieden hat.
+  const acceptedProposal =
+    booking.pickupProposals.find((p) => p.status === "ACCEPTED") ??
+    booking.timeslotProposals.find((p) => p.status === "ACCEPTED");
+  if (booking.status === "BESTAETIGT" && acceptedProposal) {
+    return acceptedProposal.proposedById === booking.requesterId
+      ? booking.providerId
+      : booking.requesterId;
+  }
+  return booking.providerId;
+}
 

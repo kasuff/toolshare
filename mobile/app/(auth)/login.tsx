@@ -61,16 +61,16 @@ export default function LoginScreen() {
         if (!validation.isValid) {
           throw new Error('Adresse konnte nicht verifiziert werden. Bitte wähle eine vorgeschlagene Adresse.');
         }
-        const { accessToken } = await api.register({
+        const { accessToken, refreshToken } = await api.register({
           email,
           password,
           name,
           address: payloadAddress,
         });
-        await login(accessToken);
+        await login({ accessToken, refreshToken });
       } else {
-        const { accessToken } = await api.login(email, password);
-        await login(accessToken);
+        const { accessToken, refreshToken } = await api.login(email, password);
+        await login({ accessToken, refreshToken });
       }
       router.replace('/tools');
     } catch (err) {

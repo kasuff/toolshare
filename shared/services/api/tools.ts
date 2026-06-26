@@ -1,7 +1,14 @@
 import type { Booking, Tool } from "../../types/domain";
-import type { BackendBooking, BackendTool, BackendRating } from "./types";
-import { request } from "./client";
+import { request, requestParsed } from "./client";
 import { mapBooking, mapTool, mapPublicRating } from "./mappers";
+import {
+  toolResponseSchema,
+  toolListResponseSchema,
+  toolBlockingPeriodListResponseSchema,
+  toolOwnerBlockListResponseSchema
+} from "../../contracts/response/tools.schema";
+import { bookingResponseSchema } from "../../contracts/response/bookings.schema";
+import { publicRatingListResponseSchema } from "../../contracts/response/ratings.schema";
 
 export const toolsApi = {
   async getTools(
@@ -13,64 +20,39 @@ export const toolsApi = {
     if (filters.category) params.set("category", filters.category);
     if (filters.ownerId) params.set("ownerId", filters.ownerId);
     if (filters.status) {
-      const backendStatus = filters.status === "VERFUEGBAR" ? "AVAILABLE" : "BORROWED";
-      params.set("status", backendStatus);
+      params.set("status", filters.status === "VERFUEGBAR" ? "AVAILABLE" : "BORROWED");
     }
-    const tools = await request<BackendTool[]>(`/tools?${params.toString()}`, undefined, token);
+    const tools = await requestParsed(toolListResponseSchema, `/tools?${params.toString()}`, undefined, token);
     return tools.map(mapTool);
   },
 
   async createTool(
-    input: {
-      name: string;
-      description: string;
-      category: string;
-      imageUrl?: string;
-      pickupLocation: string;
-      pickupLocationNote?: string;
-    },
+    input: { name: string; description: string; category: string; imageUrl?: string; pickupLocation: string; pickupLocationNote?: string },
     token: string
   ): Promise<Tool> {
-    const created = await request<BackendTool>(
+    const created = await requestParsed(
+      toolResponseSchema,
       "/tools",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          ...input,
-          pickupLocationNote: input.pickupLocationNote?.trim() || undefined
-        })
-      },
+      { method: "POST", body: JSON.stringify({ ...input, pickupLocationNote: input.pickupLocationNote?.trim() || undefined }) },
       token
     );
     return mapTool(created);
   },
 
   async getToolById(toolId: string, token: string): Promise<Tool> {
-    const tool = await request<BackendTool>(`/tools/${toolId}`, undefined, token);
+    const tool = await requestParsed(toolResponseSchema, `/tools/${toolId}`, undefined, token);
     return mapTool(tool);
   },
 
   async updateTool(
     toolId: string,
-    input: {
-      name: string;
-      description: string;
-      category: string;
-      imageUrl?: string;
-      pickupLocation: string;
-      pickupLocationNote?: string;
-    },
+    input: { name: string; description: string; category: string; imageUrl?: string; pickupLocation: string; pickupLocationNote?: string },
     token: string
   ): Promise<Tool> {
-    const updated = await request<BackendTool>(
+    const updated = await requestParsed(
+      toolResponseSchema,
       `/tools/${toolId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({
-          ...input,
-          pickupLocationNote: input.pickupLocationNote?.trim() || undefined
-        })
-      },
+      { method: "PATCH", body: JSON.stringify({ ...input, pickupLocationNote: input.pickupLocationNote?.trim() || undefined }) },
       token
     );
     return mapTool(updated);
@@ -80,80 +62,42 @@ export const toolsApi = {
     await request<void>(`/tools/${toolId}`, { method: "DELETE" }, token);
   },
 
-  async getToolBlockingPeriods(
-    toolId: string
-  ): Promise<Array<{ startIso: string; endIso: string }>> {
-    const periods = await request<Array<{ startDate: string; endDate: string }>>(
-      `/tools/${toolId}/blocking-periods`
-    );
-    return periods.map((period) => ({
-      startIso: period.startDate,
-      endIso: period.endDate
-    }));
+  async getToolBlockingPeriods(toolId: string): Promise<Array<{ startIso: string; endIso: string }>> {
+    const periods = await requestParsed(toolBlockingPeriodListResponseSchema, `/tools/${toolId}/blocking-periods`);
+    return periods.map((p) => ({ startIso: p.startDate, endIso: p.endDate }));
   },
 
-  async getToolOwnerBlocks(
-    toolId: string,
-    token: string
-  ): Promise<Array<{ id: string; startIso: string; endIso: string }>> {
-    const blocks = await request<Array<{ id: string; startDate: string; endDate: string }>>(
-      `/tools/${toolId}/owner-blocks`,
-      {},
-      token
-    );
-    return blocks.map((block) => ({
-      id: block.id,
-      startIso: block.startDate,
-      endIso: block.endDate
-    }));
+  async getToolOwnerBlocks(toolId: string, token: string): Promise<Array<{ id: string; startIso: string; endIso: string }>> {
+    const blocks = await requestParsed(toolOwnerBlockListResponseSchema, `/tools/${toolId}/owner-blocks`, {}, token);
+    return blocks.map((b) => ({ id: b.id, startIso: b.startDate, endIso: b.endDate }));
   },
 
   async deleteToolOwnerBlock(toolId: string, bookingId: string, token: string) {
     await request<void>(`/tools/${toolId}/owner-blocks/${bookingId}`, { method: "DELETE" }, token);
   },
 
-  async createToolOwnerBlock(
-    input: { toolId: string; startIso: string; endIso: string },
-    token: string
-  ): Promise<Booking> {
-    const created = await request<BackendBooking>(
+  async createToolOwnerBlock(input: { toolId: string; startIso: string; endIso: string }, token: string): Promise<Booking> {
+    const created = await requestParsed(
+      bookingResponseSchema,
       "/bookings/tool-owner-block",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          toolId: input.toolId,
-          startDate: new Date(input.startIso).toISOString(),
-          endDate: new Date(input.endIso).toISOString()
-        })
-      },
+      { method: "POST", body: JSON.stringify({ toolId: input.toolId, startDate: new Date(input.startIso).toISOString(), endDate: new Date(input.endIso).toISOString() }) },
       token
     );
     return mapBooking(created);
   },
 
-  async createToolRequest(
-    input: { toolId: string; startIso: string; endIso: string; pickupTimeIso: string },
-    token: string
-  ): Promise<Booking> {
-    const created = await request<BackendBooking>(
+  async createToolRequest(input: { toolId: string; startIso: string; endIso: string; pickupTimeIso: string }, token: string): Promise<Booking> {
+    const created = await requestParsed(
+      bookingResponseSchema,
       "/bookings/tool",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          toolId: input.toolId,
-          startDate: new Date(input.startIso).toISOString(),
-          endDate: new Date(input.endIso).toISOString(),
-          pickupTime: new Date(input.pickupTimeIso).toISOString()
-        })
-      },
+      { method: "POST", body: JSON.stringify({ toolId: input.toolId, startDate: new Date(input.startIso).toISOString(), endDate: new Date(input.endIso).toISOString(), pickupTime: new Date(input.pickupTimeIso).toISOString() }) },
       token
     );
     return mapBooking(created);
   },
 
   async getRatingsForTool(toolId: string) {
-    const ratings = await request<BackendRating[]>(`/ratings/tools/${toolId}`);
+    const ratings = await requestParsed(publicRatingListResponseSchema, `/ratings/tools/${toolId}`);
     return ratings.map(mapPublicRating);
-  },
-
+  }
 };

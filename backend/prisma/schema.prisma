@@ -64,6 +64,8 @@ model User {
   passwordHash  String
   name          String
   address       String
+  latitude      Float?
+  longitude     Float?
   role          Role           @default(USER)
   isSuspended   Boolean        @default(false)
   expoPushToken String?
@@ -79,6 +81,24 @@ model User {
   suspensionRequestsReceived SuspensionRequest[] @relation("SuspensionTarget")
   suspensionRequestsMade     SuspensionRequest[] @relation("SuspensionRequester")
   timeslotProposalsAuthored BookingTimeslotProposal[] @relation("TimeslotProposalAuthor")
+  refreshTokens RefreshToken[]
+}
+
+// Serverseitig nachgehaltene Refresh-Tokens. Es wird nur der SHA-256-Hash des
+// Tokens gespeichert (nie das Token selbst), sodass ein DB-Leak keine gültigen
+// Tokens preisgibt. Ermöglicht echtes Logout, Rotation und Sperrung vor Ablauf.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+  // Unterstützt das künftige Aufräumen abgelaufener Tokens.
+  @@index([expiresAt])
 }
 
 model Tool {
@@ -90,10 +110,17 @@ model Tool {
   imageUrl    String?
   pickupLocation String?
   pickupLocationNote String?
+  pickupLat   Float?
+  pickupLon   Float?
   status      ToolStatus @default(AVAILABLE)
   createdAt   DateTime   @default(now())
   owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   bookings    Booking[]
+
+  // ownerId = "Meine Werkzeuge"/Besitzabfragen; status/category = Filter in der Suche.
+  @@index([ownerId])
+  @@index([status])
+  @@index([category])
 }
 
 model Workshop {
@@ -102,6 +129,8 @@ model Workshop {
   name        String
   description String
   location    String
+  latitude    Float?
+  longitude   Float?
   maxCapacity Int
   equipment   String[]   @default([])
   imageUrls   String[]   @default([])
@@ -229,6 +258,9 @@ model Notification {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Deckt listByUser ab: Filter userId + Sortierung createdAt desc.
+  @@index([userId, createdAt])
 }
 
 model Report {

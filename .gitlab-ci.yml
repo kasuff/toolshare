@@ -128,6 +128,25 @@ workflow:
         })();
       '
 
+# `npm ci` occasionally segfaults (exit 139) on shared runners -- the V8 JIT
+# miscompiles, most often while `prisma generate` runs in the backend
+# postinstall hook. The same command passes on a re-run, so retry up to 3x
+# before failing the pipeline. Assumes the working directory is already the
+# package dir (the job must `cd` into it first).
+.npm_ci:
+  script:
+    - |
+      ok=0
+      for attempt in 1 2 3; do
+        if npm ci --workspaces=false --prefer-offline --cache .npm; then
+          ok=1
+          break
+        fi
+        echo "npm ci failed (attempt $attempt) -- retrying in 3s"
+        sleep 3
+      done
+      [ "$ok" -eq 1 ]
+
 # === FRONTEND JOBS ===
 
 frontend:lint:
@@ -237,7 +256,7 @@ backend:architecture:
   extends: .backend_cache
   script:
     - cd backend
-    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - !reference [.npm_ci, script]
     - npx vitest run tests/architecture.test.ts
 
 backend:contracts:
@@ -246,7 +265,7 @@ backend:contracts:
   extends: .backend_cache
   script:
     - cd backend
-    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - !reference [.npm_ci, script]
     - npm run test:contracts
 
 frontend:architecture:
@@ -255,7 +274,7 @@ frontend:architecture:
   extends: .frontend_cache
   script:
     - cd frontend
-    - npm ci --workspaces=false --prefer-offline --cache .npm
+    - !reference [.npm_ci, script]
     - npx vitest run tests/architecture.test.ts
 
 backend:test:

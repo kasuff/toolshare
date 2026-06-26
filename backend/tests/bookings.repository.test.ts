@@ -85,21 +85,24 @@ describe("bookingsRepository", () => {
         ]
       },
       include: {
-        user: true,
-        tool: { include: { owner: true } },
+        user: { select: { id: true, name: true } },
+        tool: { include: { owner: { select: { id: true, name: true } } } },
         workshop: { include: { manager: { select: { id: true, name: true } } } },
         timeslot: { include: { workshop: { include: { manager: { select: { id: true, name: true } } } } } },
         selectedTools: { include: { workshopTool: true } },
         pickupProposals: {
           orderBy: { createdAt: "asc" },
+          take: 100,
           include: { proposedBy: { select: { id: true, name: true } } }
         },
         timeslotProposals: {
           orderBy: { createdAt: "asc" },
+          take: 100,
           include: { proposedBy: { select: { id: true, name: true } } }
         }
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
+      take: 100
     });
     expect(result).toEqual([{ id: "b1" }]);
   });
@@ -228,7 +231,8 @@ describe("bookingsRepository", () => {
     expect(mocks.txBookingFindFirst).toHaveBeenCalledWith({
       where: {
         toolId: "tool-1",
-        status: { in: ["PENDING", "ACCEPTED"] },
+        // Anfrage-Modell: nur bestätigte Buchungen reservieren -> nur ACCEPTED.
+        status: "ACCEPTED",
         startDate: { lt: endDate },
         endDate: { gt: startDate }
       }

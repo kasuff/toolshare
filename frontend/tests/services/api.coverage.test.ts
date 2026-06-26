@@ -3,6 +3,27 @@ import { api } from "@toolshare/shared";
 
 const fetchMock = vi.fn();
 
+// Gültige UUIDs für schema-konforme Backend-Payloads (Response-Contracts erzwingen
+// z.string().uuid()). URL-Routing nutzt weiterhin die kurzen Pfad-IDs.
+const U = {
+  u1: "11111111-1111-1111-1111-111111111111",
+  u2: "22222222-2222-2222-2222-222222222222",
+  u3: "33333333-3333-3333-3333-333333333333",
+  t1: "aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  t2: "aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  w1: "bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  w2: "bbbbbbb2-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  s1: "ccccccc1-cccc-cccc-cccc-cccccccccccc",
+  s2: "ccccccc2-cccc-cccc-cccc-cccccccccccc",
+  wt1: "ddddddd1-dddd-dddd-dddd-dddddddddddd",
+  b1: "eeeeeee1-eeee-eeee-eeee-eeeeeeeeeeee",
+  b2: "eeeeeee2-eeee-eeee-eeee-eeeeeeeeeeee",
+  b3: "eeeeeee3-eeee-eeee-eeee-eeeeeeeeeeee",
+  n1: "fffffff1-ffff-ffff-ffff-ffffffffffff",
+  r1: "1a1a1a1a-1a1a-1a1a-1a1a-1a1a1a1a1a1a",
+  rt1: "2b2b2b2b-2b2b-2b2b-2b2b-2b2b2b2b2b2b"
+} as const;
+
 function responseJson(body: unknown, init?: ResponseInit) {
   const status = init?.status ?? 200;
   return {
@@ -32,7 +53,7 @@ describe("api coverage", () => {
 
       if (url.endsWith("/auth/login")) {
         return responseJson({
-          user: { id: "u1", email: "lea@example.com", name: "Lea", address: "Straße 1", role: "USER", isSuspended: false },
+          user: { id: U.u1, email: "lea@example.com", name: "Lea", address: "Straße 1", role: "USER", isSuspended: false },
           accessToken: "login-token",
           refreshToken: "refresh-token"
         });
@@ -40,22 +61,22 @@ describe("api coverage", () => {
 
       if (url.endsWith("/auth/register")) {
         return responseJson({
-          user: { id: "u2", email: "nina@example.com", name: "Nina", address: "Straße 2", role: "MODERATOR", isSuspended: false },
+          user: { id: U.u2, email: "nina@example.com", name: "Nina", address: "Straße 2", role: "MODERATOR", isSuspended: false },
           accessToken: "register-token",
           refreshToken: "refresh-token"
         });
       }
 
       if (url.endsWith("/users/me") && init?.method === "PATCH") {
-        return responseJson({ id: "u1", email: "lea@example.com", name: "Lea Neu", address: "Muster 3", role: "MODERATOR", isSuspended: true });
+        return responseJson({ id: U.u1, email: "lea@example.com", name: "Lea Neu", address: "Muster 3", role: "MODERATOR", isSuspended: true });
       }
 
       if (url.endsWith("/users/me")) {
-        return responseJson({ id: "u1", email: "lea@example.com", name: "Lea", address: "Straße 1", role: "MANAGER", isSuspended: false });
+        return responseJson({ id: U.u1, email: "lea@example.com", name: "Lea", address: "Straße 1", role: "MANAGER", isSuspended: false });
       }
 
       if (url.includes("/users?")) {
-        return responseJson([{ id: "u3", email: "bob@example.com", name: "Bob", role: "USER", isSuspended: false }]);
+        return responseJson([{ id: U.u3, email: "bob@example.com", name: "Bob", address: "Straße 3", role: "USER", isSuspended: false }]);
       }
 
       if (url.endsWith("/users/u1/role") || url.endsWith("/users/u1/suspension")) {
@@ -72,14 +93,14 @@ describe("api coverage", () => {
       accessToken: "register-token"
     });
     await expect(api.getCurrentUser("token-123")).resolves.toMatchObject({
-      id: "u1",
+      id: U.u1,
       role: "ADMIN",
       isSuspended: false
     });
 
     const users = await api.listUsers("token-123", { search: "lea", role: "ADMIN" });
     expect(users).toEqual([
-      expect.objectContaining({ id: "u3", name: "Bob", role: "NUTZER" })
+      expect.objectContaining({ id: U.u3, name: "Bob", role: "NUTZER" })
     ]);
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/users?search=lea&role=MANAGER",
@@ -105,69 +126,79 @@ describe("api coverage", () => {
       if (url.includes("/tools?") && init?.method !== "POST") {
         return responseJson([
           {
-            id: "t1",
-            ownerId: "u2",
+            id: U.t1,
+            ownerId: U.u2,
             name: "Akkuschrauber",
             description: "Mit Koffer",
             category: "Bohrmaschine",
             imageUrl: null,
-            status: "AVAILABLE"
+            pickupLocation: "München",
+            pickupLocationNote: null,
+            status: "AVAILABLE",
+            createdAt: "2026-05-01T10:00:00.000Z",
+            updatedAt: "2026-05-01T10:00:00.000Z",
+            owner: { id: U.u2, name: "Owner", role: "USER", isSuspended: false }
           }
         ]);
       }
 
       if (url.endsWith("/tools") && init?.method === "POST") {
         return responseJson({
-          id: "t2",
-          ownerId: "u2",
+          id: U.t2,
+          ownerId: U.u2,
           name: "Bohrhammer",
           description: "Für Beton",
           category: "Bau",
           imageUrl: null,
-          status: "REQUESTED"
+          pickupLocation: "München",
+          pickupLocationNote: null,
+          status: "REQUESTED",
+          createdAt: "2026-05-01T10:00:00.000Z",
+          updatedAt: "2026-05-01T10:00:00.000Z",
+          owner: { id: U.u2, name: "Owner", role: "USER", isSuspended: false }
         });
       }
 
       if (url.includes("/workshops?") && init?.method !== "POST") {
         return responseJson([
           {
-            id: "w1",
-            managerId: "u2",
+            id: U.w1,
+            managerId: U.u2,
             name: "Maker Space",
             description: "Mit Tisch",
             location: "Muenchen",
             maxCapacity: 6,
             extras: ["wlan"],
             imageUrls: [],
-            workshopTools: [{ id: "wt1", name: "Bohrmaschine", category: "holz" }],
+            workshopTools: [{ id: U.wt1, name: "Bohrmaschine", category: "holz" }],
             timeslots: [
-              { id: "s1", workshopId: "w1", startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z" }
+              { id: U.s1, workshopId: U.w1, startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z", blockedByOwner: false }
             ]
           }
         ]);
       }
 
-      if (url.endsWith("/workshops/w1")) {
+      if (url.endsWith(`/workshops/${U.w1}`)) {
         return responseJson({
-          id: "w1",
-          managerId: "u2",
+          id: U.w1,
+          managerId: U.u2,
           name: "Maker Space",
           description: "Mit Tisch",
           location: "Muenchen",
           maxCapacity: 6,
-          equipment: ["wlan"],
+          extras: ["wlan"],
           imageUrls: ["workshop.png"],
-          workshopTools: [{ id: "wt1", name: "Bohrmaschine", category: "holz" }],
+          workshopTools: [{ id: U.wt1, name: "Bohrmaschine", category: "holz" }],
           timeslots: [
-            { id: "s1", workshopId: "w1", startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z", blockedByOwner: true }
+            { id: U.s1, workshopId: U.w1, startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z", blockedByOwner: true }
           ]
         });
       }
 
       if (url.endsWith("/workshops") && init?.method === "POST") {
         return responseJson({
-          id: "w2",
-          managerId: "u2",
+          id: U.w2,
+          managerId: U.u2,
           name: "Neuer Raum",
           description: "Neu",
           location: "Berlin",
@@ -178,10 +209,10 @@ describe("api coverage", () => {
         });
       }
 
-      if (url.endsWith("/workshops/w2/timeslots") && init?.method === "POST") {
+      if (url.endsWith("/timeslots") && init?.method === "POST") {
         return responseJson({
-          id: `slot-${Math.random().toString(16).slice(2, 6)}`,
-          workshopId: "w2",
+          id: U.s2,
+          workshopId: U.w2,
           startTime: "2026-05-07T08:00:00.000Z",
           endTime: "2026-05-07T10:00:00.000Z",
           blockedByOwner: false
@@ -190,8 +221,8 @@ describe("api coverage", () => {
 
       if (url.endsWith("/workshops/w2/timeslots/s1") && init?.method === "PATCH") {
         return responseJson({
-          id: "s1",
-          workshopId: "w2",
+          id: U.s1,
+          workshopId: U.w2,
           startTime: "2026-05-07T09:00:00.000Z",
           endTime: "2026-05-07T11:00:00.000Z",
           blockedByOwner: true
@@ -204,31 +235,32 @@ describe("api coverage", () => {
 
       if (url.endsWith("/bookings/tool") && init?.method === "POST") {
         return responseJson({
-          id: "b1",
-          userId: "u1",
-          toolId: "t1",
+          id: U.b1,
+          userId: U.u1,
+          toolId: U.t1,
           startDate: "2026-05-06T10:00:00.000Z",
           endDate: "2026-05-06T12:00:00.000Z",
           pickupTime: "2026-05-06T09:00:00.000Z",
           status: "PENDING",
-          tool: { ownerId: "u2", name: "Akkuschrauber", imageUrl: null, status: "AVAILABLE" }
+          tool: { id: U.t1, ownerId: U.u2, name: "Akkuschrauber", imageUrl: null }
         });
       }
 
       if (url.endsWith("/bookings/workshop") && init?.method === "POST") {
         return responseJson({
-          id: "b2",
-          userId: "u1",
-          timeslotId: "s1",
+          id: U.b2,
+          userId: U.u1,
+          timeslotId: U.s1,
+          workshopId: U.w1,
           startDate: "2026-05-08T08:00:00.000Z",
           endDate: "2026-05-08T10:00:00.000Z",
           status: "ACCEPTED",
           timeslot: {
-            id: "s1",
-            workshopId: "w1",
+            id: U.s1,
+            workshopId: U.w1,
             startTime: "2026-05-08T08:00:00.000Z",
             endTime: "2026-05-08T10:00:00.000Z",
-            workshop: { id: "w1", name: "Maker Space", managerId: "u2" }
+            workshop: { id: U.w1, name: "Maker Space", managerId: U.u2 }
           }
         });
       }
@@ -236,14 +268,14 @@ describe("api coverage", () => {
       if (url.endsWith("/bookings/me")) {
         return responseJson([
           {
-            id: "b3",
-            userId: "u1",
-            toolId: "t1",
+            id: U.b3,
+            userId: U.u1,
+            toolId: U.t1,
             startDate: "2026-05-09T08:00:00.000Z",
             endDate: "2026-05-09T10:00:00.000Z",
             pickupTime: null,
             status: "RETURNED",
-            tool: { ownerId: "u2", name: "Akkuschrauber", imageUrl: null, status: "AVAILABLE" }
+            tool: { id: U.t1, ownerId: U.u2, name: "Akkuschrauber", imageUrl: null }
           }
         ]);
       }
@@ -253,11 +285,27 @@ describe("api coverage", () => {
       }
 
       if (url.endsWith("/notifications/me")) {
-        return responseJson([{ id: "n1", userId: "u1", message: "Hallo", read: false, createdAt: "2026-05-05T10:00:00.000Z" }]);
+        return responseJson([{ id: U.n1, userId: U.u1, message: "Hallo", read: false, createdAt: "2026-05-05T10:00:00.000Z" }]);
       }
 
       if (url.endsWith("/moderation/reports")) {
-        return responseJson([{ id: "r1", reason: "Defekt", status: "OPEN" }]);
+        return responseJson([
+          {
+            id: U.r1,
+            reporterId: U.u3,
+            reporterName: "Bob",
+            targetType: "TOOL",
+            targetId: U.t1,
+            targetLabel: "Akkuschrauber",
+            targetHref: null,
+            subjectUserId: null,
+            subjectUserName: null,
+            ratingPreview: null,
+            reason: "Defekt",
+            status: "OPEN",
+            createdAt: "2026-05-05T10:00:00.000Z"
+          }
+        ]);
       }
 
       if (url.endsWith("/moderation/reports/r1") && init?.method === "PATCH") {
@@ -265,11 +313,22 @@ describe("api coverage", () => {
       }
 
       if (url.endsWith("/ratings/me/received")) {
-        return responseJson([{ id: "rt1", score: 5, createdAt: "2026-05-05T12:00:00.000Z", fromUser: { name: "Lea" } }]);
+        return responseJson([
+          {
+            id: U.rt1,
+            bookingId: U.b3,
+            fromUserId: U.u2,
+            toUserId: U.u1,
+            score: 5,
+            status: "VISIBLE",
+            createdAt: "2026-05-05T12:00:00.000Z",
+            fromUser: { id: U.u2, name: "Lea" }
+          }
+        ]);
       }
 
       if (url.endsWith("/users/admin/metrics")) {
-        return responseJson({ users: 7, tools: 4, workshops: 2, openBookings: 1, openReports: 0 });
+        return responseJson({ users: 7, tools: 4, workshops: 2, openBookings: 1, openReports: 0, openSuspensionRequests: 0 });
       }
 
       throw new Error(`Unexpected request ${url}`);
@@ -277,29 +336,29 @@ describe("api coverage", () => {
 
     const tools = await api.getTools({ q: "bohr", category: "holz" }, "token-123");
     expect(tools[0]).toMatchObject({
-      id: "t1",
-      ownerId: "u2",
+      id: U.t1,
+      ownerId: U.u2,
       status: "VERFUEGBAR",
       imageUrl: expect.any(String)
     });
 
     const createdTool = await api.createTool({ name: "Bohrhammer", description: "Für Beton", category: "bau" }, "token-123");
     expect(createdTool).toMatchObject({
-      id: "t2",
+      id: U.t2,
       status: "AUSGELIEHEN"
     });
 
     const workshops = await api.getWorkshops({ q: "maker", managerId: "u2" }, "token-123");
     expect(workshops[0].workshop).toMatchObject({
-      id: "w1",
-      ownerId: "u2"
+      id: U.w1,
+      ownerId: U.u2
     });
     expect(workshops[0].workshop.imageUrls[0]).toBe("workshop.png");
-    expect(workshops[0].slots[0]).toMatchObject({ id: "s1" });
+    expect(workshops[0].slots[0]).toMatchObject({ id: U.s1 });
     expect(workshops[0].slots[0].blockedByOwner).toBe(true);
     expect(workshops[0].slots[0].startIso).toMatch(/^2026-05-06T/);
 
-    const detail = await api.getWorkshopById("w1", "token-123");
+    const detail = await api.getWorkshopById(U.w1, "token-123");
     expect(detail.workshop.extras).toEqual(["wlan"]);
     expect(detail.slots[0]).toMatchObject({ blockedByOwner: true });
 
@@ -316,14 +375,14 @@ describe("api coverage", () => {
       },
       "token-123"
     );
-    expect(createdWorkshop).toMatchObject({ id: "w2", ownerId: "u2" });
+    expect(createdWorkshop).toMatchObject({ id: U.w2, ownerId: U.u2 });
 
     const createdSlot = await api.createWorkshopTimeslot(
       "w2",
       { startIso: "2026-05-07T08:00:00.000Z", endIso: "2026-05-07T10:00:00.000Z", blockedByOwner: false },
       "token-123"
     );
-    expect(createdSlot).toMatchObject({ workshopId: "w2", blockedByOwner: false });
+    expect(createdSlot).toMatchObject({ workshopId: U.w2, blockedByOwner: false });
 
     const updatedSlot = await api.updateWorkshopTimeslot(
       "w2",
@@ -331,7 +390,7 @@ describe("api coverage", () => {
       { startIso: "2026-05-07T09:00:00.000Z", endIso: "2026-05-07T11:00:00.000Z", blockedByOwner: true },
       "token-123"
     );
-    expect(updatedSlot).toMatchObject({ id: "s1", blockedByOwner: true });
+    expect(updatedSlot).toMatchObject({ id: U.s1, blockedByOwner: true });
     expect(updatedSlot.startIso).toMatch(/^2026-05-07T/);
     await api.deleteWorkshopTimeslot("w2", "s1", "token-123");
 
@@ -341,7 +400,7 @@ describe("api coverage", () => {
     );
     expect(toolBooking).toMatchObject({
       type: "TOOL",
-      providerId: "u2",
+      providerId: U.u2,
       requesterName: undefined,
       providerName: undefined
     });
@@ -357,12 +416,12 @@ describe("api coverage", () => {
     );
     expect(workshopBooking).toMatchObject({
       type: "WORKSHOP",
-      providerId: "u2",
-      workshopId: "w1"
+      providerId: U.u2,
+      workshopId: U.w1
     });
 
     const bookings = await api.getBookingsForUser("token-123");
-    expect(bookings[0]).toMatchObject({ id: "b3", status: "ABGESCHLOSSEN", type: "TOOL" });
+    expect(bookings[0]).toMatchObject({ id: U.b3, status: "ABGESCHLOSSEN", type: "TOOL" });
 
     await api.decideBooking("b1", "BESTAETIGT", "token-123");
     await api.createPickupProposal(
@@ -374,14 +433,14 @@ describe("api coverage", () => {
     await api.respondPickupProposal("b1", "p1", "DECLINE", "token-123");
 
     const notifications = await api.getNotifications("token-123");
-    expect(notifications[0]).toMatchObject({ id: "n1", createdIso: "2026-05-05T10:00:00.000Z" });
+    expect(notifications[0]).toMatchObject({ id: U.n1, createdIso: "2026-05-05T10:00:00.000Z" });
 
     const reports = await api.listReports("token-123");
-    expect(reports).toEqual([expect.objectContaining({ id: "r1", status: "OPEN" })]);
+    expect(reports).toEqual([expect.objectContaining({ id: U.r1, status: "OPEN" })]);
     await api.updateReportStatus("r1", "RESOLVED", "token-123");
 
     const ratings = await api.getRatingsReceived("token-123");
-    expect(ratings[0]).toMatchObject({ id: "rt1", score: 5, fromUserName: "Lea", status: "SICHTBAR" });
+    expect(ratings[0]).toMatchObject({ id: U.rt1, score: 5, fromUserName: "Lea", status: "SICHTBAR" });
 
     expect(await api.getMetrics("token-123")).toMatchObject({
       users: 7,

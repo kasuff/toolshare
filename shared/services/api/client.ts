@@ -1,3 +1,5 @@
+import type { z } from "zod";
+import { getAuthSessionAdapter } from "../../auth/session";
 import { beginRequestActivity } from "../requestActivity";
 import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "../sessionEvents";
 
@@ -6,6 +8,53 @@ let API_BASE = "http://localhost:4000/api";
 export function setApiBaseUrl(url: string) {
   API_BASE = url;
 }
+
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const adapter = getAuthSessionAdapter();
+  if (!adapter) {
+    throw new Error("No auth session configured");
+  }
+
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    const refreshToken = await adapter.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error("No refresh token available");
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken })
+      });
+    } catch {
+      throw new Error("Refresh request failed");
+    }
+
+    if (!response.ok) {
+      throw new Error("Refresh request failed");
+    }
+
+    const data = (await response.json()) as { accessToken: string; refreshToken: string };
+    await adapter.setTokens({
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken
+    });
+    return data.accessToken;
+  })().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
 function toLocalDateTimeInputValue(input: string) {
   const date = new Date(input);
   if (Number.isNaN(date.getTime())) return input;
@@ -35,7 +84,37 @@ function translateValidationMessage(raw: string): string {
   return raw;
 }
 
-async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
+async function handleUnauthorized<T>(
+  path: string,
+  init: RequestInit | undefined,
+  token: string,
+  isRetry: boolean
+): Promise<T> {
+  const adapter = getAuthSessionAdapter();
+
+  if (!isRetry && adapter && path !== "/auth/refresh") {
+    const refreshToken = await adapter.getRefreshToken();
+    if (refreshToken) {
+      try {
+        const newToken = await refreshAccessToken();
+        return request<T>(path, init, newToken, true);
+      } catch {
+        // Refresh failed — fall through to session expiry
+      }
+    }
+  }
+
+  await adapter?.clearTokens();
+  notifySessionExpired();
+  throw new Error(SESSION_EXPIRED_MESSAGE);
+}
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  token?: string,
+  isRetry = false
+): Promise<T> {
   const finishActivity = beginRequestActivity();
   try {
     let response: Response;
@@ -53,8 +132,7 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
     }
 
     if (response.status === 401 && token) {
-      notifySessionExpired();
-      throw new Error(SESSION_EXPIRED_MESSAGE);
+      return handleUnauthorized<T>(path, init, token, isRetry);
     }
 
     if (response.status === 429) {
@@ -118,4 +196,14 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
   }
 }
 
-export { request, translateValidationMessage, toLocalDateTimeInputValue };
+async function requestParsed<S extends z.ZodTypeAny>(
+  schema: S,
+  path: string,
+  init?: RequestInit,
+  token?: string
+): Promise<z.infer<S>> {
+  const data = await request<unknown>(path, init, token);
+  return schema.parse(data);
+}
+
+export { request, requestParsed, translateValidationMessage, toLocalDateTimeInputValue };

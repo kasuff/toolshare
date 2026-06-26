@@ -1,7 +1,26 @@
 import { create } from 'zustand';
-import { api, onSessionExpired, SESSION_EXPIRED_MESSAGE, ACCESS_TOKEN_STORAGE_KEY, type User } from '@toolshare/shared';
+import {
+  api,
+  onSessionExpired,
+  SESSION_EXPIRED_MESSAGE,
+  ACCESS_TOKEN_STORAGE_KEY,
+  REFRESH_TOKEN_STORAGE_KEY,
+  configureAuthSession,
+  type User,
+} from '@toolshare/shared';
 
-const TOKEN_STORAGE_KEY = ACCESS_TOKEN_STORAGE_KEY;
+const ACCESS_KEY = ACCESS_TOKEN_STORAGE_KEY;
+const REFRESH_KEY = REFRESH_TOKEN_STORAGE_KEY;
+
+function persistTokens(accessToken: string, refreshToken: string) {
+  localStorage.setItem(ACCESS_KEY, accessToken);
+  localStorage.setItem(REFRESH_KEY, refreshToken);
+}
+
+function clearPersistedTokens() {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+}
 
 interface AuthState {
   token: string | null;
@@ -17,7 +36,7 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null,
+  token: typeof localStorage !== 'undefined' ? localStorage.getItem(ACCESS_KEY) : null,
   currentUser: null,
   isLoading: true,
   error: null,
@@ -25,7 +44,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email, password) => {
     try {
       const result = await api.login(email, password);
-      localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
+      persistTokens(result.accessToken, result.refreshToken);
       set({ token: result.accessToken, error: null });
       await get().initSession();
     } catch (err) {
@@ -37,7 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (input) => {
     try {
       const result = await api.register(input);
-      localStorage.setItem(TOKEN_STORAGE_KEY, result.accessToken);
+      persistTokens(result.accessToken, result.refreshToken);
       set({ token: result.accessToken, error: null });
       await get().initSession();
     } catch (err) {
@@ -47,7 +66,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    // Refresh-Token serverseitig entwerten (best effort – lokales Logout darf nie
+    // an einem fehlgeschlagenen Netzwerkaufruf hängen).
+    const refreshToken = localStorage.getItem(REFRESH_KEY);
+    if (refreshToken) {
+      void api.logout(refreshToken).catch(() => undefined);
+    }
+    clearPersistedTokens();
     set({ token: null, currentUser: null, error: null });
   },
 
@@ -71,7 +96,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const me = await api.getCurrentUser(token);
       set({ currentUser: me, error: null });
     } catch (err) {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      clearPersistedTokens();
       set({ 
         token: null, 
         currentUser: null, 
@@ -83,9 +108,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   }
 }));
 
+configureAuthSession({
+  getAccessToken: () => localStorage.getItem(ACCESS_KEY),
+  getRefreshToken: () => localStorage.getItem(REFRESH_KEY),
+  setTokens: ({ accessToken, refreshToken }) => {
+    persistTokens(accessToken, refreshToken);
+    useAuthStore.setState({ token: accessToken });
+  },
+  clearTokens: () => {
+    clearPersistedTokens();
+  },
+});
+
 // Handle token expiration events triggered by the api client centrally
 onSessionExpired(() => {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  clearPersistedTokens();
   useAuthStore.setState({ 
     token: null, 
     currentUser: null, 

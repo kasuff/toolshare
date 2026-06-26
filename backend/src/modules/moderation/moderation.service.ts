@@ -6,96 +6,9 @@ import { suspensionRepository } from "../users/suspension.repository";
 import { moderationRepository } from "./moderation.repository";
 import { toolsService } from "../tools/tools.service";
 import { workshopsService } from "../workshops/workshops.service";
+import { toModerationReportResponse } from "./moderation.presenter";
 
 type ReportRow = Awaited<ReturnType<typeof moderationRepository.listOpenReports>>[number];
-type RatingRow = Awaited<ReturnType<typeof moderationRepository.findRatingsByIds>>[number];
-
-function enrichReport(
-  report: ReportRow,
-  tools: Awaited<ReturnType<typeof moderationRepository.findToolsByIds>>,
-  workshops: Awaited<ReturnType<typeof moderationRepository.findWorkshopsByIds>>,
-  users: Awaited<ReturnType<typeof moderationRepository.findUsersByIds>>,
-  ratings: RatingRow[],
-  moderators: Awaited<ReturnType<typeof moderationRepository.findUsersByIds>>
-) {
-  let targetLabel = report.targetId;
-  let targetHref: string | null = null;
-  let subjectUserId: string | null = null;
-  let subjectUserName: string | null = null;
-  let ratingPreview: {
-    score: number;
-    comment: string | null;
-    fromUserName: string;
-    listingLabel: string | null;
-  } | null = null;
-
-  if (report.targetType === "TOOL") {
-    const tool = tools.find((t) => t.id === report.targetId);
-    if (tool) {
-      targetLabel = tool.name;
-      targetHref = `/tools/${tool.id}`;
-      subjectUserId = tool.ownerId;
-      subjectUserName = tool.owner.name;
-    }
-  } else if (report.targetType === "WORKSHOP") {
-    const workshop = workshops.find((w) => w.id === report.targetId);
-    if (workshop) {
-      targetLabel = workshop.name;
-      targetHref = `/workshops?open=${workshop.id}`;
-      subjectUserId = workshop.managerId;
-      subjectUserName = workshop.manager.name;
-    }
-  } else if (report.targetType === "RATING") {
-    const rating = ratings.find((entry) => entry.id === report.targetId);
-    if (rating) {
-      const listingLabel = rating.booking.tool?.name ?? rating.booking.timeslot?.workshop?.name ?? null;
-      targetLabel = `Bewertung (${rating.score} Sterne)`;
-      subjectUserId = rating.fromUserId;
-      subjectUserName = rating.fromUser.name;
-      ratingPreview = {
-        score: rating.score,
-        comment: rating.comment,
-        fromUserName: rating.fromUser.name,
-        listingLabel
-      };
-    }
-  } else {
-    const user = users.find((u) => u.id === report.targetId);
-    if (user) {
-      targetLabel = user.name;
-      subjectUserId = user.id;
-      subjectUserName = user.name;
-    }
-  }
-
-  const moderatorName =
-    report.moderatorId != null
-      ? (moderators.find((m) => m.id === report.moderatorId)?.name ?? null)
-      : null;
-
-  return {
-    id: report.id,
-    reporterId: report.reporterId,
-    reporterName: report.reporter.name,
-    targetType: report.targetType,
-    targetId: report.targetId,
-    targetLabel,
-    targetHref,
-    subjectUserId,
-    subjectUserName,
-    ratingPreview,
-    bookingId: report.bookingId,
-    reason: report.reason,
-    details: report.details,
-    conversationContext: report.conversationContext,
-    status: report.status,
-    decisionNote: report.decisionNote,
-    decisionAt: report.decisionAt,
-    moderatorId: report.moderatorId,
-    moderatorName,
-    createdAt: report.createdAt
-  };
-}
 
 async function enrichReports(reports: ReportRow[]) {
   const toolIds = reports.filter((r) => r.targetType === "TOOL").map((r) => r.targetId);
@@ -114,7 +27,9 @@ async function enrichReports(reports: ReportRow[]) {
     moderationRepository.findUsersByIds(moderatorIds)
   ]);
 
-  return reports.map((report) => enrichReport(report, tools, workshops, users, ratings, moderators));
+  return reports.map((report) =>
+    toModerationReportResponse(report, { tools, workshops, users, ratings, moderators })
+  );
 }
 
 export const moderationService = {

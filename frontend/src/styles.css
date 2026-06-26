@@ -102,6 +102,7 @@ input[type="datetime-local"]::-webkit-datetime-edit {
 .date-input-control > input:not(.date-input-picker-native) {
   width: 100%;
   padding-right: 44px;
+  font-weight: 400;
 }
 
 .date-input-picker-button {

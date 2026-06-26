@@ -35,8 +35,34 @@ export const authRepository = {
     passwordHash: string;
     name: string;
     address: string;
+    latitude?: number | null;
+    longitude?: number | null;
     role: "USER" | "MODERATOR" | "MANAGER";
   }) {
     return prisma.user.create({ data: input });
+  },
+
+  createRefreshToken(input: { userId: string; tokenHash: string; expiresAt: Date }) {
+    return prisma.refreshToken.create({ data: input });
+  },
+
+  findRefreshToken(tokenHash: string) {
+    return prisma.refreshToken.findUnique({ where: { tokenHash } });
+  },
+
+  /** Widerruft einen einzelnen Refresh-Token (idempotent: betrifft nur aktive). */
+  revokeRefreshToken(tokenHash: string) {
+    return prisma.refreshToken.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+  },
+
+  /** Widerruft alle aktiven Refresh-Tokens eines Nutzers (z. B. nach Passwortwechsel). */
+  revokeAllRefreshTokensForUser(userId: string) {
+    return prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
   }
 };
