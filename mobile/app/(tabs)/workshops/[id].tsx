@@ -12,11 +12,14 @@ import {
   Alert,
  } from 'react-native';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
-import { Workshop, WorkshopSlot, Tool, api, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
+import { WorkshopSlot, Tool, api, DEFAULT_PLACEHOLDER_IMAGE } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { useWorkshopDetail, useWorkshopRatings, workshopKeys } from '../../../hooks/queries/workshops.queries';
+import { inboxKeys } from '../../../hooks/queries/inbox.queries';
 import { LoadingSpinner } from '../../../components/EmptyState';
 import { ImageLightbox } from '../../../components/ImageLightbox';
 import { Ionicons } from '@expo/vector-icons';
@@ -121,13 +124,8 @@ export default function WorkshopDetailScreen() {
   const Colors = useThemeColors();
   const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [workshop, setWorkshop] = useState<Workshop | null>(null);
-  const [slots, setSlots] = useState<WorkshopSlot[]>([]);
-  const [bookedRanges, setBookedRanges] = useState<WorkshopBookedRange[]>([]);
-  const [ratings, setRatings] = useState<PublicRating[]>([]);
-  const [tools, setTools] = useState<(Tool & { selectable: boolean })[]>([]);
-  
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -152,51 +150,38 @@ export default function WorkshopDetailScreen() {
   const { token, currentUser } = useAuth();
   const router = useRouter();
 
+  const detailQuery = useWorkshopDetail(id ?? '', token);
+  const ratingsQuery = useWorkshopRatings(id ?? '');
+  const workshop = detailQuery.data?.workshop ?? null;
+  const slots = useMemo<WorkshopSlot[]>(() => detailQuery.data?.slots ?? [], [detailQuery.data]);
+  const bookedRanges = useMemo(() => detailQuery.data?.bookedRanges ?? [], [detailQuery.data]);
+  const ratings: PublicRating[] = ratingsQuery.data ?? [];
+  const isLoading = detailQuery.isLoading;
+
+  // Werkstatt-Werkzeuge aus dem Equipment der geladenen Werkstatt ableiten.
+  const tools = useMemo<(Tool & { selectable: boolean })[]>(() => {
+    if (!workshop) return [];
+    return workshop.equipmentItems.map((item) => ({
+      id: item.id,
+      ownerId: workshop.ownerId,
+      ownerName: workshop.ownerName,
+      name: item.name,
+      description: 'Werkstatt-Werkzeug',
+      category: item.category,
+      imageUrl: '',
+      status: 'VERFUEGBAR' as const,
+      selectable: true,
+    }));
+  }, [workshop]);
+
   useEffect(() => {
     setActiveImageIndex(0);
   }, [id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      async function load() {
-        if (!token || !id) return;
-        try {
-          const [found, workshopRatings] = await Promise.all([
-            api.getWorkshopById(id, token),
-            api.getRatingsForWorkshop(id).catch(() => [])
-          ]);
-          
-          if (found) {
-            setWorkshop(found.workshop);
-            setSlots(found.slots);
-            setBookedRanges(found.bookedRanges);
-            setRatings(workshopRatings);
-            
-            const mappedTools = found.workshop.equipmentItems.map(item => ({
-              id: item.id,
-              ownerId: found.workshop.ownerId,
-              ownerName: found.workshop.ownerName,
-              name: item.name,
-              description: "Werkstatt-Werkzeug",
-              category: item.category,
-              imageUrl: "",
-              status: "VERFUEGBAR" as const,
-              selectable: true
-            }));
-            
-            setTools(mappedTools);
-            setSelectedToolIds(mappedTools.filter(t => t.selectable).map(t => t.id));
-          }
-        } catch (e) {
-          console.error(e);
-          setError('Fehler beim Laden der Werkstattdaten.');
-        } finally {
-          setIsLoading(false);
-        }
-      }
-      load();
-    }, [id, token])
-  );
+  // Beim ersten Laden einer Werkstatt alle auswählbaren Werkzeuge vorauswählen.
+  useEffect(() => {
+    setSelectedToolIds(tools.filter((t) => t.selectable).map((t) => t.id));
+  }, [workshop?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isOwnWorkshop = Boolean(workshop && currentUser?.id === workshop.ownerId);
   const workshopImages = useMemo(() => {
@@ -267,9 +252,7 @@ export default function WorkshopDetailScreen() {
       if (isOwnWorkshop) {
         await api.createWorkshopTimeslot(workshop!.id, { startIso, endIso, blockedByOwner: true }, token!);
         setSuccess('Werkstatt für Eigenbedarf blockiert!');
-        // Reload slots
-        const refreshed = await api.getWorkshopById(workshop!.id, token!);
-        setSlots(refreshed.slots);
+        void queryClient.invalidateQueries({ queryKey: workshopKeys.detail(workshop!.id) });
       } else {
         await api.createWorkshopBooking({
           workshopId: workshop!.id,
@@ -278,6 +261,8 @@ export default function WorkshopDetailScreen() {
           workshopToolIds: selectedToolIds
         }, token!);
         setSuccess('Buchungsanfrage erfolgreich!');
+        void queryClient.invalidateQueries({ queryKey: workshopKeys.detail(workshop!.id) });
+        void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
         setTimeout(() => {
           router.replace('/inbox');
         }, 1500);

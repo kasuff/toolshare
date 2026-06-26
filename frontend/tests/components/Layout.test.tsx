@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Layout } from "../../src/components/Layout";
 import type { User } from "@toolshare/shared";
 import { useAuthStore } from "../../src/store/authStore";
+import { useInboxStore } from "../../src/store/inboxStore";
 import {
   INBOX_READ_CHANGED_EVENT,
   inboxReadSeedKey,
@@ -12,11 +13,13 @@ import {
   saveReadMessageIds
 } from "../../src/utils/inboxMessageRead";
 
-const { getBookingsForUser, getRatingsReceived, getRatingsGiven, getNotifications } = vi.hoisted(() => ({
+const { getBookingsForUser, getRatingsReceived, getRatingsGiven, getNotifications, getInboxReadReceipts, addInboxReadReceipts } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   getRatingsReceived: vi.fn().mockResolvedValue([]),
   getRatingsGiven: vi.fn().mockResolvedValue([]),
-  getNotifications: vi.fn().mockResolvedValue([])
+  getNotifications: vi.fn().mockResolvedValue([]),
+  getInboxReadReceipts: vi.fn(),
+  addInboxReadReceipts: vi.fn()
 }));
 
 vi.mock("@toolshare/shared", async (importOriginal) => {
@@ -26,9 +29,11 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
     api: {
       ...actual.api,
       getBookingsForUser,
-    getRatingsReceived,
-    getRatingsGiven,
-    getNotifications
+      getRatingsReceived,
+      getRatingsGiven,
+      getNotifications,
+      getInboxReadReceipts,
+      addInboxReadReceipts
     }
   };
 });
@@ -42,9 +47,12 @@ describe("Layout", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
+    useInboxStore.getState().clear();
     getRatingsReceived.mockResolvedValue([]);
     getRatingsGiven.mockResolvedValue([]);
     getNotifications.mockResolvedValue([]);
+    getInboxReadReceipts.mockResolvedValue(["__seeded__"]);
+    addInboxReadReceipts.mockResolvedValue(undefined);
   });
 
   it("shows bell, nav actions and closes profile menu on outside click", async () => {

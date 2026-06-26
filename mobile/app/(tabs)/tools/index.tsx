@@ -1,8 +1,10 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { View, FlatList, RefreshControl, TextInput, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Tool, api, TOOL_CATEGORIES, pluralize } from '@toolshare/shared';
+import { TOOL_CATEGORIES, pluralize } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { useTools } from '../../../hooks/queries/tools.queries';
+import { useFilterStore } from '../../../store/filterStore';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { ToolCard } from '../../../components/ToolCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
@@ -15,58 +17,42 @@ import { getErrorMessage } from '../../../utils/errors';
 export default function ToolsScreen() {
   const Colors = useThemeColors();
   const styles = useStyles();
-  const [tools, setTools] = useState<Tool[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, 450);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
-  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
-  const [borrowFrom, setBorrowFrom] = useState('');
-  const [borrowUntil, setBorrowUntil] = useState('');
-  
   const { token } = useAuth();
   const router = useRouter();
 
-  const loadTools = useCallback(async (query: string, cat: string | null) => {
-    if (!token) return;
-    try {
-      setError(null);
-      const data = await api.getTools({
-        q: query || undefined,
-        category: cat || undefined
-      }, token);
-      setTools(data);
-    } catch (e) {
-      console.error(e);
-      setError(getErrorMessage(e, 'Werkzeuge konnten nicht geladen werden.'));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [token]);
+  // Such-/Filterstand liegt im Zustand-Store, damit er beim Tab-Wechsel erhalten bleibt.
+  const { q: search, category: selectedCategory, borrowFrom, borrowUntil, advancedOpen: isFiltersExpanded } =
+    useFilterStore((s) => s.toolFilters);
+  const setToolFilter = useFilterStore((s) => s.setToolFilter);
 
-  useEffect(() => {
-    setIsLoading(true);
-    loadTools(debouncedSearch, selectedCategory);
-  }, [loadTools, debouncedSearch, selectedCategory]);
+  const debouncedSearch = useDebouncedValue(search, 450);
+
+  const {
+    data: tools = [],
+    isLoading,
+    isRefetching,
+    isError,
+    error: queryError,
+    refetch,
+  } = useTools(
+    { q: debouncedSearch || undefined, category: selectedCategory || undefined },
+    token
+  );
+  const error = isError ? getErrorMessage(queryError, 'Werkzeuge konnten nicht geladen werden.') : null;
+
+  const setSearch = (value: string) => setToolFilter('q', value);
+  const setSelectedCategory = (value: string | null) => setToolFilter('category', value);
 
   const handleSearchSubmit = () => {
-    setIsLoading(true);
-    loadTools(search, selectedCategory);
+    void refetch();
   };
 
   const handleClearSearch = () => {
-    setSearch('');
-    setIsLoading(true);
-    loadTools('', selectedCategory);
+    setToolFilter('q', '');
   };
 
   const onRefresh = () => {
-    setIsRefreshing(true);
-    loadTools(debouncedSearch, selectedCategory);
+    void refetch();
   };
 
   const filteredTools = useMemo(() => {
@@ -101,7 +87,7 @@ export default function ToolsScreen() {
           </View>
           <Pressable 
             style={[styles.filterToggleButton, isFiltersExpanded && styles.filterToggleButtonActive]} 
-            onPress={() => setIsFiltersExpanded(!isFiltersExpanded)}
+            onPress={() => setToolFilter('advancedOpen', !isFiltersExpanded)}
           >
             <Ionicons name="options-outline" size={24} color={isFiltersExpanded ? Colors.surface : Colors.text} />
           </Pressable>
@@ -110,8 +96,8 @@ export default function ToolsScreen() {
         {isFiltersExpanded && (
           <View style={styles.advancedFilters}>
             <View style={{ flexDirection: 'row', gap: 16 }}>
-              <DateField label="Ausleihe von" value={borrowFrom} onChange={setBorrowFrom} />
-              <DateField label="Ausleihe bis" value={borrowUntil} onChange={setBorrowUntil} />
+              <DateField label="Ausleihe von" value={borrowFrom} onChange={(v) => setToolFilter('borrowFrom', v)} />
+              <DateField label="Ausleihe bis" value={borrowUntil} onChange={(v) => setToolFilter('borrowUntil', v)} />
             </View>
           </View>
         )}
@@ -149,10 +135,7 @@ export default function ToolsScreen() {
       {error ? (
         <View style={styles.errorBanner}>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
-          <Pressable onPress={() => {
-            setIsLoading(true);
-            loadTools(debouncedSearch, selectedCategory);
-          }}>
+          <Pressable onPress={() => void refetch()}>
             <ThemedText style={styles.retryText}>Erneut versuchen</ThemedText>
           </Pressable>
         </View>
@@ -171,7 +154,7 @@ export default function ToolsScreen() {
           data={filteredTools}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[Colors.brand]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} colors={[Colors.brand]} />}
           ListEmptyComponent={() => (
             <EmptyState 
               title="Keine Werkzeuge gefunden" 

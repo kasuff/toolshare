@@ -1,6 +1,6 @@
 import {
+  INBOX_SEED_MARKER,
   INBOX_READ_CHANGED_EVENT,
-  inboxReadStorageKey,
   inboxReadSeedKey,
   requestMessageKey,
   proposalMessageKey,
@@ -11,10 +11,11 @@ import {
   countUnreadInboxThreads,
   type InboxRatingRef,
 } from "@toolshare/shared";
+import { useInboxStore } from "../store/inboxStore";
 
 export {
+  INBOX_SEED_MARKER,
   INBOX_READ_CHANGED_EVENT,
-  inboxReadStorageKey,
   inboxReadSeedKey,
   requestMessageKey,
   proposalMessageKey,
@@ -26,21 +27,8 @@ export {
   type InboxRatingRef,
 };
 
-export function loadReadMessageIds(userId: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(inboxReadStorageKey(userId));
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw) as unknown;
-    if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((x): x is string => typeof x === "string"));
-  } catch {
-    return new Set();
-  }
-}
-
-export function saveReadMessageIds(userId: string, ids: Set<string>): void {
-  localStorage.setItem(inboxReadStorageKey(userId), JSON.stringify([...ids]));
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(INBOX_READ_CHANGED_EVENT, { detail: { userId } }));
-  }
+// Aktualisiert den lokalen Zustand der gelesenen Nachrichten-IDs im Zustand-Store.
+// Wird in Tests genutzt, um den Read-Status vor dem Rendern vorzusetzen.
+export function saveReadMessageIds(_userId: string, readIds: Set<string>): void {
+  useInboxStore.getState().mergeServerIds(readIds);
 }

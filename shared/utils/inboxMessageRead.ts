@@ -5,6 +5,13 @@ const STORAGE_VER = "v1";
 /** Same-tab updates when inbox read state changes (localStorage alone does not trigger storage event). */
 export const INBOX_READ_CHANGED_EVENT = "toolshare-inbox-read-update";
 
+/**
+ * Reservierter Read-Receipt-Key, der markiert, dass die Erst-Historie eines Nutzers
+ * bereits geseedet wurde. Liegt server-seitig (kein echter Nachrichten-Key), damit
+ * das Seeding einmalig pro Nutzer und nicht pro Gerät passiert.
+ */
+export const INBOX_SEED_MARKER = "__seeded__";
+
 export function inboxReadStorageKey(userId: string): string {
   return `toolshare.inbox.readMsgs.${STORAGE_VER}.${userId}`;
 }

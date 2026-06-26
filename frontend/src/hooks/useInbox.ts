@@ -1,19 +1,18 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { api } from "@toolshare/shared";
 import { useInboxStore } from "../store/inboxStore";
 import {
   inboxKeys,
   isAttentionNotification,
   useInboxData,
+  useInboxReadReceipts,
   type InboxData
 } from "./queries/inbox.queries";
 import {
-  INBOX_READ_CHANGED_EVENT,
+  INBOX_SEED_MARKER,
   collectAllMessageKeys,
   countUnreadInboxThreads,
-  inboxReadSeedKey,
-  loadReadMessageIds,
-  ratingMessageKey,
-  saveReadMessageIds
+  ratingMessageKey
 } from "../utils/inboxMessageRead";
 
 export { inboxKeys };
@@ -48,52 +47,54 @@ export function computeUnreadCount(
 /**
  * Hintergrund-Logik der Inbox, einmal app-weit im Layout gemountet:
  * - hält den Inbox-Query am Leben (Polling/Focus-Refetch über TanStack Query),
- * - lädt die gelesen-IDs bei Nutzerwechsel,
- * - seedet beim ersten Laden alle vorhandenen Nachrichten als gelesen,
- * - synchronisiert die gelesen-IDs tab-übergreifend,
+ * - lädt die gelesen-IDs server-seitig und spiegelt sie in den Store,
+ * - seedet beim ersten Mal (server-seitiger __seeded__-Marker) alle vorhandenen
+ *   Nachrichten als gelesen, damit die Glocke nicht die komplette Historie zählt,
  * - liefert den ungelesen-Zähler für die Glocke.
  */
 export function useInboxBackground(token: string | null | undefined, userId: string | undefined) {
   const inbox = useInboxData(token ?? null, userId);
+  const receipts = useInboxReadReceipts(token ?? null, userId);
   const readMessageIds = useInboxStore((state) => state.readMessageIds);
-  const loadForUser = useInboxStore((state) => state.loadForUser);
-  const setReadIds = useInboxStore((state) => state.setReadIds);
+  const mergeServerIds = useInboxStore((state) => state.mergeServerIds);
   const clear = useInboxStore((state) => state.clear);
+  const seededForUser = useRef<string | null>(null);
 
-  // gelesen-IDs bei Nutzerwechsel laden / bei Logout leeren
+  // Logout / Nutzerwechsel: lokales Set leeren.
   useEffect(() => {
-    if (userId) {
-      loadForUser(userId);
-    } else {
+    if (!userId) {
       clear();
+      seededForUser.current = null;
     }
-  }, [userId, loadForUser, clear]);
+  }, [userId, clear]);
 
-  // Cross-Tab-Sync: anderer Tab markiert etwas → IDs neu aus dem Storage laden
+  // Server-Receipts in den Store spiegeln (append-only Vereinigung).
+  const serverReceipts = receipts.data;
   useEffect(() => {
-    if (!userId) return;
-    const onChange = () => loadForUser(userId);
-    window.addEventListener(INBOX_READ_CHANGED_EVENT, onChange);
-    return () => window.removeEventListener(INBOX_READ_CHANGED_EVENT, onChange);
-  }, [userId, loadForUser]);
+    if (serverReceipts) mergeServerIds(serverReceipts);
+  }, [serverReceipts, mergeServerIds]);
 
-  // Erstes Laden: alle bereits vorhandenen Nachrichten als gelesen seeden,
-  // damit die Glocke nicht sofort die komplette Historie als ungelesen zählt.
+  // Erstes Mal: alle bereits vorhandenen Nachrichten als gelesen seeden. Der
+  // __seeded__-Marker liegt server-seitig → einmalig pro Nutzer, nicht pro Gerät.
   const data = inbox.data;
   useEffect(() => {
-    if (!userId || !data || data.bookings.length === 0) return;
-    if (localStorage.getItem(inboxReadSeedKey(userId))) return;
+    if (!token || !userId || !data || !serverReceipts) return;
+    if (serverReceipts.has(INBOX_SEED_MARKER)) return;
+    if (seededForUser.current === userId) return;
+    seededForUser.current = userId;
 
     const keys = collectAllMessageKeys(data.bookings);
     for (const rating of [...data.ratingsGiven, ...data.ratingsReceived]) {
       keys.push(ratingMessageKey(rating.bookingId, rating.id));
     }
-    const merged = new Set(loadReadMessageIds(userId));
-    for (const key of keys) merged.add(key);
-    saveReadMessageIds(userId, merged);
-    localStorage.setItem(inboxReadSeedKey(userId), "1");
-    setReadIds(merged);
-  }, [userId, data, setReadIds]);
+    keys.push(INBOX_SEED_MARKER);
+
+    mergeServerIds(new Set(keys));
+    void api.addInboxReadReceipts(keys, token).catch((error) => {
+      console.error("Failed to seed inbox read receipts", error);
+      seededForUser.current = null; // erneuter Versuch beim nächsten Render
+    });
+  }, [token, userId, data, serverReceipts, mergeServerIds]);
 
   const unreadCount = useMemo(() => {
     if (!data || !userId) return 0;

@@ -1,10 +1,12 @@
-import { ComponentProps, useEffect, useState, useMemo, useCallback } from 'react';
+import { ComponentProps, useMemo } from 'react';
 import { View, FlatList, RefreshControl, TextInput, Pressable } from 'react-native';
 import Slider from '@react-native-community/slider';
 const SliderComponent = Slider as unknown as React.ComponentType<ComponentProps<typeof Slider>>;
 import { useRouter } from 'expo-router';
-import { Workshop, WorkshopBookedRange, WorkshopSlot, api, pluralize, isDateRangeAvailable } from '@toolshare/shared';
+import { pluralize, isDateRangeAvailable } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { useWorkshops } from '../../../hooks/queries/workshops.queries';
+import { useFilterStore } from '../../../store/filterStore';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { WorkshopCard } from '../../../components/WorkshopCard';
 import { EmptyState, LoadingSpinner } from '../../../components/EmptyState';
@@ -14,67 +16,42 @@ import { Ionicons } from '@expo/vector-icons';
 import { DateField } from '../../../components/DateTimeFields';
 import { getErrorMessage } from '../../../utils/errors';
 
-interface WorkshopOffer {
-  workshop: Workshop;
-  slots: WorkshopSlot[];
-  bookedRanges?: WorkshopBookedRange[];
-}
-
 export default function WorkshopsScreen() {
   const Colors = useThemeColors();
   const styles = useStyles();
-  const [workshops, setWorkshops] = useState<WorkshopOffer[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, 450);
-  
-  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
-  const [borrowFrom, setBorrowFrom] = useState('');
-  const [borrowUntil, setBorrowUntil] = useState('');
-  const [capacityStr, setCapacityStr] = useState('10');
-
   const { token } = useAuth();
   const router = useRouter();
 
-  const loadWorkshops = useCallback(async (query: string) => {
-    if (!token) return;
-    try {
-      setError(null);
-      const data = await api.getWorkshops({ q: query || undefined }, token);
-      setWorkshops(data);
-    } catch (e) {
-      console.error(e);
-      setError(getErrorMessage(e, 'Werkstätten konnten nicht geladen werden.'));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [token]);
+  // Such-/Filterstand im Zustand-Store, damit er beim Tab-Wechsel erhalten bleibt.
+  const { q: search, borrowFrom, borrowUntil, maxCapacity, advancedOpen: isFiltersExpanded } =
+    useFilterStore((s) => s.workshopFilters);
+  const setWorkshopFilter = useFilterStore((s) => s.setWorkshopFilter);
 
-  useEffect(() => {
-    setIsLoading(true);
-    loadWorkshops(debouncedSearch);
-  }, [loadWorkshops, debouncedSearch]);
+  const debouncedSearch = useDebouncedValue(search, 450);
+
+  const {
+    data: workshops = [],
+    isLoading,
+    isRefetching,
+    isError,
+    error: queryError,
+    refetch,
+  } = useWorkshops({ q: debouncedSearch || undefined }, token);
+  const error = isError ? getErrorMessage(queryError, 'Werkstätten konnten nicht geladen werden.') : null;
+
+  const setSearch = (value: string) => setWorkshopFilter('q', value);
 
   const handleSearchSubmit = () => {
-    setIsLoading(true);
-    loadWorkshops(search);
+    void refetch();
   };
 
   const handleClearSearch = () => {
-    setSearch('');
-    setIsLoading(true);
-    loadWorkshops('');
+    setWorkshopFilter('q', '');
   };
 
   const onRefresh = () => {
-    setIsRefreshing(true);
-    loadWorkshops(debouncedSearch);
+    void refetch();
   };
-
-  const maxCapacity = parseInt(capacityStr, 10) || 10;
 
   const filteredWorkshops = useMemo(() => {
     return workshops.filter((item) => {
@@ -114,7 +91,7 @@ export default function WorkshopsScreen() {
           </View>
           <Pressable 
             style={[styles.filterToggleButton, isFiltersExpanded && styles.filterToggleButtonActive]} 
-            onPress={() => setIsFiltersExpanded(!isFiltersExpanded)}
+            onPress={() => setWorkshopFilter('advancedOpen', !isFiltersExpanded)}
           >
             <Ionicons name="options-outline" size={24} color={isFiltersExpanded ? Colors.surface : Colors.text} />
           </Pressable>
@@ -123,15 +100,15 @@ export default function WorkshopsScreen() {
         {isFiltersExpanded && (
           <View style={styles.advancedFilters}>
             <View style={{ flexDirection: 'row', gap: 16 }}>
-              <DateField label="Ausleihe von" value={borrowFrom} onChange={setBorrowFrom} />
-              <DateField label="Ausleihe bis" value={borrowUntil} onChange={setBorrowUntil} />
+              <DateField label="Ausleihe von" value={borrowFrom} onChange={(v) => setWorkshopFilter('borrowFrom', v)} />
+              <DateField label="Ausleihe bis" value={borrowUntil} onChange={(v) => setWorkshopFilter('borrowUntil', v)} />
             </View>
 
             <View style={styles.numericField}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <ThemedText style={styles.filterLabel}>Maximale Kapazität (Personen)</ThemedText>
                 <ThemedText style={[styles.filterLabel, { color: Colors.brand, fontWeight: 'bold' }]}>
-                  {capacityStr}
+                  {maxCapacity}
                 </ThemedText>
               </View>
               <SliderComponent
@@ -139,8 +116,8 @@ export default function WorkshopsScreen() {
                 minimumValue={1}
                 maximumValue={50}
                 step={1}
-                value={parseInt(capacityStr, 10) || 10}
-                onValueChange={(val: number) => setCapacityStr(val.toString())}
+                value={maxCapacity}
+                onValueChange={(val: number) => setWorkshopFilter('maxCapacity', val)}
                 minimumTrackTintColor={Colors.brand}
                 maximumTrackTintColor={Colors.border}
                 thumbTintColor={Colors.brand}
@@ -153,10 +130,7 @@ export default function WorkshopsScreen() {
       {error ? (
         <View style={styles.errorBanner}>
           <ThemedText style={styles.errorText}>{error}</ThemedText>
-          <Pressable onPress={() => {
-            setIsLoading(true);
-            loadWorkshops(debouncedSearch);
-          }}>
+          <Pressable onPress={() => void refetch()}>
             <ThemedText style={styles.retryText}>Erneut versuchen</ThemedText>
           </Pressable>
         </View>
@@ -175,7 +149,7 @@ export default function WorkshopsScreen() {
           data={filteredWorkshops}
           keyExtractor={(item) => item.workshop.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={[Colors.brand]} />}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} colors={[Colors.brand]} />}
           ListEmptyComponent={() => (
             <EmptyState 
               title="Keine Werkstätten gefunden" 

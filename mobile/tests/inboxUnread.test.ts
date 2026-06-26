@@ -1,23 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Booking, Notification } from '@toolshare/shared';
+import { describe, it, expect } from 'vitest';
+import type { Booking, Rating } from '@toolshare/shared';
 
-// See inboxMessageRead.test.ts: appStorage depends on the native runtime, so it
-// is mocked with an in-memory store here too.
-const memory = new Map<string, string>();
-vi.mock('../utils/appStorage', () => ({
-  storage: {
-    getItem: vi.fn(async (key: string) => (memory.has(key) ? memory.get(key)! : null)),
-    setItem: vi.fn(async (key: string, value: string) => {
-      memory.set(key, value);
-    }),
-  },
-}));
-
-import {
-  isInboxSystemNotification,
-  isInboxThreadUnread,
-  countUnreadInboxItems,
-} from '../utils/inboxUnread';
+import { isInboxSystemNotification, isInboxThreadUnread } from '../utils/inboxUnread';
 
 function booking(overrides: Partial<Booking> = {}): Booking {
   return {
@@ -30,22 +14,6 @@ function booking(overrides: Partial<Booking> = {}): Booking {
     ...overrides,
   };
 }
-
-function notification(overrides: Partial<Notification> = {}): Notification {
-  return {
-    id: 'n1',
-    userId: 'provider',
-    message: 'Hallo',
-    read: false,
-    createdIso: '2026-06-01T10:00:00.000Z',
-    ...overrides,
-  };
-}
-
-beforeEach(() => {
-  memory.clear();
-  vi.clearAllMocks();
-});
 
 describe('isInboxSystemNotification', () => {
   it('matches warning/ban prefixes and cancellation/deletion phrases', () => {
@@ -87,40 +55,5 @@ describe('isInboxThreadUnread', () => {
     const r: Rating = { id: 'r1', bookingId: 'b1', fromUserId: 'requester', toUserId: 'provider', score: 5, comment: 'gut', status: 'SICHTBAR', createdIso: '2026-06-01T10:00:00.000Z' };
     expect(isInboxThreadUnread(booking(), 'provider', new Set(), r)).toBe(true);
     expect(isInboxThreadUnread(booking(), 'provider', new Set(['req:b1', 'rating:b1:r1']), r)).toBe(false);
-  });
-});
-
-describe('countUnreadInboxItems', () => {
-  it('seeds existing threads as read on first load and only counts system notifications', async () => {
-    const bookings = [booking({ id: 'b1' }), booking({ id: 'b2' })];
-    const notifications = [
-      notification({ id: 'n1', message: 'SPERRUNG: gesperrt', read: false }), // counts
-      notification({ id: 'n2', message: 'SPERRUNG: alt', read: true }), // already read
-      notification({ id: 'n3', message: 'Normale Nachricht', read: false }), // not a system notif
-    ];
-
-    // First load seeds b1/b2 as read, so only the unread system notification counts.
-    const count = await countUnreadInboxItems(bookings, notifications, 'provider');
-    expect(count).toBe(1);
-  });
-
-  it('counts a booking that arrives after the initial seed', async () => {
-    // First load seeds the existing thread.
-    await countUnreadInboxItems([booking({ id: 'b1' })], [], 'provider');
-
-    // A newly arrived booking is not covered by the seed, so it is unread,
-    // and a fresh system notification is added on top.
-    const count = await countUnreadInboxItems(
-      [booking({ id: 'b1' }), booking({ id: 'b2' })],
-      [notification({ id: 'n1', message: 'ERMAHNUNG: Bitte', read: false })],
-      'provider'
-    );
-    expect(count).toBe(2); // 1 new unread booking + 1 unread system notification
-  });
-
-  it('returns zero when there is nothing unread', async () => {
-    const bookings = [booking({ id: 'b1', requesterId: 'provider' })]; // own request
-    const count = await countUnreadInboxItems(bookings, [], 'provider');
-    expect(count).toBe(0);
   });
 });

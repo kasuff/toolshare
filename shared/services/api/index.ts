@@ -6,6 +6,7 @@ import { toolsApi } from "./tools";
 import { workshopsApi } from "./workshops";
 import { bookingsApi } from "./bookings";
 import { notificationsApi } from "./notifications";
+import { inboxApi } from "./inbox";
 import { moderationApi } from "./moderation";
 import { ratingsApi } from "./ratings";
 import { adminApi } from "./admin";
@@ -22,6 +23,7 @@ export const api = {
   ...workshopsApi,
   ...bookingsApi,
   ...notificationsApi,
+  ...inboxApi,
   ...moderationApi,
   ...ratingsApi,
   ...adminApi

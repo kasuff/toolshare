@@ -1,33 +1,19 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { Booking, PickupProposal, TimeslotProposal } from '@toolshare/shared';
 
-// appStorage pulls in the React Native / Expo SecureStore runtime, which does
-// not exist under Node. Replace it with an in-memory key/value store so the
-// read-bookkeeping logic can be exercised in isolation.
-const memory = new Map<string, string>();
-vi.mock('../utils/appStorage', () => ({
-  storage: {
-    getItem: vi.fn(async (key: string) => (memory.has(key) ? memory.get(key)! : null)),
-    setItem: vi.fn(async (key: string, value: string) => {
-      memory.set(key, value);
-    }),
-  },
-}));
-
 import {
-  inboxReadStorageKey,
-  inboxReadSeedKey,
   requestMessageKey,
   proposalMessageKey,
   collectAllMessageKeys,
-  loadReadMessageIds,
-  saveReadMessageIds,
   countUnreadInboxThreads,
   bookingHasUnreadForUser,
   collectIncomingMessageKeys,
-  seedReadMessagesIfNeeded,
-  markThreadReadForUser,
 } from '../utils/inboxMessageRead';
+
+// Hinweis: Der Read-Status liegt seit der Server-Receipts-Umstellung nicht mehr im
+// SecureStore (siehe store/inboxReadStore.ts). Hier werden nur noch die reinen,
+// aus shared re-exportierten Key-/Zähl-Helfer getestet; Persistenz/Seeding sind
+// jetzt Sache des Stores (Server-API) und werden dort/per Integrationstest geprüft.
 
 function booking(overrides: Partial<Booking> = {}): Booking {
   return {
@@ -64,19 +50,8 @@ function timeslot(overrides: Partial<TimeslotProposal> = {}): TimeslotProposal {
   };
 }
 
-beforeEach(() => {
-  memory.clear();
-  vi.clearAllMocks();
-});
-
-describe('storage key helpers', () => {
-  it('namespaces read-message keys per user', () => {
-    expect(inboxReadStorageKey('user-1')).toBe('toolshare.inbox.readMsgs.v1.user-1');
-    expect(inboxReadStorageKey('a/b c')).toBe('toolshare.inbox.readMsgs.v1.a/b c');
-  });
-
-  it('builds distinct seed and message keys', () => {
-    expect(inboxReadSeedKey('u1')).toBe('toolshare.inbox.readSeed.v1.u1');
+describe('message key helpers', () => {
+  it('builds request and proposal keys', () => {
     expect(requestMessageKey('b1')).toBe('req:b1');
     expect(proposalMessageKey('b1', 'p9')).toBe('prop:b1:p9');
   });
@@ -93,27 +68,6 @@ describe('collectAllMessageKeys', () => {
       booking({ id: 'b2' }),
     ]);
     expect(keys).toEqual(['req:b1', 'prop:b1:p1', 'prop:b1:t1', 'req:b2']);
-  });
-});
-
-describe('loadReadMessageIds / saveReadMessageIds', () => {
-  it('returns an empty set when nothing is stored', async () => {
-    const ids = await loadReadMessageIds('u1');
-    expect(ids.size).toBe(0);
-  });
-
-  it('round-trips a set of ids', async () => {
-    await saveReadMessageIds('u1', new Set(['req:b1', 'prop:b1:p1']));
-    const ids = await loadReadMessageIds('u1');
-    expect([...ids].sort()).toEqual(['prop:b1:p1', 'req:b1']);
-  });
-
-  it('ignores corrupt stored values', async () => {
-    memory.set(inboxReadStorageKey('u1'), 'not json');
-    expect((await loadReadMessageIds('u1')).size).toBe(0);
-
-    memory.set(inboxReadStorageKey('u1'), JSON.stringify({ not: 'an array' }));
-    expect((await loadReadMessageIds('u1')).size).toBe(0);
   });
 });
 
@@ -203,49 +157,5 @@ describe('collectIncomingMessageKeys', () => {
 
   it('includes the request key for the provider (the other party)', () => {
     expect(collectIncomingMessageKeys(booking(), 'provider')).toEqual(['req:b1']);
-  });
-});
-
-describe('seedReadMessagesIfNeeded', () => {
-  it('seeds all keys on first run and records the seed flag', async () => {
-    const bookings = [booking({ id: 'b1', pickupProposals: [pickup({ id: 'p1' })] })];
-    const seeded = await seedReadMessagesIfNeeded('u1', bookings);
-    expect(seeded).not.toBeNull();
-    expect(seeded!.has('req:b1')).toBe(true);
-    expect(seeded!.has('prop:b1:p1')).toBe(true);
-    expect(memory.get(inboxReadSeedKey('u1'))).toBe('1');
-  });
-
-  it('is a no-op once already seeded', async () => {
-    await seedReadMessagesIfNeeded('u1', [booking()]);
-    const second = await seedReadMessagesIfNeeded('u1', [booking({ id: 'b2' })]);
-    expect(second).toBeNull();
-  });
-
-  it('returns null if storage throws', async () => {
-    const originalHas = memory.has;
-    memory.has = () => { throw new Error('storage error'); };
-    expect(await seedReadMessagesIfNeeded('u1', [])).toBeNull();
-    memory.has = originalHas;
-  });
-});
-
-describe('markThreadReadForUser', () => {
-  it('marks incoming keys as read and returns the updated set', async () => {
-    // The provider has an incoming request (it was created by the requester).
-    const next = await markThreadReadForUser('provider', booking());
-    expect(next).not.toBeNull();
-    expect(next!.has('req:b1')).toBe(true);
-    expect([...(await loadReadMessageIds('provider'))]).toContain('req:b1');
-  });
-
-  it('returns null when there is nothing incoming to mark', async () => {
-    // The requester's own request produces no incoming keys.
-    expect(await markThreadReadForUser('requester', booking())).toBeNull();
-  });
-
-  it('returns null when everything is already read', async () => {
-    await saveReadMessageIds('provider', new Set(['req:b1']));
-    expect(await markThreadReadForUser('provider', booking())).toBeNull();
   });
 });

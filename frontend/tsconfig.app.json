@@ -26,5 +26,6 @@
       "zod": ["./node_modules/zod"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/tests"]
 }

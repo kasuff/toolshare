@@ -141,6 +141,7 @@ export function WorkshopsPage({ currentUser: propUser, token: propToken }: Props
   };
 
   const closeWorkshop = () => {
+    setSelectedWorkshopId(null);
     navigate(searchParams.get("manage") === "1" ? "/offers" : "/workshops");
   };
 

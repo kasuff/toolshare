@@ -11,6 +11,7 @@ import { authRouter } from "./modules/auth/auth.routes";
 import { bookingsRouter } from "./modules/bookings/bookings.routes";
 import { moderationRouter } from "./modules/moderation/moderation.routes";
 import { notificationsRouter } from "./modules/notifications/notifications.routes";
+import { inboxRouter } from "./modules/inbox/inbox.routes";
 import { ratingsRouter } from "./modules/ratings/ratings.routes";
 import { toolsRouter } from "./modules/tools/tools.routes";
 import { usersRouter } from "./modules/users/users.routes";
@@ -49,6 +50,11 @@ export const createApp = () => {
     res.set("Content-Type", metricsRegistry.contentType);
     res.end(await metricsRegistry.metrics());
   });
+
+  // Inbox bewusst VOR dem Rate-Limiter: der langlebige SSE-Stream (/api/inbox/stream)
+  // darf nicht gedrosselt werden. Die Read-Receipt-Endpunkte sind günstige,
+  // idempotente Operationen, daher ist die Ausnahme unkritisch.
+  app.use("/api/inbox", inboxRouter);
 
   app.use("/api", apiRateLimiter);
 
