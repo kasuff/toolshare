@@ -12,7 +12,7 @@
   "timezone": "browser",
   "refresh": "5m",
   "schemaVersion": 39,
-  "time": { "from": "now-90d", "to": "now" },
+  "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "graphTooltip": 1,
   "panels": [
@@ -23,7 +23,7 @@
       "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "dora_deployment_frequency_per_day", "legendFormat": "Deploys/Tag", "refId": "A" }
+        { "expr": "dora_deployment_frequency_per_day", "legendFormat": "Deploys/Tag", "refId": "A", "instant": true }
       ],
       "fieldConfig": {
         "defaults": {
@@ -42,7 +42,7 @@
       "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "dora_lead_time_seconds", "legendFormat": "Lead Time", "refId": "A" }
+        { "expr": "dora_lead_time_seconds", "legendFormat": "Lead Time", "refId": "A", "instant": true }
       ],
       "fieldConfig": {
         "defaults": {
@@ -60,7 +60,7 @@
       "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "dora_change_failure_rate", "legendFormat": "CFR", "refId": "A" }
+        { "expr": "dora_change_failure_rate", "legendFormat": "CFR", "refId": "A", "instant": true }
       ],
       "fieldConfig": {
         "defaults": {
@@ -85,7 +85,7 @@
       "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "dora_time_to_restore_seconds", "legendFormat": "TTR", "refId": "A" }
+        { "expr": "dora_time_to_restore_seconds", "legendFormat": "TTR", "refId": "A", "instant": true }
       ],
       "fieldConfig": {
         "defaults": {
