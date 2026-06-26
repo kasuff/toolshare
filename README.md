@@ -131,19 +131,6 @@ Die vollständige Projektdokumentation (Architektur, ADRs, Scrum, etc.) befindet
 
 Architektur liegt im Doku-Repo; im Code gelten lesbarer Code und sinnvolle Kommentare ([ADR-007](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/adr/007-repo-struktur.md)).
 
-Diese Doku liegt im Doku-Repo: [Authentifizierung & Token-Sicherheit](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/architektur/auth-token-security.md) · [Performance: Indizes & Pagination](https://gitlab.lrz.de/swe2_if/team06/project-management/-/blob/main/docs/architektur/performance-pagination.md).
-
----
-
-## Architekturrichtlinien
-
-- **State Management:** Client-State (`authStore`, `inboxStore`) mit Zustand; Server-State (Tools, …) mit TanStack Query in `hooks/queries/`. Siehe ADR-010/014 im Doku-Repo.
-- **Frontend-Schichten:** API (`@toolshare/shared`) → Hooks → UI. Erzwungen durch `frontend/tests/architecture.test.ts` (CI: `frontend:architecture`).
-- **Single Responsibility Principle (SRP):** Große Komponenten werden konsequent in wiederverwendbare UI-Komponenten und fachliche Helper-Funktionen aufgeteilt.
-- **Fehlerbehandlung:** Zentrales Error-Handling durch React Error Boundaries fängt unerwartete Fehler in Frontend und Mobile sicher ab.
-- **Architekturtests:** Backend (`backend/tests/architecture.test.ts`) und Frontend (`frontend/tests/architecture.test.ts`) in der CI-Pipeline (vitest).
-- **Geocoding:** `GeocodingService`-Abstraktion mit Redis-Cache und Nominatim-Rate-Limiter — siehe ADR-011.
-
 ---
 
 ## Team

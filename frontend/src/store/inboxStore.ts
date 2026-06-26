@@ -6,7 +6,7 @@ import {
   requestMessageKey,
   proposalMessageKey,
   type InboxRatingRef
-} from "../utils/inboxMessageRead";
+} from "@toolshare/shared";
 import { useAuthStore } from "./authStore";
 
 // Client-State der Inbox: die als gelesen markierten Nachrichten-IDs. Quelle der
