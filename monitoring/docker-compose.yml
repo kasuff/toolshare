@@ -28,6 +28,18 @@ services:
       GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
       GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
+      # ── Härtung des anonymen Zugriffs ────────────────────────────────────
+      # Anonymer Viewer-Zugriff ist nötig, weil das Admin-Portal die Dashboards
+      # tokenlos per iframe einbettet (das Bearer-Token der SPA wird im iframe
+      # nicht mitgeschickt). Damit ein anonymer Besucher darüber hinaus NICHT
+      # beliebige Daten exfiltrieren kann, wird das interaktive Explore (freie
+      # PromQL/LogQL-Abfragen über ALLE Metriken/Logs) abgeschaltet und Viewer
+      # dürfen weder editieren noch extern teilen.
+      GF_EXPLORE_ENABLED: "false"
+      GF_USERS_VIEWERS_CAN_EDIT: "false"
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
       # Grafana URL (für Embedding und Alerts).
       # Muss den Sub-Pfad /grafana enthalten, da Grafana hinter dem Frontend-nginx
       # unter <origin>/grafana/ ausgeliefert wird (siehe frontend/nginx.conf).
@@ -309,10 +321,16 @@ services:
       - "--path.rootfs=/rootfs"
       - "--path.sysfs=/host/sys"
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+      # Textfile-Collector: liest die vom walg-backup-Container geschriebene
+      # Backup-Heartbeat-Metrik (toolshare_backup_last_success_*) ein und
+      # exponiert sie unter /metrics → Prometheus alarmiert auf veraltete Backups.
+      - "--collector.textfile.directory=/var/lib/node-exporter/textfile"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+      # Shared mit walg-backup (App-Stack). Read-only: node-exporter liest nur.
+      - toolshare-backup-metrics:/var/lib/node-exporter/textfile:ro
     pid: host
     deploy:
       resources:
@@ -338,6 +356,10 @@ volumes:
     driver: local
   alertmanager-data:
     driver: local
+  # Extern von scripts/deploy-prod.sh angelegt; geteilt mit dem App-Stack
+  # (walg-backup schreibt, node-exporter liest die Backup-Heartbeat-Metrik).
+  toolshare-backup-metrics:
+    external: true
 
 networks:
   # Internes Monitoring-Netz (Prometheus → Loki/Node-Exporter)

@@ -220,10 +220,16 @@ services:
       # Retention: 4 Full-Ketten (~4 Wochen) und Size-Budget gegen Bucket-Überlauf.
       RETAIN_FULL: ${BACKUP_RETAIN_FULL:-4}
       MAX_BACKUP_BYTES: ${BACKUP_MAX_BYTES:-8000000000}
+      # Heartbeat: backup.sh schreibt hier nach jedem erfolgreichen Backup eine
+      # node-exporter-Textfile-Metrik rein (s. backup.sh / backup.rules.yml).
+      BACKUP_METRICS_DIR: /var/lib/node-exporter/textfile
     volumes:
       # backup-push liest nur das Datenverzeichnis → read-only genügt.
       - pgdata:/var/lib/postgresql/data:ro
       - ./backup/crontab:/etc/supercronic/crontab:ro
+      # Shared mit node-exporter (Monitoring-Stack): Backup-Heartbeat-Metrik.
+      # Von scripts/deploy-prod.sh als external Volume angelegt (wie das Netz).
+      - toolshare-backup-metrics:/var/lib/node-exporter/textfile
     depends_on:
       db:
         condition: service_healthy
@@ -236,6 +242,11 @@ services:
 
 volumes:
   pgdata:
+  # Extern angelegt von scripts/deploy-prod.sh (wie toolshare-network), damit
+  # walg-backup (hier) und node-exporter (Monitoring-Stack) sich denselben
+  # Heartbeat-Pfad teilen.
+  toolshare-backup-metrics:
+    external: true
 
 networks:
   toolshare-network:

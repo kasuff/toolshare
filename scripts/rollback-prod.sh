@@ -7,6 +7,17 @@
 # Voraussetzung: ein vorheriger Deploy hat :previous-Images hinterlassen
 # (deploy-prod.sh sichert :current → :previous vor jedem Build).
 #
+# ⚠ SCHEMA / MIGRATIONEN — WICHTIG:
+#   Dieses Skript rollt NUR die App-Images zurück. Datenbank-Migrationen, die ein
+#   vorheriger Deploy bereits via migrate-deploy.sh angewendet hat, werden NICHT
+#   zurückgenommen. Sicher ist dieser Rollback daher nur, solange Migrationen
+#   rückwärtskompatibel sind (Expand/Contract: Spalten/Tabellen erst additiv
+#   hinzufügen und ausrollen, Altes erst in einem späteren Release entfernen).
+#   Nach einer destruktiven Migration seit dem letzten Deploy (DROP/RENAME, NOT
+#   NULL ohne Default o. ä.) passt das alte Image nicht mehr zum Schema → dann
+#   ist der einzig sichere Weg ein Restore aus dem WAL-G-Backup (RESTORE-GUIDE in
+#   docker-compose.prod.yml), NICHT dieses Skript.
+#
 # Aufruf:  scripts/rollback-prod.sh
 # ─────────────────────────────────────────────────────────────────────────────
 set -eu
@@ -86,6 +97,13 @@ for img in toolshare-frontend toolshare-backend; do
 		exit 1
 	fi
 done
+
+echo "─────────────────────────────────────────────────────────────────────"
+echo "HINWEIS: Es werden nur die App-Images zurückgerollt, KEINE DB-Migration."
+echo "         Bei destruktiven Schema-Änderungen seit dem letzten Deploy ist"
+echo "         stattdessen ein Restore aus dem WAL-G-Backup nötig"
+echo "         (s. docker-compose.prod.yml → RESTORE-GUIDE)."
+echo "─────────────────────────────────────────────────────────────────────"
 
 echo "Rolling back app images to :previous..."
 for img in toolshare-frontend toolshare-backend; do

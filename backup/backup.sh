@@ -23,6 +23,21 @@ MAX_BACKUP_BYTES="${MAX_BACKUP_BYTES:-1800000000}"
 
 log() { echo "[walg-backup $(date -u +%FT%TZ)] $*"; }
 
+# node-exporter-Textfile-Metrik atomar schreiben (erst .tmp, dann mv im selben
+# Verzeichnis). Dient als Backup-Heartbeat: Prometheus alarmiert, wenn der
+# Timestamp zu alt ist oder ganz fehlt (s. monitoring/prometheus/alerts/
+# backup.rules.yml). No-op, wenn kein beschreibbares BACKUP_METRICS_DIR gemountet
+# ist — der Backup-Lauf selbst hängt nie an der Metrik.
+write_metric_file() {
+  file="$1"; shift
+  dir="${BACKUP_METRICS_DIR:-}"
+  [ -n "$dir" ] && [ -d "$dir" ] && [ -w "$dir" ] || return 0
+  tmp="${dir}/.${file}.$$"
+  if printf '%s\n' "$@" >"$tmp" 2>/dev/null; then
+    mv -f "$tmp" "${dir}/${file}" 2>/dev/null || rm -f "$tmp"
+  fi
+}
+
 # aws-cli-Aufruf inkl. optionalem Endpoint/Region (für S3-kompatible Provider).
 aws_cli() {
   aws ${AWS_ENDPOINT:+--endpoint-url "$AWS_ENDPOINT"} ${AWS_REGION:+--region "$AWS_REGION"} "$@"
@@ -86,6 +101,21 @@ log "Verifiziere Backups im Bucket:"
 if ! wal-g backup-list; then
   log "FEHLER: backup-list fehlgeschlagen — Backup ggf. nicht im Bucket angekommen!"
   exit 1
+fi
+
+# Heartbeat aktualisieren: das Backup ist nachweislich im Bucket gelandet. Wird
+# VOR Retention/Size-Budget geschrieben, damit ein erfolgreicher Push auch dann
+# als "frisch" zählt, wenn ein nachgelagerter Aufräumschritt scheitert.
+NOW="$(date +%s)"
+write_metric_file "toolshare_backup.prom" \
+  "# HELP toolshare_backup_last_success_timestamp_seconds Unix-Zeit des letzten erfolgreichen WAL-G-Backups (full oder delta)." \
+  "# TYPE toolshare_backup_last_success_timestamp_seconds gauge" \
+  "toolshare_backup_last_success_timestamp_seconds ${NOW}"
+if [ "$MODE" = "full" ]; then
+  write_metric_file "toolshare_backup_full.prom" \
+    "# HELP toolshare_backup_last_full_success_timestamp_seconds Unix-Zeit des letzten erfolgreichen FULL-Backups." \
+    "# TYPE toolshare_backup_last_full_success_timestamp_seconds gauge" \
+    "toolshare_backup_last_full_success_timestamp_seconds ${NOW}"
 fi
 
 # Retention: behalte die letzten RETAIN_FULL FULL-Backups inkl. der daran
