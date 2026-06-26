@@ -3,15 +3,16 @@ import { View, ScrollView, TouchableOpacity, BackHandler, Alert, ActivityIndicat
 import { useFocusEffect } from 'expo-router';
 import { Spacing, Radius, useThemeColors, createThemedStyleSheet } from '../../constants/theme';
 import { ThemedText } from '../../components/ThemedText';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, Booking, Rating } from '@toolshare/shared';
 import { RatingFormPanel } from '../../components/RatingFormPanel';
 import { StarRatingDisplay } from '../../components/StarRatingInput';
 import { useAuth } from '../../hooks/useAuth';
 import { EmptyState, LoadingSpinner } from '../../components/EmptyState';
 import { Ionicons } from '@expo/vector-icons';
-import { isInboxSystemNotification, isInboxThreadUnread, countUnreadInboxItems } from '../../utils/inboxUnread';
-import { notifyInboxBadgeRefresh } from '../../utils/inboxBadgeEvents';
-import { useInboxReadMessages } from '../../hooks/useInboxReadMessages';
+import { isInboxSystemNotification, isInboxThreadUnread } from '../../utils/inboxUnread';
+import { useInboxData, inboxKeys, type InboxData } from '../../hooks/queries/inbox.queries';
+import { useInboxReadStore } from '../../store/inboxReadStore';
 import { DateField, TimeField } from '../../components/DateTimeFields';
 import {
   combineLocalDateTimeToIso,
@@ -178,18 +179,21 @@ export default function InboxScreen() {
   const colors = useThemeColors();
   const Colors = colors;
   const styles = useStyles();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const inboxQuery = useInboxData(token, currentUser?.id);
+  const isLoading = inboxQuery.isLoading;
+  const loadError = inboxQuery.isError
+    ? getErrorMessage(inboxQuery.error, 'Nachrichten konnten nicht geladen werden.')
+    : null;
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showCounterForm, setShowCounterForm] = useState(false);
   const [pickupDraft, setPickupDraft] = useState<DraftToolRangeParts | null>(null);
   const [workshopDraft, setWorkshopDraft] = useState<DraftWorkshopRangeParts | null>(null);
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
 
-  // Rating states
-  const [ratingsGiven, setRatingsGiven] = useState<Rating[]>([]);
-  const [ratingsReceived, setRatingsReceived] = useState<Rating[]>([]);
+  // Rating states (Serverdaten aus dem Inbox-Query)
+  const ratingsGiven = useMemo<Rating[]>(() => inboxQuery.data?.ratingsGiven ?? [], [inboxQuery.data]);
+  const ratingsReceived = useMemo<Rating[]>(() => inboxQuery.data?.ratingsReceived ?? [], [inboxQuery.data]);
   const [showRatingForm, setShowRatingForm] = useState(false);
   const [ratingScore, setRatingScore] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
@@ -202,8 +206,75 @@ export default function InboxScreen() {
   const [isReporting, setIsReporting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  const allRatings = useMemo(() => [...ratingsGiven, ...ratingsReceived], [ratingsGiven, ratingsReceived]);
-  const { readIds, markThreadRead, isStorageLoaded } = useInboxReadMessages(bookings, allRatings, isLoading);
+  // Serverdaten in die Anzeige-Liste transformieren: System-Benachrichtigungen als
+  // synthetische Bookings ergänzen und nach letzter Aktivität sortieren. Früher
+  // imperativ in loadBookings, jetzt aus dem useInboxData-Query abgeleitet.
+  const bookings = useMemo<Booking[]>(() => {
+    const data = inboxQuery.data;
+    if (!data || !currentUser) return [];
+    const systemNotifications = data.notifications
+      .filter((n) => isInboxSystemNotification(n.message))
+      .map((n) => {
+        const isWarning = n.message.startsWith('ERMAHNUNG:');
+        const isSuspension = n.message.startsWith('SPERRUNG:');
+        const parsed = isWarning
+          ? parseWarningMessage(n.message)
+          : isSuspension
+            ? { reason: parseSuspensionMessage(n.message).reason, moderator: 'Administration', hint: '' }
+            : { reason: n.message, moderator: 'System', hint: '' };
+        return {
+          id: n.id,
+          type: 'SYSTEM_WARNING' as const,
+          requesterId: currentUser.id,
+          providerId: 'system',
+          status: 'BESTAETIGT' as const,
+          createdIso: n.createdIso,
+          providerName: parsed.moderator,
+          requesterName: currentUser.name ?? 'Du',
+          toolName: isWarning
+            ? 'Ermahnung der Moderation'
+            : isSuspension
+              ? 'Kontosperrung'
+              : 'System-Benachrichtigung',
+          pickupProposals: [],
+          timeslotProposals: [],
+          selectedWorkshopTools: [],
+          systemWarningText: n.message,
+          isNotificationRead: n.read,
+        } as Booking;
+      });
+
+    const localRatingsByBookingId = new Map<string, Rating>();
+    for (const r of data.ratingsGiven) localRatingsByBookingId.set(r.bookingId, r);
+    for (const r of data.ratingsReceived) localRatingsByBookingId.set(r.bookingId, r);
+
+    const combined = [...data.bookings, ...systemNotifications];
+    combined.sort(
+      (a, b) =>
+        getLastActivityMs(b, localRatingsByBookingId.get(b.id)) -
+        getLastActivityMs(a, localRatingsByBookingId.get(a.id))
+    );
+    return combined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inboxQuery.data, currentUser?.id, currentUser?.name]);
+
+  // Lokal gelesen-IDs aus dem Zustand-Store (Pendant zur Webapp).
+  const readIds = useInboxReadStore((s) => s.readMessageIds);
+  const isStorageLoaded = useInboxReadStore((s) => s.isStorageLoaded);
+  const loadReadForUser = useInboxReadStore((s) => s.loadForUser);
+  const markThreadReadStore = useInboxReadStore((s) => s.markThreadRead);
+
+  // Sobald die Serverdaten vorliegen, gelesen-IDs (einmalig) seeden/laden.
+  useEffect(() => {
+    if (inboxQuery.data && currentUser?.id) {
+      void loadReadForUser(currentUser.id, inboxQuery.data.bookings, inboxQuery.data.ratingsReceived);
+    }
+  }, [inboxQuery.data, currentUser?.id, loadReadForUser]);
+
+  // Ausgewählte Buchung mit frisch geladenen Daten synchron halten (Polling/Refetch).
+  useEffect(() => {
+    setSelectedBooking((prev) => (prev ? bookings.find((b) => b.id === prev.id) ?? prev : null));
+  }, [bookings]);
 
   const ratingsByBookingId = useMemo(() => {
     const map = new Map<string, Rating>();
@@ -214,78 +285,11 @@ export default function InboxScreen() {
 
   const selectedBookingRating = selectedBooking ? ratingsByBookingId.get(selectedBooking.id) ?? null : null;
 
-  const loadBookings = useCallback(async () => {
-    if (!token || !currentUser?.id) return;
-    try {
-      setLoadError(null);
-      const [bookingsData, notificationsData, ratingsGivenData, ratingsReceivedData] = await Promise.all([
-        api.getBookingsForUser(token),
-        api.getNotifications(token),
-        api.getRatingsGiven(token).catch(() => []),
-        api.getRatingsReceived(token).catch(() => [])
-      ]);
-      
-      const systemNotifications = notificationsData
-        .filter(n => isInboxSystemNotification(n.message))
-        .map(n => {
-          const isWarning = n.message.startsWith("ERMAHNUNG:");
-          const isSuspension = n.message.startsWith("SPERRUNG:");
-          const parsed = isWarning
-            ? parseWarningMessage(n.message)
-            : isSuspension
-              ? { reason: parseSuspensionMessage(n.message).reason, moderator: "Administration", hint: "" }
-              : { reason: n.message, moderator: "System", hint: "" };
-          return {
-            id: n.id,
-            type: "SYSTEM_WARNING" as const,
-            requesterId: currentUser.id,
-            providerId: "system",
-            status: "BESTAETIGT" as const,
-            createdIso: n.createdIso,
-            providerName: parsed.moderator,
-            requesterName: currentUser.name ?? "Du",
-            toolName: isWarning ? "Ermahnung der Moderation" : isSuspension ? "Kontosperrung" : "System-Benachrichtigung",
-            pickupProposals: [],
-            timeslotProposals: [],
-            selectedWorkshopTools: [],
-            systemWarningText: n.message,
-            isNotificationRead: n.read
-          } as Booking;
-        });
-
-      const localRatingsByBookingId = new Map<string, Rating>();
-      for (const r of ratingsGivenData) localRatingsByBookingId.set(r.bookingId, r);
-      for (const r of ratingsReceivedData) localRatingsByBookingId.set(r.bookingId, r);
-
-      const combined = [...bookingsData, ...systemNotifications];
-      combined.sort((a, b) => 
-        getLastActivityMs(b, localRatingsByBookingId.get(b.id)) - 
-        getLastActivityMs(a, localRatingsByBookingId.get(a.id))
-      );
-      
-      setBookings(combined);
-      setRatingsGiven(ratingsGivenData);
-      setRatingsReceived(ratingsReceivedData);
-      setSelectedBooking((prev) => (prev ? combined.find((b) => b.id === prev.id) ?? prev : null));
-      const unreadCount = await countUnreadInboxItems(bookingsData, notificationsData, currentUser.id, ratingsReceivedData);
-      notifyInboxBadgeRefresh(unreadCount);
-    } catch (e) {
-      console.error(e);
-      setLoadError(getErrorMessage(e, 'Nachrichten konnten nicht geladen werden.'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser?.id, currentUser?.name, token]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadBookings();
-      const intervalId = setInterval(() => {
-        void loadBookings();
-      }, 20_000);
-
-      return () => clearInterval(intervalId);
-    }, [loadBookings])
+  // Inbox-Serverdaten neu laden (nach Mutationen). Polling und Focus-Refetch
+  // übernimmt useInboxData selbst.
+  const reloadInbox = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: inboxKeys.all }),
+    [queryClient]
   );
 
   useEffect(() => {
@@ -334,13 +338,25 @@ export default function InboxScreen() {
     if (booking.type === 'SYSTEM_WARNING' && !booking.isNotificationRead) {
       try {
         await api.markNotificationAsRead(booking.id, token!);
-        setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, isNotificationRead: true } : b));
-        notifyInboxBadgeRefresh();
+        // Benachrichtigung im Query-Cache als gelesen markieren; Badge und Liste
+        // leiten sich daraus ab (kein manuelles setState/Event nötig).
+        if (currentUser?.id) {
+          queryClient.setQueryData<InboxData>(inboxKeys.data(currentUser.id), (old) =>
+            old
+              ? {
+                  ...old,
+                  notifications: old.notifications.map((n) =>
+                    n.id === booking.id ? { ...n, read: true } : n
+                  ),
+                }
+              : old
+          );
+        }
       } catch (e) {
         console.error('Fehler beim Markieren als gelesen:', e);
       }
-    } else {
-      await markThreadRead(booking, ratingsByBookingId.get(booking.id));
+    } else if (currentUser?.id) {
+      await markThreadReadStore(currentUser.id, booking, ratingsByBookingId.get(booking.id));
     }
   };
 
@@ -373,7 +389,7 @@ export default function InboxScreen() {
     setIsSubmittingProposal(true);
     try {
       await api.createPickupProposal(selectedBooking.id, pickupIso, returnIso, token);
-      await loadBookings();
+      await reloadInbox();
       setShowCounterForm(false);
       Alert.alert('Gesendet', 'Alternativvorschlag gesendet.');
     } catch (e) {
@@ -402,7 +418,7 @@ export default function InboxScreen() {
     setIsSubmittingProposal(true);
     try {
       await api.createTimeslotProposal(selectedBooking.id, startIso, endIso, token);
-      await loadBookings();
+      await reloadInbox();
       setShowCounterForm(false);
       Alert.alert('Gesendet', 'Alternativzeitraum gesendet.');
     } catch (e) {
@@ -425,7 +441,7 @@ export default function InboxScreen() {
         await api.respondTimeslotProposal(selectedBooking.id, pendingTimeslot.id, 'ACCEPT', token);
         Alert.alert('Angenommen', 'Alternativzeit angenommen.');
       }
-      await loadBookings();
+      await reloadInbox();
     } catch (e) {
       Alert.alert('Fehler', e instanceof Error ? e.message : 'Vorschlag konnte nicht angenommen werden.');
     } finally {
@@ -446,7 +462,7 @@ export default function InboxScreen() {
         await api.respondTimeslotProposal(selectedBooking.id, pendingTimeslot.id, 'DECLINE', token);
         Alert.alert('Abgelehnt', 'Alternativzeit abgelehnt.');
       }
-      await loadBookings();
+      await reloadInbox();
     } catch (e) {
       Alert.alert('Fehler', e instanceof Error ? e.message : 'Vorschlag konnte nicht abgelehnt werden.');
     } finally {
@@ -467,7 +483,7 @@ export default function InboxScreen() {
       setShowRatingForm(false);
       setRatingScore(0);
       setRatingComment('');
-      await loadBookings();
+      await reloadInbox();
     } catch (e) {
       Alert.alert('Fehler', e instanceof Error ? e.message : 'Bewertung konnte nicht gespeichert werden.');
     } finally {
@@ -480,7 +496,7 @@ export default function InboxScreen() {
     try {
       await api.decideBooking(bookingId, accept ? 'BESTAETIGT' : 'ABGELEHNT', token);
       setShowCounterForm(false);
-      await loadBookings();
+      await reloadInbox();
     } catch (e) {
       console.error(e);
       Alert.alert('Fehler', e instanceof Error ? e.message : 'Status konnte nicht gesetzt werden.');
@@ -517,10 +533,7 @@ export default function InboxScreen() {
     return (
       <View style={styles.center}>
         <EmptyState title="Laden fehlgeschlagen" text={loadError} />
-        <TouchableOpacity style={styles.retryButton} onPress={() => {
-          setIsLoading(true);
-          void loadBookings();
-        }}>
+        <TouchableOpacity style={styles.retryButton} onPress={() => void inboxQuery.refetch()}>
           <ThemedText style={styles.retryButtonText}>Erneut versuchen</ThemedText>
         </TouchableOpacity>
       </View>

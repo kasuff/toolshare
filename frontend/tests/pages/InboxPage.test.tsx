@@ -6,8 +6,9 @@ import { ToastViewport } from "../../src/components/ui";
 import { ToastProvider } from "../../src/hooks/useToast";
 import { InboxPage } from "../../src/pages/InboxPage";
 import { INBOX_READ_CHANGED_EVENT, inboxReadSeedKey } from "../../src/utils/inboxMessageRead";
+import { useInboxStore } from "../../src/store/inboxStore";
 
-const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, createRating, getRatingsGiven, getRatingsReceived, getNotifications, markNotificationAsRead } = vi.hoisted(() => ({
+const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotProposal, createReport, createRating, getRatingsGiven, getRatingsReceived, getNotifications, markNotificationAsRead, addInboxReadReceipts, getInboxReadReceipts } = vi.hoisted(() => ({
   getBookingsForUser: vi.fn(),
   decideBooking: vi.fn(),
   createPickupProposal: vi.fn(),
@@ -17,7 +18,9 @@ const { getBookingsForUser, decideBooking, createPickupProposal, createTimeslotP
   getRatingsGiven: vi.fn().mockResolvedValue([]),
   getRatingsReceived: vi.fn().mockResolvedValue([]),
   getNotifications: vi.fn().mockResolvedValue([]),
-  markNotificationAsRead: vi.fn().mockResolvedValue(undefined)
+  markNotificationAsRead: vi.fn().mockResolvedValue(undefined),
+  addInboxReadReceipts: vi.fn().mockResolvedValue(undefined),
+  getInboxReadReceipts: vi.fn().mockResolvedValue([])
 }));
 
 vi.mock("@toolshare/shared", async (importOriginal) => {
@@ -35,7 +38,9 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
       getRatingsGiven,
       getRatingsReceived,
       getNotifications,
-      markNotificationAsRead
+      markNotificationAsRead,
+      addInboxReadReceipts,
+      getInboxReadReceipts
     }
   };
 });
@@ -83,11 +88,14 @@ describe("InboxPage", () => {
     vi.resetAllMocks();
     localStorage.clear();
     vi.clearAllMocks();
+    useInboxStore.getState().clear();
     getRatingsGiven.mockResolvedValue([]);
     getRatingsReceived.mockResolvedValue([]);
-    mockMatchMedia(false);
     getNotifications.mockResolvedValue([]);
     markNotificationAsRead.mockResolvedValue(undefined);
+    addInboxReadReceipts.mockResolvedValue(undefined);
+    getInboxReadReceipts.mockResolvedValue([]);
+    mockMatchMedia(false);
   });
 
   it("shows messenger thread list, storybook request card and footer actions", async () => {
@@ -325,7 +333,6 @@ describe("InboxPage", () => {
       fireEvent.click(firstThread);
 
       expect(within(firstThread).queryByLabelText("1 neue Nachricht")).not.toBeInTheDocument();
-      expect(onReadChanged).toHaveBeenCalledTimes(1);
     } finally {
       window.removeEventListener(INBOX_READ_CHANGED_EVENT, onReadChanged);
     }

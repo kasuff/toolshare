@@ -138,7 +138,7 @@ describe("authService.refresh", () => {
   beforeEach(() => vi.resetAllMocks());
 
   const signRefreshToken = (payload: { userId: string; role: "USER" | "MODERATOR" | "MANAGER" }) =>
-    jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: "7d" });
+    jwt.sign(payload, (process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET) as string, { expiresIn: "7d" });
 
   const storedToken = () => ({
     userId: USER_ID,

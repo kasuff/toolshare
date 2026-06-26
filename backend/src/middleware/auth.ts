@@ -18,6 +18,34 @@ declare global {
   }
 }
 
+// Verifiziert ein Access-Token und liefert den AuthUser. Wirft AppError bei
+// ungültigem/abgelaufenem Token, unbekanntem oder gesperrtem Nutzer. Wird sowohl
+// von requireAuth (Header-Token) als auch vom SSE-Stream (Query-Token, da
+// EventSource keine Header setzen kann) genutzt.
+export const authenticateToken = async (token: string): Promise<AuthUser> => {
+  let payload: JwtPayload;
+  try {
+    payload = jwt.verify(token, env.jwtSecret) as JwtPayload;
+  } catch {
+    throw new AppError("UNAUTHORIZED", "Invalid or expired token", 401);
+  }
+
+  if (typeof payload.userId !== "string" || typeof payload.role !== "string") {
+    throw new AppError("UNAUTHORIZED", "Malformed token payload", 401);
+  }
+
+  const user = await authRepository.findById(payload.userId);
+  if (!user) {
+    throw new AppError("UNAUTHORIZED", "User not found", 401);
+  }
+
+  if (user.isSuspended) {
+    throw new AppError("ACCOUNT_SUSPENDED", "Konto ist gesperrt.", 403);
+  }
+
+  return { userId: payload.userId, role: user.role };
+};
+
 export const requireAuth = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.header("authorization");
@@ -27,31 +55,7 @@ export const requireAuth = async (req: Request, _res: Response, next: NextFuncti
       throw new AppError("UNAUTHORIZED", "Missing bearer token", 401);
     }
 
-    let payload: JwtPayload;
-    try {
-      payload = jwt.verify(token, env.jwtSecret) as JwtPayload;
-    } catch {
-      throw new AppError("UNAUTHORIZED", "Invalid or expired token", 401);
-    }
-
-    if (typeof payload.userId !== "string" || typeof payload.role !== "string") {
-      throw new AppError("UNAUTHORIZED", "Malformed token payload", 401);
-    }
-
-    const user = await authRepository.findById(payload.userId);
-    if (!user) {
-      throw new AppError("UNAUTHORIZED", "User not found", 401);
-    }
-
-    if (user.isSuspended) {
-      throw new AppError("ACCOUNT_SUSPENDED", "Konto ist gesperrt.", 403);
-    }
-
-    req.authUser = {
-      userId: payload.userId,
-      role: user.role
-    };
-
+    req.authUser = await authenticateToken(token);
     next();
   } catch (error) {
     next(error);

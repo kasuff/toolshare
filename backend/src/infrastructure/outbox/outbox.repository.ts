@@ -10,8 +10,8 @@ export type OutboxEnqueueInput = {
 };
 
 export const outboxRepository = {
-  enqueue(tx: Prisma.TransactionClient, input: OutboxEnqueueInput) {
-    return tx.outboxEvent.create({
+  async enqueue(tx: Prisma.TransactionClient, input: OutboxEnqueueInput) {
+    const row = await tx.outboxEvent.create({
       data: {
         eventType: input.eventType,
         payload: input.payload,
@@ -20,6 +20,9 @@ export const outboxRepository = {
         aggregateId: input.aggregateId
       }
     });
+    // Fires after COMMIT — listeners wake up immediately, no notification on rollback
+    await tx.$executeRaw`SELECT pg_notify('outbox_pending', ${row.id})`;
+    return row;
   },
 
   // FOR UPDATE SKIP LOCKED: gesperrte (von einem anderen Worker bereits geclaimte)

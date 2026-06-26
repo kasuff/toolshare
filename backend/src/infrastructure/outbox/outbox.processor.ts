@@ -4,6 +4,7 @@ import {
 } from "../../domain/events/notification.events";
 import { notificationsRepository } from "../../modules/notifications/notifications.repository";
 import { pushService } from "../../modules/notifications/push.service";
+import { publishInboxChanged } from "../../modules/inbox/inbox.events";
 import { outboxRepository } from "./outbox.repository";
 
 type OutboxRow = {
@@ -23,6 +24,10 @@ async function handleUserNotification(payload: UserNotificationPayload, idempote
   if (payload.pushTitle && payload.pushBody) {
     await pushService.sendPushNotification(payload.userId, payload.pushTitle, payload.pushBody);
   }
+  // Echtzeit-Ping an den Empfänger (Web-SSE). Deckt alle enqueueten Notifications ab
+  // (Proposals, Moderation, Stornierungen sowie die neu ergänzten Buchungsanfragen
+  // und Ratings).
+  publishInboxChanged(payload.userId);
   await outboxRepository.recordDelivery(idempotencyKey);
 }
 

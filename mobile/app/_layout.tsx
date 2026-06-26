@@ -1,8 +1,11 @@
 import { Slot } from 'expo-router';
 import { View } from 'react-native';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { LoadingSpinner } from '../components/EmptyState';
 import { setApiBaseUrl } from '@toolshare/shared';
-import { AuthProvider, useAuth } from '../hooks/useAuth';
+import { useAuth, useProtectedRoute } from '../hooks/useAuth';
+import { queryClient } from '../lib/queryClient';
+import { useReactQueryFocus } from '../hooks/useReactQueryFocus';
 import { ToastProvider } from '../hooks/useToast';
 import { ToastViewport } from '../components/Toast';
 
@@ -47,6 +50,8 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 
 function AppLayout() {
   const { isLoaded, token, currentUser } = useAuth();
+  useProtectedRoute();
+  useReactQueryFocus();
   usePushNotifications(token, currentUser?.id);
   const styles = useStyles();
 
@@ -68,11 +73,11 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 export default function RootLayout() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
+      <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <AppLayout />
         </ToastProvider>
-      </AuthProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

@@ -1,6 +1,8 @@
 import { createApp } from "./app";
 import { env } from "./config/env";
+import { startOutboxListener } from "./infrastructure/outbox/outbox.listener";
 import { startOutboxWorker } from "./infrastructure/outbox/outbox.worker";
+import { initInboxEventBus } from "./modules/inbox/inbox.events";
 import { bootstrapManagerAllowlist } from "./modules/users/manager-allowlist.bootstrap";
 
 const start = async () => {
@@ -8,6 +10,8 @@ const start = async () => {
 
   if (process.env.NODE_ENV !== "test") {
     startOutboxWorker();
+    await startOutboxListener();
+    await initInboxEventBus();
   }
 
   const app = createApp();

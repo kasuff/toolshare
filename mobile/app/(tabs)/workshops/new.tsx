@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react';
 import { View, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Image, BackHandler, Pressable } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, TOOL_CATEGORIES } from '@toolshare/shared';
 import { useAuth } from '../../../hooks/useAuth';
+import { workshopKeys } from '../../../hooks/queries/workshops.queries';
+import { offerKeys } from '../../../hooks/queries/offers.queries';
 import { useThemeColors, createThemedStyleSheet, Spacing, Radius } from '../../../constants/theme';
 import { ThemedText } from '../../../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +40,7 @@ export default function NewWorkshopScreen() {
   const Colors = useThemeColors();
   const styles = useStyles();
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -242,6 +246,8 @@ export default function NewWorkshopScreen() {
         slots: []
       }, token!);
 
+      void queryClient.invalidateQueries({ queryKey: workshopKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: offerKeys.all });
       router.replace('/offers');
     } catch (err) {
       setApiError(getErrorMessage(err, 'Werkstatt konnte nicht angelegt werden.'));
