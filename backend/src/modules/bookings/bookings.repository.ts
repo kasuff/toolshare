@@ -24,7 +24,8 @@ export const bookingsRepository = {
         selectedTools: { include: { workshopTool: true } },
         // Sicherheits-Cap gegen pathologisch lange Verhandlungen (real nur wenige
         // Proposals). Echtes Lazy-Laden der Nachrichten je geöffnetem Chat ist als
-        // Folgeschritt vorgesehen (siehe docs/performance-pagination.md).
+        // Folgeschritt vorgesehen (siehe Architektur-Doku "Performance, Indizes
+        // & Pagination" im project-management-Repo).
         pickupProposals: {
           orderBy: { createdAt: "asc" },
           take: 100,
