@@ -275,7 +275,7 @@ frontend:architecture:
   script:
     - cd frontend
     - !reference [.npm_ci, script]
-    - npx vitest run tests/architecture.test.ts
+    - npx vitest run src/tests/architecture.test.ts
 
 backend:test:
   stage: test
@@ -355,6 +355,14 @@ mobile:test:
     paths:
       - mobile/coverage/
     expire_in: 1 week
+
+mobile:architecture:
+  stage: test
+  image: node:20.19-slim
+  extends: .mobile_cache
+  script:
+    - !reference [.mobile_install, script]
+    - npx vitest run tests/architecture.test.ts
 
 # === BUILD JOBS ===
 
