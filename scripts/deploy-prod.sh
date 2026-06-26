@@ -101,6 +101,17 @@ if ! docker network inspect toolshare-network >/dev/null 2>&1; then
 	docker network create toolshare-network
 fi
 
+# 0) Rollback-Sicherung: das aktuell laufende App-Image (:current) nach
+#    :previous umtaggen, BEVOR der Build es überschreibt. So bleibt das letzte
+#    funktionierende Image erhalten und scripts/rollback-prod.sh kann es in
+#    Sekunden zurückrollen. Fehlt :current (erster Deploy), wird nur übersprungen.
+for img in toolshare-frontend toolshare-backend; do
+	if docker image inspect "${img}:current" >/dev/null 2>&1; then
+		echo "Sichere ${img}:current -> ${img}:previous"
+		docker tag "${img}:current" "${img}:previous"
+	fi
+done
+
 # 1) Build app images FIRST — before touching anything that is running.
 #    If a build fails (e.g. a transient npm-registry ECONNRESET), abort here:
 #    the current app keeps serving and, crucially, the monitoring stack
@@ -142,6 +153,9 @@ if [ -n "${CI:-}" ]; then
 	set_env GITLAB_PRODUCTION_ENV "${GITLAB_PRODUCTION_ENV:-}"
 	set_env GRAFANA_ADMIN_PASSWORD "${GRAFANA_ADMIN_PASSWORD:-}"
 	set_env DORA_OUTAGE_SOURCE "${DORA_OUTAGE_SOURCE:-}"
+	# Alertmanager → GitLab (HTTP-Alert-Integration): Webhook-URL + Auth-Key.
+	set_env GITLAB_ALERT_WEBHOOK_URL "${GITLAB_ALERT_WEBHOOK_URL:-}"
+	set_env GITLAB_ALERT_AUTH_KEY "${GITLAB_ALERT_AUTH_KEY:-}"
 fi
 
 # 3) Ensure the monitoring stack is up. It runs as an independent compose

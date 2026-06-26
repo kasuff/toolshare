@@ -34,12 +34,23 @@ services:
       args:
         VITE_API_URL: /api
         VITE_GRAFANA_URL: /grafana
+    # Stabiler Image-Tag → ermöglicht Rollback: deploy-prod.sh taggt das laufende
+    # :current vor jedem Build nach :previous um (s. scripts/rollback-prod.sh).
+    image: toolshare-frontend:current
     ports:
       - "3000:80"
     depends_on:
       - backend
     # Wie backend/db: nach Reboot oder Crash automatisch wieder starten.
     restart: unless-stopped
+    # Healthcheck gegen /healthz (s. frontend/nginx.conf), damit das Deploy-Script
+    # ein nginx mit kaputter Config/ohne Assets nicht als "ready" wertet.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - toolshare-network
 
@@ -48,8 +59,13 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       target: prod
+    # Stabiler Image-Tag für Rollback (s. frontend / scripts/rollback-prod.sh).
+    image: toolshare-backend:current
     ports:
-      - "4000:4000"
+      # Nur an localhost: das Frontend-nginx erreicht das Backend übers
+      # Docker-Netz (http://backend:4000). Der Host-Port dient nur dem Debugging
+      # per SSH-Tunnel und ist nicht öffentlich erreichbar.
+      - "127.0.0.1:4000:4000"
     environment:
       DATABASE_URL: postgresql://toolshare:${POSTGRES_PASSWORD}@db:5432/toolshare
       JWT_SECRET: ${JWT_SECRET}
@@ -118,12 +134,19 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Reiner Cache → keine Persistenz (--save ""), und eine harte maxmemory mit
+    # LRU-Verdrängung, damit Redis auf der 3,8-GB-VM (kein Swap) nicht unbegrenzt
+    # wächst und den Host OOM-killt. Das mem_limit darunter ist die zweite
+    # Sicherung auf Container-Ebene.
+    command: ["redis-server", "--save", "", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 64m
     networks:
       - toolshare-network
 

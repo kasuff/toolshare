@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-bookworm-slim AS dev
+FROM node:20.19-bookworm-slim AS dev
 WORKDIR /app
 
 # Alles als non-root "node" (uid 1000) ausführen: /app dem User übergeben und
@@ -24,7 +24,7 @@ COPY --chown=node:node . .
 EXPOSE 3000
 CMD ["npm", "run", "dev", "--workspace=frontend", "--", "--host", "0.0.0.0", "--port", "3000"]
 
-FROM node:20-bookworm-slim AS build
+FROM node:20.19-bookworm-slim AS build
 WORKDIR /app
 
 COPY package*.json ./

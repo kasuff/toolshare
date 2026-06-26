@@ -11,11 +11,11 @@ global:
 rule_files:
   - /etc/prometheus/alerts/*.yml
 
-# Alertmanager (optional, für spätere Alert-Weiterleitung per E-Mail/Slack)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets: ["alertmanager:9093"]
+# Alertmanager: leitet gefeuerte Alerts an GitLab weiter (s. monitoring/alertmanager).
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
 
@@ -60,7 +60,7 @@ scrape_configs:
       - targets: ["grafana:3000"]
         labels:
           service: "grafana"
-    metrics_path: /metrics
+    metrics_path: /grafana/metrics
 
   # ── DORA Exporter (Deployment Freq, Lead Time, CFR, Time to Restore) ───────
   - job_name: "dora-exporter"

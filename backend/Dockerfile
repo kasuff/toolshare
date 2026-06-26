@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-bookworm-slim AS base
+FROM node:20.19-bookworm-slim AS base
 WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
@@ -37,7 +37,7 @@ CMD ["npm", "run", "dev"]
 FROM base AS build
 RUN npm run build
 
-FROM node:20-bookworm-slim AS prod
+FROM node:20.19-bookworm-slim AS prod
 WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*

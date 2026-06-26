@@ -1,5 +1,3 @@
-version: "3.8"
-
 # Toolshare Observability Stack
 # Starten: docker compose -f monitoring/docker-compose.yml up -d
 # Stoppen:  docker compose -f monitoring/docker-compose.yml down
@@ -264,6 +262,43 @@ services:
       - monitoring-network
       - toolshare-network
 
+  # ─── Alertmanager ─────────────────────────────────────────────────────────
+  # Brücke Prometheus → GitLab: empfängt die von Prometheus gefeuerten Alerts und
+  # leitet sie an die GitLab-HTTP-Alert-Integration weiter (dort entstehen
+  # Alerts/Incidents inkl. Benachrichtigung). Ohne diesen Service feuern die
+  # Alert-Regeln ins Leere. Config wird beim Start aus den GitLab-Secrets
+  # gerendert (s. alertmanager/entrypoint.sh).
+  alertmanager:
+    build:
+      context: ./alertmanager
+    container_name: toolshare-alertmanager
+    restart: unless-stopped
+    environment:
+      # Kein unsicherer Default: fehlen die Secrets, bricht compose ab, statt
+      # einen Alertmanager ohne funktionierendes Ziel hochzufahren.
+      GITLAB_ALERT_WEBHOOK_URL: ${GITLAB_ALERT_WEBHOOK_URL:?GITLAB_ALERT_WEBHOOK_URL muss gesetzt sein}
+      GITLAB_ALERT_AUTH_KEY: ${GITLAB_ALERT_AUTH_KEY:?GITLAB_ALERT_AUTH_KEY muss gesetzt sein}
+    ports:
+      # Nur an localhost (Debug/SSH-Tunnel); Prometheus erreicht AM übers Docker-Netz.
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9093/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "${ALERTMANAGER_CPU_LIMIT:-0.10}"
+          memory: "${ALERTMANAGER_MEM_LIMIT:-128M}"
+        reservations:
+          cpus: "0.01"
+          memory: "32M"
+    networks:
+      - monitoring-network
+
   # ─── Node Exporter ──────────────────────────────────────────────────────────
   node-exporter:
     image: prom/node-exporter:v1.8.1
@@ -300,6 +335,8 @@ volumes:
   promtail-positions:
     driver: local
   dora-data:
+    driver: local
+  alertmanager-data:
     driver: local
 
 networks:
