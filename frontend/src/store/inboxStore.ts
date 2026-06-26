@@ -1,18 +1,20 @@
 import { create } from "zustand";
+import { api } from "@toolshare/shared";
 import type { Booking, PickupProposal, TimeslotProposal } from "@toolshare/shared";
 import {
-  loadReadMessageIds,
-  saveReadMessageIds,
   ratingMessageKey,
   requestMessageKey,
   proposalMessageKey,
   type InboxRatingRef
 } from "../utils/inboxMessageRead";
+import { useAuthStore } from "./authStore";
 
-// Client-State der Inbox: ausschließlich die lokal als gelesen markierten
-// Nachrichten-IDs (localStorage-gestützt, kein Server-Pendant). Die Serverdaten
-// (Buchungen, Benachrichtigungen, Bewertungen) liegen in TanStack Query
-// (useInboxData); der ungelesen-Zähler wird daraus abgeleitet (useInboxBackground).
+// Client-State der Inbox: die als gelesen markierten Nachrichten-IDs. Quelle der
+// Wahrheit ist jetzt der Server (useInboxReadReceipts); dieser Store spiegelt die
+// Server-Menge (mergeServerIds) und hält die optimistischen Mark-Aktionen. Da der
+// Read-Status append-only ist (Keys werden nur hinzugefügt), ist die Vereinigung von
+// Server- und lokalem Set immer korrekt und vermeidet Flackern, wenn ein Refetch
+// einen gerade optimistisch markierten Key noch nicht enthält.
 function getIncomingMessageKeys(
   booking: Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] },
   currentUserId: string,
@@ -38,12 +40,20 @@ function getIncomingMessageKeys(
   return keys;
 }
 
+// Persistiert die Keys server-seitig (fire-and-forget; bei Fehler bleibt der lokale
+// optimistische Stand, der nächste Refetch korrigiert/bestätigt ihn).
+function persist(messageKeys: string[]): void {
+  const token = useAuthStore.getState().token;
+  if (!token || messageKeys.length === 0) return;
+  void api.addInboxReadReceipts(messageKeys, token).catch((error) => {
+    console.error("Failed to persist inbox read receipts", error);
+  });
+}
+
 interface InboxReadState {
   readMessageIds: Set<string>;
-  /** Lädt die gelesen-IDs des Nutzers aus dem localStorage. */
-  loadForUser: (userId: string) => void;
-  /** Ersetzt das Set direkt (z. B. nach dem initialen Seeding). */
-  setReadIds: (ids: Set<string>) => void;
+  /** Vereinigt die vom Server geladenen IDs mit dem lokalen Set (append-only). */
+  mergeServerIds: (ids: Set<string>) => void;
   markMessageRead: (messageKey: string, userId: string) => void;
   markThreadRead: (
     booking: Booking & { pickupProposals?: PickupProposal[]; timeslotProposals?: TimeslotProposal[] },
@@ -56,21 +66,26 @@ interface InboxReadState {
 export const useInboxStore = create<InboxReadState>((set, get) => ({
   readMessageIds: new Set(),
 
-  loadForUser: (userId) => {
-    set({ readMessageIds: loadReadMessageIds(userId) });
+  mergeServerIds: (ids) => {
+    const { readMessageIds } = get();
+    let changed = readMessageIds.size !== ids.size;
+    const next = new Set(readMessageIds);
+    for (const id of ids) {
+      if (!next.has(id)) {
+        next.add(id);
+        changed = true;
+      }
+    }
+    if (changed) set({ readMessageIds: next });
   },
 
-  setReadIds: (ids) => {
-    set({ readMessageIds: ids });
-  },
-
-  markMessageRead: (messageKey, userId) => {
+  markMessageRead: (messageKey) => {
     const { readMessageIds } = get();
     if (readMessageIds.has(messageKey)) return;
     const next = new Set(readMessageIds);
     next.add(messageKey);
-    saveReadMessageIds(userId, next);
     set({ readMessageIds: next });
+    persist([messageKey]);
   },
 
   markThreadRead: (booking, userId, rating) => {
@@ -79,17 +94,17 @@ export const useInboxStore = create<InboxReadState>((set, get) => ({
     if (incomingKeys.length === 0) return;
 
     const next = new Set(readMessageIds);
-    let changed = false;
+    const added: string[] = [];
     for (const key of incomingKeys) {
       if (!next.has(key)) {
         next.add(key);
-        changed = true;
+        added.push(key);
       }
     }
-    if (!changed) return;
+    if (added.length === 0) return;
 
-    saveReadMessageIds(userId, next);
     set({ readMessageIds: next });
+    persist(added);
   },
 
   clear: () => {

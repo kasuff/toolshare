@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@toolshare/shared";
 import { useInboxBackground } from "../hooks/useInbox";
+import { useInboxStream } from "../hooks/useInboxStream";
 import { RoleSwitcher } from "./RoleSwitcher";
 
 type Props = {
@@ -87,6 +88,8 @@ export function Layout({ users, currentUser, token, onSwitchUser, onLogout }: Pr
   // Inbox-Hintergrundlogik (Polling + Focus-Refetch via TanStack Query, Seeding,
   // ungelesen-Zähler) zentral hier, da das Layout app-weit gemountet ist.
   const { unreadCount: unreadRequestBellCount } = useInboxBackground(token, currentUser?.id);
+  // Echtzeit-Pushes (SSE): invalidieren die Inbox-Queries bei serverseitigen Events.
+  useInboxStream(token, currentUser?.id);
 
   const inboxAriaLabel =
     unreadRequestBellCount > 0
