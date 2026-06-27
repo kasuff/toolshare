@@ -17,14 +17,12 @@ export type InboxData = {
 
 // Lädt alle Inbox-Serverdaten in einem Query. Die vier Endpunkte werden immer
 // gemeinsam konsumiert (Inbox-Seite + Tab-Badge), daher ein gebündelter Query mit
-// einem Cache-Eintrag. Der Hintergrund-Refetch (refetchInterval) und der
-// Focus-Refetch (AppState -> focusManager) ersetzen das frühere manuelle
-// setInterval/AppState in der Inbox-Seite und in useInboxBadgeCount.
+// einem Cache-Eintrag. Der Focus-Refetch (AppState -> focusManager) sorgt dafür,
+// dass beim Wechsel in den Vordergrund frische Daten geladen werden.
 export function useInboxData(token: string | null, userId: string | undefined) {
   return useQuery({
     queryKey: inboxKeys.data(userId ?? ''),
     enabled: Boolean(token && userId),
-    refetchInterval: 20_000,
     refetchOnWindowFocus: true,
     queryFn: async (): Promise<InboxData> => {
       const [bookings, ratingsGiven, ratingsReceived, notifications] = await Promise.all([
