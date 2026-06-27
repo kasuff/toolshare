@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { toolResponseSchema } from "../../../shared/contracts/response/tools.schema";
 import { problemDetailsSchema } from "../../../shared/contracts/errors/problem.schema";
-import { toToolResponse } from "../../src/modules/tools/tools.presenter";
-import type { ToolEntity } from "../../src/modules/tools/tools.entity";
+import { toToolResponse } from "../../src/modules/tools/controllers/tools.presenter";
+import type { ToolEntity } from "../../src/modules/tools/entities/tools.entity";
 
 const sampleTool: ToolEntity = {
   id: "11111111-1111-1111-1111-111111111111",

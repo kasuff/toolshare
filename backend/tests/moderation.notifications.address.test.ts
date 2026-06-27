@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { moderationRepository } from "../src/modules/moderation/moderation.repository";
-import { moderationService } from "../src/modules/moderation/moderation.service";
-import { suspensionRepository } from "../src/modules/users/suspension.repository";
+import { moderationRepository } from "../src/modules/moderation/repositories/moderation.repository";
+import { moderationService } from "../src/modules/moderation/services/moderation.service";
+import { suspensionRepository } from "../src/modules/users/repositories/suspension.repository";
 import { enqueueBookingCancellationNotification } from "../src/infrastructure/outbox/enqueue-user-notification";
-import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
-import { notificationsService } from "../src/modules/notifications/notifications.service";
-import { addressService } from "../src/modules/address/address.service";
-import { toolsService } from "../src/modules/tools/tools.service";
-import { workshopsService } from "../src/modules/workshops/workshops.service";
-import { ratingsService } from "../src/modules/ratings/ratings.service";
+import { notificationsRepository } from "../src/modules/notifications/repositories/notifications.repository";
+import { notificationsService } from "../src/modules/notifications/services/notifications.service";
+import { addressService } from "../src/modules/address/services/address.service";
+import { toolsService } from "../src/modules/tools/services/tools.service";
+import { workshopsService } from "../src/modules/workshops/services/workshops.service";
+import { ratingsService } from "../src/modules/ratings/services/ratings.service";
 
-vi.mock("../src/modules/moderation/moderation.repository", () => ({
+vi.mock("../src/modules/moderation/repositories/moderation.repository", () => ({
   moderationRepository: {
     createReport: vi.fn(),
     listOpenReports: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock("../src/modules/moderation/moderation.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/users/suspension.repository", () => ({
+vi.mock("../src/modules/users/repositories/suspension.repository", () => ({
   suspensionRepository: {
     create: vi.fn(),
     listManagerIds: vi.fn()
@@ -40,8 +40,8 @@ vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
   newModerationNotificationKey: vi.fn(() => "moderation:key")
 }));
 
-vi.mock("../src/modules/notifications/notifications.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/modules/notifications/notifications.service")>();
+vi.mock("../src/modules/notifications/services/notifications.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/modules/notifications/services/notifications.service")>();
   return {
     notificationsService: {
       ...actual.notificationsService,
@@ -51,7 +51,7 @@ vi.mock("../src/modules/notifications/notifications.service", async (importOrigi
   };
 });
 
-vi.mock("../src/modules/notifications/notifications.repository", () => ({
+vi.mock("../src/modules/notifications/repositories/notifications.repository", () => ({
   notificationsRepository: {
     listByUser: vi.fn(),
     markAsRead: vi.fn(),
@@ -59,21 +59,21 @@ vi.mock("../src/modules/notifications/notifications.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/tools/tools.service", () => ({
+vi.mock("../src/modules/tools/services/tools.service", () => ({
   toolsService: {
     getById: vi.fn(),
     remove: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/workshops/workshops.service", () => ({
+vi.mock("../src/modules/workshops/services/workshops.service", () => ({
   workshopsService: {
     getById: vi.fn(),
     remove: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/ratings/ratings.service", () => ({
+vi.mock("../src/modules/ratings/services/ratings.service", () => ({
   ratingsService: {
     hideFromModeration: vi.fn(),
     removeFromModeration: vi.fn()

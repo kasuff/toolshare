@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { systemRulesService } from "../src/modules/system-rules/system-rules.service";
-import { systemRulesRepository } from "../src/modules/system-rules/system-rules.repository";
-import { ENFORCED_SETTING_DEFS } from "../src/modules/system-rules/system-settings.config";
+import { systemRulesService } from "../src/modules/system-rules/services/system-rules.service";
+import { systemRulesRepository } from "../src/modules/system-rules/repositories/system-rules.repository";
+import { ENFORCED_SETTING_DEFS } from "../src/modules/system-rules/services/system-settings.config";
 
-vi.mock("../src/modules/system-rules/system-rules.repository", () => ({
+vi.mock("../src/modules/system-rules/repositories/system-rules.repository", () => ({
   systemRulesRepository: {
     findAllValues: vi.fn(),
     upsert: vi.fn()

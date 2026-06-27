@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { moderationRepository } from "../src/modules/moderation/moderation.repository";
+import { moderationRepository } from "../src/modules/moderation/repositories/moderation.repository";
 
 const mocks = vi.hoisted(() => ({
   reportCreate: vi.fn(),

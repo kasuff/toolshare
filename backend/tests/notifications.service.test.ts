@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { enqueueModerationNotification } from "../src/infrastructure/outbox/enqueue-user-notification";
-import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
-import { suspensionRepository } from "../src/modules/users/suspension.repository";
-import { notificationsService } from "../src/modules/notifications/notifications.service";
+import { notificationsRepository } from "../src/modules/notifications/repositories/notifications.repository";
+import { suspensionRepository } from "../src/modules/users/repositories/suspension.repository";
+import { notificationsService } from "../src/modules/notifications/services/notifications.service";
 
 vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
   enqueueModerationNotification: vi.fn(),
   newModerationNotificationKey: vi.fn(() => "moderation:key")
 }));
 
-vi.mock("../src/modules/notifications/notifications.repository", () => ({
+vi.mock("../src/modules/notifications/repositories/notifications.repository", () => ({
   notificationsRepository: {
     listByUser: vi.fn(),
     markAsRead: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock("../src/modules/notifications/notifications.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/users/suspension.repository", () => ({
+vi.mock("../src/modules/users/repositories/suspension.repository", () => ({
   suspensionRepository: {
     listManagerIds: vi.fn()
   }

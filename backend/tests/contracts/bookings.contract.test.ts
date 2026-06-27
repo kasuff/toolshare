@@ -8,8 +8,8 @@ import { problemDetailsSchema } from "@toolshare/shared/contracts/errors/problem
 import {
   toBookingResponse,
   toBookingPickupProposalResponse
-} from "../../src/modules/bookings/bookings.presenter";
-import type { BookingEntity, BookingPickupProposalEntity } from "../../src/modules/bookings/bookings.entity";
+} from "../../src/modules/bookings/controllers/bookings.presenter";
+import type { BookingEntity, BookingPickupProposalEntity } from "../../src/modules/bookings/entities/bookings.entity";
 
 const sampleBooking: BookingEntity = {
   id: "11111111-1111-1111-1111-111111111111",

@@ -1,9 +1,9 @@
-import { usersService } from "../src/modules/users/users.service";
-import { usersRepository } from "../src/modules/users/users.repository";
-import { notificationsService } from "../src/modules/notifications/notifications.service";
+import { usersService } from "../src/modules/users/services/users.service";
+import { usersRepository } from "../src/modules/users/repositories/users.repository";
+import { notificationsService } from "../src/modules/notifications/services/notifications.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../src/modules/users/users.repository", () => ({
+vi.mock("../src/modules/users/repositories/users.repository", () => ({
   usersRepository: {
     findByIdPublic: vi.fn(),
     updateProfile: vi.fn(),
@@ -14,13 +14,13 @@ vi.mock("../src/modules/users/users.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/notifications/notifications.service", () => ({
+vi.mock("../src/modules/notifications/services/notifications.service", () => ({
   notificationsService: {
     createSuspensionNotice: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/address/address.service", () => ({
+vi.mock("../src/modules/address/services/address.service", () => ({
   addressService: {
     geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
   }

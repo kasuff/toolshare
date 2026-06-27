@@ -6,11 +6,11 @@ import {
   addressSuggestionsResponseSchema,
   addressValidationResponseSchema
 } from "@toolshare/shared/contracts/response/address.schema";
-import { toSystemSettingResponse } from "../../src/modules/system-rules/system-rules.presenter";
+import { toSystemSettingResponse } from "../../src/modules/system-rules/controllers/system-rules.presenter";
 import {
   toAddressSuggestionResponseList,
   toAddressValidationResponse
-} from "../../src/modules/address/address.presenter";
+} from "../../src/modules/address/controllers/address.presenter";
 
 describe("system-rules + address contracts", () => {
   it("system setting presenter matches schema and hides internal fields", () => {

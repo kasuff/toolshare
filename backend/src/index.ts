@@ -2,8 +2,8 @@ import { createApp } from "./app";
 import { env } from "./config/env";
 import { startOutboxListener } from "./infrastructure/outbox/outbox.listener";
 import { startOutboxWorker } from "./infrastructure/outbox/outbox.worker";
-import { initInboxEventBus } from "./modules/inbox/inbox.events";
-import { bootstrapManagerAllowlist } from "./modules/users/manager-allowlist.bootstrap";
+import { initInboxEventBus } from "./modules/inbox/services/inbox.events";
+import { bootstrapManagerAllowlist } from "./modules/users/services/manager-allowlist.bootstrap";
 
 const start = async () => {
   await bootstrapManagerAllowlist();

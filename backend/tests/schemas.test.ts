@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { registerSchema } from "../src/modules/auth/auth.schema";
-import { updateMyProfileSchema } from "../src/modules/users/users.schema";
+import { registerSchema } from "../src/modules/auth/controllers/auth.schema";
+import { updateMyProfileSchema } from "../src/modules/users/controllers/users.schema";
 
 describe("Schema Validation - Hausnummer Prüfung", () => {
   describe("registerSchema", () => {

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ratingsRepository } from "../src/modules/ratings/ratings.repository";
-import { ratingsService } from "../src/modules/ratings/ratings.service";
+import { ratingsRepository } from "../src/modules/ratings/repositories/ratings.repository";
+import { ratingsService } from "../src/modules/ratings/services/ratings.service";
 
-vi.mock("../src/modules/ratings/ratings.repository", () => ({
+vi.mock("../src/modules/ratings/repositories/ratings.repository", () => ({
   ratingsRepository: {
     listReceived: vi.fn(),
     listGiven: vi.fn(),

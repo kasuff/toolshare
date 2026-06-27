@@ -1,0 +1,1 @@
+export { addInboxReadReceiptsSchema } from "@toolshare/shared/contracts/request/inbox.schema";

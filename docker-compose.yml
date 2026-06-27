@@ -65,7 +65,8 @@ services:
 
   db:
     image: postgres:16-alpine
-    # Kein Host-Port: DB nur im Docker-Netz erreichbar (nicht von außen)
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: toolshare
       POSTGRES_PASSWORD: toolshare

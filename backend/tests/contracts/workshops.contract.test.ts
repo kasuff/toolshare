@@ -6,8 +6,8 @@ import {
 import {
   toWorkshopResponse,
   toWorkshopTimeslotResponse
-} from "../../src/modules/workshops/workshops.presenter";
-import type { WorkshopEntity, WorkshopTimeslotEntity } from "../../src/modules/workshops/workshops.entity";
+} from "../../src/modules/workshops/controllers/workshops.presenter";
+import type { WorkshopEntity, WorkshopTimeslotEntity } from "../../src/modules/workshops/entities/workshops.entity";
 
 const sampleWorkshop: WorkshopEntity = {
   id: "11111111-1111-1111-1111-111111111111",
