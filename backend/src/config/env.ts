@@ -23,6 +23,36 @@ for (const key of required) {
   }
 }
 
+// Secret-Stärke erzwingen: ein zu kurzes JWT_SECRET ist trivial brute-forcebar.
+// Mindestens 32 Zeichen (≈ 256 Bit bei zufälligem Secret). Gilt auch für ein
+// EXPLIZIT gesetztes JWT_REFRESH_SECRET; fällt es auf JWT_SECRET zurück, ist es
+// durch denselben Check bereits abgedeckt.
+const MIN_SECRET_LENGTH = 32;
+const assertStrongSecret = (key: string, value: string | undefined) => {
+  if (value && value.length < MIN_SECRET_LENGTH) {
+    throw new Error(`${key} must be at least ${MIN_SECRET_LENGTH} characters long`);
+  }
+};
+assertStrongSecret("JWT_SECRET", process.env.JWT_SECRET);
+assertStrongSecret("JWT_REFRESH_SECRET", process.env.JWT_REFRESH_SECRET);
+
+// Wird R2 als Storage gewählt, müssen alle R2-Zugangsdaten gesetzt sein — sonst
+// scheitert erst der erste Bild-Upload zur Laufzeit statt sauber beim Boot.
+if (process.env.STORAGE_BACKEND === "r2") {
+  const requiredR2 = [
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_PUBLIC_URL"
+  ] as const;
+  const missingR2 = requiredR2.filter((key) => !process.env[key]);
+  if (missingR2.length > 0) {
+    throw new Error(
+      `STORAGE_BACKEND=r2 requires: ${missingR2.join(", ")}`
+    );
+  }
+}
+
 const parsePositiveInt = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;

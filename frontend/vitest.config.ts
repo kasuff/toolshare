@@ -26,7 +26,7 @@ export default defineConfig({
     maxWorkers: 1,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'cobertura', 'lcov'],
+      reporter: ['text', 'json', 'cobertura', 'lcov', 'html'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'node_modules/',

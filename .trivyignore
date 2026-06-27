@@ -1,0 +1,11 @@
+# Trivy ignore list — jeder Eintrag MUSS begründet sein.
+# Format: eine CVE-ID je Zeile; Kommentare mit '#'.
+
+# CVE-2025-68121 — crypto/tls: fehlerhafte Zertifikatsprüfung bei TLS-Session-
+# Resumption (Go-stdlib, gefixt in Go 1.24.13+). Gemeldet für /usr/local/bin/gosu
+# im Base-Image postgres:16-bookworm. gosu ist ein reines setuid+exec-Tool (Drop
+# auf den postgres-User in scripts/verify-restore.sh) und baut KEINE Netzwerk-/
+# TLS-Verbindungen auf — der verwundbare crypto/tls-Pfad ist nicht erreichbar.
+# Ein echter Fix kommt erst, wenn das Upstream-Postgres-Image gosu mit Go
+# >=1.24.13 neu baut; bis dahin Suppression statt CI-Block.
+CVE-2025-68121

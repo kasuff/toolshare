@@ -69,6 +69,12 @@ async function queryPrometheusRange(
   }));
 }
 
+// Container der Monitoring-Stack-Eigenüberwachung (Loki, Promtail & Co.). Werden
+// im allgemeinen Fehler-Log-Panel ausgeblendet, da ihr Betriebsrauschen keine
+// Anwendungsfehler sind. Regex matcht das von Promtail gesetzte `container`-Label.
+const INFRA_CONTAINERS =
+  "toolshare-(loki|promtail|grafana|prometheus|alertmanager|node-exporter|dora-exporter)";
+
 async function queryLoki(
   logQuery: string,
   limit = 50
@@ -83,7 +89,7 @@ async function queryLoki(
   url.searchParams.set("limit", String(limit));
   url.searchParams.set("direction", "backward");
 
-  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(15000) });
   if (!res.ok) return [];
 
   const json = (await res.json()) as {
@@ -163,8 +169,18 @@ export const monitoringController = {
     const level = String(req.query.level ?? "error");
     const service = req.query.service ? String(req.query.service) : null;
 
-    let lokiQuery = `{job="docker"}`;
-    if (service) lokiQuery = `{job="docker", service="${service}"}`;
+    // Beim Browsen aller Logs die Monitoring-Infrastruktur selbst ausblenden:
+    // deren interne gRPC-/Cancel-Logs enthalten alle das Wort "error" und würden
+    // sonst genau die level=error-Query treffen, die sie erzeugt – eine
+    // selbstverstärkende Rückkopplung (eine abgebrochene Loki-Query produziert
+    // ~20-30 "error"-Zeilen). Fragt der Aufrufer gezielt einen Service ab, wird
+    // er voll respektiert (auch loki/promtail bleiben dann sichtbar).
+    let lokiQuery: string;
+    if (service) {
+      lokiQuery = `{job="docker", service="${service}"}`;
+    } else {
+      lokiQuery = `{job="docker", container!~"${INFRA_CONTAINERS}"}`;
+    }
     if (level === "error") lokiQuery += ` |= "error"`;
     else if (level === "warn") lokiQuery += ` |~ "(?i)warn"`;
 

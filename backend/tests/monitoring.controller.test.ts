@@ -161,7 +161,11 @@ describe("monitoring controller", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.count).toBe(1);
-      expect(response.body.query).toBe('{job="docker"} |= "error"');
+      // Default-Query blendet die Monitoring-Infrastruktur aus (sonst würde ihr
+      // eigenes Betriebsrauschen die level=error-Abfrage selbst verstärken).
+      expect(response.body.query).toBe(
+        '{job="docker", container!~"toolshare-(loki|promtail|grafana|prometheus|alertmanager|node-exporter|dora-exporter)"} |= "error"'
+      );
       expect(response.body.logs[0]).toMatchObject({
         line: "error: database timeout",
         labels: { job: "docker", service: "backend" }

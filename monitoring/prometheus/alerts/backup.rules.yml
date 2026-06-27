@@ -1,0 +1,73 @@
+groups:
+  - name: backup.alerts
+    interval: 60s
+    rules:
+
+      # ── Heartbeat fehlt komplett ───────────────────────────────────────────
+      # Es liegt gar keine Backup-Metrik vor → walg-backup hat noch nie (oder
+      # seit einem Volume-Reset nicht mehr) erfolgreich geschrieben: Cron läuft
+      # nicht, R2-Credentials fehlen, Volume nicht gemountet, Container down.
+      # for: 25h überbrückt das Fenster zwischen frischem Deploy und dem ersten
+      # planmäßigen 02:00-Lauf, ohne dauerhaft Blind zu sein.
+      - alert: BackupHeartbeatMissing
+        expr: absent(toolshare_backup_last_success_timestamp_seconds)
+        for: 25h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup-Heartbeat fehlt komplett"
+          description: "Keine toolshare_backup_last_success_timestamp_seconds-Metrik vorhanden — seit >25h kein erfolgreiches Backup registriert. walg-backup-Container, Crontab und R2-Credentials prüfen."
+
+      # ── Letztes Backup (delta ODER full) zu alt ────────────────────────────
+      # Delta läuft täglich 02:00 (Mo–Sa), FULL So 02:00 → höchstens ~24h alt.
+      # 26h-Schwelle gibt ~2h Puffer für lange Läufe/Zeitdrift.
+      - alert: BackupTooOld
+        expr: time() - toolshare_backup_last_success_timestamp_seconds > 26 * 3600
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Letztes DB-Backup ist zu alt"
+          description: "Das jüngste erfolgreiche WAL-G-Backup ist {{ $value | humanizeDuration }} alt (Schwelle 26h). Das tägliche Delta-Backup schlägt vermutlich fehl — walg-backup-Logs prüfen."
+
+      # ── FULL-Backup zu alt ─────────────────────────────────────────────────
+      # FULL läuft wöchentlich (So 02:00). 8 Tage = 1 Woche + 1 Tag Puffer. Ohne
+      # aktuelles FULL hängt die ganze Delta-Kette an einer veraltenden Basis.
+      - alert: FullBackupTooOld
+        expr: time() - toolshare_backup_last_full_success_timestamp_seconds > 8 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Letztes FULL-Backup ist zu alt"
+          description: "Das jüngste FULL-Backup ist {{ $value | humanizeDuration }} alt (Schwelle 8 Tage). Wöchentliches FULL (So 02:00) prüfen — Delta-Kette baut sonst auf einer alten Basis auf."
+
+      # ── Restore-Verifikation läuft gar nicht ───────────────────────────────
+      # "Ein Backup ist erst ein Backup, wenn der Restore getestet wurde." Diese
+      # Metrik schreibt scripts/verify-restore.sh nach einem nachweislich
+      # erfolgreichen Restore in einen Wegwerf-Postgres. Fehlt sie komplett, ist
+      # der wöchentliche CI-Schedule (backup:verify-restore) vermutlich nie
+      # eingerichtet worden — Backups werden gepusht, aber NIE auf
+      # Wiederherstellbarkeit geprüft. for: 8d überbrückt das Fenster bis zum
+      # ersten Lauf nach Aktivierung des Features.
+      - alert: RestoreVerifyMissing
+        expr: absent(toolshare_restore_verify_last_success_timestamp_seconds)
+        for: 8d
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restore-Verifikation hat noch nie erfolgreich gelaufen"
+          description: "Keine toolshare_restore_verify_last_success_timestamp_seconds-Metrik vorhanden. Wöchentlichen Pipeline-Schedule für backup:verify-restore einrichten (oder Job einmal manuell auf main starten), sonst werden Backups nie auf Wiederherstellbarkeit geprüft."
+
+      # ── Letzte Restore-Verifikation zu alt ─────────────────────────────────
+      # verify-restore läuft wöchentlich per Schedule. 9 Tage = 1 Woche + 2 Tage
+      # Puffer für verschobene Läufe. Schlägt der Restore-Test fehl, veraltet die
+      # Metrik → Alarm, bevor man im Ernstfall ein unbrauchbares Backup entdeckt.
+      - alert: RestoreVerifyTooOld
+        expr: time() - toolshare_restore_verify_last_success_timestamp_seconds > 9 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Letzte Restore-Verifikation ist zu alt"
+          description: "Die jüngste erfolgreiche Restore-Verifikation ist {{ $value | humanizeDuration }} alt (Schwelle 9 Tage). Der wöchentliche backup:verify-restore-Job schlägt vermutlich fehl — CI-Logs prüfen; das Backup ist evtl. nicht wiederherstellbar."

@@ -334,6 +334,52 @@ mobile:lint:
     paths:
       - mobile-lint-report.html
 
+# === MONITORING-CONFIG-VALIDIERUNG ===
+#
+# Ohne diesen Gate würde ein Tippfehler in einer Alert-Regel oder der
+# Alertmanager-Config erst beim nächsten Deploy auffallen: Prometheus lädt die
+# fehlerhafte rule-Datei nicht und Alertmanager crash-loopt — die GESAMTE
+# Alarmierung fällt dann still aus, ohne dass jemand alarmiert wird (genau das,
+# was die Alerts verhindern sollten). promtool/amtool sind in den offiziellen
+# Images enthalten → keine zusätzlichen Tools nötig.
+monitoring:rules:
+  stage: lint
+  image:
+    name: prom/prometheus:v2.53.0   # gleiche Version wie monitoring/prometheus/Dockerfile
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - monitoring/prometheus/**/*
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - promtool check rules monitoring/prometheus/alerts/*.yml
+
+monitoring:alertmanager-config:
+  stage: lint
+  image:
+    name: prom/alertmanager:v0.27.0   # gleiche Version wie monitoring/alertmanager/Dockerfile
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - monitoring/alertmanager/**/*
+    - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    # Dummy-Secrets nur fürs Rendern; die echten kommen zur Laufzeit aus dem Env.
+    RENDER_ONLY: "1"
+    TPL: "$CI_PROJECT_DIR/monitoring/alertmanager/alertmanager.yml.tpl"
+    OUT: "$CI_PROJECT_DIR/alertmanager.rendered.yml"
+    GITLAB_ALERT_WEBHOOK_URL: "https://ci.example/alerts/notify.json"
+    GITLAB_ALERT_AUTH_KEY: "ci-dummy-token-1234567890"
+    WATCHDOG_HEARTBEAT_URL: "https://ci.example/ping/abc"
+  script:
+    # Beide Pfade prüfen: mit Heartbeat-URL (webhook) und ohne (No-op-Receiver).
+    - sh monitoring/alertmanager/entrypoint.sh
+    - amtool check-config "$CI_PROJECT_DIR/alertmanager.rendered.yml"
+    - WATCHDOG_HEARTBEAT_URL="" sh monitoring/alertmanager/entrypoint.sh
+    - amtool check-config "$CI_PROJECT_DIR/alertmanager.rendered.yml"
+
 mobile:test:
   stage: test
   image: node:20.19-slim
@@ -456,6 +502,35 @@ deploy:production:
   script:
     - ./scripts/deploy-prod.sh
 
+# === BACKUP RESTORE-VERIFIKATION ===
+#
+# Holt das jüngste WAL-G-Backup aus R2 in einen Wegwerf-Postgres und prüft, dass
+# echte Daten zurückkommen. Läuft NICHT bei jedem Push, sondern nur per Schedule
+# (wöchentlichen Pipeline-Schedule einrichten) oder manuell. Braucht den
+# Deploy-Runner auf dem Host (dort existiert das toolshare-pg-walg:local-Image)
+# und die R2_BACKUP_*-/R2_ACCOUNT_ID-Variablen.
+backup:verify-restore:
+  stage: deploy
+  image:
+    name: docker:27.3.1-cli
+    entrypoint: [""]
+  tags:
+    - server
+    - deploy
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+    DOCKER_TLS_CERTDIR: ""
+  interruptible: false
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+      allow_failure: true
+  before_script:
+    - chmod +x scripts/verify-restore.sh
+  script:
+    - ./scripts/verify-restore.sh
+
 # === PAGES JOB ===
 
 pages:
@@ -469,7 +544,7 @@ pages:
     - backend:test
     - mobile:lint
     - mobile:test
-    - job: security:container:trivy
+    - job: security:images:trivy
       optional: true
     - job: semgrep-sast
       optional: true
@@ -1027,17 +1102,103 @@ semgrep-sast:
       sast: gl-sast-report.json
     when: always
 
-security:container:trivy:
+# Container-Security ist in drei Jobs getrennt:
+#   1. security:source:trivy   – Quellbaum-Scan (Lockfiles/Secrets/Misconfig),
+#      leichtgewichtig auf einem Shared-Runner, gibt frühes Feedback im test-Stage.
+#   2. security:images:build   – baut die TATSÄCHLICH ausgelieferten Images auf
+#      dem Deploy-Host (Server-Runner mit Docker-Socket). Kein Bauen im Scan-Job.
+#   3. security:images:trivy   – scannt die unter 2. lokal gebauten Images.
+# Damit greifen unsere `apt-get upgrade`/`apk upgrade`-Layer: ein in Debian/Alpine
+# bereits gefixtes OS-Paket blockiert nicht mehr, nur weil der floatende
+# Upstream-Tag (z. B. postgres:16-bookworm) noch nicht neu gebaut wurde.
+
+security:source:trivy:
   stage: test
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
   script:
-    # Full scan incl. monitoring/ (the dora-exporter is our own image/code).
-    # First command writes the HIGH+CRITICAL report and never fails the job;
-    # the second gates the pipeline on CRITICAL findings only.
+    # Erst der nie blockierende HIGH+CRITICAL-Report, dann das CRITICAL-Gate.
     - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table -o trivy-report.txt . || true
     - trivy fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 1 .
+  artifacts:
+    when: always
+    paths:
+      - trivy-report.txt
+
+security:images:build:
+  stage: build
+  # Server-Runner: der Docker-Socket des Deploy-Hosts ist hier verfügbar. Die
+  # Images werden in den lokalen Daemon gebaut und bleiben dort für den
+  # Scan-Job (security:images:trivy) sichtbar — kein Artifact-Transport nötig.
+  image:
+    name: docker:27.3.1-cli
+    entrypoint: [""]
+  tags:
+    - server
+    - deploy
+  # Nur auf main: die Images werden auf dem Deploy-Host gebaut — kein Grund, den
+  # Prod-Host bei jeder MR mit vollen backend/frontend-Builds zu belasten.
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_BUILDKIT: "1"
+  script:
+    # Exakt wie docker-compose.prod.yml: backend/frontend mit Kontext '.',
+    # backup/alertmanager mit ihrem Unterverzeichnis. Tag je Commit, damit
+    # parallele Pipelines sich nicht in die Quere kommen.
+    - docker build --target prod -f backend/Dockerfile  -t toolshare-backend:ci-$CI_COMMIT_SHORT_SHA  .
+    - docker build --target prod -f frontend/Dockerfile -t toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA .
+    - docker build -f backup/Dockerfile -t toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA backup
+    - docker build -f monitoring/alertmanager/Dockerfile -t toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA monitoring/alertmanager
+
+security:images:trivy:
+  stage: build
+  # Läuft auf demselben Server-Runner und scannt die unter security:images:build
+  # in den lokalen Daemon gebauten Images (trivy liest sie über den Socket).
+  # docker-cli-Image, weil wir die Images im after_script wieder aufräumen.
+  image:
+    name: docker:27.3.1-cli
+    entrypoint: [""]
+  tags:
+    - server
+    - deploy
+  # Nur auf main (siehe security:images:build) — scannt dessen lokale Images.
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+    DOCKER_TLS_CERTDIR: ""
+  needs:
+    # Report aus dem Quell-Scan übernehmen und um die Image-Sektion ergänzen.
+    - job: security:source:trivy
+      artifacts: true
+    - security:images:build
+  before_script:
+    - apk add --no-cache curl
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+  script:
+    # Gescannt werden die lokal gebauten Images plus die Drittanbieter-Images,
+    # die wir 1:1 deployen (redis, node-exporter). Report wird angehängt;
+    # --ignore-unfixed gated nur auf CRITICAL-Lücken mit verfügbarem Fix.
+    - |
+      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.8.1"
+      echo "" >> trivy-report.txt
+      echo "=== Image-Scans (HIGH,CRITICAL) ===" >> trivy-report.txt
+      for img in $IMAGES; do
+        echo "--- $img ---" >> trivy-report.txt
+        trivy image --scanners vuln --severity HIGH,CRITICAL --format table "$img" >> trivy-report.txt 2>&1 || true
+      done
+    - |
+      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.8.1"
+      for img in $IMAGES; do
+        trivy image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 "$img"
+      done
+  after_script:
+    # Die ci-Tags wieder entfernen, damit der Host-Daemon nicht volläuft.
+    - docker rmi -f toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA || true
   artifacts:
     when: always
     paths:

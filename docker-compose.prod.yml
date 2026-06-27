@@ -1,3 +1,30 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# WAL-G ↔ Cloudflare-R2-Konfiguration (S3-kompatibel).
+#
+# Wird von db (archive_command) UND walg-backup (backup-push/Retention) geteilt.
+# Alle Werte kommen aus GitLab-CI/CD-Variablen — KEIN .env.backup mehr nötig
+# (konsistent mit dem restlichen Stack, der ${VAR} ebenfalls aus dem CI-Env zieht).
+#
+# Eigener, PRIVATER Backup-Bucket (NICHT der öffentliche Bilder-Bucket R2_BUCKET):
+#   R2_BACKUP_BUCKET            z. B. toolshare-db-backups
+#   R2_BACKUP_ACCESS_KEY_ID     R2-API-Token (S3), möglichst nur für diesen Bucket
+#   R2_BACKUP_SECRET_ACCESS_KEY
+#   R2_ACCOUNT_ID               wird für den R2-S3-Endpoint wiederverwendet
+# ─────────────────────────────────────────────────────────────────────────────
+x-walg-env: &walg-env
+  WALG_S3_PREFIX: s3://${R2_BACKUP_BUCKET}
+  AWS_ENDPOINT: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+  # R2 kennt keine echten Regionen; "auto" ist die kanonische Vorgabe.
+  AWS_REGION: auto
+  AWS_ACCESS_KEY_ID: ${R2_BACKUP_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${R2_BACKUP_SECRET_ACCESS_KEY}
+  # R2 verlangt Path-Style-Adressierung (kein bucket.host Virtual-Hosting).
+  AWS_S3_FORCE_PATH_STYLE: "true"
+  # brotli komprimiert die Backups dichter als das lz4-Default → weniger R2-Speicher.
+  WALG_COMPRESSION_METHOD: brotli
+  # > 0 aktiviert Delta-Backups (Seiten-Differenz zum letzten Full).
+  WALG_DELTA_MAX_STEPS: "6"
+
 services:
   frontend:
     build:
@@ -7,12 +34,23 @@ services:
       args:
         VITE_API_URL: /api
         VITE_GRAFANA_URL: /grafana
+    # Stabiler Image-Tag → ermöglicht Rollback: deploy-prod.sh taggt das laufende
+    # :current vor jedem Build nach :previous um (s. scripts/rollback-prod.sh).
+    image: toolshare-frontend:current
     ports:
       - "3000:80"
     depends_on:
       - backend
     # Wie backend/db: nach Reboot oder Crash automatisch wieder starten.
     restart: unless-stopped
+    # Healthcheck gegen /healthz (s. frontend/nginx.conf), damit das Deploy-Script
+    # ein nginx mit kaputter Config/ohne Assets nicht als "ready" wertet.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - toolshare-network
 
@@ -21,8 +59,13 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       target: prod
+    # Stabiler Image-Tag für Rollback (s. frontend / scripts/rollback-prod.sh).
+    image: toolshare-backend:current
     ports:
-      - "4000:4000"
+      # Nur an localhost: das Frontend-nginx erreicht das Backend übers
+      # Docker-Netz (http://backend:4000). Der Host-Port dient nur dem Debugging
+      # per SSH-Tunnel und ist nicht öffentlich erreichbar.
+      - "127.0.0.1:4000:4000"
     environment:
       DATABASE_URL: postgresql://toolshare:${POSTGRES_PASSWORD}@db:5432/toolshare
       JWT_SECRET: ${JWT_SECRET}
@@ -59,24 +102,23 @@ services:
       - toolshare-network
 
   db:
-    # BACKUP DEAKTIVIERT: Standard-Postgres-Image, da kein S3-Bucket deployed ist.
     # Custom-Image (statt postgres:16-alpine): enthält das wal-g-Binary, das
-    # archive_command für die kontinuierliche WAL-Archivierung benötigt.
-    # build:
-    #   context: ./backup
-    image: postgres:16-alpine
+    # archive_command für die kontinuierliche WAL-Archivierung (PITR) braucht.
+    # Gleiches Image wie walg-backup → wird nur einmal gebaut (gemeinsamer Tag).
+    build:
+      context: ./backup
+    image: toolshare-pg-walg:local
     # Eigene postgresql.conf aktiviert wal_level/archive_mode/archive_command.
-    # command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
+      # archive_command (= wal-g wal-push %p) erbt dieses Env → WAL-G/R2-Vars.
+      <<: *walg-env
       POSTGRES_USER: toolshare
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: toolshare
-    # S3-/WAL-G-Variablen: archive_command (= wal-g wal-push) erbt dieses Env.
-    # env_file:
-    #   - .env.backup
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # - ./backup/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./backup/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U toolshare"]
       interval: 5s
@@ -92,12 +134,19 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Reiner Cache → keine Persistenz (--save ""), und eine harte maxmemory mit
+    # LRU-Verdrängung, damit Redis auf der 3,8-GB-VM (kein Swap) nicht unbegrenzt
+    # wächst und den Host OOM-killt. Das mem_limit darunter ist die zweite
+    # Sicherung auf Container-Ebene.
+    command: ["redis-server", "--save", "", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 64m
     networks:
       - toolshare-network
 
@@ -114,7 +163,8 @@ services:
   #  RESTORE-GUIDE  (Wiederherstellung aus einem WAL-G-Backup)
   # ═══════════════════════════════════════════════════════════════════════════
   #
-  #  Voraussetzung: .env.backup ist befüllt (gleicher Bucket + Credentials).
+  #  Voraussetzung: die R2_BACKUP_*-/R2_ACCOUNT_ID-Variablen sind im Env
+  #  gesetzt (lokal export ... oder via GitLab-CI/CD-Variablen).
   #
   #  1) Verfügbare Backups auflisten:
   #       docker compose -f docker-compose.prod.yml run --rm \
@@ -150,36 +200,53 @@ services:
   #  7) Rest hochfahren:
   #       docker compose -f docker-compose.prod.yml up -d
   # ═══════════════════════════════════════════════════════════════════════════
-  # BACKUP DEAKTIVIERT: Kein S3-Bucket deployed → walg-backup-Runner auskommentiert.
-  # walg-backup:
-  #   build:
-  #     context: ./backup
-  #   # Standard-Entrypoint (Postgres) durch supercronic ersetzen → reiner Cron-Runner.
-  #   entrypoint: ["/usr/local/bin/supercronic", "/etc/supercronic/crontab"]
-  #   user: postgres
-  #   environment:
-  #     # Verbindung zur laufenden DB für pg_backup_start/stop.
-  #     PGHOST: db
-  #     PGPORT: "5432"
-  #     PGUSER: toolshare
-  #     PGPASSWORD: ${POSTGRES_PASSWORD}
-  #     PGDATABASE: toolshare
-  #   # S3-/WAL-G-Variablen (WALG_S3_PREFIX, AWS_*, Kompression, Delta-Steps).
-  #   env_file:
-  #     - .env.backup
-  #   volumes:
-  #     # backup-push liest nur das Datenverzeichnis → read-only genügt.
-  #     - pgdata:/var/lib/postgresql/data:ro
-  #     - ./backup/crontab:/etc/supercronic/crontab:ro
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-  #   networks:
-  #     - toolshare-network
+  walg-backup:
+    # Gleiches Image wie db (wal-g + supercronic); db baut es, hier nur referenziert.
+    image: toolshare-pg-walg:local
+    build:
+      context: ./backup
+    # Standard-Entrypoint (Postgres) durch supercronic ersetzen → reiner Cron-Runner.
+    entrypoint: ["/usr/local/bin/supercronic", "/etc/supercronic/crontab"]
+    user: postgres
+    environment:
+      # WAL-G-/R2-Variablen (WALG_S3_PREFIX, AWS_*, Kompression, Delta-Steps).
+      <<: *walg-env
+      # Verbindung zur laufenden DB für pg_backup_start/stop.
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: toolshare
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: toolshare
+      # Retention: 4 Full-Ketten (~4 Wochen) und Size-Budget gegen Bucket-Überlauf.
+      RETAIN_FULL: ${BACKUP_RETAIN_FULL:-4}
+      MAX_BACKUP_BYTES: ${BACKUP_MAX_BYTES:-8000000000}
+      # Heartbeat: backup.sh schreibt hier nach jedem erfolgreichen Backup eine
+      # node-exporter-Textfile-Metrik rein (s. backup.sh / backup.rules.yml).
+      BACKUP_METRICS_DIR: /var/lib/node-exporter/textfile
+    volumes:
+      # backup-push liest nur das Datenverzeichnis → read-only genügt.
+      - pgdata:/var/lib/postgresql/data:ro
+      - ./backup/crontab:/etc/supercronic/crontab:ro
+      # Shared mit node-exporter (Monitoring-Stack): Backup-Heartbeat-Metrik.
+      # Von scripts/deploy-prod.sh als external Volume angelegt (wie das Netz).
+      - toolshare-backup-metrics:/var/lib/node-exporter/textfile
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    # Schlanker Cron-Runner: knapp deckeln, damit er die VM nicht belastet.
+    mem_limit: 256m
+    mem_reservation: 64m
+    networks:
+      - toolshare-network
 
 volumes:
   pgdata:
+  # Extern angelegt von scripts/deploy-prod.sh (wie toolshare-network), damit
+  # walg-backup (hier) und node-exporter (Monitoring-Stack) sich denselben
+  # Heartbeat-Pfad teilen.
+  toolshare-backup-metrics:
+    external: true
 
 networks:
   toolshare-network:

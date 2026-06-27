@@ -101,6 +101,33 @@ if ! docker network inspect toolshare-network >/dev/null 2>&1; then
 	docker network create toolshare-network
 fi
 
+# Backup-Heartbeat-Volume: walg-backup (App-Stack) schreibt hier nach jedem
+# erfolgreichen Backup eine node-exporter-Textfile-Metrik hinein, node-exporter
+# (Monitoring-Stack) liest sie read-only und Prometheus alarmiert, wenn das
+# letzte Backup zu alt ist oder ganz fehlt (s. monitoring/prometheus/alerts/
+# backup.rules.yml). Beide Compose-Projekte binden das Volume als *external* ein
+# → es muss vorab existieren, genau wie das Netz oben.
+if ! docker volume inspect toolshare-backup-metrics >/dev/null 2>&1; then
+	echo "Creating shared backup-metrics volume toolshare-backup-metrics..."
+	docker volume create toolshare-backup-metrics >/dev/null
+fi
+# Der walg-backup-Container schreibt als nicht-root (user: postgres) → das
+# Volume-Wurzelverzeichnis (root:root 0755) world-writable machen. Enthält nur
+# eine Heartbeat-Metrik, keine Secrets. Läuft gegen den Daemon (nicht im
+# Job-Container-FS), daher hier per Wegwerf-Container statt mkdir/chmod.
+docker run --rm -v toolshare-backup-metrics:/m alpine:3 chmod 0777 /m >/dev/null 2>&1 || true
+
+# 0) Rollback-Sicherung: das aktuell laufende App-Image (:current) nach
+#    :previous umtaggen, BEVOR der Build es überschreibt. So bleibt das letzte
+#    funktionierende Image erhalten und scripts/rollback-prod.sh kann es in
+#    Sekunden zurückrollen. Fehlt :current (erster Deploy), wird nur übersprungen.
+for img in toolshare-frontend toolshare-backend; do
+	if docker image inspect "${img}:current" >/dev/null 2>&1; then
+		echo "Sichere ${img}:current -> ${img}:previous"
+		docker tag "${img}:current" "${img}:previous"
+	fi
+done
+
 # 1) Build app images FIRST — before touching anything that is running.
 #    If a build fails (e.g. a transient npm-registry ECONNRESET), abort here:
 #    the current app keeps serving and, crucially, the monitoring stack
@@ -142,6 +169,11 @@ if [ -n "${CI:-}" ]; then
 	set_env GITLAB_PRODUCTION_ENV "${GITLAB_PRODUCTION_ENV:-}"
 	set_env GRAFANA_ADMIN_PASSWORD "${GRAFANA_ADMIN_PASSWORD:-}"
 	set_env DORA_OUTAGE_SOURCE "${DORA_OUTAGE_SOURCE:-}"
+	# Alertmanager → GitLab (HTTP-Alert-Integration): Webhook-URL + Auth-Key.
+	set_env GITLAB_ALERT_WEBHOOK_URL "${GITLAB_ALERT_WEBHOOK_URL:-}"
+	set_env GITLAB_ALERT_AUTH_KEY "${GITLAB_ALERT_AUTH_KEY:-}"
+	# Dead-Man's-Switch: externe Heartbeat-Ping-URL für den Watchdog-Alert.
+	set_env WATCHDOG_HEARTBEAT_URL "${WATCHDOG_HEARTBEAT_URL:-}"
 fi
 
 # 3) Ensure the monitoring stack is up. It runs as an independent compose
@@ -153,5 +185,13 @@ $COMPOSE -f "$MONITORING_COMPOSE_FILE" build
 echo "Starting monitoring stack..."
 $COMPOSE -f "$MONITORING_COMPOSE_FILE" up -d
 wait_for_containers "$MONITORING_COMPOSE_FILE"
+
+# 4) Aufräumen: das Re-Tagging (:current → :previous) und jeder neue Build lassen
+#    unreferenzierte (dangling) Images zurück. Auf der kleinen VM würde das die
+#    Disk über die Zeit volllaufen lassen und irgendwann den nächsten Build (oder
+#    Postgres) zum Scheitern bringen. Es werden NUR dangling Images entfernt →
+#    :current/:previous/:local bleiben erhalten, das Rollback bleibt möglich.
+echo "Pruning dangling images..."
+docker image prune -f >/dev/null 2>&1 || true
 
 echo "Deployment finished successfully!"

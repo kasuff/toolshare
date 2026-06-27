@@ -53,3 +53,7 @@ backend/prisma/*.db
 
 # DB backups (contain production data — never commit)
 backup_*.sql
+
+# Python (dora-exporter) — kompilierte Artefakte nie committen
+__pycache__/
+*.pyc

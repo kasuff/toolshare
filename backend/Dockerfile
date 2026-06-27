@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
-FROM node:20-bookworm-slim AS base
+FROM node:20.19-bookworm-slim AS base
 WORKDIR /app
 
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get upgrade -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Alle Installs laufen als unprivilegierter `node`-User, damit node_modules
 # von Anfang an node gehoert. Das erspart am Ende ein `chown -R node:node`
@@ -37,10 +37,10 @@ CMD ["npm", "run", "dev"]
 FROM base AS build
 RUN npm run build
 
-FROM node:20-bookworm-slim AS prod
+FROM node:20.19-bookworm-slim AS prod
 WORKDIR /app
 
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get upgrade -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /shared && chown node:node /app /shared
 USER node

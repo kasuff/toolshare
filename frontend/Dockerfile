@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-bookworm-slim AS dev
+FROM node:20.19-bookworm-slim AS dev
 WORKDIR /app
 
 # Alles als non-root "node" (uid 1000) ausführen: /app dem User übergeben und
@@ -24,7 +24,7 @@ COPY --chown=node:node . .
 EXPOSE 3000
 CMD ["npm", "run", "dev", "--workspace=frontend", "--", "--host", "0.0.0.0", "--port", "3000"]
 
-FROM node:20-bookworm-slim AS build
+FROM node:20.19-bookworm-slim AS build
 WORKDIR /app
 
 COPY package*.json ./
@@ -41,6 +41,9 @@ ENV VITE_GRAFANA_URL=$VITE_GRAFANA_URL
 RUN npm run build --workspace=frontend
 
 FROM nginx:1.27-alpine AS prod
+# Sicherheits-Updates der Alpine-Base einziehen, damit das ausgelieferte Image
+# nicht auf den Rebuild des Upstream-Tags warten muss.
+RUN apk -U upgrade --no-cache
 COPY ./frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 EXPOSE 80

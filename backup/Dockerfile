@@ -7,27 +7,39 @@
 # Base = Debian (bookworm), NICHT alpine: die offiziellen WAL-G-Binaries sind
 # gegen glibc gelinkt und laufen nicht auf musl/alpine.
 #
-# Hinweis Architektur: Die Release-Assets unten sind amd64. Auf arm64-Servern
-# müssen WALG_VERSION-Asset und supercronic-URL entsprechend angepasst werden.
+# Architektur: TARGETARCH wird von BuildKit automatisch gesetzt (amd64|arm64).
+# Daraus werden die passenden Release-Assets gewählt — der Build läuft also
+# sowohl auf x86- als auch auf ARM-Servern ohne Anpassung.
 
 FROM postgres:16-bookworm
 
 ARG WALG_VERSION=v3.0.3
 ARG SUPERCRONIC_VERSION=v0.2.33
+# Von BuildKit gesetzt; Fallback amd64, falls ohne BuildKit gebaut wird.
+ARG TARGETARCH=amd64
 
 RUN set -eux; \
     apt-get update; \
+    # Sicherheits-Updates der Base-Layer einziehen (z. B. libgnutls30), damit das
+    # ausgelieferte Image nicht auf den Rebuild des Upstream-Tags warten muss.
+    apt-get upgrade -y; \
     # awscli: nur zum Messen der Bucket-Belegung (Size-Budget in backup.sh).
     apt-get install -y --no-install-recommends ca-certificates curl awscli; \
+    # Asset-Namen je Architektur auflösen: WAL-G nutzt "aarch64", supercronic "arm64".
+    case "$TARGETARCH" in \
+      amd64) WALG_ARCH=amd64;   SUPERCRONIC_ARCH=amd64 ;; \
+      arm64) WALG_ARCH=aarch64; SUPERCRONIC_ARCH=arm64 ;; \
+      *) echo "Nicht unterstützte Architektur: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
     # WAL-G (Postgres-Variante, statisch gegen glibc)
     curl -fsSL -o /tmp/wal-g.tar.gz \
-      "https://github.com/wal-g/wal-g/releases/download/${WALG_VERSION}/wal-g-pg-ubuntu-20.04-amd64.tar.gz"; \
+      "https://github.com/wal-g/wal-g/releases/download/${WALG_VERSION}/wal-g-pg-ubuntu-20.04-${WALG_ARCH}.tar.gz"; \
     tar -xzf /tmp/wal-g.tar.gz -C /usr/local/bin; \
-    mv /usr/local/bin/wal-g-pg-ubuntu-20.04-amd64 /usr/local/bin/wal-g; \
+    mv "/usr/local/bin/wal-g-pg-ubuntu-20.04-${WALG_ARCH}" /usr/local/bin/wal-g; \
     chmod +x /usr/local/bin/wal-g; \
     # supercronic: cron-Daemon, der für Container gebaut ist (läuft als non-root, loggt nach stdout)
     curl -fsSL -o /usr/local/bin/supercronic \
-      "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-amd64"; \
+      "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${SUPERCRONIC_ARCH}"; \
     chmod +x /usr/local/bin/supercronic; \
     apt-get purge -y --auto-remove curl; \
     rm -rf /tmp/wal-g.tar.gz /var/lib/apt/lists/*
