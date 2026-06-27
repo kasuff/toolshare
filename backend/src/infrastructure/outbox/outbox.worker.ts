@@ -41,6 +41,23 @@ export async function triggerDrain() {
   }
 }
 
+let pruneTimer: NodeJS.Timeout | null = null;
+
+export async function pruneOldEvents() {
+  try {
+    const olderThan = new Date();
+    olderThan.setDate(olderThan.getDate() - 7); // Keep events for 7 days
+    const result = await outboxRepository.prune(olderThan);
+    if (result.deletedProcessed > 0 || result.deletedFailed > 0) {
+      console.log(
+        `[Outbox Pruner] Cleaned up ${result.deletedProcessed} processed and ${result.deletedFailed} failed outbox events.`
+      );
+    }
+  } catch (error) {
+    console.error("[Outbox Pruner] Failed to prune outbox events:", error);
+  }
+}
+
 export function startOutboxWorker() {
   if (timer) {
     return;
@@ -49,11 +66,19 @@ export function startOutboxWorker() {
   // Safety net: catches events missed during listener reconnects or in multi-instance
   // setups where the notifying instance differs from the listening one.
   timer = setInterval(() => void triggerDrain(), 30_000);
+
+  // Run initial prune and set up hourly interval (3,600,000 ms)
+  void pruneOldEvents();
+  pruneTimer = setInterval(() => void pruneOldEvents(), 3_600_000);
 }
 
 export function stopOutboxWorker() {
   if (timer) {
     clearInterval(timer);
     timer = null;
+  }
+  if (pruneTimer) {
+    clearInterval(pruneTimer);
+    pruneTimer = null;
   }
 }
