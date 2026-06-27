@@ -46,7 +46,11 @@ services:
     # Healthcheck gegen /healthz (s. frontend/nginx.conf), damit das Deploy-Script
     # ein nginx mit kaputter Config/ohne Assets nicht als "ready" wertet.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/healthz || exit 1"]
+      # 127.0.0.1 statt localhost: nginx lauscht nur auf IPv4 (0.0.0.0:80); der
+      # IPv6-Default-Listen wird uebersprungen, weil unsere default.conf von der
+      # Paket-Version abweicht. localhost loest im Container auf ::1 auf →
+      # "connection refused" → faelschlich unhealthy → Deploy bricht ab.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/healthz || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -9,3 +9,11 @@
 # Ein echter Fix kommt erst, wenn das Upstream-Postgres-Image gosu mit Go
 # >=1.24.13 neu baut; bis dahin Suppression statt CI-Block.
 CVE-2025-68121
+
+# CVE-2026-33186 — gRPC-Go authz: Authorization-Bypass durch fehlerhafte HTTP/2-
+# Path-Validierung (gefixt in grpc 1.79.3). Transitive Go-Abhaengigkeit in einem
+# unserer Images. Die Luecke betrifft ausschliesslich den gRPC-authz-SERVER-Pfad;
+# keines unserer Images betreibt einen gRPC-authz-Server (wal-g = CLI-Backup-
+# Client, node-exporter/alertmanager exponieren keinen gRPC-authz) → nicht
+# erreichbar/ausnutzbar. Erneut pruefen, sobald ein Image-Bump grpc>=1.79.3 zieht.
+CVE-2026-33186
