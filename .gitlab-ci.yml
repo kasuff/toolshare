@@ -498,7 +498,7 @@ pages:
     - backend:test
     - mobile:lint
     - mobile:test
-    - job: security:container:trivy
+    - job: security:images:trivy
       optional: true
     - job: semgrep-sast
       optional: true
@@ -1056,43 +1056,89 @@ semgrep-sast:
       sast: gl-sast-report.json
     when: always
 
-security:container:trivy:
+# Container-Security ist in drei Jobs getrennt:
+#   1. security:source:trivy   – Quellbaum-Scan (Lockfiles/Secrets/Misconfig),
+#      leichtgewichtig auf einem Shared-Runner, gibt frühes Feedback im test-Stage.
+#   2. security:images:build   – baut die TATSÄCHLICH ausgelieferten Images auf
+#      dem Deploy-Host (Server-Runner mit Docker-Socket). Kein Bauen im Scan-Job.
+#   3. security:images:trivy   – scannt die unter 2. lokal gebauten Images.
+# Damit greifen unsere `apt-get upgrade`/`apk upgrade`-Layer: ein in Debian/Alpine
+# bereits gefixtes OS-Paket blockiert nicht mehr, nur weil der floatende
+# Upstream-Tag (z. B. postgres:16-bookworm) noch nicht neu gebaut wurde.
+
+security:source:trivy:
   stage: test
-  # docker-cli + DinD: wir bauen unten die TATSÄCHLICH ausgelieferten Images und
-  # scannen diese, statt nur die rohen Upstream-Bases. So greifen unsere
-  # `apt-get upgrade`/`apk upgrade`-Layer und ein bereits in Debian/Alpine
-  # gefixtes OS-Paket blockiert die Pipeline nicht mehr, nur weil der floatende
-  # Upstream-Tag (z. B. postgres:16-bookworm) noch nicht neu gebaut wurde.
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    # Erst der nie blockierende HIGH+CRITICAL-Report, dann das CRITICAL-Gate.
+    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table -o trivy-report.txt . || true
+    - trivy fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 1 .
+  artifacts:
+    when: always
+    paths:
+      - trivy-report.txt
+
+security:images:build:
+  stage: build
+  # Server-Runner: der Docker-Socket des Deploy-Hosts ist hier verfügbar. Die
+  # Images werden in den lokalen Daemon gebaut und bleiben dort für den
+  # Scan-Job (security:images:trivy) sichtbar — kein Artifact-Transport nötig.
   image:
     name: docker:27.3.1-cli
     entrypoint: [""]
-  services:
-    - docker:27.3.1-dind
+  tags:
+    - server
+    - deploy
+  # Nur auf main: die Images werden auf dem Deploy-Host gebaut — kein Grund, den
+  # Prod-Host bei jeder MR mit vollen backend/frontend-Builds zu belasten.
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
   variables:
-    DOCKER_HOST: tcp://docker:2375
+    DOCKER_HOST: unix:///var/run/docker.sock
     DOCKER_TLS_CERTDIR: ""
     DOCKER_BUILDKIT: "1"
+  script:
+    # Exakt wie docker-compose.prod.yml: backend/frontend mit Kontext '.',
+    # backup/alertmanager mit ihrem Unterverzeichnis. Tag je Commit, damit
+    # parallele Pipelines sich nicht in die Quere kommen.
+    - docker build --target prod -f backend/Dockerfile  -t toolshare-backend:ci-$CI_COMMIT_SHORT_SHA  .
+    - docker build --target prod -f frontend/Dockerfile -t toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA .
+    - docker build -f backup/Dockerfile -t toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA backup
+    - docker build -f monitoring/alertmanager/Dockerfile -t toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA monitoring/alertmanager
+
+security:images:trivy:
+  stage: build
+  # Läuft auf demselben Server-Runner und scannt die unter security:images:build
+  # in den lokalen Daemon gebauten Images (trivy liest sie über den Socket).
+  # docker-cli-Image, weil wir die Images im after_script wieder aufräumen.
+  image:
+    name: docker:27.3.1-cli
+    entrypoint: [""]
+  tags:
+    - server
+    - deploy
+  # Nur auf main (siehe security:images:build) — scannt dessen lokale Images.
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+    DOCKER_TLS_CERTDIR: ""
+  needs:
+    # Report aus dem Quell-Scan übernehmen und um die Image-Sektion ergänzen.
+    - job: security:source:trivy
+      artifacts: true
+    - security:images:build
   before_script:
-    # Das docker-cli-Image (Alpine) bringt nur den Client mit → Trivy nachziehen.
     - apk add --no-cache curl
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
   script:
-    # 1) Quellbaum: Lockfiles, Secrets, Fehlkonfiguration. Erst der nie
-    #    blockierende HIGH+CRITICAL-Report, dann das CRITICAL-Gate.
-    - trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --format table -o trivy-report.txt . || true
-    - trivy fs --scanners vuln,secret,misconfig --severity CRITICAL --exit-code 1 .
-    # 2) Unsere ausgelieferten Images bauen (Build-Kontext exkl. node_modules via
-    #    .dockerignore). backend/frontend nutzen Kontext '.', backup/alertmanager
-    #    ihr Unterverzeichnis — exakt wie docker-compose.prod.yml.
-    - docker build --target prod -f backend/Dockerfile  -t toolshare-backend:scan  .
-    - docker build --target prod -f frontend/Dockerfile -t toolshare-frontend:scan .
-    - docker build -f backup/Dockerfile -t toolshare-pg-walg:scan backup
-    - docker build -f monitoring/alertmanager/Dockerfile -t toolshare-alertmanager:scan monitoring/alertmanager
-    # 3) Gescannt werden die eben gebauten Images plus die Drittanbieter-Images,
-    #    die wir 1:1 deployen (redis, node-exporter). Report wird angehängt;
-    #    --ignore-unfixed gated nur auf CRITICAL-Lücken mit verfügbarem Fix.
+    # Gescannt werden die lokal gebauten Images plus die Drittanbieter-Images,
+    # die wir 1:1 deployen (redis, node-exporter). Report wird angehängt;
+    # --ignore-unfixed gated nur auf CRITICAL-Lücken mit verfügbarem Fix.
     - |
-      IMAGES="toolshare-backend:scan toolshare-frontend:scan toolshare-pg-walg:scan toolshare-alertmanager:scan redis:7-alpine prom/node-exporter:v1.8.1"
+      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.8.1"
       echo "" >> trivy-report.txt
       echo "=== Image-Scans (HIGH,CRITICAL) ===" >> trivy-report.txt
       for img in $IMAGES; do
@@ -1100,10 +1146,13 @@ security:container:trivy:
         trivy image --scanners vuln --severity HIGH,CRITICAL --format table "$img" >> trivy-report.txt 2>&1 || true
       done
     - |
-      IMAGES="toolshare-backend:scan toolshare-frontend:scan toolshare-pg-walg:scan toolshare-alertmanager:scan redis:7-alpine prom/node-exporter:v1.8.1"
+      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.8.1"
       for img in $IMAGES; do
         trivy image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 "$img"
       done
+  after_script:
+    # Die ci-Tags wieder entfernen, damit der Host-Daemon nicht volläuft.
+    - docker rmi -f toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA || true
   artifacts:
     when: always
     paths:
