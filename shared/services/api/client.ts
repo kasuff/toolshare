@@ -22,8 +22,9 @@ async function refreshAccessToken(): Promise<string> {
   }
 
   refreshPromise = (async () => {
-    const refreshToken = await adapter.getRefreshToken();
-    if (!refreshToken) {
+    const useCookie = adapter.useCookieForRefresh === true;
+    const refreshToken = useCookie ? undefined : await adapter.getRefreshToken();
+    if (!useCookie && !refreshToken) {
       throw new Error("No refresh token available");
     }
 
@@ -31,8 +32,9 @@ async function refreshAccessToken(): Promise<string> {
     try {
       response = await fetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken })
+        body: refreshToken ? JSON.stringify({ refreshToken }) : JSON.stringify({})
       });
     } catch {
       throw new Error("Refresh request failed");
@@ -87,14 +89,14 @@ function translateValidationMessage(raw: string): string {
 async function handleUnauthorized<T>(
   path: string,
   init: RequestInit | undefined,
-  token: string,
+  token: string | undefined,
   isRetry: boolean
 ): Promise<T> {
   const adapter = getAuthSessionAdapter();
 
   if (!isRetry && adapter && path !== "/auth/refresh") {
-    const refreshToken = await adapter.getRefreshToken();
-    if (refreshToken) {
+    const canRefresh = adapter.useCookieForRefresh === true || Boolean(await adapter.getRefreshToken());
+    if (canRefresh) {
       try {
         const newToken = await refreshAccessToken();
         return request<T>(path, init, newToken, true);
@@ -116,14 +118,19 @@ async function request<T>(
   isRetry = false
 ): Promise<T> {
   const finishActivity = beginRequestActivity();
+  const adapter = getAuthSessionAdapter();
   try {
     let response: Response;
     try {
+      // Web-Clients (useCookieForRefresh=true) authentifizieren über den at-Cookie;
+      // kein Bearer-Header. Mobile-Clients schicken weiterhin den Bearer-Header.
+      const addBearer = Boolean(token) && adapter?.useCookieForRefresh !== true;
       response = await fetch(`${API_BASE}${path}`, {
         ...init,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(addBearer ? { Authorization: `Bearer ${token}` } : {}),
           ...(init?.headers ?? {})
         }
       });
@@ -131,7 +138,10 @@ async function request<T>(
       throw new Error("Netzwerkfehler: Bitte Verbindung prüfen und erneut versuchen.");
     }
 
-    if (response.status === 401 && token) {
+    // 401-Auto-Refresh: bei explizitem Token (Mobile) oder Cookie-Auth (Web).
+    // /auth/refresh selbst wird nicht erneut versucht — das würde eine Endlosschleife erzeugen.
+    const isCookieAuth401 = adapter?.useCookieForRefresh === true && path !== "/auth/refresh";
+    if (response.status === 401 && (token || isCookieAuth401)) {
       return handleUnauthorized<T>(path, init, token, isRetry);
     }
 
