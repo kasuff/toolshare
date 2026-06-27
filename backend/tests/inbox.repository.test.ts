@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { inboxRepository } from "../src/modules/inbox/inbox.repository";
+import { inboxRepository } from "../src/modules/inbox/repositories/inbox.repository";
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),

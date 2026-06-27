@@ -1,9 +1,9 @@
-import { usersService } from "../src/modules/users/users.service";
-import { usersRepository } from "../src/modules/users/users.repository";
-import { notificationsService } from "../src/modules/notifications/notifications.service";
+import { usersService } from "../src/modules/users/services/users.service";
+import { usersRepository } from "../src/modules/users/repositories/users.repository";
+import { notificationsService } from "../src/modules/notifications/services/notifications.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../src/modules/users/users.repository", () => ({
+vi.mock("../src/modules/users/repositories/users.repository", () => ({
   usersRepository: {
     findByIdPublic: vi.fn(),
     updateProfile: vi.fn(),
@@ -14,9 +14,15 @@ vi.mock("../src/modules/users/users.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/notifications/notifications.service", () => ({
+vi.mock("../src/modules/notifications/services/notifications.service", () => ({
   notificationsService: {
     createSuspensionNotice: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/address/services/address.service", () => ({
+  addressService: {
+    geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
   }
 }));
 
@@ -46,7 +52,7 @@ describe("usersService profile endpoints", () => {
     expect(mockedUsersRepository.listPublic).toHaveBeenCalledWith({ role: "USER", search: "lea" });
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ id: "user-1", email: "user@example.com", role: "USER" });
-    expect(typeof result[0].createdAt).toBe("string");
+    expect(result[0].createdAt).toBeInstanceOf(Date);
   });
 
   it("returns profile and rejects missing users", async () => {

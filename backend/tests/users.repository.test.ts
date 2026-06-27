@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { usersRepository } from "../src/modules/users/users.repository";
+import { usersRepository } from "../src/modules/users/repositories/users.repository";
 
 const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),

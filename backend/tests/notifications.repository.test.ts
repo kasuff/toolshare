@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
+import { notificationsRepository } from "../src/modules/notifications/repositories/notifications.repository";
 
 const mocks = vi.hoisted(() => ({
   notificationFindMany: vi.fn(),

@@ -10,9 +10,9 @@ import {
 import {
   toAdminMetricsResponse,
   toUserResponse
-} from "../../src/modules/users/users.presenter";
-import { toAuthResponse, toRefreshResponse } from "../../src/modules/auth/auth.presenter";
-import type { UserEntity } from "../../src/modules/users/users.entity";
+} from "../../src/modules/users/controllers/users.presenter";
+import { toAuthResponse, toRefreshResponse } from "../../src/modules/auth/controllers/auth.presenter";
+import type { UserEntity } from "../../src/modules/users/entities/users.entity";
 
 const sampleUser: UserEntity = {
   id: "11111111-1111-1111-1111-111111111111",

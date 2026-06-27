@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authRepository } from "../src/modules/auth/auth.repository";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
 
 const mocks = vi.hoisted(() => ({
   refreshCreate: vi.fn(),

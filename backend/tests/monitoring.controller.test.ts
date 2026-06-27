@@ -2,9 +2,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import type { Express } from "express";
-import { authRepository } from "../src/modules/auth/auth.repository";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
 
-vi.mock("../src/modules/auth/auth.repository", () => ({
+vi.mock("../src/modules/auth/repositories/auth.repository", () => ({
   authRepository: {
     findById: vi.fn()
   }

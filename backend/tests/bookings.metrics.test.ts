@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import type { Express } from "express";
 
-vi.mock("../src/modules/bookings/bookings.service", () => ({
+vi.mock("../src/modules/bookings/services/bookings.service", () => ({
   bookingsService: {
     listForUserContext: vi.fn(),
     createToolBooking: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock("../src/modules/bookings/bookings.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/auth/auth.repository", () => ({
+vi.mock("../src/modules/auth/repositories/auth.repository", () => ({
   authRepository: {
     findById: vi.fn(),
     findByEmail: vi.fn(),
@@ -38,8 +38,8 @@ vi.mock("../src/utils/metrics", () => ({
   collectDefaultMetrics: vi.fn()
 }));
 
-import { bookingsService } from "../src/modules/bookings/bookings.service";
-import { authRepository } from "../src/modules/auth/auth.repository";
+import { bookingsService } from "../src/modules/bookings/services/bookings.service";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
 import { bookingsCreatedTotal } from "../src/utils/metrics";
 
 const mockedBookingsService = vi.mocked(bookingsService);

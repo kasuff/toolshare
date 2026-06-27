@@ -33,4 +33,16 @@ config.resolver.extraNodeModules = {
   'webidl-conversions': webidlConversionsPath,
 };
 
+// Shared-Paket direkt aus TypeScript-Quelle auflösen, damit kein
+// pre-kompiliertes dist/ im EAS-Build nötig ist.
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === '@toolshare/shared') {
+    return {
+      filePath: path.resolve(workspaceRoot, 'shared/index.ts'),
+      type: 'sourceFile',
+    };
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;

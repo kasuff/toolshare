@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 
-vi.mock("../src/modules/auth/auth.service", () => ({
+vi.mock("../src/modules/auth/services/auth.service", () => ({
   authService: {
     register: vi.fn(),
     login: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock("../src/utils/metrics", () => ({
   collectDefaultMetrics: vi.fn()
 }));
 
-import { authService } from "../src/modules/auth/auth.service";
+import { authService } from "../src/modules/auth/services/auth.service";
 import { userRegistrationsTotal, userLoginsTotal } from "../src/utils/metrics";
 
 const mockedAuthService = vi.mocked(authService);

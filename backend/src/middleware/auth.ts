@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { env } from "../config/env";
-import { authRepository } from "../modules/auth/auth.repository";
+import { authRepository } from "../modules/auth/repositories/auth.repository";
 import { AppError } from "../utils/app-error";
 
 export type AuthUser = {
@@ -48,11 +48,14 @@ export const authenticateToken = async (token: string): Promise<AuthUser> => {
 
 export const requireAuth = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Cookie hat Vorrang (Web-Clients); Bearer-Header dient als Fallback für Mobile.
+    const cookieToken = req.cookies?.["at"] as string | undefined;
     const authHeader = req.header("authorization");
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+    const token = cookieToken ?? bearerToken;
 
     if (!token) {
-      throw new AppError("UNAUTHORIZED", "Missing bearer token", 401);
+      throw new AppError("UNAUTHORIZED", "Missing authentication", 401);
     }
 
     req.authUser = await authenticateToken(token);

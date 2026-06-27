@@ -12,6 +12,10 @@ export type AuthSessionAdapter = {
   getRefreshToken: () => string | null | Promise<string | null>;
   setTokens: (tokens: AuthTokens) => void | Promise<void>;
   clearTokens: () => void | Promise<void>;
+  /** Web-Clients setzen dieses Flag, wenn der Refresh-Token im httpOnly-Cookie
+   *  liegt. Der API-Client sendet dann keinen Token im Body, sondern verlässt
+   *  sich auf credentials: 'include'. */
+  useCookieForRefresh?: boolean;
 };
 
 let sessionAdapter: AuthSessionAdapter | null = null;

@@ -2,16 +2,16 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import type { Express } from "express";
-import { authRepository } from "../src/modules/auth/auth.repository";
-import { systemRulesRepository } from "../src/modules/system-rules/system-rules.repository";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
+import { systemRulesRepository } from "../src/modules/system-rules/repositories/system-rules.repository";
 
-vi.mock("../src/modules/auth/auth.repository", () => ({
+vi.mock("../src/modules/auth/repositories/auth.repository", () => ({
   authRepository: {
     findById: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/system-rules/system-rules.repository", () => ({
+vi.mock("../src/modules/system-rules/repositories/system-rules.repository", () => ({
   systemRulesRepository: {
     findAllValues: vi.fn(),
     upsert: vi.fn()

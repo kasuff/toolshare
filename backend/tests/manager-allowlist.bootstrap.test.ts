@@ -1,4 +1,4 @@
-import { bootstrapManagerAllowlist } from "../src/modules/users/manager-allowlist.bootstrap";
+import { bootstrapManagerAllowlist } from "../src/modules/users/services/manager-allowlist.bootstrap";
 import { prisma } from "../src/config/prisma";
 import { env } from "../src/config/env";
 import { beforeEach, describe, expect, it, vi } from "vitest";

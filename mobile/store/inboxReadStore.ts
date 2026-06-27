@@ -18,10 +18,9 @@ import { useAuthStore } from './authStore';
 interface InboxReadState {
   readMessageIds: Set<string>;
   isStorageLoaded: boolean;
-  /** Nutzer, für den bereits geladen/geseedet wurde – verhindert wiederholtes Laden bei jedem Poll. */
   loadedUserId: string | null;
 
-  /** Lädt die Server-Receipts des Nutzers und seedet (einmalig) die Erst-Historie. */
+  /** Lädt/aktualisiert die Server-Receipts des Nutzers und seedet (einmalig) die Erst-Historie. */
   loadForUser: (userId: string, bookings: Booking[], ratings: Rating[]) => Promise<void>;
   /** Markiert einen Thread (eingehende Nachrichten) als gelesen und persistiert server-seitig. */
   markThreadRead: (userId: string, booking: Booking, rating?: Rating | null) => Promise<void>;
@@ -34,9 +33,6 @@ export const useInboxReadStore = create<InboxReadState>((set, get) => ({
   loadedUserId: null,
 
   loadForUser: async (userId, bookings, ratings) => {
-    if (get().loadedUserId === userId && get().isStorageLoaded) {
-      return;
-    }
     const token = useAuthStore.getState().token;
     if (!token) return;
 

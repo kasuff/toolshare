@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
@@ -6,18 +7,18 @@ import { env } from "./config/env";
 import { errorHandler } from "./middleware/error-handler";
 import { metricsMiddleware } from "./middleware/metrics.middleware";
 import { apiRateLimiter } from "./middleware/rate-limit";
-import { addressRouter } from "./modules/address/address.routes";
-import { authRouter } from "./modules/auth/auth.routes";
-import { bookingsRouter } from "./modules/bookings/bookings.routes";
-import { moderationRouter } from "./modules/moderation/moderation.routes";
-import { notificationsRouter } from "./modules/notifications/notifications.routes";
-import { inboxRouter } from "./modules/inbox/inbox.routes";
-import { ratingsRouter } from "./modules/ratings/ratings.routes";
-import { toolsRouter } from "./modules/tools/tools.routes";
-import { usersRouter } from "./modules/users/users.routes";
-import { workshopsRouter } from "./modules/workshops/workshops.routes";
-import { monitoringRouter } from "./modules/monitoring/monitoring.routes";
-import { systemRulesRouter } from "./modules/system-rules/system-rules.routes";
+import { addressRouter } from "./modules/address/controllers/address.routes";
+import { authRouter } from "./modules/auth/controllers/auth.routes";
+import { bookingsRouter } from "./modules/bookings/controllers/bookings.routes";
+import { moderationRouter } from "./modules/moderation/controllers/moderation.routes";
+import { notificationsRouter } from "./modules/notifications/controllers/notifications.routes";
+import { inboxRouter } from "./modules/inbox/controllers/inbox.routes";
+import { ratingsRouter } from "./modules/ratings/controllers/ratings.routes";
+import { toolsRouter } from "./modules/tools/controllers/tools.routes";
+import { usersRouter } from "./modules/users/controllers/users.routes";
+import { workshopsRouter } from "./modules/workshops/controllers/workshops.routes";
+import { monitoringRouter } from "./modules/monitoring/controllers/monitoring.routes";
+import { systemRulesRouter } from "./modules/system-rules/controllers/system-rules.routes";
 import { metricsRegistry } from "./utils/metrics";
 
 export const createApp = () => {
@@ -36,6 +37,7 @@ export const createApp = () => {
     })
   );
   app.use(morgan("dev"));
+  app.use(cookieParser());
   app.use(express.json({ limit: "10mb" }));
 
   // Prometheus-Metriken: vor den API-Routen, damit alle Requests erfasst werden

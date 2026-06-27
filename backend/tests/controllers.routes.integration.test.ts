@@ -2,23 +2,23 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import type { Express } from "express";
-import { authRepository } from "../src/modules/auth/auth.repository";
-import { toolsService } from "../src/modules/tools/tools.service";
-import { workshopsService } from "../src/modules/workshops/workshops.service";
-import { ratingsService } from "../src/modules/ratings/ratings.service";
-import { moderationService } from "../src/modules/moderation/moderation.service";
-import { notificationsService } from "../src/modules/notifications/notifications.service";
-import { usersService } from "../src/modules/users/users.service";
-import { authService } from "../src/modules/auth/auth.service";
-import { bookingsService } from "../src/modules/bookings/bookings.service";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
+import { toolsService } from "../src/modules/tools/services/tools.service";
+import { workshopsService } from "../src/modules/workshops/services/workshops.service";
+import { ratingsService } from "../src/modules/ratings/services/ratings.service";
+import { moderationService } from "../src/modules/moderation/services/moderation.service";
+import { notificationsService } from "../src/modules/notifications/services/notifications.service";
+import { usersService } from "../src/modules/users/services/users.service";
+import { authService } from "../src/modules/auth/services/auth.service";
+import { bookingsService } from "../src/modules/bookings/services/bookings.service";
 
-vi.mock("../src/modules/auth/auth.repository", () => ({
+vi.mock("../src/modules/auth/repositories/auth.repository", () => ({
   authRepository: {
     findById: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/tools/tools.service", () => ({
+vi.mock("../src/modules/tools/services/tools.service", () => ({
   toolsService: {
     list: vi.fn(),
     getById: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("../src/modules/tools/tools.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/workshops/workshops.service", () => ({
+vi.mock("../src/modules/workshops/services/workshops.service", () => ({
   workshopsService: {
     list: vi.fn(),
     getById: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock("../src/modules/workshops/workshops.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/ratings/ratings.service", () => ({
+vi.mock("../src/modules/ratings/services/ratings.service", () => ({
   ratingsService: {
     create: vi.fn(),
     listReceived: vi.fn(),
@@ -50,7 +50,7 @@ vi.mock("../src/modules/ratings/ratings.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/moderation/moderation.service", () => ({
+vi.mock("../src/modules/moderation/services/moderation.service", () => ({
   moderationService: {
     createReport: vi.fn(),
     listReports: vi.fn(),
@@ -59,14 +59,14 @@ vi.mock("../src/modules/moderation/moderation.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/notifications/notifications.service", () => ({
+vi.mock("../src/modules/notifications/services/notifications.service", () => ({
   notificationsService: {
     listForUser: vi.fn(),
     markAsRead: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/users/users.service", () => ({
+vi.mock("../src/modules/users/services/users.service", () => ({
   usersService: {
     getAdminMetrics: vi.fn(),
     listUsers: vi.fn(),
@@ -78,7 +78,7 @@ vi.mock("../src/modules/users/users.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/auth/auth.service", () => ({
+vi.mock("../src/modules/auth/services/auth.service", () => ({
   authService: {
     register: vi.fn(),
     login: vi.fn(),
@@ -87,7 +87,7 @@ vi.mock("../src/modules/auth/auth.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/bookings/bookings.service", () => ({
+vi.mock("../src/modules/bookings/services/bookings.service", () => ({
   bookingsService: {
     listForUserContext: vi.fn(),
     createToolBooking: vi.fn(),
@@ -165,9 +165,30 @@ describe("Controller route integration coverage", () => {
   });
 
   describe("tools controller routes", () => {
+    const mockTool = {
+      id: TOOL_ID,
+      ownerId: MANAGER_ID,
+      name: "Bohrmaschine",
+      description: "Leistungsstarkes Werkzeug",
+      category: "Elektro",
+      imageUrl: "https://example.com/tool.png",
+      pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+      pickupLocationNote: "4. Stock",
+      status: "AVAILABLE",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      owner: {
+        id: MANAGER_ID,
+        name: "Manager",
+        role: "MANAGER",
+        isSuspended: false
+      },
+      bookings: []
+    };
+
     it("handles list and getById", async () => {
-      mockedToolsService.list.mockResolvedValueOnce([{ id: TOOL_ID }] as any);
-      mockedToolsService.getById.mockResolvedValueOnce({ id: TOOL_ID } as any);
+      mockedToolsService.list.mockResolvedValueOnce([mockTool] as any);
+      mockedToolsService.getById.mockResolvedValueOnce(mockTool as any);
 
       const listResponse = await request(app)
         .get("/api/tools")
@@ -186,8 +207,8 @@ describe("Controller route integration coverage", () => {
     });
 
     it("handles create, update and remove", async () => {
-      mockedToolsService.create.mockResolvedValueOnce({ id: TOOL_ID } as any);
-      mockedToolsService.update.mockResolvedValueOnce({ id: TOOL_ID, name: "Neu" } as any);
+      mockedToolsService.create.mockResolvedValueOnce(mockTool as any);
+      mockedToolsService.update.mockResolvedValueOnce({ ...mockTool, name: "Neu" } as any);
       mockedToolsService.remove.mockResolvedValueOnce(undefined);
 
       const createResponse = await request(app)
@@ -411,9 +432,52 @@ describe("Controller route integration coverage", () => {
 
   describe("moderation controller routes", () => {
     it("handles report create/list/update", async () => {
+      const mockReportContext = {
+        tools: [],
+        workshops: [],
+        users: [{ id: TARGET_USER_ID, name: "Target User" }],
+        ratings: [],
+        moderators: []
+      };
+
       mockedModerationService.createReport.mockResolvedValueOnce({ id: REPORT_ID } as any);
-      mockedModerationService.listReports.mockResolvedValueOnce([{ id: REPORT_ID }] as any);
-      mockedModerationService.listClosedReports.mockResolvedValueOnce([{ id: "closed-1" }] as any);
+      mockedModerationService.listReports.mockResolvedValueOnce([
+        {
+          report: {
+            id: REPORT_ID,
+            reporterId: MANAGER_ID,
+            reporter: { id: MANAGER_ID, name: "Manager" },
+            targetType: "USER",
+            targetId: TARGET_USER_ID,
+            reason: "Spam report",
+            details: "Details",
+            status: "OPEN",
+            createdAt: new Date().toISOString()
+          },
+          context: mockReportContext
+        }
+      ] as any);
+      mockedModerationService.listClosedReports.mockResolvedValueOnce([
+        {
+          report: {
+            id: "closed-1",
+            reporterId: MANAGER_ID,
+            reporter: { id: MANAGER_ID, name: "Manager" },
+            targetType: "USER",
+            targetId: TARGET_USER_ID,
+            reason: "Spam report",
+            details: "Details",
+            status: "RESOLVED",
+            createdAt: new Date().toISOString(),
+            decisionAt: new Date().toISOString(),
+            moderatorId: MANAGER_ID
+          },
+          context: {
+            ...mockReportContext,
+            moderators: [{ id: MANAGER_ID, name: "Manager" }]
+          }
+        }
+      ] as any);
       mockedModerationService.updateReportStatus.mockResolvedValueOnce({ id: REPORT_ID, status: "RESOLVED" } as any);
 
       const createResponse = await request(app)
