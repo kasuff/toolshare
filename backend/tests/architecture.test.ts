@@ -59,10 +59,10 @@ describe("Layered Architecture Constraints", () => {
     );
   });
 
-  it("Services should not import from controllers or routes", () => {
+  it("Services should not import from controllers, routes, or presenters", () => {
     const services = allFiles.filter((file) => file.includes(".service.ts"));
     assertNoImport(services, "Service", (imp) =>
-      imp.includes(".controller") || imp.includes(".route")
+      imp.includes(".controller") || imp.includes(".route") || imp.includes(".presenter")
     );
   });
 
