@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
 import { moderationService } from "./moderation.service";
+import { toModerationReportResponse } from "./moderation.presenter";
 
 export const moderationController = {
   createReport: asyncHandler(async (req: Request, res: Response) => {
@@ -17,12 +18,14 @@ export const moderationController = {
   }),
 
   listReports: asyncHandler(async (_req: Request, res: Response) => {
-    const reports = await moderationService.listReports();
+    const results = await moderationService.listReports();
+    const reports = results.map(r => toModerationReportResponse(r.report, r.context));
     res.status(200).json(reports);
   }),
 
   listClosedReports: asyncHandler(async (_req: Request, res: Response) => {
-    const reports = await moderationService.listClosedReports();
+    const results = await moderationService.listClosedReports();
+    const reports = results.map(r => toModerationReportResponse(r.report, r.context));
     res.status(200).json(reports);
   }),
 

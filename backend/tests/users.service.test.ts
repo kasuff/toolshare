@@ -20,6 +20,12 @@ vi.mock("../src/modules/notifications/notifications.service", () => ({
   }
 }));
 
+vi.mock("../src/modules/address/address.service", () => ({
+  addressService: {
+    geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
+  }
+}));
+
 const mockedUsersRepository = vi.mocked(usersRepository);
 const mockedNotificationsService = vi.mocked(notificationsService);
 
@@ -46,7 +52,7 @@ describe("usersService profile endpoints", () => {
     expect(mockedUsersRepository.listPublic).toHaveBeenCalledWith({ role: "USER", search: "lea" });
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ id: "user-1", email: "user@example.com", role: "USER" });
-    expect(typeof result[0].createdAt).toBe("string");
+    expect(result[0].createdAt).toBeInstanceOf(Date);
   });
 
   it("returns profile and rejects missing users", async () => {

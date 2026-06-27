@@ -22,8 +22,8 @@ describe("systemRulesService.listSettings", () => {
 
     expect(result).toHaveLength(ENFORCED_SETTING_DEFS.length);
     expect(result.map((s) => s.key)).toEqual(ENFORCED_SETTING_DEFS.map((d) => d.key));
-    // enforced/defaultValue sind interne Felder und werden nicht mehr ausgeliefert
-    expect(result.every((s) => !("enforced" in s))).toBe(true);
+    // enforced/defaultValue sind nun Teil der internen Service-Rückgabe
+    expect(result.every((s) => "enforced" in s)).toBe(true);
     for (const setting of result) {
       const def = ENFORCED_SETTING_DEFS.find((d) => d.key === setting.key)!;
       expect(setting.value).toBe(def.defaultValue);
@@ -91,7 +91,9 @@ describe("systemRulesService.updateSetting", () => {
       key: "maxLoanDurationDays",
       value: 30,
       label: "Maximale Ausleihdauer eines Werkzeugs",
-      unit: "Tage"
+      unit: "Tage",
+      enforced: true,
+      defaultValue: 14
     });
   });
 });

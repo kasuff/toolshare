@@ -6,7 +6,6 @@ import { suspensionRepository } from "../users/suspension.repository";
 import { moderationRepository } from "./moderation.repository";
 import { toolsService } from "../tools/tools.service";
 import { workshopsService } from "../workshops/workshops.service";
-import { toModerationReportResponse } from "./moderation.presenter";
 
 type ReportRow = Awaited<ReturnType<typeof moderationRepository.listOpenReports>>[number];
 
@@ -27,9 +26,10 @@ async function enrichReports(reports: ReportRow[]) {
     moderationRepository.findUsersByIds(moderatorIds)
   ]);
 
-  return reports.map((report) =>
-    toModerationReportResponse(report, { tools, workshops, users, ratings, moderators })
-  );
+  return reports.map((report) => ({
+    report,
+    context: { tools, workshops, users, ratings, moderators }
+  }));
 }
 
 export const moderationService = {

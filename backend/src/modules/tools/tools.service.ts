@@ -3,12 +3,6 @@ import { getImageStorageService } from "../../config/services";
 import { resolveImageReference } from "../../ports/image-storage.service";
 import { addressService } from "../address/address.service";
 import { toolsRepository } from "./tools.repository";
-import {
-  toToolBlockingPeriodResponseList,
-  toToolOwnerBlockResponseList,
-  toToolResponse,
-  toToolResponseList
-} from "./tools.presenter";
 
 const canModerate = (role: "USER" | "MODERATOR" | "MANAGER") => {
   return role === "MODERATOR" || role === "MANAGER";
@@ -25,8 +19,7 @@ export const toolsService = {
       .list({
         ...filters,
         excludeSuspendedOwners: !filters.ownerId
-      })
-      .then(toToolResponseList);
+      });
   },
 
   async getById(id: string) {
@@ -38,7 +31,7 @@ export const toolsService = {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
     const bookings = await toolsRepository.findActiveBookingRanges(id);
-    return toToolResponse({ ...tool, bookings });
+    return { ...tool, bookings };
   },
 
   async listBlockingPeriods(id: string) {
@@ -47,7 +40,7 @@ export const toolsService = {
       throw new AppError("TOOL_NOT_FOUND", "Tool not found", 404);
     }
     const periods = await toolsRepository.listBlockingPeriods(id);
-    return toToolBlockingPeriodResponseList(periods);
+    return periods;
   },
 
   async listOwnerBlocks(id: string, requesterId: string) {
@@ -59,7 +52,7 @@ export const toolsService = {
       throw new AppError("FORBIDDEN", "Only the tool owner can view its blocks", 403);
     }
     const blocks = await toolsRepository.listOwnerBlocks(id, requesterId);
-    return toToolOwnerBlockResponseList(blocks);
+    return blocks;
   },
 
   async deleteOwnerBlock(input: { toolId: string; bookingId: string; actorId: string }) {
@@ -97,7 +90,7 @@ export const toolsService = {
       pickupLat: coordinates?.latitude ?? null,
       pickupLon: coordinates?.longitude ?? null
     });
-    return toToolResponse(created);
+    return created;
   },
 
   async update(input: {
@@ -142,7 +135,7 @@ export const toolsService = {
         ? { pickupLat: geo?.latitude ?? null, pickupLon: geo?.longitude ?? null }
         : {})
     });
-    return toToolResponse(updated);
+    return updated;
   },
 
   async remove(input: {

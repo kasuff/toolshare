@@ -6,12 +6,6 @@ import { toolsService } from "../tools/tools.service";
 import { workshopsService } from "../workshops/workshops.service";
 import { computePreviousPickupForNewProposal } from "./bookings.pickup.utils";
 import { assertBookingCanBeCompleted } from "./bookings.completion";
-import {
-  toBookingPickupProposalResponse,
-  toBookingResponse,
-  toBookingResponseList,
-  toBookingTimeslotProposalResponse
-} from "./bookings.presenter";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -84,7 +78,7 @@ export const bookingsService = {
       const providerId = getProviderId(booking);
       return !(booking.userId === userId && providerId === userId);
     });
-    return toBookingResponseList(visible);
+    return visible;
   },
 
   async createToolBooking(input: {
@@ -129,7 +123,7 @@ export const bookingsService = {
       );
     }
 
-    return toBookingResponse(result.booking);
+    return result.booking;
   },
 
   async createToolOwnerBlock(input: {
@@ -159,7 +153,7 @@ export const bookingsService = {
     if (result === "CONFLICT") {
       throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
     }
-    return toBookingResponse(result);
+    return result;
   },
 
   async createWorkshopBooking(input: {
@@ -209,7 +203,7 @@ export const bookingsService = {
     if (result === null) {
       throw new AppError("BOOKING_CONFLICT", "Resource is unavailable in the selected period", 409);
     }
-    return toBookingResponse(result);
+    return result;
   },
 
   async updateBookingStatus(input: {
@@ -260,7 +254,7 @@ export const bookingsService = {
       markToolAvailableId:
         input.status === "RETURNED" && booking.tool?.id ? booking.tool.id : undefined
     });
-    return toBookingResponse(updated);
+    return updated;
   },
 
   async createPickupProposal(input: {
@@ -341,7 +335,7 @@ export const bookingsService = {
       pushBody: "Neuer Alternativvorschlag zu einer Ausleihanfrage."
     });
 
-    return toBookingPickupProposalResponse(created);
+    return created;
   },
 
   async respondPickupProposal(input: {
@@ -388,7 +382,7 @@ export const bookingsService = {
         pushBody: "Dein Alternativvorschlag wurde abgelehnt."
       });
       const declined = await bookingsRepository.findPickupProposalById(input.proposalId);
-      return declined ? toBookingPickupProposalResponse(declined) : null;
+      return declined ?? null;
     }
 
     const proposedReturnTime = proposalRow.proposedReturnTime ?? booking.endDate;
@@ -422,7 +416,7 @@ export const bookingsService = {
     });
 
     const accepted = await bookingsRepository.findPickupProposalById(input.proposalId);
-    return accepted ? toBookingPickupProposalResponse(accepted) : null;
+    return accepted ?? null;
   },
 
   async createTimeslotProposal(input: {
@@ -496,7 +490,7 @@ export const bookingsService = {
       pushBody: "Neuer Alternativvorschlag für die Werkstattbuchung."
     });
 
-    return toBookingTimeslotProposalResponse(created);
+    return created;
   },
 
   async respondTimeslotProposal(input: {
@@ -547,7 +541,7 @@ export const bookingsService = {
         pushBody: "Dein Alternativvorschlag zur Werkstattbuchung wurde abgelehnt."
       });
       const declined = await bookingsRepository.findTimeslotProposalById(input.proposalId);
-      return declined ? toBookingTimeslotProposalResponse(declined) : null;
+      return declined ?? null;
     }
 
     await ensureWorkshopProposalCanUseRange(
@@ -576,7 +570,7 @@ export const bookingsService = {
     });
 
     const accepted = await bookingsRepository.findTimeslotProposalById(input.proposalId);
-    return accepted ? toBookingTimeslotProposalResponse(accepted) : null;
+    return accepted ?? null;
   }
 };
 
