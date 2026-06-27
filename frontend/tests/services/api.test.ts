@@ -272,6 +272,7 @@ describe("api service", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/bookings/tool",
       {
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer token-123"
@@ -305,6 +306,7 @@ describe("api service", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:4000/api/bookings/b1/pickup-proposals",
       {
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer token-123"
