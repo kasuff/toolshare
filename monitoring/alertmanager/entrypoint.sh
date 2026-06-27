@@ -7,8 +7,10 @@ set -eu
 : "${GITLAB_ALERT_WEBHOOK_URL:?GITLAB_ALERT_WEBHOOK_URL muss gesetzt sein}"
 : "${GITLAB_ALERT_AUTH_KEY:?GITLAB_ALERT_AUTH_KEY muss gesetzt sein}"
 
-TPL=/etc/alertmanager/alertmanager.yml.tpl
-OUT=/tmp/alertmanager.yml
+# Template-/Ausgabepfad sind überschreibbar, damit CI dieselbe Render-Logik gegen
+# die Datei im Repo-Checkout fahren kann (statt /etc/alertmanager im Image).
+TPL="${TPL:-/etc/alertmanager/alertmanager.yml.tpl}"
+OUT="${OUT:-/tmp/alertmanager.yml}"
 
 # Sonderzeichen escapen, die sed im Ersetzungstext interpretiert: & \ und das
 # Trennzeichen #. So bleiben URL/Key auch mit solchen Zeichen unversehrt.
@@ -45,6 +47,13 @@ sed -e "/__WATCHDOG_WEBHOOK_CONFIGS__/r ${WATCHDOG_BLOCK}" \
     -e "/__WATCHDOG_WEBHOOK_CONFIGS__/d" \
     "$OUT" >"${OUT}.tmp" && mv "${OUT}.tmp" "$OUT"
 rm -f "$WATCHDOG_BLOCK"
+
+# CI-Validierung: nur rendern, nicht starten. Der Lint-Job rendert mit
+# Dummy-Secrets und prüft das Ergebnis anschließend mit `amtool check-config`.
+if [ -n "${RENDER_ONLY:-}" ]; then
+  echo "RENDER_ONLY gesetzt → Config nach $OUT gerendert, Alertmanager wird NICHT gestartet."
+  exit 0
+fi
 
 exec /bin/alertmanager \
   --config.file="$OUT" \

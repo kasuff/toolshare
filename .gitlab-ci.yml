@@ -334,6 +334,52 @@ mobile:lint:
     paths:
       - mobile-lint-report.html
 
+# === MONITORING-CONFIG-VALIDIERUNG ===
+#
+# Ohne diesen Gate würde ein Tippfehler in einer Alert-Regel oder der
+# Alertmanager-Config erst beim nächsten Deploy auffallen: Prometheus lädt die
+# fehlerhafte rule-Datei nicht und Alertmanager crash-loopt — die GESAMTE
+# Alarmierung fällt dann still aus, ohne dass jemand alarmiert wird (genau das,
+# was die Alerts verhindern sollten). promtool/amtool sind in den offiziellen
+# Images enthalten → keine zusätzlichen Tools nötig.
+monitoring:rules:
+  stage: lint
+  image:
+    name: prom/prometheus:v2.53.0   # gleiche Version wie monitoring/prometheus/Dockerfile
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - monitoring/prometheus/**/*
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - promtool check rules monitoring/prometheus/alerts/*.yml
+
+monitoring:alertmanager-config:
+  stage: lint
+  image:
+    name: prom/alertmanager:v0.27.0   # gleiche Version wie monitoring/alertmanager/Dockerfile
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - monitoring/alertmanager/**/*
+    - if: $CI_COMMIT_BRANCH == "main"
+  variables:
+    # Dummy-Secrets nur fürs Rendern; die echten kommen zur Laufzeit aus dem Env.
+    RENDER_ONLY: "1"
+    TPL: "$CI_PROJECT_DIR/monitoring/alertmanager/alertmanager.yml.tpl"
+    OUT: "$CI_PROJECT_DIR/alertmanager.rendered.yml"
+    GITLAB_ALERT_WEBHOOK_URL: "https://ci.example/alerts/notify.json"
+    GITLAB_ALERT_AUTH_KEY: "ci-dummy-token-1234567890"
+    WATCHDOG_HEARTBEAT_URL: "https://ci.example/ping/abc"
+  script:
+    # Beide Pfade prüfen: mit Heartbeat-URL (webhook) und ohne (No-op-Receiver).
+    - sh monitoring/alertmanager/entrypoint.sh
+    - amtool check-config "$CI_PROJECT_DIR/alertmanager.rendered.yml"
+    - WATCHDOG_HEARTBEAT_URL="" sh monitoring/alertmanager/entrypoint.sh
+    - amtool check-config "$CI_PROJECT_DIR/alertmanager.rendered.yml"
+
 mobile:test:
   stage: test
   image: node:20.19-slim
