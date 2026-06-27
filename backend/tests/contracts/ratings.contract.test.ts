@@ -6,8 +6,8 @@ import {
 import {
   toPublicRatingResponse,
   toRatingResponse
-} from "../../src/modules/ratings/ratings.presenter";
-import type { RatingEntity } from "../../src/modules/ratings/ratings.entity";
+} from "../../src/modules/ratings/controllers/ratings.presenter";
+import type { RatingEntity } from "../../src/modules/ratings/entities/ratings.entity";
 
 const sampleRating: RatingEntity = {
   id: "11111111-1111-1111-1111-111111111111",

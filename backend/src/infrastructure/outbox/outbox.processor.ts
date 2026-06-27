@@ -2,9 +2,9 @@ import {
   USER_NOTIFICATION_REQUESTED,
   type UserNotificationPayload
 } from "../../domain/events/notification.events";
-import { notificationsRepository } from "../../modules/notifications/notifications.repository";
-import { pushService } from "../../modules/notifications/push.service";
-import { publishInboxChanged } from "../../modules/inbox/inbox.events";
+import { notificationsRepository } from "../../modules/notifications/repositories/notifications.repository";
+import { pushService } from "../../modules/notifications/services/push.service";
+import { publishInboxChanged } from "../../modules/inbox/services/inbox.events";
 import { outboxRepository } from "./outbox.repository";
 
 type OutboxRow = {

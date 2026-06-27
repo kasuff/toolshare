@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { workshopsRepository } from "../src/modules/workshops/workshops.repository";
-import { workshopsService } from "../src/modules/workshops/workshops.service";
+import { workshopsRepository } from "../src/modules/workshops/repositories/workshops.repository";
+import { workshopsService } from "../src/modules/workshops/services/workshops.service";
 
-vi.mock("../src/modules/workshops/workshops.repository", () => ({
+vi.mock("../src/modules/workshops/repositories/workshops.repository", () => ({
   workshopsRepository: {
     list: vi.fn(),
     findById: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock("../src/modules/workshops/workshops.repository", () => ({
   }
 }));
 
-vi.mock("../src/modules/address/address.service", () => ({
+vi.mock("../src/modules/address/services/address.service", () => ({
   addressService: {
     geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
   }

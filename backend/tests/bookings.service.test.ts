@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
+import { bookingsRepository } from "../src/modules/bookings/repositories/bookings.repository";
 import { enqueueProposalNotification } from "../src/infrastructure/outbox/enqueue-user-notification";
-import { toolsService } from "../src/modules/tools/tools.service";
-import { workshopsService } from "../src/modules/workshops/workshops.service";
-import { bookingsService } from "../src/modules/bookings/bookings.service";
-import { systemRulesService } from "../src/modules/system-rules/system-rules.service";
+import { toolsService } from "../src/modules/tools/services/tools.service";
+import { workshopsService } from "../src/modules/workshops/services/workshops.service";
+import { bookingsService } from "../src/modules/bookings/services/bookings.service";
+import { systemRulesService } from "../src/modules/system-rules/services/system-rules.service";
 
-vi.mock("../src/modules/bookings/bookings.repository", () => ({
+vi.mock("../src/modules/bookings/repositories/bookings.repository", () => ({
   bookingsRepository: {
     listForUserContext: vi.fn(),
     createToolBookingTransaction: vi.fn(),
@@ -41,19 +41,19 @@ vi.mock("../src/infrastructure/outbox/enqueue-user-notification", () => ({
   enqueueProposalNotification: vi.fn()
 }));
 
-vi.mock("../src/modules/system-rules/system-rules.service", () => ({
+vi.mock("../src/modules/system-rules/services/system-rules.service", () => ({
   systemRulesService: {
     getValues: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/tools/tools.service", () => ({
+vi.mock("../src/modules/tools/services/tools.service", () => ({
   toolsService: {
     getById: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/workshops/workshops.service", () => ({
+vi.mock("../src/modules/workshops/services/workshops.service", () => ({
   workshopsService: {
     getById: vi.fn()
   }

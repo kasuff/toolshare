@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { env } from "../config/env";
-import { authRepository } from "../modules/auth/auth.repository";
+import { authRepository } from "../modules/auth/repositories/auth.repository";
 import { AppError } from "../utils/app-error";
 
 export type AuthUser = {

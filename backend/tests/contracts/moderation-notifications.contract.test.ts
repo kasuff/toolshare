@@ -5,9 +5,9 @@ import {
   toModerationReportResponse,
   type ModerationLookups,
   type ReportRowInput
-} from "../../src/modules/moderation/moderation.presenter";
-import { toNotificationResponse } from "../../src/modules/notifications/notifications.presenter";
-import type { NotificationEntity } from "../../src/modules/notifications/notifications.entity";
+} from "../../src/modules/moderation/controllers/moderation.presenter";
+import { toNotificationResponse } from "../../src/modules/notifications/controllers/notifications.presenter";
+import type { NotificationEntity } from "../../src/modules/notifications/entities/notifications.entity";
 
 const emptyLookups: ModerationLookups = {
   tools: [],

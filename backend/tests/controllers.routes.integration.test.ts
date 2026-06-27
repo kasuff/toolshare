@@ -2,23 +2,23 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import type { Express } from "express";
-import { authRepository } from "../src/modules/auth/auth.repository";
-import { toolsService } from "../src/modules/tools/tools.service";
-import { workshopsService } from "../src/modules/workshops/workshops.service";
-import { ratingsService } from "../src/modules/ratings/ratings.service";
-import { moderationService } from "../src/modules/moderation/moderation.service";
-import { notificationsService } from "../src/modules/notifications/notifications.service";
-import { usersService } from "../src/modules/users/users.service";
-import { authService } from "../src/modules/auth/auth.service";
-import { bookingsService } from "../src/modules/bookings/bookings.service";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
+import { toolsService } from "../src/modules/tools/services/tools.service";
+import { workshopsService } from "../src/modules/workshops/services/workshops.service";
+import { ratingsService } from "../src/modules/ratings/services/ratings.service";
+import { moderationService } from "../src/modules/moderation/services/moderation.service";
+import { notificationsService } from "../src/modules/notifications/services/notifications.service";
+import { usersService } from "../src/modules/users/services/users.service";
+import { authService } from "../src/modules/auth/services/auth.service";
+import { bookingsService } from "../src/modules/bookings/services/bookings.service";
 
-vi.mock("../src/modules/auth/auth.repository", () => ({
+vi.mock("../src/modules/auth/repositories/auth.repository", () => ({
   authRepository: {
     findById: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/tools/tools.service", () => ({
+vi.mock("../src/modules/tools/services/tools.service", () => ({
   toolsService: {
     list: vi.fn(),
     getById: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("../src/modules/tools/tools.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/workshops/workshops.service", () => ({
+vi.mock("../src/modules/workshops/services/workshops.service", () => ({
   workshopsService: {
     list: vi.fn(),
     getById: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock("../src/modules/workshops/workshops.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/ratings/ratings.service", () => ({
+vi.mock("../src/modules/ratings/services/ratings.service", () => ({
   ratingsService: {
     create: vi.fn(),
     listReceived: vi.fn(),
@@ -50,7 +50,7 @@ vi.mock("../src/modules/ratings/ratings.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/moderation/moderation.service", () => ({
+vi.mock("../src/modules/moderation/services/moderation.service", () => ({
   moderationService: {
     createReport: vi.fn(),
     listReports: vi.fn(),
@@ -59,14 +59,14 @@ vi.mock("../src/modules/moderation/moderation.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/notifications/notifications.service", () => ({
+vi.mock("../src/modules/notifications/services/notifications.service", () => ({
   notificationsService: {
     listForUser: vi.fn(),
     markAsRead: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/users/users.service", () => ({
+vi.mock("../src/modules/users/services/users.service", () => ({
   usersService: {
     getAdminMetrics: vi.fn(),
     listUsers: vi.fn(),
@@ -78,7 +78,7 @@ vi.mock("../src/modules/users/users.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/auth/auth.service", () => ({
+vi.mock("../src/modules/auth/services/auth.service", () => ({
   authService: {
     register: vi.fn(),
     login: vi.fn(),
@@ -87,7 +87,7 @@ vi.mock("../src/modules/auth/auth.service", () => ({
   }
 }));
 
-vi.mock("../src/modules/bookings/bookings.service", () => ({
+vi.mock("../src/modules/bookings/services/bookings.service", () => ({
   bookingsService: {
     listForUserContext: vi.fn(),
     createToolBooking: vi.fn(),

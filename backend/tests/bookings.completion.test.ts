@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertBookingCanBeCompleted } from "../src/modules/bookings/bookings.completion";
+import { assertBookingCanBeCompleted } from "../src/modules/bookings/services/bookings.completion";
 
 const past = new Date("2026-05-01T10:00:00.000Z");
 const future = new Date("2026-07-01T10:00:00.000Z");
