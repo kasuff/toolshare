@@ -165,9 +165,30 @@ describe("Controller route integration coverage", () => {
   });
 
   describe("tools controller routes", () => {
+    const mockTool = {
+      id: TOOL_ID,
+      ownerId: MANAGER_ID,
+      name: "Bohrmaschine",
+      description: "Leistungsstarkes Werkzeug",
+      category: "Elektro",
+      imageUrl: "https://example.com/tool.png",
+      pickupLocation: "Musterstraße 1, 80802 München, Deutschland",
+      pickupLocationNote: "4. Stock",
+      status: "AVAILABLE",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      owner: {
+        id: MANAGER_ID,
+        name: "Manager",
+        role: "MANAGER",
+        isSuspended: false
+      },
+      bookings: []
+    };
+
     it("handles list and getById", async () => {
-      mockedToolsService.list.mockResolvedValueOnce([{ id: TOOL_ID }] as any);
-      mockedToolsService.getById.mockResolvedValueOnce({ id: TOOL_ID } as any);
+      mockedToolsService.list.mockResolvedValueOnce([mockTool] as any);
+      mockedToolsService.getById.mockResolvedValueOnce(mockTool as any);
 
       const listResponse = await request(app)
         .get("/api/tools")
@@ -186,8 +207,8 @@ describe("Controller route integration coverage", () => {
     });
 
     it("handles create, update and remove", async () => {
-      mockedToolsService.create.mockResolvedValueOnce({ id: TOOL_ID } as any);
-      mockedToolsService.update.mockResolvedValueOnce({ id: TOOL_ID, name: "Neu" } as any);
+      mockedToolsService.create.mockResolvedValueOnce(mockTool as any);
+      mockedToolsService.update.mockResolvedValueOnce({ ...mockTool, name: "Neu" } as any);
       mockedToolsService.remove.mockResolvedValueOnce(undefined);
 
       const createResponse = await request(app)
@@ -411,9 +432,52 @@ describe("Controller route integration coverage", () => {
 
   describe("moderation controller routes", () => {
     it("handles report create/list/update", async () => {
+      const mockReportContext = {
+        tools: [],
+        workshops: [],
+        users: [{ id: TARGET_USER_ID, name: "Target User" }],
+        ratings: [],
+        moderators: []
+      };
+
       mockedModerationService.createReport.mockResolvedValueOnce({ id: REPORT_ID } as any);
-      mockedModerationService.listReports.mockResolvedValueOnce([{ id: REPORT_ID }] as any);
-      mockedModerationService.listClosedReports.mockResolvedValueOnce([{ id: "closed-1" }] as any);
+      mockedModerationService.listReports.mockResolvedValueOnce([
+        {
+          report: {
+            id: REPORT_ID,
+            reporterId: MANAGER_ID,
+            reporter: { id: MANAGER_ID, name: "Manager" },
+            targetType: "USER",
+            targetId: TARGET_USER_ID,
+            reason: "Spam report",
+            details: "Details",
+            status: "OPEN",
+            createdAt: new Date().toISOString()
+          },
+          context: mockReportContext
+        }
+      ] as any);
+      mockedModerationService.listClosedReports.mockResolvedValueOnce([
+        {
+          report: {
+            id: "closed-1",
+            reporterId: MANAGER_ID,
+            reporter: { id: MANAGER_ID, name: "Manager" },
+            targetType: "USER",
+            targetId: TARGET_USER_ID,
+            reason: "Spam report",
+            details: "Details",
+            status: "RESOLVED",
+            createdAt: new Date().toISOString(),
+            decisionAt: new Date().toISOString(),
+            moderatorId: MANAGER_ID
+          },
+          context: {
+            ...mockReportContext,
+            moderators: [{ id: MANAGER_ID, name: "Manager" }]
+          }
+        }
+      ] as any);
       mockedModerationService.updateReportStatus.mockResolvedValueOnce({ id: REPORT_ID, status: "RESOLVED" } as any);
 
       const createResponse = await request(app)
