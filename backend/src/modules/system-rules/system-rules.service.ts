@@ -7,10 +7,6 @@ import {
   type SystemSetting,
   type SystemSettingKey
 } from "./system-settings.config";
-import {
-  toSystemSettingResponse,
-  toSystemSettingResponseList
-} from "./system-rules.presenter";
 
 // Liefert die durchgesetzten Einstellungen mit aufgelöstem Wert
 // (gespeicherter Wert oder Default) als interne Entity inkl. enforced/defaultValue.
@@ -27,7 +23,7 @@ export const systemRulesService = {
   // sie sollen nicht angezeigt/editiert werden.
   async listSettings() {
     const settings = await resolveSettings();
-    return toSystemSettingResponseList(settings);
+    return settings;
   },
 
   // Aufgelöste Werte als Map (key -> value) für die Durchsetzung in der Geschäftslogik.
@@ -55,6 +51,6 @@ export const systemRulesService = {
       );
     }
     const row = await systemRulesRepository.upsert(key, value);
-    return toSystemSettingResponse({ ...def, value: row.value });
+    return { ...def, value: row.value };
   }
 };

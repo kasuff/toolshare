@@ -1,10 +1,5 @@
 import { AppError } from "../../utils/app-error";
 import { ratingsRepository } from "./ratings.repository";
-import {
-  toPublicRatingResponseList,
-  toRatingResponse,
-  toRatingResponseList
-} from "./ratings.presenter";
 
 function getProviderUserId(booking: NonNullable<Awaited<ReturnType<typeof ratingsRepository.findBookingWithParticipants>>>) {
   if (booking.tool?.ownerId) {
@@ -22,23 +17,19 @@ function isBookingFinished(booking: { status: string; endDate: Date }) {
 
 export const ratingsService = {
   async listReceived(userId: string) {
-    const ratings = await ratingsRepository.listReceived(userId);
-    return toRatingResponseList(ratings);
+    return await ratingsRepository.listReceived(userId);
   },
 
   async listGiven(userId: string) {
-    const ratings = await ratingsRepository.listGiven(userId);
-    return toRatingResponseList(ratings);
+    return await ratingsRepository.listGiven(userId);
   },
 
   async listForTool(toolId: string) {
-    const ratings = await ratingsRepository.listForTool(toolId);
-    return toPublicRatingResponseList(ratings);
+    return await ratingsRepository.listForTool(toolId);
   },
 
   async listForWorkshop(workshopId: string) {
-    const ratings = await ratingsRepository.listForWorkshop(workshopId);
-    return toPublicRatingResponseList(ratings);
+    return await ratingsRepository.listForWorkshop(workshopId);
   },
 
   async create(input: {
@@ -83,7 +74,7 @@ export const ratingsService = {
       comment: input.comment?.trim() || undefined,
       starsLabel
     });
-    return toRatingResponse(rating);
+    return rating;
   },
 
   async hideFromModeration(ratingId: string, moderatorId: string, decisionNote?: string) {

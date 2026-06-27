@@ -3,11 +3,6 @@ import { getImageStorageService } from "../../config/services";
 import { resolveImageUrls } from "../../ports/image-storage.service";
 import { addressService } from "../address/address.service";
 import { workshopsRepository } from "./workshops.repository";
-import {
-  toWorkshopResponse,
-  toWorkshopResponseList,
-  toWorkshopTimeslotResponse
-} from "./workshops.presenter";
 
 export const workshopsService = {
   async list(filters: { managerId?: string; location?: string; search?: string }) {
@@ -15,7 +10,7 @@ export const workshopsService = {
       ...filters,
       excludeSuspendedManagers: !filters.managerId
     });
-    return toWorkshopResponseList(workshops);
+    return workshops;
   },
 
   async getById(id: string) {
@@ -29,7 +24,7 @@ export const workshopsService = {
     // Belegte Zeiträume separat laden, damit auch Altbuchungen via timeslotId
     // (nicht nur direkter workshopId-FK) im Kalender als belegt erscheinen.
     const bookings = await workshopsRepository.findActiveBookingRanges(id);
-    return toWorkshopResponse({ ...workshop, bookings });
+    return { ...workshop, bookings };
   },
 
   async create(input: {
@@ -53,7 +48,7 @@ export const workshopsService = {
       workshopTools: input.workshopTools ?? [],
       imageUrls
     });
-    return toWorkshopResponse(created);
+    return created;
   },
 
   async update(input: {
@@ -96,7 +91,7 @@ export const workshopsService = {
         ? { latitude: geo?.latitude ?? null, longitude: geo?.longitude ?? null }
         : {})
     });
-    return toWorkshopResponse(updated);
+    return updated;
   },
 
   async remove(input: {
@@ -163,7 +158,7 @@ export const workshopsService = {
         throw new AppError("ACTIVE_BOOKING_EXISTS", "Affected timeslot has active bookings and cannot be blocked", 409);
       }
 
-      return toWorkshopTimeslotResponse(blockedInsert);
+      return blockedInsert;
     }
 
     const overlap = await workshopsRepository.findOverlappingTimeslot(
@@ -181,7 +176,7 @@ export const workshopsService = {
       endTime,
       blockedByOwner
     });
-    return toWorkshopTimeslotResponse(created);
+    return created;
   },
 
   async updateTimeslot(input: {
@@ -245,7 +240,7 @@ export const workshopsService = {
       endTime: input.endTime ? nextEnd : undefined,
       blockedByOwner: input.blockedByOwner
     });
-    return toWorkshopTimeslotResponse(updated);
+    return updated;
   },
 
   async removeTimeslot(input: {

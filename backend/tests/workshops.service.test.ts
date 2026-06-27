@@ -21,6 +21,12 @@ vi.mock("../src/modules/workshops/workshops.repository", () => ({
   }
 }));
 
+vi.mock("../src/modules/address/address.service", () => ({
+  addressService: {
+    geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
+  }
+}));
+
 const mockedWorkshopsRepository = vi.mocked(workshopsRepository);
 
 describe("workshopsService", () => {

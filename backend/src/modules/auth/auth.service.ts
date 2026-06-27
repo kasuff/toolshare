@@ -5,7 +5,6 @@ import { env } from "../../config/env";
 import { AppError } from "../../utils/app-error";
 import { addressService } from "../address/address.service";
 import { authRepository } from "./auth.repository";
-import { toAuthResponse, toRefreshResponse } from "./auth.presenter";
 
 const SALT_ROUNDS = 12;
 
@@ -51,7 +50,7 @@ const buildAuthPayload = async (user: {
 }) => {
   const payload: TokenPayload = { userId: user.id, role: user.role };
   const refreshToken = await issueRefreshToken(payload);
-  return toAuthResponse({
+  return {
     user: {
       id: user.id,
       email: user.email,
@@ -62,7 +61,7 @@ const buildAuthPayload = async (user: {
     },
     accessToken: signAccessToken(payload),
     refreshToken
-  });
+  };
 };
 
 export const authService = {
@@ -167,10 +166,10 @@ export const authService = {
     await authRepository.revokeRefreshToken(tokenHash);
     const nextPayload: TokenPayload = { userId: payload.userId, role: user.role };
     const nextRefreshToken = await issueRefreshToken(nextPayload);
-    return toRefreshResponse({
+    return {
       accessToken: signAccessToken(nextPayload),
       refreshToken: nextRefreshToken
-    });
+    };
   },
 
   // Logout ist idempotent: der vorgelegte Refresh-Token wird serverseitig

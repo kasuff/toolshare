@@ -2,11 +2,12 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
 import { suspensionService } from "./suspension.service";
 import { usersService } from "./users.service";
+import { toAdminMetricsResponse, toUserResponse, toUserResponseList } from "./users.presenter";
 
 export const usersController = {
   adminMetrics: asyncHandler(async (_req: Request, res: Response) => {
     const result = await usersService.getAdminMetrics();
-    res.status(200).json(result);
+    res.status(200).json(toAdminMetricsResponse(result));
   }),
 
   listSuspensionRequests: asyncHandler(async (_req: Request, res: Response) => {
@@ -29,17 +30,17 @@ export const usersController = {
       role: req.query.role as "USER" | "MODERATOR" | "MANAGER" | undefined,
       search: req.query.search as string | undefined
     });
-    res.status(200).json(users);
+    res.status(200).json(toUserResponseList(users));
   }),
 
   getMine: asyncHandler(async (req: Request, res: Response) => {
     const user = await usersService.getMyProfile(req.authUser!.userId);
-    res.status(200).json(user);
+    res.status(200).json(toUserResponse(user));
   }),
 
   getById: asyncHandler(async (req: Request, res: Response) => {
     const user = await usersService.getById(req.params.id);
-    res.status(200).json(user);
+    res.status(200).json(toUserResponse(user));
   }),
 
   updateMine: asyncHandler(async (req: Request, res: Response) => {
@@ -49,7 +50,7 @@ export const usersController = {
       address: req.body.address,
       expoPushToken: req.body.expoPushToken
     });
-    res.status(200).json(user);
+    res.status(200).json(toUserResponse(user));
   }),
 
   updateRole: asyncHandler(async (req: Request, res: Response) => {
@@ -58,7 +59,7 @@ export const usersController = {
       role: req.body.role as "USER" | "MODERATOR" | "MANAGER",
       actorId: req.authUser!.userId
     });
-    res.status(200).json(user);
+    res.status(200).json(toUserResponse(user));
   }),
 
   updateSuspension: asyncHandler(async (req: Request, res: Response) => {
@@ -66,6 +67,6 @@ export const usersController = {
       targetUserId: req.params.id,
       isSuspended: req.body.isSuspended as boolean
     });
-    res.status(200).json(user);
+    res.status(200).json(toUserResponse(user));
   })
 };

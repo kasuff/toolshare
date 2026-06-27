@@ -1,8 +1,4 @@
 import { getGeocodingService } from "../../config/services";
-import {
-  toAddressSuggestionResponseList,
-  toAddressValidationResponse
-} from "./address.presenter";
 
 export type GeoCoordinates = {
   latitude: number;
@@ -11,13 +7,11 @@ export type GeoCoordinates = {
 
 export const addressService = {
   async suggest(query: string) {
-    const suggestions = await getGeocodingService().suggest(query);
-    return toAddressSuggestionResponseList(suggestions);
+    return await getGeocodingService().suggest(query);
   },
 
   async validate(query: string) {
-    const result = await getGeocodingService().validate(query);
-    return toAddressValidationResponse(result);
+    return await getGeocodingService().validate(query);
   },
 
   async geocode(query: string): Promise<GeoCoordinates | null> {

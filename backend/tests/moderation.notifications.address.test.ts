@@ -124,12 +124,13 @@ describe("moderationService", () => {
     const listed = await moderationService.listReports();
 
     expect(created).toMatchObject({ id: "r1" });
-    expect(listed[0]).toMatchObject({
+    expect(listed[0].report).toMatchObject({
       id: "r1",
-      targetLabel: "Bohrer",
-      targetHref: "/tools/tool-1",
-      subjectUserId: "u2"
+      targetType: "TOOL",
+      targetId: "tool-1"
     });
+    expect(listed[0].context.tools).toHaveLength(1);
+    expect(listed[0].context.tools[0]).toMatchObject({ id: "tool-1", name: "Bohrer" });
   });
 
   it("rejects unknown report updates", async () => {

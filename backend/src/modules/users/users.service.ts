@@ -2,12 +2,10 @@ import { AppError } from "../../utils/app-error";
 import { addressService } from "../address/address.service";
 import { notificationsService } from "../notifications/notifications.service";
 import { usersRepository } from "./users.repository";
-import { toAdminMetricsResponse, toUserResponse, toUserResponseList } from "./users.presenter";
 
 export const usersService = {
   async listUsers(filters: { role?: "USER" | "MODERATOR" | "MANAGER"; search?: string }) {
-    const users = await usersRepository.listPublic(filters);
-    return toUserResponseList(users);
+    return await usersRepository.listPublic(filters);
   },
 
   async getMyProfile(userId: string) {
@@ -15,7 +13,7 @@ export const usersService = {
     if (!user) {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
-    return toUserResponse(user);
+    return user;
   },
 
   async getById(userId: string) {
@@ -23,7 +21,7 @@ export const usersService = {
     if (!user) {
       throw new AppError("USER_NOT_FOUND", "User not found", 404);
     }
-    return toUserResponse(user);
+    return user;
   },
 
   async updateMyProfile(input: { userId: string; name?: string; address?: string; expoPushToken?: string }) {
@@ -42,7 +40,7 @@ export const usersService = {
         : {}),
       expoPushToken: input.expoPushToken
     });
-    return toUserResponse(updated);
+    return updated;
   },
 
   async updateRole(input: {
@@ -64,7 +62,7 @@ export const usersService = {
     }
 
     const updated = await usersRepository.updateRole(input.targetUserId, input.role);
-    return toUserResponse(updated);
+    return updated;
   },
 
   async updateSuspension(input: { targetUserId: string; isSuspended: boolean }) {
@@ -90,11 +88,11 @@ export const usersService = {
       );
     }
 
-    return toUserResponse(updated);
+    return updated;
   },
 
   async getAdminMetrics() {
     const metrics = await usersRepository.getSystemMetrics();
-    return toAdminMetricsResponse(metrics);
+    return metrics;
   }
 };

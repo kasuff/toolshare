@@ -1,6 +1,12 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
 import { toolsService } from "./tools.service";
+import {
+  toToolBlockingPeriodResponseList,
+  toToolOwnerBlockResponseList,
+  toToolResponse,
+  toToolResponseList
+} from "./tools.presenter";
 
 export const toolsController = {
   list: asyncHandler(async (req: Request, res: Response) => {
@@ -10,22 +16,22 @@ export const toolsController = {
       ownerId: req.query.ownerId as string | undefined,
       search: req.query.search as string | undefined
     });
-    res.status(200).json(tools);
+    res.status(200).json(toToolResponseList(tools));
   }),
 
   getById: asyncHandler(async (req: Request, res: Response) => {
     const tool = await toolsService.getById(req.params.id);
-    res.status(200).json(tool);
+    res.status(200).json(toToolResponse(tool));
   }),
 
   listBlockingPeriods: asyncHandler(async (req: Request, res: Response) => {
     const periods = await toolsService.listBlockingPeriods(req.params.id);
-    res.status(200).json(periods);
+    res.status(200).json(toToolBlockingPeriodResponseList(periods));
   }),
 
   listOwnerBlocks: asyncHandler(async (req: Request, res: Response) => {
     const blocks = await toolsService.listOwnerBlocks(req.params.id, req.authUser!.userId);
-    res.status(200).json(blocks);
+    res.status(200).json(toToolOwnerBlockResponseList(blocks));
   }),
 
   deleteOwnerBlock: asyncHandler(async (req: Request, res: Response) => {
@@ -47,7 +53,7 @@ export const toolsController = {
       pickupLocation: req.body.pickupLocation,
       pickupLocationNote: req.body.pickupLocationNote
     });
-    res.status(201).json(tool);
+    res.status(201).json(toToolResponse(tool));
   }),
 
   update: asyncHandler(async (req: Request, res: Response) => {
@@ -65,7 +71,7 @@ export const toolsController = {
         status: req.body.status
       }
     });
-    res.status(200).json(tool);
+    res.status(200).json(toToolResponse(tool));
   }),
 
   remove: asyncHandler(async (req: Request, res: Response) => {

@@ -6,6 +6,12 @@ import type { Express } from "express";
 import { authRepository } from "../src/modules/auth/auth.repository";
 import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
 
+vi.mock("../src/modules/address/address.service", () => ({
+  addressService: {
+    geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
+  }
+}));
+
 vi.mock("../src/modules/auth/auth.repository", () => ({
   authRepository: {
     findByEmail: vi.fn(),

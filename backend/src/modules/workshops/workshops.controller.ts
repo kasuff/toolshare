@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
 import { workshopsService } from "./workshops.service";
+import {
+  toWorkshopResponse,
+  toWorkshopResponseList,
+  toWorkshopTimeslotResponse
+} from "./workshops.presenter";
 
 export const workshopsController = {
   list: asyncHandler(async (req: Request, res: Response) => {
@@ -9,12 +14,12 @@ export const workshopsController = {
       location: req.query.location as string | undefined,
       search: req.query.search as string | undefined
     });
-    res.status(200).json(workshops);
+    res.status(200).json(toWorkshopResponseList(workshops));
   }),
 
   getById: asyncHandler(async (req: Request, res: Response) => {
     const workshop = await workshopsService.getById(req.params.id);
-    res.status(200).json(workshop);
+    res.status(200).json(toWorkshopResponse(workshop));
   }),
 
   create: asyncHandler(async (req: Request, res: Response) => {
@@ -28,7 +33,7 @@ export const workshopsController = {
       workshopTools: req.body.workshopTools,
       imageUrls: req.body.imageUrls
     });
-    res.status(201).json(workshop);
+    res.status(201).json(toWorkshopResponse(workshop));
   }),
 
   update: asyncHandler(async (req: Request, res: Response) => {
@@ -46,7 +51,7 @@ export const workshopsController = {
         imageUrls: req.body.imageUrls
       }
     });
-    res.status(200).json(workshop);
+    res.status(200).json(toWorkshopResponse(workshop));
   }),
 
   remove: asyncHandler(async (req: Request, res: Response) => {
@@ -67,7 +72,7 @@ export const workshopsController = {
       endTime: req.body.endTime,
       blockedByOwner: req.body.blockedByOwner
     });
-    res.status(201).json(timeslot);
+    res.status(201).json(toWorkshopTimeslotResponse(timeslot));
   }),
 
   updateTimeslot: asyncHandler(async (req: Request, res: Response) => {
@@ -80,7 +85,7 @@ export const workshopsController = {
       endTime: req.body.endTime,
       blockedByOwner: req.body.blockedByOwner
     });
-    res.status(200).json(timeslot);
+    res.status(200).json(toWorkshopTimeslotResponse(timeslot));
   }),
 
   removeTimeslot: asyncHandler(async (req: Request, res: Response) => {

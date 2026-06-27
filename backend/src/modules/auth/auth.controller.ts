@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
 import { userRegistrationsTotal, userLoginsTotal } from "../../utils/metrics";
 import { authService } from "./auth.service";
+import { toAuthResponse, toRefreshResponse } from "./auth.presenter";
 
 const REFRESH_COOKIE = "rt";
 const ACCESS_COOKIE = "at";
@@ -49,7 +50,7 @@ export const authController = {
     userRegistrationsTotal.inc();
     setRefreshCookie(res, result.refreshToken);
     setAccessCookie(res, result.accessToken);
-    res.status(201).json(result);
+    res.status(201).json(toAuthResponse(result));
   }),
 
   login: asyncHandler(async (req: Request, res: Response) => {
@@ -58,7 +59,7 @@ export const authController = {
       userLoginsTotal.inc({ status: "success" });
       setRefreshCookie(res, result.refreshToken);
       setAccessCookie(res, result.accessToken);
-      res.status(200).json(result);
+      res.status(200).json(toAuthResponse(result));
     } catch (err) {
       userLoginsTotal.inc({ status: "failed" });
       throw err;
@@ -74,7 +75,7 @@ export const authController = {
     const result = await authService.refresh(refreshToken);
     setRefreshCookie(res, result.refreshToken);
     setAccessCookie(res, result.accessToken);
-    res.status(200).json(result);
+    res.status(200).json(toRefreshResponse(result));
   }),
 
   logout: asyncHandler(async (req: Request, res: Response) => {

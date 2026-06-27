@@ -18,6 +18,12 @@ vi.mock("../src/modules/auth/auth.repository", () => ({
   }
 }));
 
+vi.mock("../src/modules/address/address.service", () => ({
+  addressService: {
+    geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
+  }
+}));
+
 const mockedRepo = vi.mocked(authRepository);
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";

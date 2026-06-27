@@ -2,11 +2,17 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/async-handler";
 import { bookingsCreatedTotal } from "../../utils/metrics";
 import { bookingsService } from "./bookings.service";
+import {
+  toBookingPickupProposalResponse,
+  toBookingResponse,
+  toBookingResponseList,
+  toBookingTimeslotProposalResponse
+} from "./bookings.presenter";
 
 export const bookingsController = {
   listMine: asyncHandler(async (req: Request, res: Response) => {
     const bookings = await bookingsService.listForUserContext(req.authUser!.userId);
-    res.status(200).json(bookings);
+    res.status(200).json(toBookingResponseList(bookings));
   }),
 
   createToolBooking: asyncHandler(async (req: Request, res: Response) => {
@@ -18,7 +24,7 @@ export const bookingsController = {
       pickupTime: req.body.pickupTime
     });
     bookingsCreatedTotal.inc();
-    res.status(201).json(booking);
+    res.status(201).json(toBookingResponse(booking));
   }),
 
   createToolOwnerBlock: asyncHandler(async (req: Request, res: Response) => {
@@ -28,7 +34,7 @@ export const bookingsController = {
       startDate: req.body.startDate,
       endDate: req.body.endDate
     });
-    res.status(201).json(booking);
+    res.status(201).json(toBookingResponse(booking));
   }),
 
   createWorkshopBooking: asyncHandler(async (req: Request, res: Response) => {
@@ -40,7 +46,7 @@ export const bookingsController = {
       workshopToolIds: req.body.workshopToolIds
     });
     bookingsCreatedTotal.inc();
-    res.status(201).json(booking);
+    res.status(201).json(toBookingResponse(booking));
   }),
 
   updateStatus: asyncHandler(async (req: Request, res: Response) => {
@@ -50,7 +56,7 @@ export const bookingsController = {
       bookingId: req.params.id,
       status: req.body.status as "PENDING" | "ACCEPTED" | "REJECTED" | "RETURNED"
     });
-    res.status(200).json(updated);
+    res.status(200).json(toBookingResponse(updated));
   }),
 
   createPickupProposal: asyncHandler(async (req: Request, res: Response) => {
@@ -60,7 +66,7 @@ export const bookingsController = {
       pickupTime: req.body.pickupTime as string,
       returnTime: req.body.returnTime as string
     });
-    res.status(201).json(created);
+    res.status(201).json(toBookingPickupProposalResponse(created));
   }),
 
   respondPickupProposal: asyncHandler(async (req: Request, res: Response) => {
@@ -70,7 +76,7 @@ export const bookingsController = {
       proposalId: req.params.proposalId as string,
       decision: req.body.decision as "ACCEPT" | "DECLINE"
     });
-    res.status(200).json(updated);
+    res.status(200).json(updated ? toBookingPickupProposalResponse(updated) : null);
   }),
 
   createTimeslotProposal: asyncHandler(async (req: Request, res: Response) => {
@@ -80,7 +86,7 @@ export const bookingsController = {
       startDate: req.body.startDate as string,
       endDate: req.body.endDate as string
     });
-    res.status(201).json(created);
+    res.status(201).json(toBookingTimeslotProposalResponse(created));
   }),
 
   respondTimeslotProposal: asyncHandler(async (req: Request, res: Response) => {
@@ -90,6 +96,6 @@ export const bookingsController = {
       proposalId: req.params.proposalId as string,
       decision: req.body.decision as "ACCEPT" | "DECLINE"
     });
-    res.status(200).json(updated);
+    res.status(200).json(updated ? toBookingTimeslotProposalResponse(updated) : null);
   })
 };
