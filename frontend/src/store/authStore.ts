@@ -3,31 +3,16 @@ import {
   api,
   onSessionExpired,
   SESSION_EXPIRED_MESSAGE,
-  ACCESS_TOKEN_STORAGE_KEY,
-  REFRESH_TOKEN_STORAGE_KEY,
   configureAuthSession,
   type User,
 } from '@toolshare/shared';
-
-const ACCESS_KEY = ACCESS_TOKEN_STORAGE_KEY;
-const REFRESH_KEY = REFRESH_TOKEN_STORAGE_KEY;
-
-function persistTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem(ACCESS_KEY, accessToken);
-  localStorage.setItem(REFRESH_KEY, refreshToken);
-}
-
-function clearPersistedTokens() {
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
-}
 
 interface AuthState {
   token: string | null;
   currentUser: User | null;
   isLoading: boolean;
   error: string | null;
-  
+
   login: (email: string, password: string) => Promise<void>;
   register: (input: { email: string; password: string; name: string; address: string; }) => Promise<void>;
   logout: () => void;
@@ -36,7 +21,9 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: typeof localStorage !== 'undefined' ? localStorage.getItem(ACCESS_KEY) : null,
+  // Kein persistierter Token mehr — Access-Token lebt nur im Zustand-Store (in-memory).
+  // Beim Seitenaufruf holt initSession den Token über den rt-Cookie neu.
+  token: null,
   currentUser: null,
   isLoading: true,
   error: null,
@@ -44,9 +31,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email, password) => {
     try {
       const result = await api.login(email, password);
-      persistTokens(result.accessToken, result.refreshToken);
+      // Server setzt at-Cookie (httpOnly). accessToken zusätzlich in State für
+      // SSE-Stream und 401-Retry-Logik; kein localStorage-Schreiben mehr.
       set({ token: result.accessToken, error: null });
-      await get().initSession();
+      const me = await api.getCurrentUser(result.accessToken);
+      set({ currentUser: me });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Anmeldung fehlgeschlagen." });
       throw err;
@@ -56,9 +45,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (input) => {
     try {
       const result = await api.register(input);
-      persistTokens(result.accessToken, result.refreshToken);
       set({ token: result.accessToken, error: null });
-      await get().initSession();
+      const me = await api.getCurrentUser(result.accessToken);
+      set({ currentUser: me });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Registrierung fehlgeschlagen." });
       throw err;
@@ -66,13 +55,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
-    // Refresh-Token serverseitig entwerten (best effort – lokales Logout darf nie
-    // an einem fehlgeschlagenen Netzwerkaufruf hängen).
-    const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (refreshToken) {
-      void api.logout(refreshToken).catch(() => undefined);
-    }
-    clearPersistedTokens();
+    // Refresh-Token serverseitig entwerten — Browser sendet rt- und at-Cookie automatisch.
+    // Server löscht beide Cookies. Kein localStorage zu leeren.
+    void api.logout().catch(() => undefined);
     set({ token: null, currentUser: null, error: null });
   },
 
@@ -85,23 +70,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initSession: async () => {
-    const { token } = get();
-    if (!token) {
-      set({ currentUser: null, isLoading: false });
-      return;
-    }
-
     set({ isLoading: true });
     try {
-      const me = await api.getCurrentUser(token);
+      // Kein Token im localStorage → immer zuerst Refresh aufrufen.
+      // Browser sendet rt-Cookie automatisch; Server antwortet mit neuem at-Cookie
+      // und gibt accessToken im Body zurück.
+      const refreshed = await api.refresh();
+      set({ token: refreshed.accessToken });
+      const me = await api.getCurrentUser(refreshed.accessToken);
       set({ currentUser: me, error: null });
-    } catch (err) {
-      clearPersistedTokens();
-      set({ 
-        token: null, 
-        currentUser: null, 
-        error: err instanceof Error ? err.message : "Session konnte nicht geladen werden." 
-      });
+    } catch {
+      // rt-Cookie fehlt oder abgelaufen → nicht eingeloggt. Kein Fehler anzeigen.
+      set({ token: null, currentUser: null });
     } finally {
       set({ isLoading: false });
     }
@@ -109,23 +89,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 configureAuthSession({
-  getAccessToken: () => localStorage.getItem(ACCESS_KEY),
-  getRefreshToken: () => localStorage.getItem(REFRESH_KEY),
-  setTokens: ({ accessToken, refreshToken }) => {
-    persistTokens(accessToken, refreshToken);
+  getAccessToken: () => useAuthStore.getState().token,
+  // Refresh-Token liegt im httpOnly-Cookie — nicht per JS lesbar.
+  getRefreshToken: () => null,
+  setTokens: ({ accessToken }) => {
     useAuthStore.setState({ token: accessToken });
   },
   clearTokens: () => {
-    clearPersistedTokens();
+    useAuthStore.setState({ token: null });
   },
+  useCookieForRefresh: true,
 });
 
-// Handle token expiration events triggered by the api client centrally
 onSessionExpired(() => {
-  clearPersistedTokens();
-  useAuthStore.setState({ 
-    token: null, 
-    currentUser: null, 
+  useAuthStore.setState({
+    token: null,
+    currentUser: null,
     error: SESSION_EXPIRED_MESSAGE,
     isLoading: false
   });

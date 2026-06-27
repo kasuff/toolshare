@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
@@ -36,6 +37,7 @@ export const createApp = () => {
     })
   );
   app.use(morgan("dev"));
+  app.use(cookieParser());
   app.use(express.json({ limit: "10mb" }));
 
   // Prometheus-Metriken: vor den API-Routen, damit alle Requests erfasst werden
