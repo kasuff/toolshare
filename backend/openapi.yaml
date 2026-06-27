@@ -4,7 +4,7 @@ info:
   title: ToolShare API
   description: REST API contract for ToolShare (auth, tools, bookings, workshops,
     users, ratings, moderation, notifications, system-rules & address). Response
-    payloads are derived from the shared Zod response contracts (ADR-013).
+    payloads are derived from the shared Zod response contracts (ADR-012).
 servers:
   - url: http://localhost:4000/api
 components:
