@@ -83,5 +83,53 @@ export const outboxRepository = {
       create: { idempotencyKey },
       update: {}
     });
+  },
+
+  async prune(olderThan: Date) {
+    return prisma.$transaction(async (tx) => {
+      const processedEvents = await tx.outboxEvent.findMany({
+        where: {
+          processedAt: {
+            lt: olderThan
+          }
+        },
+        select: { idempotencyKey: true }
+      });
+
+      const keys = processedEvents.map((e) => e.idempotencyKey);
+
+      if (keys.length > 0) {
+        await tx.notificationDelivery.deleteMany({
+          where: {
+            idempotencyKey: {
+              in: keys
+            }
+          }
+        });
+      }
+
+      const deletedCount = await tx.outboxEvent.deleteMany({
+        where: {
+          processedAt: {
+            lt: olderThan
+          }
+        }
+      });
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const deletedFailed = await tx.outboxEvent.deleteMany({
+        where: {
+          processedAt: null,
+          retryCount: { gte: 5 },
+          createdAt: { lt: thirtyDaysAgo }
+        }
+      });
+
+      return {
+        deletedProcessed: deletedCount.count,
+        deletedFailed: deletedFailed.count
+      };
+    });
   }
 };
