@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@toolshare/shared";
+import { api, configureAuthSession } from "@toolshare/shared";
 
 const fetchMock = vi.fn();
 
@@ -44,6 +44,14 @@ function responseNoContent(status = 204) {
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  // setup.ts imports authStore which calls configureAuthSession({ useCookieForRefresh: true })
+  // as a module-level side effect. Reset to non-cookie mode so Bearer tokens are included.
+  configureAuthSession({
+    getAccessToken: () => null,
+    getRefreshToken: () => null,
+    setTokens: vi.fn(),
+    clearTokens: vi.fn()
+  });
 });
 
 describe("api coverage", () => {

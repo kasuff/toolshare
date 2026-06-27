@@ -9,13 +9,15 @@ const {
   registerApi,
   getCurrentUser,
   suggestAddresses,
-  validateAddress
+  validateAddress,
+  refresh
 } = vi.hoisted(() => ({
   loginApi: vi.fn(),
   registerApi: vi.fn(),
   getCurrentUser: vi.fn(),
   suggestAddresses: vi.fn(),
-  validateAddress: vi.fn()
+  validateAddress: vi.fn(),
+  refresh: vi.fn()
 }));
 
 function syncAuthStore(overrides: {
@@ -42,7 +44,8 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
       register: registerApi,
       getCurrentUser,
       suggestAddresses,
-      validateAddress
+      validateAddress,
+      refresh
     }
   };
 });
@@ -72,7 +75,10 @@ function resetSession() {
   getCurrentUser.mockReset();
   suggestAddresses.mockReset();
   validateAddress.mockReset();
+  refresh.mockReset();
   getCurrentUser.mockResolvedValue(null);
+  // Default: no active session → initSession() fails fast
+  refresh.mockRejectedValue(new Error("no session"));
   syncAuthStore();
 }
 
@@ -104,7 +110,7 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    fireEvent.change(screen.getByPlaceholderText("E-Mail"), { target: { value: "lea@example.com" } });
+    fireEvent.change(await screen.findByPlaceholderText("E-Mail"), { target: { value: "lea@example.com" } });
     fireEvent.change(screen.getByPlaceholderText("Passwort (mind. 8 Zeichen)"), { target: { value: "password123" } });
     fireEvent.click(screen.getByRole("button", { name: "Einloggen" }));
 
@@ -119,7 +125,7 @@ describe("App", () => {
         <App />
       </MemoryRouter>
     );
-    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Neu bei Toolshare/i }));
   }
 
   it("shows live password match feedback during registration", async () => {
@@ -205,14 +211,14 @@ describe("App", () => {
     });
   });
 
-  it("redirects logged out users from protected routes", () => {
+  it("redirects logged out users from protected routes", async () => {
     render(
       <MemoryRouter initialEntries={["/tools/new"]}>
         <App />
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Bitte melde dich an, um diese Funktion zu nutzen.")).toBeInTheDocument();
+    expect(await screen.findByText("Bitte melde dich an, um diese Funktion zu nutzen.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Willkommen zurück" })).toBeInTheDocument();
   });
 
@@ -223,9 +229,10 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Bitte melde dich an, um diese Funktion zu nutzen.")).toBeInTheDocument();
+    expect(await screen.findByText("Bitte melde dich an, um diese Funktion zu nutzen.")).toBeInTheDocument();
     unmount();
 
+    refresh.mockResolvedValue({ accessToken: "token-123", refreshToken: "rt" });
     syncAuthStore({
       token: "token-123",
       currentUser: { id: "u5", name: "Sabine", role: "NUTZER" }
@@ -258,6 +265,7 @@ describe("App", () => {
   });
 
   it("renders the admin route when the session user is an admin", async () => {
+    refresh.mockResolvedValue({ accessToken: "token-123", refreshToken: "rt" });
     syncAuthStore({
       token: "token-123",
       currentUser: { id: "u5", name: "Sabine", role: "ADMIN" }
@@ -274,6 +282,7 @@ describe("App", () => {
   });
 
   it("renders the moderation route when the session user is a moderator", async () => {
+    refresh.mockResolvedValue({ accessToken: "token-123", refreshToken: "rt" });
     syncAuthStore({
       token: "token-123",
       currentUser: { id: "u4", name: "Tobias", role: "MODERATOR" }

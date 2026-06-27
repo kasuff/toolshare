@@ -12,7 +12,8 @@ vi.mock("@toolshare/shared", async () => {
     api: {
       ...actual.api,
       suggestAddresses: vi.fn(),
-      validateAddress: vi.fn()
+      validateAddress: vi.fn(),
+      refresh: vi.fn().mockRejectedValue(new Error("no session"))
     }
   };
 });
@@ -63,7 +64,7 @@ describe("Authentication user journey", () => {
 
     renderApp("/auth");
 
-    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Neu bei Toolshare/i }));
     fireEvent.focus(screen.getByPlaceholderText("Adresse suchen"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen"), {
       target: { value: "Muster" }
@@ -87,7 +88,7 @@ describe("Authentication user journey", () => {
     vi.mocked(api.suggestAddresses).mockResolvedValue([]);
 
     renderApp("/auth");
-    fireEvent.click(screen.getByRole("button", { name: /Neu bei Toolshare/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Neu bei Toolshare/i }));
     fireEvent.focus(screen.getByPlaceholderText("Adresse suchen"));
     fireEvent.change(screen.getByPlaceholderText("Adresse suchen"), {
       target: { value: "zzz" }

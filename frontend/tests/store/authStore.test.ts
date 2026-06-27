@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "../../src/store/authStore";
 import { notifySessionExpired, SESSION_EXPIRED_MESSAGE } from "@toolshare/shared";
 
-const { login, register, getCurrentUser, updateMyProfile } = vi.hoisted(() => ({
+const { login, register, getCurrentUser, updateMyProfile, refresh, logout } = vi.hoisted(() => ({
   login: vi.fn(),
   register: vi.fn(),
   getCurrentUser: vi.fn(),
-  updateMyProfile: vi.fn()
+  updateMyProfile: vi.fn(),
+  refresh: vi.fn(),
+  logout: vi.fn()
 }));
 
 vi.mock("@toolshare/shared", async (importOriginal) => {
@@ -19,7 +21,9 @@ vi.mock("@toolshare/shared", async (importOriginal) => {
       login,
       register,
       getCurrentUser,
-      updateMyProfile
+      updateMyProfile,
+      refresh,
+      logout
     }
   };
 });
@@ -42,11 +46,14 @@ describe("authStore", () => {
     register.mockReset();
     getCurrentUser.mockReset();
     updateMyProfile.mockReset();
+    refresh.mockReset();
+    logout.mockReset();
+    logout.mockResolvedValue(undefined);
     resetAuthStore();
   });
 
   it("loads the current user from a stored token and handles logout", async () => {
-    localStorage.setItem("toolshare_access_token", "stored-token");
+    refresh.mockResolvedValueOnce({ accessToken: "stored-token", refreshToken: "rt" });
     getCurrentUser.mockResolvedValueOnce({
       id: "u1",
       name: "Lea",
@@ -54,7 +61,6 @@ describe("authStore", () => {
       role: "NUTZER",
       isSuspended: false
     });
-    useAuthStore.setState({ token: "stored-token", isLoading: true });
 
     await act(async () => {
       await useAuthStore.getState().initSession();
@@ -67,13 +73,12 @@ describe("authStore", () => {
       useAuthStore.getState().logout();
     });
 
-    expect(localStorage.getItem("toolshare_access_token")).toBeNull();
-    expect(localStorage.getItem("toolshare_refresh_token")).toBeNull();
+    expect(useAuthStore.getState().token).toBeNull();
     expect(useAuthStore.getState().currentUser).toBeNull();
   });
 
   it("clears an expired session immediately", async () => {
-    localStorage.setItem("toolshare_access_token", "expired-token");
+    refresh.mockResolvedValueOnce({ accessToken: "expired-token", refreshToken: "rt" });
     getCurrentUser.mockResolvedValueOnce({
       id: "u1",
       name: "Lea",
@@ -81,7 +86,6 @@ describe("authStore", () => {
       role: "NUTZER",
       isSuspended: false
     });
-    useAuthStore.setState({ token: "expired-token", isLoading: true });
 
     await act(async () => {
       await useAuthStore.getState().initSession();
@@ -93,8 +97,6 @@ describe("authStore", () => {
       notifySessionExpired();
     });
 
-    expect(localStorage.getItem("toolshare_access_token")).toBeNull();
-    expect(localStorage.getItem("toolshare_refresh_token")).toBeNull();
     expect(useAuthStore.getState().token).toBeNull();
     expect(useAuthStore.getState().currentUser).toBeNull();
     expect(useAuthStore.getState().error).toBe(SESSION_EXPIRED_MESSAGE);
@@ -124,8 +126,7 @@ describe("authStore", () => {
     });
 
     expect(login).toHaveBeenCalledWith("lea@toolshare.local", "password123");
-    expect(localStorage.getItem("toolshare_access_token")).toBe("login-token");
-    expect(localStorage.getItem("toolshare_refresh_token")).toBe("login-refresh");
+    expect(useAuthStore.getState().token).toBe("login-token");
 
     await act(async () => {
       await useAuthStore.getState().register({
@@ -142,8 +143,7 @@ describe("authStore", () => {
       name: "Nina",
       address: "Musterstraße 1"
     });
-    expect(localStorage.getItem("toolshare_access_token")).toBe("register-token");
-    expect(localStorage.getItem("toolshare_refresh_token")).toBe("register-refresh");
+    expect(useAuthStore.getState().token).toBe("register-token");
   });
 
   it("updates profile for logged-in users and rejects guest updates", async () => {
