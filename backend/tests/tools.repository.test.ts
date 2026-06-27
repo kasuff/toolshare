@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toolsRepository } from "../src/modules/tools/tools.repository";
+import { toolsRepository } from "../src/modules/tools/repositories/tools.repository";
 
 const mocks = vi.hoisted(() => ({
   toolFindMany: vi.fn(),

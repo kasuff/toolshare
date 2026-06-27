@@ -17,16 +17,18 @@ export const authApi = {
     });
   },
 
-  async refresh(refreshToken: string): Promise<RefreshPayload> {
+  // Web-Clients übergeben keinen Token — der Browser sendet den rt-Cookie automatisch.
+  // Mobile-Clients übergeben den Refresh-Token im Body.
+  async refresh(refreshToken?: string): Promise<RefreshPayload> {
     return requestParsed(refreshResponseSchema, "/auth/refresh", {
       method: "POST",
-      body: JSON.stringify({ refreshToken })
+      body: JSON.stringify(refreshToken ? { refreshToken } : {})
     });
   },
 
-  // Entwertet den Refresh-Token serverseitig, sodass er nach dem Logout nicht
-  // mehr eingelöst werden kann. Idempotent (auch bei ungültigem/fehlendem Token).
-  async logout(refreshToken: string): Promise<void> {
+  // Entwertet den Refresh-Token serverseitig (idempotent). Web-Clients übergeben
+  // keinen Token – der Browser sendet ihn automatisch als httpOnly-Cookie.
+  async logout(refreshToken?: string): Promise<void> {
     return request<void>("/auth/logout", {
       method: "POST",
       body: JSON.stringify({ refreshToken })

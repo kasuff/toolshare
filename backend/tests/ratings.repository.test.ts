@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ratingsRepository } from "../src/modules/ratings/ratings.repository";
+import { ratingsRepository } from "../src/modules/ratings/repositories/ratings.repository";
 
 const mocks = vi.hoisted(() => ({
   bookingFindUnique: vi.fn(),

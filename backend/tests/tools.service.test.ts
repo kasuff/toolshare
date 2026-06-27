@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toolsRepository } from "../src/modules/tools/tools.repository";
-import { toolsService } from "../src/modules/tools/tools.service";
-import type { ToolEntity } from "../src/modules/tools/tools.entity";
+import { toolsRepository } from "../src/modules/tools/repositories/tools.repository";
+import { toolsService } from "../src/modules/tools/services/tools.service";
+import type { ToolEntity } from "../src/modules/tools/entities/tools.entity";
 
 vi.mock("../src/config/services", () => ({
   getImageStorageService: () => ({
@@ -10,7 +10,7 @@ vi.mock("../src/config/services", () => ({
   })
 }));
 
-vi.mock("../src/modules/tools/tools.repository", () => ({
+vi.mock("../src/modules/tools/repositories/tools.repository", () => ({
   toolsRepository: {
     list: vi.fn(),
     findById: vi.fn(),

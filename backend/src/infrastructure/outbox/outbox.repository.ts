@@ -30,7 +30,7 @@ export const outboxRepository = {
   // multi-instanz-sicher — mehrere Backend-Replicas können den Outbox-Worker
   // gleichzeitig laufen lassen und teilen sich die Events disjunkt auf, ohne
   // Doppelverarbeitung. Zusammen mit der Idempotenz (idempotencyKey +
-  // NotificationDelivery) Voraussetzung für horizontale Skalierung (siehe ADR-016).
+  // NotificationDelivery) Voraussetzung für horizontale Skalierung (siehe ADR-013).
   async claimPending(limit: number) {
     return prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
@@ -82,6 +82,54 @@ export const outboxRepository = {
       where: { idempotencyKey },
       create: { idempotencyKey },
       update: {}
+    });
+  },
+
+  async prune(olderThan: Date) {
+    return prisma.$transaction(async (tx) => {
+      const processedEvents = await tx.outboxEvent.findMany({
+        where: {
+          processedAt: {
+            lt: olderThan
+          }
+        },
+        select: { idempotencyKey: true }
+      });
+
+      const keys = processedEvents.map((e) => e.idempotencyKey);
+
+      if (keys.length > 0) {
+        await tx.notificationDelivery.deleteMany({
+          where: {
+            idempotencyKey: {
+              in: keys
+            }
+          }
+        });
+      }
+
+      const deletedCount = await tx.outboxEvent.deleteMany({
+        where: {
+          processedAt: {
+            lt: olderThan
+          }
+        }
+      });
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const deletedFailed = await tx.outboxEvent.deleteMany({
+        where: {
+          processedAt: null,
+          retryCount: { gte: 5 },
+          createdAt: { lt: thirtyDaysAgo }
+        }
+      });
+
+      return {
+        deletedProcessed: deletedCount.count,
+        deletedFailed: deletedFailed.count
+      };
     });
   }
 };

@@ -69,7 +69,7 @@ registry.registerComponent('securitySchemes', 'bearerAuth', {
   bearerFormat: 'JWT',
 });
 
-// Response-Schemas als wiederverwendbare Komponenten registrieren (ADR-013).
+// Response-Schemas als wiederverwendbare Komponenten registrieren (ADR-012).
 const ToolResponse = registry.register("ToolResponse", toolResponseSchema);
 const ToolListResponse = registry.register("ToolListResponse", toolListResponseSchema);
 const ToolBlockingPeriodListResponse = registry.register(
@@ -521,7 +521,7 @@ const document = generator.generateDocument({
     version: "0.1.0",
     title: "ToolShare API",
     description:
-      "REST API contract for ToolShare (auth, tools, bookings, workshops, users, ratings, moderation, notifications, system-rules & address). Response payloads are derived from the shared Zod response contracts (ADR-013)."
+      "REST API contract for ToolShare (auth, tools, bookings, workshops, users, ratings, moderation, notifications, system-rules & address). Response payloads are derived from the shared Zod response contracts (ADR-012)."
   },
   servers: [{ url: "http://localhost:4000/api" }]
 });

@@ -1,10 +1,10 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authService } from "../src/modules/auth/auth.service";
-import { authRepository } from "../src/modules/auth/auth.repository";
+import { authService } from "../src/modules/auth/services/auth.service";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
 
-vi.mock("../src/modules/auth/auth.repository", () => ({
+vi.mock("../src/modules/auth/repositories/auth.repository", () => ({
   authRepository: {
     findByEmail: vi.fn(),
     findById: vi.fn(),
@@ -15,6 +15,12 @@ vi.mock("../src/modules/auth/auth.repository", () => ({
     findRefreshToken: vi.fn(),
     revokeRefreshToken: vi.fn(),
     revokeAllRefreshTokensForUser: vi.fn()
+  }
+}));
+
+vi.mock("../src/modules/address/services/address.service", () => ({
+  addressService: {
+    geocode: vi.fn().mockResolvedValue({ latitude: 48.137154, longitude: 11.576124 })
   }
 }));
 

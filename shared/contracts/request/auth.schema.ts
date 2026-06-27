@@ -22,7 +22,7 @@ export const loginBodySchema = z.object({
 });
 
 export const refreshBodySchema = z.object({
-  refreshToken: z.string().min(1)
+  refreshToken: z.string().min(1).optional()
 });
 
 export const changePasswordBodySchema = z.object({

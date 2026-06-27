@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { bookingsRepository } from "../src/modules/bookings/bookings.repository";
+import { bookingsRepository } from "../src/modules/bookings/repositories/bookings.repository";
 
 const mocks = vi.hoisted(() => ({
   bookingFindMany: vi.fn(),

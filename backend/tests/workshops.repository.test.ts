@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { workshopsRepository } from "../src/modules/workshops/workshops.repository";
+import { workshopsRepository } from "../src/modules/workshops/repositories/workshops.repository";
 
 const mocks = vi.hoisted(() => ({
   workshopFindMany: vi.fn(),

@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { USER_NOTIFICATION_REQUESTED } from "../src/domain/events/notification.events";
-import { notificationsRepository } from "../src/modules/notifications/notifications.repository";
-import { pushService } from "../src/modules/notifications/push.service";
+import { notificationsRepository } from "../src/modules/notifications/repositories/notifications.repository";
+import { pushService } from "../src/modules/notifications/services/push.service";
 import { processOutboxEvent } from "../src/infrastructure/outbox/outbox.processor";
 import { outboxRepository } from "../src/infrastructure/outbox/outbox.repository";
 
-vi.mock("../src/modules/notifications/notifications.repository", () => ({
+vi.mock("../src/modules/notifications/repositories/notifications.repository", () => ({
   notificationsRepository: {
     create: vi.fn()
   }
 }));
 
-vi.mock("../src/modules/notifications/push.service", () => ({
+vi.mock("../src/modules/notifications/services/push.service", () => ({
   pushService: {
     sendPushNotification: vi.fn()
   }

@@ -1,9 +1,9 @@
 import bcrypt from "bcrypt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authService } from "../src/modules/auth/auth.service";
-import { authRepository } from "../src/modules/auth/auth.repository";
+import { authService } from "../src/modules/auth/services/auth.service";
+import { authRepository } from "../src/modules/auth/repositories/auth.repository";
 
-vi.mock("../src/modules/auth/auth.repository", () => ({
+vi.mock("../src/modules/auth/repositories/auth.repository", () => ({
   authRepository: {
     findCredentialsById: vi.fn(),
     updatePassword: vi.fn(),
