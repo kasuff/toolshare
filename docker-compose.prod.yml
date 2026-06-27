@@ -108,7 +108,9 @@ services:
     build:
       context: ./backup
     image: toolshare-pg-walg:local
-    # Eigene postgresql.conf aktiviert wal_level/archive_mode/archive_command.
+    # postgresql.conf (wal_level/archive_mode/archive_command) ist ins Image
+    # gebacken (s. backup/Dockerfile) — KEIN Bind-Mount aus dem Repo-Checkout,
+    # damit der Container nach jedem Neustart eine gültige Config findet.
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       # archive_command (= wal-g wal-push %p) erbt dieses Env → WAL-G/R2-Vars.
@@ -118,7 +120,6 @@ services:
       POSTGRES_DB: toolshare
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backup/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U toolshare"]
       interval: 5s
@@ -226,7 +227,8 @@ services:
     volumes:
       # backup-push liest nur das Datenverzeichnis → read-only genügt.
       - pgdata:/var/lib/postgresql/data:ro
-      - ./backup/crontab:/etc/supercronic/crontab:ro
+      # crontab ist ins Image gebacken (s. backup/Dockerfile) — kein Bind aus
+      # dem flüchtigen Repo-Checkout.
       # Shared mit node-exporter (Monitoring-Stack): Backup-Heartbeat-Metrik.
       # Von scripts/deploy-prod.sh als external Volume angelegt (wie das Netz).
       - toolshare-backup-metrics:/var/lib/node-exporter/textfile

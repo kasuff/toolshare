@@ -46,3 +46,14 @@ RUN set -eux; \
 
 COPY backup.sh /usr/local/bin/backup.sh
 RUN chmod +x /usr/local/bin/backup.sh
+
+# Konfiguration INS IMAGE backen statt per Bind-Mount aus dem Repo-Checkout.
+# Grund: Der CI-Deploy läuft aus dem flüchtigen GitLab-Checkout (/builds/...).
+# Ein relativer Bind (./backup/postgresql.conf) zeigt auf diesen Pfad; wird der
+# Checkout aufgeräumt, legt Docker beim nächsten Container-Neustart ein leeres
+# VERZEICHNIS an → Postgres parst ein Dir als Config → Crash-Loop. Im Image
+# eingebacken sind beide Dateien immer vorhanden und der Deploy reproduzierbar.
+#   - postgresql.conf → db (config_file: wal_level/archive_mode/archive_command)
+#   - crontab         → walg-backup (supercronic-Zeitplan Full/Delta)
+COPY postgresql.conf /etc/postgresql/postgresql.conf
+COPY crontab /etc/supercronic/crontab
