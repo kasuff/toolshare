@@ -177,10 +177,10 @@ describe("api coverage", () => {
             location: "Muenchen",
             maxCapacity: 6,
             extras: ["wlan"],
-            imageUrls: [],
+            imageUrls: ["workshop.png"],
             workshopTools: [{ id: U.wt1, name: "Bohrmaschine", category: "holz" }],
             timeslots: [
-              { id: U.s1, workshopId: U.w1, startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z", blockedByOwner: false }
+              { id: U.s1, workshopId: U.w1, startTime: "2026-05-06T10:00:00.000Z", endTime: "2026-05-06T12:00:00.000Z", blockedByOwner: true }
             ]
           }
         ]);
