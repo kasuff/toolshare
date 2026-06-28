@@ -14,14 +14,17 @@ Zentrales Monitoring-, Logging- und Reporting-System auf Basis von:
 
 ## Schnellstart (lokal)
 
+> **BuildKit erforderlich:** Alle `docker compose`-Befehle benötigen aktiviertes BuildKit (`DOCKER_BUILDKIT=1`).
+> Ab Docker 23 ist es standardmäßig aktiv.
+
 ```bash
 # 1. App-Stack starten (erzeugt das toolshare-network)
-docker compose up -d
+DOCKER_BUILDKIT=1 docker compose up -d
 
 # 2. Monitoring-Stack starten
 cd monitoring
 cp .env.example .env      # Passwörter anpassen!
-docker compose up -d
+DOCKER_BUILDKIT=1 docker compose up -d
 
 # 3. Grafana öffnen
 open http://localhost:3001

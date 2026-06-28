@@ -9,8 +9,11 @@ Der komplette Stack muss laufen (Frontend :3000, Backend :4000, Postgres). Lokal
 am einfachsten:
 
 ```bash
-docker compose up -d
+DOCKER_BUILDKIT=1 docker compose up -d
 ```
+
+> **BuildKit erforderlich:** Ab Docker 23 ist BuildKit standardmäßig aktiv.
+> Bei älteren Versionen `DOCKER_BUILDKIT=1` voranstellen.
 
 Playwright verwendet den laufenden Stack wieder und startet keinen zweiten Server.
 
@@ -154,7 +157,7 @@ Backend-Start** bereits registrierte Nutzer befördert. Einmalige Einrichtung:
 1. Test-Manager-E-Mail zur Allowlist in `docker-compose.yml` hinzufügen
    (bereits geschehen: `e2e-manager@toolshare.test`).
 2. Die E-Mail registrieren (z. B. per API), Passwort setzen.
-3. Backend **einmal** neu starten (`docker compose up -d backend`), damit der
+3. Backend **einmal** neu starten (`DOCKER_BUILDKIT=1 docker compose up -d backend`), damit der
    Bootstrap die E-Mail zu `MANAGER` befördert.
 
 Danach genügt pro Testlauf der API-Login – kein weiterer Neustart nötig. Die

@@ -72,6 +72,10 @@ toolshare/
 - [Docker](https://www.docker.com/) + Docker Compose
 - [Git](https://git-scm.com/)
 
+> **BuildKit erforderlich:** Alle `docker compose`-Befehle müssen mit aktiviertem BuildKit ausgeführt werden.
+> Ab Docker 23 ist BuildKit standardmäßig aktiv. Bei älteren Versionen die Umgebungsvariable voranstellen:
+> `DOCKER_BUILDKIT=1 docker compose …`
+
 ### Starten
 
 ```bash
@@ -80,10 +84,10 @@ git clone https://gitlab.lrz.de/swe2_if/team06/toolshare.git
 cd toolshare
 
 # Alle Services starten (Frontend, Backend, DB) - Development
-docker compose up --build
+DOCKER_BUILDKIT=1 docker compose up --build
 
 # Produktionsnahes Setup lokal testen
-POSTGRES_PASSWORD=toolshare JWT_SECRET=change-me docker compose -f docker-compose.prod.yml up --build
+DOCKER_BUILDKIT=1 POSTGRES_PASSWORD=toolshare JWT_SECRET=change-me docker compose -f docker-compose.prod.yml up --build
 
 # Oder einzeln:
 # Frontend:  http://localhost:3000
