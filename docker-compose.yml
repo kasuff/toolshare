@@ -33,7 +33,7 @@ services:
       - "4000:4000"
     environment:
       DATABASE_URL: postgresql://toolshare:toolshare@db:5432/toolshare
-      JWT_SECRET: dev-secret-change-in-production
+      JWT_SECRET: dev-secret-change-in-production!
       JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production
       PORT: 4000
       CORS_ORIGIN: http://localhost:3000
