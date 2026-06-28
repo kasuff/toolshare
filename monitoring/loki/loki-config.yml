@@ -63,8 +63,20 @@ limits_config:
   max_concurrent_tail_requests: 20
   # Maximale Log-Einträge pro Query
   max_entries_limit_per_query: 10000
-  # Split & Cache für schnellere Queries
-  split_queries_by_interval: 15m
+  # Split & Cache für schnellere Queries.
+  # 15m war zu fein: ein auto-refreshendes Dashboard zerlegte jede 1h-Query in
+  # 4 Sub-Queries × viele Panels × 30s-Refresh → Query-Frontend-Queue lief über
+  # ("too many outstanding requests", HTTP 500). 1h hält die Sub-Query-Zahl klein.
+  split_queries_by_interval: 1h
+  # Begrenzt die Parallelität pro Query (Schutz vor Querier-Überlast).
+  max_query_parallelism: 8
+
+# ── Query-Frontend ───────────────────────────────────────────────────────────
+# Die per-Tenant-Queue des Query-Frontends. Der Default ist klein und lief unter
+# dem Dashboard-Abfragesturm über → 500 "too many outstanding requests".
+frontend:
+  max_outstanding_per_tenant: 2048
+  compress_responses: true
 
 # ── Query-Optimierung ────────────────────────────────────────────────────────
 query_range:

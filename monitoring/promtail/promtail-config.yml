@@ -71,6 +71,17 @@ scrape_configs:
       - labels:
           stream:
 
+      # HTTP-Status-Code extrahieren (für log-basierte 5xx-/Fehlerraten).
+      # Greift bei nginx-Access-Logs (z.B. frontend): "GET /x HTTP/1.1" 502 …
+      # Zeilen ohne dieses Muster bleiben unberührt (kein Label) → keine Cardinality.
+      - regex:
+          expression: '"(?P<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (?P<path>/[^\s"]*) HTTP/[0-9.]+" (?P<status>[0-9]{3})'
+          source: output
+
+      - labels:
+          status:
+          method:
+
       # Log-Level aus Nachricht extrahieren (heuristisch)
       - regex:
           expression: '(?i)(?P<level>error|warn(?:ing)?|info|debug|fatal|panic|trace)'
