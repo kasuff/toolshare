@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AddressInput } from "./components/AddressInput";
 import { EMPTY_ADDRESS, isAddressComplete, toAddressPayload } from "./utils/address";
@@ -9,23 +9,24 @@ import { ToastProvider, useToast } from "./hooks/useToast";
 import { useAuthStore } from "./store/authStore";
 import { useInboxStore } from "./store/inboxStore";
 import { DashboardPage } from "./pages/DashboardPage";
-import { ToolsPage } from "./pages/ToolsPage";
-import { ToolDetailPage } from "./pages/ToolDetailPage";
-import { EditToolPage } from "./pages/EditToolPage";
-import { NewToolPage } from "./pages/NewToolPage";
-import { WorkshopsPage } from "./pages/WorkshopsPage";
-import { NewWorkshopPage } from "./pages/NewWorkshopPage";
-import { EditWorkshopPage } from "./pages/EditWorkshopPage";
-import { WorkshopAvailabilityPage } from "./pages/WorkshopAvailabilityPage";
-import { InboxPage } from "./pages/InboxPage";
-import { AdminPage } from "./pages/AdminPage";
-import { ModerationPage } from "./pages/ModerationPage";
-import { MyOffersPage } from "./pages/MyOffersPage";
-import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { api } from "@toolshare/shared";
 import { SESSION_EXPIRED_MESSAGE, onSessionExpired } from "@toolshare/shared";
-import { ImpressumPage } from "./pages/ImpressumPage";
-import { DatenschutzPage } from "./pages/DatenschutzPage";
+
+const ToolsPage = lazy(() => import("./pages/ToolsPage").then((m) => ({ default: m.ToolsPage })));
+const ToolDetailPage = lazy(() => import("./pages/ToolDetailPage").then((m) => ({ default: m.ToolDetailPage })));
+const EditToolPage = lazy(() => import("./pages/EditToolPage").then((m) => ({ default: m.EditToolPage })));
+const NewToolPage = lazy(() => import("./pages/NewToolPage").then((m) => ({ default: m.NewToolPage })));
+const WorkshopsPage = lazy(() => import("./pages/WorkshopsPage").then((m) => ({ default: m.WorkshopsPage })));
+const NewWorkshopPage = lazy(() => import("./pages/NewWorkshopPage").then((m) => ({ default: m.NewWorkshopPage })));
+const EditWorkshopPage = lazy(() => import("./pages/EditWorkshopPage").then((m) => ({ default: m.EditWorkshopPage })));
+const WorkshopAvailabilityPage = lazy(() => import("./pages/WorkshopAvailabilityPage").then((m) => ({ default: m.WorkshopAvailabilityPage })));
+const InboxPage = lazy(() => import("./pages/InboxPage").then((m) => ({ default: m.InboxPage })));
+const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const ModerationPage = lazy(() => import("./pages/ModerationPage").then((m) => ({ default: m.ModerationPage })));
+const MyOffersPage = lazy(() => import("./pages/MyOffersPage").then((m) => ({ default: m.MyOffersPage })));
+const ProfileSettingsPage = lazy(() => import("./pages/ProfileSettingsPage").then((m) => ({ default: m.ProfileSettingsPage })));
+const ImpressumPage = lazy(() => import("./pages/ImpressumPage").then((m) => ({ default: m.ImpressumPage })));
+const DatenschutzPage = lazy(() => import("./pages/DatenschutzPage").then((m) => ({ default: m.DatenschutzPage })));
 
 function AuthScreen({
   onLogin,
@@ -310,6 +311,7 @@ function AppWithProviders() {
   };
 
   return (
+    <Suspense fallback={null}>
     <Routes>
       <Route
         path="/"
@@ -413,6 +415,7 @@ function AppWithProviders() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }
 
