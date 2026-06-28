@@ -79,6 +79,12 @@ mkdir -p "$PGDATA"
 chown -R postgres:postgres /restore
 chmod 700 "$PGDATA"
 
+# Superuser/DB des wiederhergestellten Clusters (= prod POSTGRES_USER/DB).
+# Ohne -U würde psql die OS-Rolle "postgres" annehmen, die im Backup nicht
+# existiert (prod-Superuser ist "toolshare") → FATAL: role "postgres" does not exist.
+DBUSER="${DBUSER:-toolshare}"
+DBNAME="${DBNAME:-toolshare}"
+
 echo "→ Verfügbare Backups im Bucket:"
 gosu postgres wal-g backup-list
 
@@ -93,12 +99,12 @@ echo "→ Starte Postgres (spielt WALs ein, verlässt Recovery automatisch)..."
 gosu postgres pg_ctl -D "$PGDATA" -o "-c listen_addresses=127.0.0.1" -w -t 180 start
 
 echo "→ Verifiziere: Schema vorhanden?"
-TABLES=$(gosu postgres psql -d toolshare -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='"'"'public'"'"'")
+TABLES=$(gosu postgres psql -U "$DBUSER" -d "$DBNAME" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='"'"'public'"'"'")
 echo "   public-Tabellen: $TABLES"
 [ "$TABLES" -gt 0 ] || { echo "FEHLER: keine Tabellen im wiederhergestellten Schema"; exit 1; }
 
 echo "→ Verifiziere: fachliche Daten (User-Tabelle) abfragbar?"
-USERS=$(gosu postgres psql -d toolshare -tAc "SELECT count(*) FROM \"User\"")
+USERS=$(gosu postgres psql -U "$DBUSER" -d "$DBNAME" -tAc "SELECT count(*) FROM \"User\"")
 echo "   User-Datensätze: $USERS"
 
 gosu postgres pg_ctl -D "$PGDATA" -w -t 60 stop || true
@@ -115,6 +121,8 @@ docker run --rm \
 	-e AWS_SECRET_ACCESS_KEY="${R2_BACKUP_SECRET_ACCESS_KEY}" \
 	-e AWS_S3_FORCE_PATH_STYLE="true" \
 	-e WALG_COMPRESSION_METHOD="brotli" \
+	-e DBUSER="${RESTORE_DB_USER:-toolshare}" \
+	-e DBNAME="${RESTORE_DB_NAME:-toolshare}" \
 	-v "${VOLUME}:/restore" \
 	--entrypoint sh \
 	"$IMAGE" -c "$INNER"
