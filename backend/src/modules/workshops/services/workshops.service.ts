@@ -10,7 +10,16 @@ export const workshopsService = {
       ...filters,
       excludeSuspendedManagers: !filters.managerId
     });
-    return workshops;
+    const ids = workshops.map((w) => w.id);
+    const allBookings = ids.length > 0
+      ? await workshopsRepository.findActiveBookingRangesForWorkshops(ids)
+      : [];
+    return workshops.map((w) => ({
+      ...w,
+      bookings: allBookings.filter(
+        (b) => b.workshopId === w.id || b.timeslot?.workshopId === w.id
+      )
+    }));
   },
 
   async getById(id: string) {

@@ -12,7 +12,7 @@
   "description": "Fehlerlogs, Warnungen, Log-Volumen und Service-übergreifende Log-Analyse",
   "tags": ["logs", "loki", "toolshare"],
   "timezone": "browser",
-  "refresh": "30s",
+  "refresh": "1m",
   "schemaVersion": 39,
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
@@ -51,7 +51,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=\"docker\"} |= \"error\" [1h]))",
+          "expr": "sum(count_over_time({job=\"docker\", service!~\"grafana|prometheus|loki|promtail|dora-exporter|alertmanager|node-exporter\"} |= \"error\" [1h]))",
           "legendFormat": "Fehler",
           "refId": "A"
         }
@@ -81,7 +81,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=\"docker\"} |~ \"(?i)warn\" [1h]))",
+          "expr": "sum(count_over_time({job=\"docker\", service!~\"grafana|prometheus|loki|promtail|dora-exporter|alertmanager|node-exporter\"} |~ \"(?i)warn\" [1h]))",
           "legendFormat": "Warnungen",
           "refId": "A"
         }
@@ -211,7 +211,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "{job=\"docker\"} |= \"error\" | line_format \"[{{.service}}] {{.line}}\"",
+          "expr": "{job=\"docker\", service!~\"grafana|prometheus|loki|promtail|dora-exporter|alertmanager|node-exporter\"} |= \"error\" | line_format \"[{{.service}}] {{.line}}\"",
           "legendFormat": "",
           "refId": "A"
         }
@@ -261,7 +261,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "topk(10, sum by (service) (count_over_time({job=\"docker\"} |= \"error\" [1h])))",
+          "expr": "topk(10, sum by (service) (count_over_time({job=\"docker\", service!~\"grafana|prometheus|loki|promtail|dora-exporter|alertmanager|node-exporter\"} |= \"error\" [1h])))",
           "legendFormat": "",
           "refId": "A",
           "instant": true

@@ -93,12 +93,12 @@ echo "→ Starte Postgres (spielt WALs ein, verlässt Recovery automatisch)..."
 gosu postgres pg_ctl -D "$PGDATA" -o "-c listen_addresses=127.0.0.1" -w -t 180 start
 
 echo "→ Verifiziere: Schema vorhanden?"
-TABLES=$(gosu postgres psql -d toolshare -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='"'"'public'"'"'")
+TABLES=$(gosu postgres psql -U toolshare -d toolshare -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='"'"'public'"'"'")
 echo "   public-Tabellen: $TABLES"
 [ "$TABLES" -gt 0 ] || { echo "FEHLER: keine Tabellen im wiederhergestellten Schema"; exit 1; }
 
 echo "→ Verifiziere: fachliche Daten (User-Tabelle) abfragbar?"
-USERS=$(gosu postgres psql -d toolshare -tAc "SELECT count(*) FROM \"User\"")
+USERS=$(gosu postgres psql -U toolshare -d toolshare -tAc "SELECT count(*) FROM \"User\"")
 echo "   User-Datensätze: $USERS"
 
 gosu postgres pg_ctl -D "$PGDATA" -w -t 60 stop || true

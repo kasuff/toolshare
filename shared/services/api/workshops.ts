@@ -20,30 +20,26 @@ export const workshopsApi = {
     if (filters.q) params.set("search", filters.q);
     if (filters.managerId) params.set("managerId", filters.managerId);
     const workshops = await requestParsed(workshopListResponseSchema, `/workshops?${params.toString()}`, undefined, token);
-    const withSlots = await Promise.all(
-      workshops.map(async (workshop) => {
-        const detail = await requestParsed(workshopResponseSchema, `/workshops/${workshop.id}`, undefined, token);
-        const slots = (detail.timeslots ?? []).map(mapWorkshopSlot);
-        const bookedRanges = mapWorkshopBookedRanges(detail.bookings);
-        const mappedWorkshop = mapWorkshop(detail);
-        const tools = mappedWorkshop.equipmentItems.map((tool) => {
-          const backendTool = detail.workshopTools?.find((entry) => entry.id === tool.id);
-          const status = backendTool?.status ? toolStatusMap[backendTool.status] : ("VERFUEGBAR" as const);
-          return {
-            id: tool.id,
-            ownerId: mappedWorkshop.ownerId,
-            name: tool.name,
-            description: "Werkstatt-Werkzeug",
-            category: tool.category,
-            imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
-            status,
-            selectable: status === "VERFUEGBAR"
-          };
-        });
-        return { workshop: mappedWorkshop, slots, bookedRanges, tools };
-      })
-    );
-    return withSlots;
+    return workshops.map((workshop) => {
+      const slots = (workshop.timeslots ?? []).map(mapWorkshopSlot);
+      const bookedRanges = mapWorkshopBookedRanges(workshop.bookings);
+      const mappedWorkshop = mapWorkshop(workshop);
+      const tools = mappedWorkshop.equipmentItems.map((tool) => {
+        const backendTool = workshop.workshopTools?.find((entry) => entry.id === tool.id);
+        const status = backendTool?.status ? toolStatusMap[backendTool.status] : ("VERFUEGBAR" as const);
+        return {
+          id: tool.id,
+          ownerId: mappedWorkshop.ownerId,
+          name: tool.name,
+          description: "Werkstatt-Werkzeug",
+          category: tool.category,
+          imageUrl: DEFAULT_PLACEHOLDER_IMAGE,
+          status,
+          selectable: status === "VERFUEGBAR"
+        };
+      });
+      return { workshop: mappedWorkshop, slots, bookedRanges, tools };
+    });
   },
 
   async getWorkshopById(workshopId: string, token: string): Promise<{ workshop: Workshop; slots: WorkshopSlot[]; bookedRanges: WorkshopBookedRange[] }> {

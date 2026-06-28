@@ -37,9 +37,33 @@ export const workshopsRepository = {
             name: true,
             category: true
           }
+        },
+        timeslots: {
+          orderBy: { startTime: "asc" }
         }
       },
       orderBy: { name: "asc" }
+    });
+  },
+
+  findActiveBookingRangesForWorkshops(workshopIds: string[]) {
+    return prisma.booking.findMany({
+      where: {
+        status: { in: ["PENDING", "ACCEPTED"] },
+        OR: [
+          { workshopId: { in: workshopIds } },
+          { timeslot: { workshopId: { in: workshopIds } } }
+        ]
+      },
+      select: {
+        id: true,
+        workshopId: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+        timeslot: { select: { workshopId: true } }
+      },
+      orderBy: { startDate: "asc" }
     });
   },
 
