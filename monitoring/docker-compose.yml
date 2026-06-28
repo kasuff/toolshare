@@ -318,7 +318,7 @@ services:
 
   # ─── Node Exporter ──────────────────────────────────────────────────────────
   node-exporter:
-    image: prom/node-exporter:v1.8.1
+    image: prom/node-exporter:v1.11.1
     container_name: toolshare-node-exporter
     restart: unless-stopped
     command:

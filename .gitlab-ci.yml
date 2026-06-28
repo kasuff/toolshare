@@ -1184,7 +1184,7 @@ security:images:trivy:
     # die wir 1:1 deployen (redis, node-exporter). Report wird angehängt;
     # --ignore-unfixed gated nur auf CRITICAL-Lücken mit verfügbarem Fix.
     - |
-      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.8.1"
+      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.11.1"
       echo "" >> trivy-report.txt
       echo "=== Image-Scans (HIGH,CRITICAL) ===" >> trivy-report.txt
       for img in $IMAGES; do
@@ -1192,7 +1192,7 @@ security:images:trivy:
         trivy image --scanners vuln --severity HIGH,CRITICAL --format table "$img" >> trivy-report.txt 2>&1 || true
       done
     - |
-      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.8.1"
+      IMAGES="toolshare-backend:ci-$CI_COMMIT_SHORT_SHA toolshare-frontend:ci-$CI_COMMIT_SHORT_SHA toolshare-pg-walg:ci-$CI_COMMIT_SHORT_SHA toolshare-alertmanager:ci-$CI_COMMIT_SHORT_SHA redis:7-alpine prom/node-exporter:v1.11.1"
       for img in $IMAGES; do
         trivy image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 "$img"
       done
